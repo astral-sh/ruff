@@ -353,13 +353,22 @@ impl Options {
         };
 
         // collect the existing site packages
-        let mut extra_paths: Vec<SystemPathBuf> = environment
-            .extra_paths
-            .as_deref()
-            .unwrap_or_default()
-            .iter()
-            .map(|path| path.absolute(project_root, system))
-            .collect();
+        let mut extra_paths: Vec<SystemPathBuf> = Vec::new();
+        for relative_path in environment.extra_paths.as_deref().unwrap_or_default() {
+            if crate::glob::has_glob_metachar(relative_path.path().as_str()) {
+                let anchor = match relative_path.source() {
+                    ValueSource::File(_) => project_root,
+                    ValueSource::Cli | ValueSource::Editor => system.current_directory(),
+                };
+                extra_paths.extend(crate::glob::expand_glob_to_directories(
+                    relative_path.path().as_str(),
+                    anchor,
+                    system,
+                ));
+            } else {
+                extra_paths.push(relative_path.absolute(project_root, system));
+            }
+        }
 
         // read all the paths off the PYTHONPATH environment variable, check
         // they exist as a directory, and add them to the vec of extra_paths
@@ -2084,5 +2093,93 @@ where
             Some(value) => Cow::Borrowed(value),
             None => Cow::Owned(T::default()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::system::{SystemPath, TestSystem};
+
+    use crate::metadata::options::EnvironmentOptions;
+    use crate::metadata::value::RelativePathBuf;
+
+    /// Verify that a glob in extra-paths expands to matching directories.
+    #[test]
+    fn extra_paths_glob_expands_to_directories() {
+        // Arrange: a project with two packages, each having a `src/` directory
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .create_directory_all(SystemPath::new("/project/packages/a/src"))
+            .unwrap();
+        system
+            .memory_file_system()
+            .create_directory_all(SystemPath::new("/project/packages/b/src"))
+            .unwrap();
+
+        let options = EnvironmentOptions {
+            extra_paths: Some(vec![RelativePathBuf::new(
+                "./packages/*/src",
+                crate::metadata::value::ValueSource::File(std::sync::Arc::new(
+                    ruff_db::system::SystemPathBuf::from("/project"),
+                )),
+            )]),
+            ..EnvironmentOptions::default()
+        };
+
+        let project_root = SystemPath::new("/project");
+        let mut resolved: Vec<_> = options
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .flat_map(|p| {
+                if crate::glob::has_glob_metachar(p.path().as_str()) {
+                    let anchor = project_root;
+                    crate::glob::expand_glob_to_directories(
+                        p.path().as_str(),
+                        anchor,
+                        &system,
+                    )
+                } else {
+                    vec![p.absolute(project_root, &system)]
+                }
+            })
+            .collect();
+        resolved.sort();
+
+        // Assert
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved[0].as_str().ends_with("/packages/a/src"));
+        assert!(resolved[1].as_str().ends_with("/packages/b/src"));
+    }
+
+    /// Literal (non-glob) extra-paths are unchanged.
+    #[test]
+    fn extra_paths_literal_unchanged() {
+        let system = TestSystem::default();
+        let options = EnvironmentOptions {
+            extra_paths: Some(vec![RelativePathBuf::new(
+                "./shared/stubs",
+                crate::metadata::value::ValueSource::File(std::sync::Arc::new(
+                    ruff_db::system::SystemPathBuf::from("/project"),
+                )),
+            )]),
+            ..EnvironmentOptions::default()
+        };
+
+        let project_root = SystemPath::new("/project");
+        let resolved: Vec<_> = options
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|p| p.absolute(project_root, &system))
+            .collect();
+
+        assert_eq!(
+            resolved,
+            vec![ruff_db::system::SystemPathBuf::from("/project/shared/stubs")]
+        );
     }
 }

@@ -361,6 +361,113 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
     Ok(())
 }
 
+/// Glob patterns in `extra-paths` configuration are anchored to the project root, not CWD.
+///
+/// Project layout:
+/// ```
+///  - packages
+///    |- core
+///    |  |- src
+///    |     |- core_lib.py
+///  - child  (command is run from here)
+///  - pyproject.toml
+/// ```
+#[test]
+fn glob_patterns_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            extra-paths = ["packages/*/src"]
+            "#,
+        ),
+        (
+            "packages/core/src/core_lib.py",
+            r#"
+            def core_func() -> str:
+                return "core"
+            "#,
+        ),
+        (
+            "child/test.py",
+            r#"
+            from core_lib import core_func
+
+            x: str = core_func()
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Glob patterns in `--extra-search-path` are expanded to matching directories.
+///
+/// This is useful in monorepos where multiple packages follow a consistent layout.
+/// The glob is resolved relative to the current working directory.
+///
+/// Project layout:
+/// ```
+///  - packages
+///    |- core
+///    |  |- src
+///    |     |- core_lib.py
+///    |- utils
+///       |- src
+///          |- utils_lib.py
+///  - test.py
+/// ```
+#[test]
+fn extra_search_path_glob_expansion() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "packages/core/src/core_lib.py",
+            r#"
+            def core_func() -> str:
+                return "core"
+            "#,
+        ),
+        (
+            "packages/utils/src/utils_lib.py",
+            r#"
+            def util_func() -> int:
+                return 42
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from core_lib import core_func
+            from utils_lib import util_func
+
+            x: str = core_func()
+            y: int = util_func()
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--extra-search-path").arg("packages/*/src"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn user_configuration() -> anyhow::Result<()> {
     let case = CliTest::with_files([
