@@ -8,7 +8,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::typed_dict::{TypedDictSchema, FunctionalTypedDictSpec, functional_typed_dict_field};
-use crate::types::{KnownClass, Type, TypeContext};
+use crate::types::{IntersectionType, KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
@@ -32,6 +32,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_starred = args.iter().any(ast::Expr::is_starred_expr);
         let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
 
+        // The fallback type reflects the fact that if the call were successful,
+        // it would return a class that is a subclass of `Mapping[str, object]`
+        // with an unknown set of fields.
+        let fallback = || {
+            let spec = &[KnownClass::Str.to_instance(db), Type::object()];
+            let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
+            IntersectionType::from_elements(
+                db,
+                [str_object_map.to_meta_type(db), Type::unknown()],
+            )
+        };
+
         let Some(name_arg) = args.first() else {
             for arg in args {
                 self.infer_expression(arg, TypeContext::default());
@@ -49,7 +61,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
             }
 
-            return KnownClass::TypedDictFallback.to_subclass_of(db);
+            return fallback();
         };
 
         let fields_arg = args.get(1);
@@ -71,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
-            return KnownClass::TypedDictFallback.to_subclass_of(db);
+            return fallback();
         }
 
         if args.len() > 2
