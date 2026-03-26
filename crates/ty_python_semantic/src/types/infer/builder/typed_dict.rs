@@ -86,8 +86,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let mut total = true;
-        let deprecated_syntax = fields_arg.is_none();
-        let mut deprecated_field_values = Vec::new();
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
@@ -135,23 +133,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(&kw.value);
                 }
                 field_name => {
-                    if deprecated_syntax {
-                        let field_name = Name::new(field_name);
-                        deprecated_field_values.push((field_name.clone(), &kw.value));
-                    } else {
-                        self.infer_expression(&kw.value, TypeContext::default());
-                        if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
-                            builder.into_diagnostic(format_args!(
-                                "Argument `{field_name}` does not match any known parameter of function `TypedDict`",
-                            ));
-                        }
+                    self.infer_expression(&kw.value, TypeContext::default());
+                    if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
+                        builder.into_diagnostic(format_args!(
+                            "Argument `{field_name}` does not match any known parameter of function `TypedDict`",
+                        ));
                     }
                 }
             }
         }
 
-        if deprecated_syntax
-            && deprecated_field_values.is_empty()
+        if fields_arg.is_none()
             && let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr)
         {
             builder.into_diagnostic(
@@ -199,16 +191,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let spec = if let Some(fields_arg) = fields_arg {
                     if fields_are_known {
-                        self.infer_dangling_typeddict_spec(
-                            Some(fields_arg),
-                            &deprecated_field_values,
-                            total,
-                        )
+                        self.infer_dangling_typeddict_spec(fields_arg, total)
                     } else {
                         TypedDictSpec::unknown(db)
                     }
                 } else {
-                    self.infer_dangling_typeddict_spec(None, &deprecated_field_values, total)
+                    TypedDictSpec::known(db, TypedDictSchema::default())
                 };
 
                 DynamicTypedDictAnchor::ScopeOffset {
@@ -226,44 +214,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_dangling_typeddict_spec(
         &mut self,
-        fields_arg: Option<&ast::Expr>,
-        deprecated_field_values: &[(Name, &ast::Expr)],
+        fields_arg: &ast::Expr,
         total: bool,
     ) -> TypedDictSpec<'db> {
         let db = self.db();
         let mut schema = TypedDictSchema::default();
 
-        if let Some(ast::Expr::Dict(dict_expr)) = fields_arg {
-            for item in &dict_expr.items {
-                let Some(key) = &item.key else {
-                    return TypedDictSpec::unknown(db);
-                };
+        let ast::Expr::Dict(dict_expr) = fields_arg else {
+            return TypedDictSpec::unknown(db);
+        };
 
-                let key_ty = self
-                    .try_expression_type(key)
-                    .unwrap_or_else(|| self.infer_expression(key, TypeContext::default()));
-                let Some(key_literal) = key_ty.as_string_literal() else {
-                    return TypedDictSpec::unknown(db);
-                };
+        for item in &dict_expr.items {
+            let Some(key) = &item.key else {
+                return TypedDictSpec::unknown(db);
+            };
 
-                let annotation =
-                    self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
+            let key_ty = self
+                .try_expression_type(key)
+                .unwrap_or_else(|| self.infer_expression(key, TypeContext::default()));
+            let Some(key_literal) = key_ty.as_string_literal() else {
+                return TypedDictSpec::unknown(db);
+            };
 
-                schema.insert(
-                    Name::new(key_literal.value(db)),
-                    functional_typed_dict_field(annotation.inner_type(), total),
-                );
-            }
-
-            return TypedDictSpec::known(db, schema);
-        }
-
-        for (field_name, annotation_expr) in deprecated_field_values {
             let annotation =
-                self.infer_annotation_expression(annotation_expr, DeferredExpressionState::None);
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
 
             schema.insert(
-                field_name.clone(),
+                Name::new(key_literal.value(db)),
                 functional_typed_dict_field(annotation.inner_type(), total),
             );
         }

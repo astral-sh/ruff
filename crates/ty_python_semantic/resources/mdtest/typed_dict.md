@@ -2211,15 +2211,6 @@ reveal_type(inline["x"])  # revealed: int
 inline_bad = TypedDict("InlineBad", {"x": int})(x="bad")
 ```
 
-Inline functional `TypedDict`s also work with the deprecated keyword syntax:
-
-```py
-from typing_extensions import TypedDict
-
-inline_deprecated = TypedDict("InlineDeprecated", x=int)(x=1)
-reveal_type(inline_deprecated["x"])  # revealed: int
-```
-
 Inline functional `TypedDict`s resolve string forward references to existing names:
 
 ```py
@@ -2315,20 +2306,16 @@ bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
 
 ## Deprecated keyword-argument syntax
 
-The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is supported
-for backwards compatibility:
+The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is rejected.
+This syntax is deprecated since Python 3.11, and raises an exception on Python 3.13+:
 
 ```py
 from typing_extensions import TypedDict
 
-# Deprecated syntax: TypedDict("Name", field1=type1, field2=type2)
+# error: [unknown-argument] "Argument `name` does not match any known parameter of function `TypedDict`"
+# error: [unknown-argument] "Argument `year` does not match any known parameter of function `TypedDict`"
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 Movie2 = TypedDict("Movie2", name=str, year=int)
-
-movie2: Movie2 = {"name": "Blade Runner", "year": 1982}
-reveal_type(movie2)  # revealed: Movie2
-
-# error: [invalid-argument-type]
-bad_movie: Movie2 = {"name": "Blade Runner", "year": "not an int"}
 ```
 
 ## Function syntax with invalid arguments
