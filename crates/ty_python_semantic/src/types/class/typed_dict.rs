@@ -216,11 +216,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let object_class = KnownClass::Object
-            .to_class_literal(db)
-            .as_class_literal()
-            .expect("object should be a class literal")
-            .default_specialization(db);
+        let object_class = ClassType::object(db);
         Mro::from([
             self_base,
             ClassBase::TypedDict,
@@ -231,7 +227,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Get the metaclass of this `TypedDict`.
     ///
     /// `TypedDict`s use `type` as their metaclass.
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Type.to_class_literal(db)
     }
