@@ -2871,14 +2871,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
-                // sub-expressions and in the module-level scope. But doing so makes the number of
-                // such constraints so high that it significantly degrades performance. We thus cut
-                // scope here and add these constraints only at statement level function calls,
-                // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
-                //
-                // We also only add these inside function scopes, since considering module-level
-                // constraints can affect the type of imported symbols, leading to a lot more
-                // work in third-party code.
+                // sub-expressions. But doing so makes the number of such constraints so high that
+                // it significantly degrades performance. We thus cut scope here and add these
+                // constraints only at statement-level function calls, like `sys.exit()`, and not
+                // within sub-expressions like `3 + sys.exit()` etc.
                 let call_info = match value.as_ref() {
                     ast::Expr::Call(ast::ExprCall { func, .. }) => {
                         Some((func.as_ref(), value.as_ref(), false))
@@ -2893,7 +2889,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 };
 
                 if let Some((func, expr, is_await)) = call_info {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
+                    if !self.source_type.is_stub() {
                         let callable = self.add_standalone_expression(func);
                         let call_expr = self.add_standalone_expression(expr);
 
@@ -2905,17 +2901,32 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }),
                             is_positive: true,
                         };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
+                        if self.in_function_scope() {
+                            let constraint = self.record_reachability_constraint(
+                                PredicateOrLiteral::Predicate(predicate),
+                            );
+
+                            // Also gate narrowing by this constraint: if the call returns
+                            // `Never`, any narrowing in the current branch should be
+                            // invalidated (since this path is unreachable). This enables
+                            // narrowing to be preserved after if-statements where one branch
+                            // calls a `NoReturn` function like `sys.exit()`.
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_all_places(constraint);
+                        } else {
+                            // In non-function scopes, we only record a narrowing constraint
+                            // (no a reachability constraints). Recording reachability for
+                            // (not a reachability constraint). Recording reachability for
+                            // too important of a use case.
+                            let predicate_id =
+                                self.add_predicate(PredicateOrLiteral::Predicate(predicate));
+                            let constraint = self
+                                .current_reachability_constraints_mut()
+                                .add_atom(predicate_id);
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_all_places(constraint);
+                        }
                     }
                 }
             }
