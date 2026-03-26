@@ -5,11 +5,21 @@
 # TODO: this comment has an issue
 # TDO-3870
 
+# TODO: this comment has an issue without any code prefix
+# this was already existing, but not tested
+# 3870
+
 # TODO: the link has an issue code of the minimum length
 # T-001
 
 # TODO: the issue code can be arbitrarily long
 # ABCDEFGHIJKLMNOPQRSTUVWXYZ-001
+
+# TODO: the issue code can be followed by text
+# TD003 is the id of the ticket in our internal jira
+
+# TODO: this works even if we have just a number
+# 1234 is the id of the ticket in our internal jira
 
 # TDO003 - errors
 # TODO: this comment has no
