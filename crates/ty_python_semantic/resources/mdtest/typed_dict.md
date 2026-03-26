@@ -2218,6 +2218,13 @@ MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
 # Invalid type expressions are rejected:
 # error: [invalid-syntax-in-forward-annotation] "Syntax error in forward annotation: Unexpected token at the end of an expression"
 BadExtras = TypedDict("BadExtras", {"name": str}, extra_items="not a type expression")
+
+# Forward references in extra_items are supported:
+TD = TypedDict("TD", {}, extra_items="TD | None")
+reveal_type(TD)  # revealed: <class 'TD'>
+
+class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 ## Function syntax with forward references
@@ -2235,6 +2242,18 @@ class Director:
 
 movie: MovieWithDirector = {"title": "The Matrix", "director": Director()}
 reveal_type(movie)  # revealed: MovieWithDirector
+```
+
+## Recursive functional `TypedDict` (unstringified forward reference)
+
+Forward references in functional `TypedDict` calls must be stringified, since the field types are
+evaluated at runtime. An unstringified self-reference is an error:
+
+```py
+from typing import TypedDict
+
+# error: [unresolved-reference] "Name `T` used when not defined"
+T = TypedDict("T", {"x": T | None})
 ```
 
 ## Recursive functional `TypedDict`
