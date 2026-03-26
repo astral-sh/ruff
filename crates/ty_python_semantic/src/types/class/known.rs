@@ -1076,15 +1076,11 @@ impl KnownClass {
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
-    pub(crate) fn to_specialized_subclass_of<'t, 'db, T>(
+    pub(crate) fn to_specialized_subclass_of<'db>(
         self,
         db: &'db dyn Db,
-        specialization: T,
-    ) -> Type<'db>
-    where
-        T: Into<Cow<'t, [Type<'db>]>>,
-        'db: 't,
-    {
+        specialization: &[Type<'db>],
+    ) -> Type<'db> {
         self.to_specialized_class_type(db, specialization)
             .map(|class_type| SubclassOfType::from(db, class_type))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
