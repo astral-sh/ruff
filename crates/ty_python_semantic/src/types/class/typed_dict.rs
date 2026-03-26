@@ -1,10 +1,11 @@
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::NodeIndex;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Db;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
@@ -14,13 +15,13 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    TypedDictSchema, FunctionalTypedDictSpec, deferred_functional_typed_dict_spec, dynamic_typed_dict_schema,
+    FunctionalTypedDictSpec, TypedDictSchema, deferred_functional_typed_dict_spec,
+    dynamic_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Type,
     TypeVarVariance, UnionBuilder, UnionType,
 };
-use crate::Db;
 
 pub(super) fn synthesize_typed_dict_update_member<'db>(
     db: &'db dyn Db,
@@ -179,7 +180,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             cycle_initial = deferred_spec_initial,
             heap_size = ruff_memory_usage::heap_size
         )]
-        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> FunctionalTypedDictSpec<'db> {
+        fn deferred_spec<'db>(
+            db: &'db dyn Db,
+            definition: Definition<'db>,
+        ) -> FunctionalTypedDictSpec<'db> {
             deferred_functional_typed_dict_spec(db, definition)
         }
 
@@ -208,7 +212,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Get the MRO for this `TypedDict`.
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
-    /// [self, TypedDict, object]
+    /// [self, `TypedDict`, object]
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));

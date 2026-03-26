@@ -2839,8 +2839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
-                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict)
-                    {
+                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
                         self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
