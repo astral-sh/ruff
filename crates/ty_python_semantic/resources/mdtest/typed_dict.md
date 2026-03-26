@@ -2241,8 +2241,9 @@ partial_with_name = PartialMovie(name="The Matrix")
 # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
 TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
 
-# TODO: Non-literal bool arguments should also be rejected per the spec:
+# Non-literal bool arguments are also rejected per the spec:
 def f(total: bool) -> None:
+    # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
     TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
 ```
 
@@ -2260,8 +2261,9 @@ OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=Tru
 # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
 ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
 
-# TODO: Non-literal bool arguments should also be rejected per the spec:
+# Non-literal bool arguments are also rejected per the spec:
 def f(closed: bool) -> None:
+    # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
     ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
 ```
 

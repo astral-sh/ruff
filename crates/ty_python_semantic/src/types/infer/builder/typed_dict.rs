@@ -122,40 +122,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             match arg.id.as_str() {
-                "total" => {
+                arg_name @ ("total" | "closed") => {
                     let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                    if kw_type
+                        .as_literal_value()
+                        .is_none_or(|literal| !literal.is_bool())
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid argument to parameter `total` of `TypedDict()`"
+                            "Invalid argument to parameter `{arg_name}` of `TypedDict()`"
                         ));
                         diagnostic.set_primary_message(format_args!(
-                            "Expected `bool`, found `{}`",
+                            "Expected either `True` or `False`, got object of type `{}`",
                             kw_type.display(db)
                         ));
                     }
 
-                    if kw_type.bool(db).is_always_false() {
-                        total = false;
-                    } else if !kw_type.bool(db).is_always_true() {
-                        total = true;
-                    }
-                }
-                "closed" => {
-                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid argument to parameter `closed` of `TypedDict()`"
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Expected `bool`, found `{}`",
-                            kw_type.display(db)
-                        ));
+                    if arg_name == "total" {
+                        if kw_type.bool(db).is_always_false() {
+                            total = false;
+                        } else if !kw_type.bool(db).is_always_true() {
+                            total = true;
+                        }
                     }
                 }
                 "extra_items" => {
