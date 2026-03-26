@@ -2334,6 +2334,10 @@ Bad6 = TypedDict("Bad6", {"name": str}, **kw)
 # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
 Bad7 = TypedDict(*tup, **kw)
 
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+# error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
+Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
+
 kwargs = {"x": int}
 
 # error: [invalid-argument-type] "Expected a dict literal with string-literal keys for parameter `fields` of `TypedDict()`"
