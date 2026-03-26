@@ -5,6 +5,7 @@ Thank you for contributing to Ruff/ty! To help us out with reviewing, please con
 - Does this pull request include a descriptive title? (Please prefix with `[ty]` for ty pull
   requests.)
 - Does this pull request include references to any relevant issues?
+- Does this PR follow our [AI policy](https://github.com/astral-sh/.github/blob/main/AI_POLICY.md)?
 -->
 
 ## Summary
