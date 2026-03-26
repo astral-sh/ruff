@@ -1403,8 +1403,8 @@ fn add_argument_completions<'db>(
             ast::AnyNodeRef::Arguments(_) => {
                 in_arguments = true;
             }
-            ast::AnyNodeRef::ExprCall(call) => {
-                if in_arguments && call.arguments.range().contains_range(cursor.range) {
+            ast::AnyNodeRef::ExprCall(_) => {
+                if in_arguments {
                     add_function_arg_completions(db, model.file(), cursor, completions);
                 }
                 return;
