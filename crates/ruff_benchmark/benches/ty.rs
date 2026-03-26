@@ -566,7 +566,7 @@ fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
 }
 
 fn benchmark_many_enum_members(criterion: &mut Criterion) {
-    const NUM_ENUM_MEMBERS: usize = 512;
+    const NUM_ENUM_MEMBERS: usize = 256;
 
     setup_rayon();
 
