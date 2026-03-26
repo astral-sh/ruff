@@ -119,33 +119,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         target: &ast::ExprAttribute,
         object_ty: Type<'db>,
         attribute: &str,
-        emit_diagnostics: bool,
     ) {
-        if !emit_diagnostics {
-            return;
-        }
-
         let db = self.db();
 
         match object_ty {
             Type::Union(union) => {
                 for elem in union.elements(db) {
-                    self.validate_final_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        emit_diagnostics,
-                    );
+                    self.validate_final_attribute_assignment(target, *elem, attribute);
                 }
             }
             Type::Intersection(intersection) => {
                 for elem in intersection.positive(db) {
-                    self.validate_final_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        emit_diagnostics,
-                    );
+                    self.validate_final_attribute_assignment(target, *elem, attribute);
                 }
             }
             Type::TypeAlias(..)

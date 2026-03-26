@@ -2022,6 +2022,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         false,
                     )
                 }) {
+                    if emit_diagnostics {
+                        self.validate_final_attribute_assignment(target, object_ty, attribute);
+                    }
                     true
                 } else {
                     // TODO: This is not a very helpful error message, as it does not include the underlying reason
@@ -2056,6 +2059,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }) {
                     // Perform loud inference using the narrowed type context.
                     infer_value_ty.infer_loud(self, infer_value_ty.last_tcx());
+                    if emit_diagnostics {
+                        self.validate_final_attribute_assignment(target, object_ty, attribute);
+                    }
                     true
                 } else {
                     // Otherwise, perform loud inference without type context, as we failed to
@@ -4330,12 +4336,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
-                self.validate_final_attribute_assignment(
-                    attr_expr,
-                    object_ty,
-                    attr_expr.attr.id(),
-                    true,
-                );
+                self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }
     }

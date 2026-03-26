@@ -317,6 +317,31 @@ def g(x: TA):
     x.x = 56  # error: [invalid-assignment]
 ```
 
+### Attributes on unions and intersections
+
+When the object type is a union, we still detect `Final` attribute assignments for elements that
+declare the attribute as `Final`:
+
+```py
+from typing import Final
+
+class HasFinal:
+    x: Final[int] = 42
+
+class NotFinal:
+    x: int = 42
+
+def union_both_final(arg: HasFinal | HasFinal):
+    arg.x = 1  # error: [invalid-assignment]
+
+def union_one_final(arg: HasFinal | NotFinal):
+    arg.x = 1  # error: [invalid-assignment]
+
+def union_augmented(arg: HasFinal | NotFinal):
+    # error: [invalid-assignment]
+    arg.x += 1
+```
+
 ## Mutability
 
 Objects qualified with `Final` *can be modified*. `Final` represents a constant reference to an
