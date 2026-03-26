@@ -1,7 +1,7 @@
 use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::SourceText;
 use ruff_db::system::{SystemPath, WritableSystem};
 use ruff_db::{
@@ -9,7 +9,7 @@ use ruff_db::{
     files::File,
     source::source_text,
 };
-use ruff_diagnostics::{Fix, IsolationLevel, SourceMap};
+use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use salsa::Setter as _;
@@ -56,6 +56,8 @@ pub fn fix_all_diagnostics(
     fix_all(db, diagnostics, cancellation_token, FixMode::ApplyFixes)
 }
 
+const MAX_ITERATIONS: usize = 10;
+
 fn fix_all(
     db: &mut dyn Db,
     mut diagnostics: Vec<Diagnostic>,
@@ -98,123 +100,34 @@ fn fix_all(
 
     // Try to suppress all lint-diagnostics in the given file.
     for (&file, file_diagnostics) in &mut by_file {
-        if cancellation_token.is_cancelled() {
-            return Err(Canceled);
+        match fix_file(
+            db,
+            &*system,
+            file,
+            fix_mode,
+            &file_diagnostics,
+            &cancellation_token,
+        ) {
+            Ok(FixedFile {
+                applied_fixes,
+                new_diagnostics,
+            }) => {
+                *file_diagnostics = new_diagnostics;
+                fixed_count += applied_fixes;
+            }
+            Err(FixFileError::Canceled) => return Err(Canceled),
+            Err(FixFileError::WriteFailed(error)) => {
+                let mut diag = Diagnostic::new(
+                    DiagnosticId::Io,
+                    Severity::Error,
+                    format_args!("Failed to write fixes to file: {error}"),
+                );
+
+                diag.annotate(Annotation::primary(Span::from(file)));
+                file_diagnostics.push(diag);
+            }
+            Err(FixFileError::NoChanges) => {}
         }
-
-        let Some(path) = file.path(db).as_system_path() else {
-            tracing::debug!(
-                "Skipping file `{}` with non-system path because vendored and system virtual file paths are read-only",
-                file.path(db)
-            );
-
-            continue;
-        };
-
-        let parsed = parsed_module(db, file);
-        if parsed.load(db).has_syntax_errors() {
-            tracing::warn!("Skipping file `{path}` with syntax errors",);
-            continue;
-        }
-
-        let fixes = fix_mode.fixes(db, file, file_diagnostics);
-
-        if fixes.is_empty() {
-            tracing::debug!("Skipping file `{path}` because it has no fixable diagnostics");
-            continue;
-        }
-
-        tracing::debug!("Applying {} fixes in `{path}`.", fixes.len());
-
-        // Required to work around borrow checker issues.
-        let path = path.to_path_buf();
-        let source = source_text(db, file);
-
-        // TODO: Handle overlapping fixes when adding support for `--fix` by iterating until all fixes
-        // were successfully applied. We don't need to do that for suppressions because suppression fixes
-        // should never overlap (and, if they were, the worst outcome is that some suppressions are missing).
-        let FixedCode {
-            source: new_source,
-            source_map,
-            applied_fixes,
-        } = apply_fixes(&source, fixes).unwrap_or_else(|fixed| fixed);
-
-        let new_source = source.with_text(new_source, &source_map);
-
-        // Verify that the fix didn't introduce any syntax errors by overriding
-        // the source text for `file`.
-        let mut source_guard = WithUpdatedSourceGuard::new(db, file, &source, new_source.clone());
-        let db = source_guard.db();
-        let new_parsed = parsed_module(db, file);
-        let new_parsed = new_parsed.load(db);
-
-        if new_parsed.has_syntax_errors() {
-            let mut diag = Diagnostic::new(
-                DiagnosticId::InternalError,
-                Severity::Fatal,
-                format_args!("Applying fixes introduced a syntax error. Reverting all changes."),
-            );
-
-            let mut file_annotation = Annotation::primary(Span::from(file));
-            file_annotation.hide_snippet(true);
-            diag.annotate(file_annotation);
-
-            let parse_diagnostics: Vec<_> = new_parsed
-                .errors()
-                .iter()
-                .map(|error| {
-                    Diagnostic::invalid_syntax(Span::from(file), &error.error, error.location)
-                })
-                .collect();
-
-            diag.add_bug_sub_diagnostics("%5BFix%20error%5D");
-
-            let file_db: &dyn ruff_db::Db = db;
-
-            diag.info(format_args!(
-                "Introduced syntax errors:\n\n{}",
-                DisplayDiagnostics::new(
-                    &file_db,
-                    &DisplayDiagnosticConfig::new("ty"),
-                    &parse_diagnostics
-                )
-            ));
-
-            file_diagnostics.push(diag);
-
-            continue;
-        }
-
-        // Write the changes back to disk.
-        if let Err(err) = write_changes(db, &*system, file, &path, &new_source) {
-            let mut diag = Diagnostic::new(
-                DiagnosticId::Io,
-                Severity::Error,
-                format_args!("Failed to write fixes to file: {err}"),
-            );
-
-            diag.annotate(Annotation::primary(Span::from(file)));
-            diagnostics.push(diag);
-
-            continue;
-        }
-
-        // If we got here then we've been successful. Re-check to get the diagnostics with the
-        // update source, update the fix count.
-
-        if applied_fixes == file_diagnostics.len() {
-            file_diagnostics.clear();
-        } else {
-            // If there are any other file level diagnostics, call `check_file` to re-compute them
-            // with updated ranges.
-            *file_diagnostics = db.check_file(file);
-        }
-
-        fixed_count += applied_fixes;
-        // Don't restore the source text or we risk a panic when rendering the diagnostics
-        // if reading any of the fixed files fails (for whatever reason).
-        // The override will get removed on the next `File::sync_path` call.
-        source_guard.defuse();
     }
 
     // Stitch the remaining diagnostics back together.
@@ -228,6 +141,207 @@ fn fix_all(
         diagnostics,
         count: fixed_count,
     })
+}
+
+fn fix_file(
+    db: &mut dyn Db,
+    system: &dyn WritableSystem,
+    file: File,
+    mode: FixMode,
+    diagnostics: &[Diagnostic],
+    cancellation_token: &CancellationToken,
+) -> Result<FixedFile, FixFileError> {
+    if cancellation_token.is_cancelled() {
+        return Err(FixFileError::Canceled);
+    }
+
+    let path = file.path(db);
+    let Some(path) = path.as_system_path() else {
+        tracing::debug!("Skipping read-only file `{path}`");
+
+        return Err(FixFileError::NoChanges);
+    };
+
+    let parsed = parsed_module(db, file);
+    if parsed.load(db).has_syntax_errors() {
+        tracing::warn!("Skipping file `{path}` with syntax errors");
+
+        return Err(FixFileError::NoChanges);
+    }
+
+    let mut fixes = mode.fixes(db, file, diagnostics);
+
+    if fixes.is_empty() {
+        tracing::warn!("Skipping file `{path}` without applicable fixes.");
+        return Err(FixFileError::NoChanges);
+    }
+
+    let mut fuel = MAX_ITERATIONS;
+    // The remaining diagnostics after fixing all errors in file.
+    let mut new_diagnostics = vec![];
+    let mut total_fixes = 0;
+
+    // Make the borrow checker happy
+    let path = path.to_path_buf();
+
+    let mut source_text_guard = SourceTextGuard::new(db, file);
+
+    loop {
+        tracing::debug!("Applying {} fixes to `{path}`.", fixes.len());
+
+        let source_text = source_text_guard.current();
+        let FixedCode {
+            source: new_source,
+            source_map,
+            applied_fixes,
+        } = apply_fixes(&source_text, fixes);
+
+        let new_source = source_text.with_text(new_source, &source_map);
+        source_text_guard.replace(new_source.clone());
+
+        let db = &*source_text_guard.db;
+
+        // Verify that the fix didn't introduce any syntax errors by overriding
+        // the source text for `file`.
+        // let mut source_guard = WithUpdatedSourceGuard::new(db, file, &source, new_source.clone());
+        // let db = source_guard.db();
+        let new_parsed = parsed_module(db, file);
+        let new_parsed = new_parsed.load(db);
+
+        // Two cases: First iteration, bail
+        // Later iteration, preserve result from previous iteration.
+        if new_parsed.has_syntax_errors() {
+            new_diagnostics.push(create_fix_introduced_syntax_error_diagnostic(
+                db,
+                file,
+                &new_parsed,
+            ));
+
+            if total_fixes == 0 {
+                return Err(FixFileError::NoChanges);
+            }
+
+            // Restore the file's source to the version from the previous iteration that
+            // didn't contain any syntax errors.
+            source_text_guard.replace(source_text);
+            break;
+        }
+
+        total_fixes += applied_fixes;
+        let prev_iteration_diagnostics = new_diagnostics;
+
+        new_diagnostics = db.check_file(file);
+        fixes = mode.fixes(db, file, &new_diagnostics);
+
+        if fixes.is_empty() {
+            break;
+        }
+
+        if fuel == 0 {
+            new_diagnostics.push(create_too_many_iterations_diagnostics(
+                file,
+                mode,
+                &prev_iteration_diagnostics,
+            ));
+            break;
+        }
+
+        fuel -= 1;
+
+        if cancellation_token.is_cancelled() {
+            return Err(FixFileError::Canceled);
+        }
+    }
+
+    // Write the changes back to disk.
+    write_changes(source_text_guard, &*system, file, &path)?;
+
+    Ok(FixedFile {
+        new_diagnostics,
+        applied_fixes: total_fixes,
+    })
+}
+
+fn create_fix_introduced_syntax_error_diagnostic(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+) -> Diagnostic {
+    let mut diag = Diagnostic::new(
+        DiagnosticId::InternalError,
+        Severity::Fatal,
+        format_args!("Applying fixes introduced a syntax error. Reverting changes."),
+    );
+
+    let mut file_annotation = Annotation::primary(Span::from(file));
+    file_annotation.hide_snippet(true);
+    diag.annotate(file_annotation);
+
+    let parse_diagnostics: Vec<_> = parsed
+        .errors()
+        .iter()
+        .map(|error| Diagnostic::invalid_syntax(Span::from(file), &error.error, error.location))
+        .collect();
+
+    diag.add_bug_sub_diagnostics("%5BFix%20error%5D");
+
+    let file_db: &dyn ruff_db::Db = db;
+
+    diag.info(format_args!(
+        "Introduced syntax errors:\n\n{}",
+        DisplayDiagnostics::new(
+            &file_db,
+            &DisplayDiagnosticConfig::new("ty"),
+            &parse_diagnostics
+        )
+    ));
+
+    diag
+}
+
+fn create_too_many_iterations_diagnostics(
+    file: File,
+    fix_mode: FixMode,
+    diagnostics: &[Diagnostic],
+) -> Diagnostic {
+    let fixable_ids = diagnostics
+        .iter()
+        .filter(|diagnostic| fix_mode.is_fixable(diagnostic))
+        .map(|diagnostic| diagnostic.id().as_str())
+        .collect::<Vec<_>>();
+
+    let codes = fixable_ids.join(", ");
+
+    let mut diag = Diagnostic::new(
+        DiagnosticId::InternalError,
+        Severity::Fatal,
+        format_args!("Fixes failed to converge after {MAX_ITERATIONS} iterations."),
+    );
+
+    let mut file_annotation = Annotation::primary(Span::from(file));
+    file_annotation.hide_snippet(true);
+    diag.annotate(file_annotation);
+
+    diag.add_bug_sub_diagnostics("%5BInfinite%20loop%5D");
+    diag.info(format_args!("Fixable diagnostics: {codes}"));
+    diag
+}
+
+#[derive(Debug, Error)]
+enum FixFileError {
+    #[error("operation was cancelled")]
+    Canceled,
+
+    #[error("no fixes were applied")]
+    NoChanges,
+
+    #[error(transparent)]
+    WriteFailed(#[from] WriteChangesError),
+}
+
+struct FixedFile {
+    new_diagnostics: Vec<Diagnostic>,
+    applied_fixes: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -315,25 +429,29 @@ struct ApplicableFix {
     ///
     /// This is always 1 for `--fix`, but there are instances where `--add-ignore` groups
     /// multiple suppressions into a single fix. We need to track the count here to know
-    /// how many diagnostics were fixed in the precense of overlapping fixes (which `--add-ignore` should
+    /// how many diagnostics were fixed in the presence of overlapping fixes (which `--add-ignore` should
     /// never generate but better be safe than sorry).
     fixed_diagnostics: usize,
 }
 
 fn write_changes(
-    db: &dyn Db,
+    guard: SourceTextGuard,
     system: &dyn WritableSystem,
     file: File,
     path: &SystemPath,
-    new_source: &SourceText,
 ) -> Result<(), WriteChangesError> {
     let metadata = system.path_metadata(path)?;
 
+    let db = &*guard.db;
     if metadata.revision() != file.revision(db) {
         return Err(WriteChangesError::FileWasModified);
     }
 
+    let new_source = source_text(db, file);
+
     system.write_file_bytes(path, &new_source.to_bytes())?;
+
+    guard.commit();
 
     Ok(())
 }
@@ -350,23 +468,27 @@ enum WriteChangesError {
 /// Apply a series of fixes to `File` and returns the updated source code along with the source map.
 ///
 /// Returns an error if not all fixes were applied because some fixes are overlapping.
-fn apply_fixes(source: &str, mut fixes: Vec<ApplicableFix>) -> Result<FixedCode, FixedCode> {
+fn apply_fixes(source: &str, mut fixes: Vec<ApplicableFix>) -> FixedCode {
     let mut output = String::with_capacity(source.len());
     let mut last_pos: Option<TextSize> = None;
-    let mut has_overlapping_fixes = false;
     let mut isolated: FxHashSet<u32> = FxHashSet::default();
+    let mut applied_edits: FxHashSet<&Edit> = FxHashSet::default();
 
     let mut source_map = SourceMap::default();
 
     fixes.sort_unstable_by_key(|fix| fix.fix.min_start());
-    let mut applied = 0usize;
+    let mut applied_fixes = 0usize;
 
-    for fix in fixes {
+    for fix in &fixes {
         let ApplicableFix {
             fix,
             fixed_diagnostics,
         } = fix;
-        let mut edits = fix.edits().iter().peekable();
+        let mut edits = fix
+            .edits()
+            .iter()
+            .filter(|edit| !applied_edits.contains(edit))
+            .peekable();
 
         // If the fix contains at least one new edit, enforce isolation and positional requirements.
         if let Some(first) = edits.peek() {
@@ -374,14 +496,12 @@ fn apply_fixes(source: &str, mut fixes: Vec<ApplicableFix>) -> Result<FixedCode,
             // same isolation group, skip it.
             if let IsolationLevel::Group(id) = fix.isolation() {
                 if !isolated.insert(id) {
-                    has_overlapping_fixes = true;
                     continue;
                 }
             }
 
             // If this fix overlaps with a fix we've already applied, skip it.
             if last_pos.is_some_and(|last_pos| last_pos >= first.start()) {
-                has_overlapping_fixes = true;
                 continue;
             }
         }
@@ -404,23 +524,18 @@ fn apply_fixes(source: &str, mut fixes: Vec<ApplicableFix>) -> Result<FixedCode,
             last_pos = Some(edit.end());
         }
 
-        applied += fixed_diagnostics;
+        applied_edits.extend(fix.edits());
+        applied_fixes += fixed_diagnostics;
     }
 
     // Add the remaining content.
     let slice = &source[last_pos.unwrap_or_default().to_usize()..];
     output.push_str(slice);
 
-    let fixed = FixedCode {
+    FixedCode {
         source: output,
         source_map,
-        applied_fixes: applied,
-    };
-
-    if has_overlapping_fixes {
-        Err(fixed)
-    } else {
-        Ok(fixed)
+        applied_fixes,
     }
 }
 
@@ -432,53 +547,49 @@ struct FixedCode {
     /// The fixed source code
     source: String,
 
+    /// The number of fixes that were applied.
     applied_fixes: usize,
 }
 
 /// Guard that sets [`File::set_source_text_override`] and guarantees to restore the original source
 /// text unless the guard is explicitly defused.
-struct WithUpdatedSourceGuard<'db> {
-    db: &'db mut dyn Db,
+struct SourceTextGuard<'db> {
     file: File,
-    old_source: Option<SourceText>,
+    original: SourceText,
+    db: &'db mut dyn Db,
 }
 
-impl<'db> WithUpdatedSourceGuard<'db> {
-    fn new(
-        db: &'db mut dyn Db,
-        file: File,
-        old_source: &SourceText,
-        new_source: SourceText,
-    ) -> Self {
-        file.set_source_text_override(db).to(Some(new_source));
-        Self {
-            db,
-            file,
-            old_source: Some(old_source.clone()),
-        }
+impl<'db> SourceTextGuard<'db> {
+    fn new(db: &'db mut dyn Db, file: File) -> Self {
+        let original = source_text(db, file);
+        Self { file, original, db }
     }
 
-    fn defuse(&mut self) {
-        self.old_source = None;
+    fn current(&self) -> SourceText {
+        source_text(self.db, self.file)
     }
 
-    fn db(&mut self) -> &mut dyn Db {
-        self.db
+    fn replace(&mut self, new_source: SourceText) {
+        self.file
+            .set_source_text_override(self.db)
+            .to(Some(new_source));
+    }
+
+    fn commit(self) {
+        std::mem::forget(self);
     }
 }
 
-impl Drop for WithUpdatedSourceGuard<'_> {
+impl Drop for SourceTextGuard<'_> {
     fn drop(&mut self) {
-        if let Some(old_source) = self.old_source.take() {
-            // We don't set `source_text_override` to `None` here because setting the value
-            // invalidates the `source_text` query and there's the chance that reading the file's content
-            // will fail this time (e.g. because the file was deleted), resulting in ty panicking
-            // when trying to render any diagnostic for that file (because all offsets now point nowhere).
-            // The override will be cleared by `File::sync_path`, the next time the revision changes.
-            self.file
-                .set_source_text_override(self.db)
-                .to(Some(old_source));
-        }
+        // We don't set `source_text_override` to `None` here because setting the value
+        // invalidates the `source_text` query and there's the chance that reading the file's content
+        // will fail this time (e.g. because the file was deleted), resulting in ty panicking
+        // when trying to render any diagnostic for that file (because all offsets now point nowhere).
+        // The override will be cleared by `File::sync_path`, the next time the revision changes.
+        self.file
+            .set_source_text_override(self.db)
+            .to(Some(self.original.clone()));
     }
 }
 
