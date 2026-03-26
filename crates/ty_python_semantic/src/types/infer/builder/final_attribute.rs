@@ -120,65 +120,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
-        let db = self.db();
+        let Some((meta_attr, fallback_attr)) =
+            self.assignment_attribute_members(object_ty, attribute)
+        else {
+            return;
+        };
 
-        match object_ty {
-            Type::Union(union) => {
-                for elem in union.elements(db) {
-                    self.validate_final_attribute_assignment(target, *elem, attribute);
-                }
-            }
-            Type::Intersection(intersection) => {
-                for elem in intersection.positive(db) {
-                    self.validate_final_attribute_assignment(target, *elem, attribute);
-                }
-            }
-            Type::TypeAlias(..)
-            | Type::NominalInstance(..)
-            | Type::ProtocolInstance(_)
-            | Type::LiteralValue(..)
-            | Type::SpecialForm(..)
-            | Type::KnownInstance(..)
-            | Type::PropertyInstance(..)
-            | Type::FunctionLiteral(..)
-            | Type::Callable(..)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeVar(..)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::ClassLiteral(..)
-            | Type::GenericAlias(..)
-            | Type::SubclassOf(..) => {
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    return;
-                };
-
-                if !self.invalid_assignment_to_final_attribute(
-                    object_ty,
-                    target,
-                    attribute,
-                    meta_attr.qualifiers,
-                ) && let Some(fallback_attr) = fallback_attr
-                {
-                    self.invalid_assignment_to_final_attribute(
-                        object_ty,
-                        target,
-                        attribute,
-                        fallback_attr.qualifiers,
-                    );
-                }
-            }
-            Type::Dynamic(..) | Type::Never | Type::ModuleLiteral(_) | Type::BoundSuper(_) => {}
+        if !self.invalid_assignment_to_final_attribute(
+            object_ty,
+            target,
+            attribute,
+            meta_attr.qualifiers,
+        ) && let Some(fallback_attr) = fallback_attr
+        {
+            self.invalid_assignment_to_final_attribute(
+                object_ty,
+                target,
+                attribute,
+                fallback_attr.qualifiers,
+            );
         }
     }
 }

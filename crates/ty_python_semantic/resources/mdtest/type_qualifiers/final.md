@@ -342,6 +342,35 @@ def union_augmented(arg: HasFinal | NotFinal):
     arg.x += 1
 ```
 
+Intersections also detect `Final` attribute assignments:
+
+```py
+from typing import Final
+from ty_extensions import Intersection
+
+class HasFinal:
+    x: Final[int] = 42
+
+class NotFinal:
+    x: int = 42
+
+class Other:
+    pass
+
+def intersection_with_final(arg: Intersection[HasFinal, Other]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_both_final(arg: Intersection[HasFinal, HasFinal]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_one_final(arg: Intersection[HasFinal, NotFinal]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_augmented(arg: Intersection[HasFinal, NotFinal]):
+    # error: [invalid-assignment]
+    arg.x += 1
+```
+
 ## Mutability
 
 Objects qualified with `Final` *can be modified*. `Final` represents a constant reference to an
