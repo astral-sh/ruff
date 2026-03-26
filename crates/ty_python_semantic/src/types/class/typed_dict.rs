@@ -93,7 +93,6 @@ pub enum DynamicTypedDictAnchor<'db> {
 }
 
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DynamicTypedDictLiteral<'db> {
     /// The name of the TypedDict (from the first argument).
     #[returns(ref)]
