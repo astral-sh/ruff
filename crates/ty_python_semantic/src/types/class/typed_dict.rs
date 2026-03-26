@@ -233,18 +233,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     /// Look up an instance member defined directly on this `TypedDict` (not inherited).
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
         if !self.has_known_fields(db) {
             // When fields are unknown, return Any for any field lookup.
             return Member::definitely_declared(Type::any());
-        }
-
-        // Look up the field by name using the computed schema.
-        let schema = dynamic_typed_dict_schema(db, self);
-        if let Some(field) = schema.get(name) {
-            // For TypedDict, field access via attribute is not the primary way
-            // to interact with them (dict indexing is), but we still allow it.
-            return Member::definitely_declared(field.declared_ty);
         }
 
         Member::default()
