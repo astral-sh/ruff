@@ -2269,10 +2269,10 @@ def f(closed: bool) -> None:
 
 ## Function syntax with `extra_items`
 
-The `extra_items` keyword is accepted and validated as a type expression:
+The `extra_items` keyword is accepted and validated as an annotation expression:
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import ReadOnly, TypedDict
 
 # extra_items is accepted (no error)
 MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
@@ -2288,6 +2288,11 @@ reveal_type(TD)  # revealed: <class 'TD'>
 class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
+
+# Type qualifiers like ReadOnly are valid in extra_items (annotation expression, not type expression):
+TD2 = TypedDict("TD2", {}, extra_items=ReadOnly[int])
+
+class Bar(TypedDict("TD3", {}, extra_items=ReadOnly[int])): ...
 ```
 
 ## Function syntax with forward references
