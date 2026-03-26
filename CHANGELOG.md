@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.15.8
+
+Released on 2026-03-26.
+
+### Preview features
+
+- \[`ruff`\] New rule `unnecessary-if` (`RUF050`) ([#24114](https://github.com/astral-sh/ruff/pull/24114))
+- \[`ruff`\] New rule `useless-finally` (`RUF072`) ([#24165](https://github.com/astral-sh/ruff/pull/24165))
+- \[`ruff`\] New rule `f-string-percent-format` (`RUF073`): warn when using `%` operator on an f-string ([#24162](https://github.com/astral-sh/ruff/pull/24162))
+- \[`pyflakes`\] Recognize `frozendict` as a builtin for Python 3.15+ ([#24100](https://github.com/astral-sh/ruff/pull/24100))
+
+### Bug fixes
+
+- \[`flake8-async`\] `ASYNC115`: autofix to use full qualified `anyio.lowlevel` import ([#24166](https://github.com/astral-sh/ruff/pull/24166))
+- \[`flake8-bandit`\] Check tuple arguments for partial paths in `S607` ([#24080](https://github.com/astral-sh/ruff/pull/24080))
+- \[`pyflakes`\] Skip `undefined-name` (`F821`) for conditionally deleted variables ([#24088](https://github.com/astral-sh/ruff/pull/24088))
+- `E501`/`W505`/formatter: Exclude nested pragma comments from line width calculation ([#24071](https://github.com/astral-sh/ruff/pull/24071))
+- Fix `%foo?` parsing in IPython assignment expressions ([#24152](https://github.com/astral-sh/ruff/pull/24152))
+- `analyze graph`: resolve string imports that reference attributes, not just modules ([#24058](https://github.com/astral-sh/ruff/pull/24058))
+
+### Rule changes
+
+- \[`eradicate`\] ignore `ty: ignore` comments in `ERA001` ([#24192](https://github.com/astral-sh/ruff/pull/24192))
+- \[`flake8-bandit`\] Treat sys.executable as trusted input in S603 ([#24106](https://github.com/astral-sh/ruff/pull/24106))
+- \[`flake8-self`\] Recognize `Self` annotation and `self` assignment in `SLF001` ([#24144](https://github.com/astral-sh/ruff/pull/24144))
+- \[`pyflakes`\] `F507`: Fix false negative for non-tuple RHS in `%`-formatting ([#24142](https://github.com/astral-sh/ruff/pull/24142))
+- \[`refurb`\] Parenthesize generator arguments in FURB142 fixer (#21098) ([#24200](https://github.com/astral-sh/ruff/pull/24200))
+
+### Performance
+
+- Speed up diagnostic rendering ([#24146](https://github.com/astral-sh/ruff/pull/24146))
+
+### Server
+
+- Warn when Markdown files are skipped due to preview being disabled ([#24150](https://github.com/astral-sh/ruff/pull/24150))
+
+### Documentation
+
+- Clarify `extend-ignore` and `extend-select` settings documentation ([#24064](https://github.com/astral-sh/ruff/pull/24064))
+- Mention AI policy in PR template ([#24198](https://github.com/astral-sh/ruff/pull/24198))
+
+### Other changes
+
+- Bump the npm version before publish ([#24178](https://github.com/astral-sh/ruff/pull/24178))
+- Use the `release` environment in `publish-docs` ([#24214](https://github.com/astral-sh/ruff/pull/24214))
+- Use trusted publishing for NPM packages ([#24171](https://github.com/astral-sh/ruff/pull/24171))
+
+### Contributors
+
+- [@bitloi](https://github.com/bitloi)
+- [@Sim-hu](https://github.com/Sim-hu)
+- [@mvanhorn](https://github.com/mvanhorn)
+- [@chinar-amrutkar](https://github.com/chinar-amrutkar)
+- [@markjm](https://github.com/markjm)
+- [@RenzoMXD](https://github.com/RenzoMXD)
+- [@vivekkhimani](https://github.com/vivekkhimani)
+- [@seroperson](https://github.com/seroperson)
+- [@moktamd](https://github.com/moktamd)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@zanieb](https://github.com/zanieb)
+- [@dylwil3](https://github.com/dylwil3)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.15.7
 
 Released on 2026-03-19.
