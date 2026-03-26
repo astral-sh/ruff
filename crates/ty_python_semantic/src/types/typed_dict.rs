@@ -544,6 +544,10 @@ pub(super) fn dynamic_typed_dict_schema<'db>(
     class.items(db)
 }
 
+#[salsa::tracked(
+    cycle_initial = deferred_functional_typed_dict_spec_initial,
+    heap_size = ruff_memory_usage::heap_size
+)]
 pub(super) fn deferred_functional_typed_dict_spec<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -616,6 +620,14 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
     }
 
     FunctionalTypedDictSpec::known(db, schema)
+}
+
+fn deferred_functional_typed_dict_spec_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    _definition: Definition<'db>,
+) -> FunctionalTypedDictSpec<'db> {
+    FunctionalTypedDictSpec::unknown(db)
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
