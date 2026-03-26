@@ -2427,6 +2427,112 @@ Bad10 = TypedDict("Bad10", {name: 42})
 class Bad11(TypedDict("Bad11", {name: 42})): ...
 ```
 
+## Equivalence between functional and class-based `TypedDict`
+
+Functional and class-based `TypedDict`s with the same fields are structurally equivalent:
+
+```py
+from typing import TypedDict
+from typing_extensions import assert_type
+from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+
+class ClassBased(TypedDict):
+    name: str
+    age: int
+
+Functional = TypedDict("Functional", {"name": str, "age": int})
+
+static_assert(is_equivalent_to(ClassBased, Functional))
+static_assert(is_assignable_to(ClassBased, Functional))
+static_assert(is_assignable_to(Functional, ClassBased))
+
+cb: ClassBased = {"name": "Alice", "age": 30}
+assert_type(cb, Functional)
+
+fn: Functional = {"name": "Bob", "age": 25}
+assert_type(fn, ClassBased)
+```
+
+## Subtyping between functional and class-based `TypedDict`
+
+A functional `TypedDict` is not a subtype of a class-based one when the field types differ:
+
+```py
+from typing import TypedDict
+from ty_extensions import is_assignable_to, static_assert
+
+class StrFields(TypedDict):
+    x: str
+
+IntFields = TypedDict("IntFields", {"x": int})
+
+static_assert(not is_assignable_to(IntFields, StrFields))
+static_assert(not is_assignable_to(StrFields, IntFields))
+```
+
+## Methods on functional `TypedDict`
+
+Functional `TypedDict`s support the same synthesized methods as class-based ones:
+
+```py
+from typing import TypedDict
+
+Person = TypedDict("Person", {"name": str, "age": int})
+
+def _(p: Person) -> None:
+    # __getitem__
+    reveal_type(p["name"])  # revealed: str
+    reveal_type(p["age"])  # revealed: int
+
+    # get()
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+
+    # setdefault()
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+
+    # __contains__
+    reveal_type("name" in p)  # revealed: bool
+
+    # __setitem__
+    p["name"] = "Alice"
+    # error: [invalid-assignment]
+    p["name"] = 42
+
+    # __delitem__ on required fields is an error
+    # error: [invalid-argument-type]
+    del p["name"]
+```
+
+Functional `TypedDict`s with `total=False` have optional fields that support `pop` and `del`:
+
+```py
+from typing import TypedDict
+
+Partial = TypedDict("Partial", {"name": str, "extra": int}, total=False)
+
+def _(p: Partial) -> None:
+    reveal_type(p.get("name"))  # revealed: str | None
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.pop("name"))  # revealed: str
+    reveal_type(p.pop("name", "fallback"))  # revealed: str
+    del p["extra"]
+```
+
+## Merge operators on functional `TypedDict`
+
+```py
+from typing import TypedDict
+
+Foo = TypedDict("Foo", {"x": int, "y": str})
+
+def _(a: Foo, b: Foo) -> None:
+    reveal_type(a | b)  # revealed: Foo
+    reveal_type(a | {"x": 1})  # revealed: Foo
+    reveal_type(a | {"x": 1, "y": "a", "z": True})  # revealed: dict[str, object]
+```
+
 ## Error cases
 
 ### `typing.TypedDict` is not allowed in type expressions
