@@ -7,7 +7,6 @@ use crate::place::place_from_declarations;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceExpr, ScopedPlaceId};
 use crate::semantic_index::semantic_index;
-use crate::types::TypeVarBoundOrConstraints;
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
@@ -48,19 +47,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let class_ty = object_ty
             .nominal_class(db)
-            .or_else(|| {
-                let Type::TypeVar(typevar) = object_ty else {
-                    return None;
-                };
-
-                let TypeVarBoundOrConstraints::UpperBound(bound) =
-                    typevar.typevar(db).bound_or_constraints(db)?
-                else {
-                    return None;
-                };
-
-                bound.nominal_class(db)
-            })
             .or_else(|| object_ty.to_class_type(db))?;
 
         for base in class_ty.iter_mro(db) {
