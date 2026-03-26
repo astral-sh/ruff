@@ -285,7 +285,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_annotation_expression(&kw.value, self.deferred_state);
                     }
                     _ => {
-                        self.infer_annotation_expression(&kw.value, self.deferred_state);
+                        self.infer_expression(&kw.value, TypeContext::default());
                     }
                 }
             }
@@ -326,17 +326,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let key_ty = self.infer_expression(key, TypeContext::default());
                 if key_ty.as_string_literal().is_none() {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, key)
-                    {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, key) {
                         let mut diagnostic = builder.into_diagnostic(
                             "Expected a string-literal key \
                                 in the `fields` dict of `TypedDict()`",
                         );
-                        diagnostic.set_primary_message(format_args!(
-                            "Found `{}`",
-                            key_ty.display(db)
-                        ));
+                        diagnostic
+                            .set_primary_message(format_args!("Found `{}`", key_ty.display(db)));
                     }
                     return false;
                 }
