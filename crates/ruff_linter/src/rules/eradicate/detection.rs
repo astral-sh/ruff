@@ -25,6 +25,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         |   ruff\s*:\s*(disable|enable)
         |   mypy:
         |   type:\s*ignore
+        |   ty:\s*ignore
         |   SPDX-License-Identifier:
         |   fmt:\s*(on|off|skip)
         |   region|endregion
@@ -322,6 +323,15 @@ mod tests {
         assert!(!comment_contains_code("# type:ignore", &[]));
         assert!(!comment_contains_code("# type: ignore[import]", &[]));
         assert!(!comment_contains_code("# type:ignore[import]", &[]));
+        assert!(!comment_contains_code("# ty: ignore", &[]));
+        assert!(!comment_contains_code("# ty:ignore", &[]));
+        assert!(!comment_contains_code("# ty: ignore[import]", &[]));
+        assert!(!comment_contains_code("# ty:ignore[import]", &[]));
+        assert!(!comment_contains_code(
+            "# ty: ignore[missing-argument, invalid-argument-type]",
+            &[]
+        ));
+        assert!(!comment_contains_code("# ty: ignore[]", &[]));
         assert!(!comment_contains_code(
             "# TODO: Do that",
             &["TODO".to_string()]
