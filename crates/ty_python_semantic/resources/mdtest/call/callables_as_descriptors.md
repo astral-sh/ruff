@@ -289,6 +289,34 @@ reveal_type(MyClass().method)  # revealed: (...) -> int
 reveal_type(MyClass().method.__name__)  # revealed: str
 ```
 
+## Generic helper returns through lossy `Callable` decorators
+
+Lossy `Callable[..., R]` decorators should preserve owner-borrowed typevars while still reducing
+away method-owned ones.
+
+```py
+from typing import Callable
+
+def callable_identity[R](func: Callable[..., R]) -> Callable[..., R]:
+    return func
+
+class Box[T]:
+    def __init__(self, x: T):
+        self.x = x
+
+    @callable_identity
+    def clone(self) -> Box[T]:
+        return self
+
+class C:
+    @callable_identity
+    def generic_method[T](self, value: T) -> T:
+        return value
+
+reveal_type(Box(1).clone())  # revealed: Box[int]
+reveal_type(C().generic_method(1))  # revealed: Unknown
+```
+
 ## classmethods passed through Callable-returning decorators
 
 The behavior described above is also applied to classmethods. If a method is decorated with
