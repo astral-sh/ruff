@@ -68,7 +68,7 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
-    /// Apply fixes to resolve errors..
+    /// Apply fixes to resolve errors.
     #[arg(long)]
     pub(crate) fix: bool,
 

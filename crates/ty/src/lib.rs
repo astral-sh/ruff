@@ -401,9 +401,14 @@ impl MainLoop {
                                     terminal_settings.output_format.is_human_readable();
 
                                 if is_human_readable {
+                                    let (action, noun) = match mode {
+                                        FixMode::AddIgnore => ("Added", "ignore comment"),
+                                        FixMode::ApplyFixes => ("Applied", "fix"),
+                                    };
+
                                     writeln!(
                                         self.printer.stream_for_failure_summary(),
-                                        "Added {} ignore comment{}",
+                                        "{action} {} {noun}{}",
                                         result.count,
                                         if result.count > 1 { "s" } else { "" }
                                     )?;

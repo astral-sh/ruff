@@ -1,3 +1,6 @@
+use std::fs;
+
+use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
@@ -108,6 +111,93 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     ----- stderr -----
     WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
     ");
+
+    Ok(())
+}
+
+#[test]
+fn fix() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "unused_ignore.py",
+        r#"
+            x = 1  # ty: ignore[unresolved-reference]
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Applied 1 fix
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(
+        fs::read_to_string(case.root().join("unused_ignore.py"))?,
+        @r"
+    x = 1
+    "
+    );
+
+    assert_cmd_snapshot!(
+        case.command().arg("--warn").arg("unused-ignore-comment"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_unfixable() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("has_syntax_error.py", "x = (\n"),
+        (
+            "unused_ignore.py",
+            r#"
+            x = 1  # ty: ignore[unresolved-reference]
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]: unexpected EOF while parsing
+     --> has_syntax_error.py:2:1
+      |
+    1 | x = (
+      |      ^
+      |
+
+    Found 1 diagnostic
+    Applied 1 fix
+
+    ----- stderr -----
+    WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
+    "
+    );
+
+    assert_snapshot!(
+        fs::read_to_string(case.root().join("unused_ignore.py"))?,
+        @r"
+    x = 1
+    "
+    );
 
     Ok(())
 }
