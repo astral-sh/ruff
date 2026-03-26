@@ -79,16 +79,6 @@ pub struct Lexer<'src> {
     /// Cell offsets for Jupyter notebook sources. This tracks the byte offsets where each
     /// cell begins in the concatenated source. Empty slice for non-notebook sources.
     cell_offsets: &'src [TextSize],
-
-    /// Index into `cell_offsets` indicating the current cell the lexer is in.
-    current_cell: usize,
-
-    /// When true, the next call to `next_token()` should emit a Dedent token to flush
-    /// the indent stack at a cell boundary.
-    pending_cell_dedent: bool,
-
-    /// The byte offset of the cell boundary that triggered the pending dedent.
-    pending_cell_dedent_offset: TextSize,
 }
 
 impl<'src> Lexer<'src> {
@@ -124,9 +114,6 @@ impl<'src> Lexer<'src> {
             interpolated_strings: InterpolatedStrings::default(),
             errors: Vec::new(),
             cell_offsets: &[],
-            current_cell: 0,
-            pending_cell_dedent: false,
-            pending_cell_dedent_offset: TextSize::new(0),
         };
 
         if start_offset == TextSize::new(0) {
@@ -145,6 +132,7 @@ impl<'src> Lexer<'src> {
     /// it will emit `Dedent` tokens to flush the stack.
     pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
         self.cell_offsets = cell_offsets;
+        self.cursor.set_cell_offsets(cell_offsets);
     }
 
     /// Returns the kind of the current token.
@@ -181,45 +169,6 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        // Handle pending cell boundary cleanup before lexing the next token.
-        // This shares logic with `consume_end()` at EOF to ensure consistent
-        // handling of nesting, interpolated strings, and indentation.
-        if self.pending_cell_dedent {
-            // Finish any unterminated interpolated-strings at the cell boundary.
-            while let Some(interpolated_string) = self.interpolated_strings.pop() {
-                self.nesting = interpolated_string.nesting();
-                self.push_error(LexicalError::new(
-                    LexicalErrorType::from_interpolated_string_error(
-                        InterpolatedStringErrorType::UnterminatedString,
-                        interpolated_string.kind(),
-                    ),
-                    self.token_range(),
-                ));
-            }
-
-            // Report errors for unclosed nesting at the cell boundary.
-            let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
-            if self.nesting > init_nesting {
-                self.nesting = 0;
-                self.push_error(LexicalError::new(
-                    LexicalErrorType::Eof,
-                    self.token_range(),
-                ));
-            }
-
-            // Flush to logical line start (newline + dedents).
-            let token = self.flush_to_logical_line_start(TokenKind::Dedent);
-            if token == TokenKind::Dedent {
-                self.current_kind = TokenKind::Dedent;
-                self.current_range =
-                    TextRange::empty(self.pending_cell_dedent_offset);
-                return TokenKind::Dedent;
-            }
-            // All dedents emitted, clear the flag and continue lexing normally.
-            self.pending_cell_dedent = false;
-            self.state = State::AfterNewline;
-        }
-
         self.cursor.start_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
@@ -228,10 +177,6 @@ impl<'src> Lexer<'src> {
         if !matches!(self.current_kind, TokenKind::Unknown) {
             self.current_range = self.token_range();
         }
-
-        // After lexing a token, check if we've crossed into a new notebook cell.
-        // If so, and the indent stack is not empty, schedule dedent emission.
-        self.check_cell_boundary();
 
         self.current_kind
     }
@@ -1478,6 +1423,8 @@ impl<'src> Lexer<'src> {
     }
 
     fn consume_end(&mut self) -> TokenKind {
+        let is_cell_boundary = self.cursor.is_at_cell_boundary();
+
         // First, finish any unterminated interpolated-strings.
         while let Some(interpolated_string) = self.interpolated_strings.pop() {
             self.nesting = interpolated_string.nesting();
@@ -1498,11 +1445,33 @@ impl<'src> Lexer<'src> {
         if self.nesting > init_nesting {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
+            if is_cell_boundary {
+                // At a cell boundary, report the nesting error and advance past the boundary.
+                // Remaining dedents will be flushed on subsequent next_token() calls.
+                self.cursor.next_cell();
+                return self.push_error(LexicalError::new(
+                    LexicalErrorType::Eof,
+                    self.token_range(),
+                ));
+            }
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
         // Then flush to a logical line boundary (newline + dedents).
-        self.flush_to_logical_line_start(TokenKind::EndOfFile)
+        let end_token = if is_cell_boundary {
+            TokenKind::Dedent
+        } else {
+            TokenKind::EndOfFile
+        };
+
+        let token = self.flush_to_logical_line_start(end_token);
+
+        // When all dedents are flushed at a cell boundary, advance past it.
+        if is_cell_boundary && token == end_token {
+            self.cursor.next_cell();
+        }
+
+        token
     }
 
     /// Flush the lexer state to a logical line boundary by emitting a trailing newline
@@ -1526,44 +1495,6 @@ impl<'src> Lexer<'src> {
             TokenKind::Dedent
         } else {
             end_token
-        }
-    }
-
-    /// Check if the lexer has crossed a notebook cell boundary. If so, and if the indent
-    /// stack is not empty, schedule dedent emission on the next call to `next_token()`.
-    ///
-    /// This forces the lexer to close all open indent levels at cell boundaries,
-    /// similar to what happens at EOF. The parser will then report "expected indented block"
-    /// for compound statements whose bodies span cells.
-    fn check_cell_boundary(&mut self) {
-        if self.cell_offsets.is_empty() {
-            return;
-        }
-
-        let current_offset = self.offset();
-
-        // Find which cell we're in by searching for the last cell offset <= current position.
-        // cell_offsets contains the start offsets of each cell, so we need to find the
-        // highest index i where cell_offsets[i] <= current_offset.
-        let new_cell = self
-            .cell_offsets
-            .partition_point(|&offset| offset <= current_offset)
-            .saturating_sub(1);
-
-        // Clamp to valid range (should already be, but safety check)
-        let new_cell = new_cell.min(self.cell_offsets.len().saturating_sub(1));
-
-        if new_cell > self.current_cell {
-            self.current_cell = new_cell;
-
-            // Only emit dedents if the indent stack is not at root level
-            if self.indentations.current() != &Indentation::root() {
-                self.pending_cell_dedent = true;
-                // Use the start of the new cell as the dedent token's position
-                if let Some(&cell_start) = self.cell_offsets.get(new_cell) {
-                    self.pending_cell_dedent_offset = cell_start;
-                }
-            }
         }
     }
 
@@ -1812,9 +1743,7 @@ impl<'src> Lexer<'src> {
             pending_indentation: self.pending_indentation,
             interpolated_strings_checkpoint: self.interpolated_strings.checkpoint(),
             errors_position: self.errors.len(),
-            current_cell: self.current_cell,
-            pending_cell_dedent: self.pending_cell_dedent,
-            pending_cell_dedent_offset: self.pending_cell_dedent_offset,
+            current_cell: self.cursor.current_cell(),
         }
     }
 
@@ -1833,13 +1762,14 @@ impl<'src> Lexer<'src> {
             interpolated_strings_checkpoint,
             errors_position,
             current_cell,
-            pending_cell_dedent,
-            pending_cell_dedent_offset,
         } = checkpoint;
 
         let mut cursor = Cursor::new(self.source);
         // We preserve the previous char using this method.
         cursor.skip_bytes(cursor_offset.to_usize());
+        // Restore cell-awareness on the reconstructed cursor.
+        cursor.set_cell_offsets(self.cell_offsets);
+        cursor.set_current_cell(current_cell);
 
         self.current_value = value;
         self.current_kind = current_kind;
@@ -1853,9 +1783,6 @@ impl<'src> Lexer<'src> {
         self.interpolated_strings
             .rewind(interpolated_strings_checkpoint);
         self.errors.truncate(errors_position);
-        self.current_cell = current_cell;
-        self.pending_cell_dedent = pending_cell_dedent;
-        self.pending_cell_dedent_offset = pending_cell_dedent_offset;
     }
 
     pub fn finish(self) -> Vec<LexicalError> {
@@ -1876,8 +1803,6 @@ pub(crate) struct LexerCheckpoint {
     interpolated_strings_checkpoint: InterpolatedStringsCheckpoint,
     errors_position: usize,
     current_cell: usize,
-    pending_cell_dedent: bool,
-    pending_cell_dedent_offset: TextSize,
 }
 
 #[derive(Copy, Clone, Debug)]

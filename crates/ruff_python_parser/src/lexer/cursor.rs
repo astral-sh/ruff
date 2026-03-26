@@ -16,18 +16,79 @@ pub(super) struct Cursor<'src> {
     /// token which is being lexed.
     source_length: TextSize,
 
+    /// Total length of the original source. Used to compute absolute cursor position
+    /// for cell boundary checks.
+    total_source_length: TextSize,
+
     /// Stores the previous character for debug assertions.
     #[cfg(debug_assertions)]
     prev_char: char,
+
+    /// Cell offsets for Jupyter notebook sources. Tracks the byte offsets where each cell
+    /// begins in the concatenated source. Empty slice for non-notebook sources.
+    cell_offsets: &'src [TextSize],
+
+    /// Index into `cell_offsets` indicating the current cell the cursor is in.
+    current_cell: usize,
 }
 
 impl<'src> Cursor<'src> {
     pub(crate) fn new(source: &'src str) -> Self {
         Self {
             source_length: source.text_len(),
+            total_source_length: source.text_len(),
             chars: source.chars(),
             #[cfg(debug_assertions)]
             prev_char: EOF_CHAR,
+            cell_offsets: &[],
+            current_cell: 0,
+        }
+    }
+
+    /// Set cell offsets for notebook cell boundary awareness.
+    pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.cell_offsets = cell_offsets;
+    }
+
+    /// Returns the current cell index.
+    pub(crate) fn current_cell(&self) -> usize {
+        self.current_cell
+    }
+
+    /// Set the current cell index (used during checkpoint/rewind).
+    pub(crate) fn set_current_cell(&mut self, cell: usize) {
+        self.current_cell = cell;
+    }
+
+    /// Returns `true` if the cursor is positioned at a notebook cell boundary.
+    ///
+    /// A cell boundary occurs when the cursor position equals the start offset
+    /// of the next cell (i.e., `cell_offsets[current_cell + 1]`).
+    pub(crate) fn is_at_cell_boundary(&self) -> bool {
+        if self.cell_offsets.is_empty() {
+            return false;
+        }
+
+        // current_cell tracks which cell we're in. The next cell starts at
+        // cell_offsets[current_cell + 1]. If cursor position equals that offset,
+        // we're at a boundary.
+        let Some(&next_cell_start) = self.cell_offsets.get(self.current_cell + 1) else {
+            return false;
+        };
+
+        // Compute current offset: total source length minus remaining chars
+        let current_offset = self.total_source_length - self.text_len();
+        current_offset == next_cell_start
+    }
+
+    /// Advance past the current cell boundary. Returns `true` if there are more cells,
+    /// `false` if this was the last cell.
+    pub(crate) fn next_cell(&mut self) -> bool {
+        if self.current_cell + 1 < self.cell_offsets.len() {
+            self.current_cell += 1;
+            true
+        } else {
+            false
         }
     }
 
@@ -38,8 +99,11 @@ impl<'src> Cursor<'src> {
     }
 
     /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the position is past the end of the file.
+    /// Returns [`EOF_CHAR`] if the position is past the end of the file or at a cell boundary.
     pub(super) fn first(&self) -> char {
+        if self.is_at_cell_boundary() {
+            return EOF_CHAR;
+        }
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
 
@@ -83,14 +147,18 @@ impl<'src> Cursor<'src> {
         self.source_length = self.text_len();
     }
 
-    /// Returns `true` if the cursor is at the end of file.
+    /// Returns `true` if the cursor is at the end of file or at a cell boundary.
     pub(super) fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
+        self.chars.as_str().is_empty() || self.is_at_cell_boundary()
     }
 
     /// Moves the cursor to the next character, returning the previous character.
-    /// Returns [`None`] if there is no next character.
+    /// Returns [`None`] if there is no next character or at a cell boundary.
     pub(super) fn bump(&mut self) -> Option<char> {
+        if self.is_at_cell_boundary() {
+            return None;
+        }
+
         let prev = self.chars.next()?;
 
         #[cfg(debug_assertions)]
