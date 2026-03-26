@@ -184,4 +184,27 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn preview_error_suffix_on_exception_name() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join("N818_preview.py").as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::ErrorSuffixOnExceptionName)
+            },
+        )?;
+        assert_diagnostics!("preview_N818_N818_preview.py", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn stable_error_suffix_on_exception_name() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join("N818_preview.py").as_path(),
+            &settings::LinterSettings::for_rule(Rule::ErrorSuffixOnExceptionName),
+        )?;
+        assert_diagnostics!("stable_N818_N818_preview.py", diagnostics);
+        Ok(())
+    }
 }

@@ -14,6 +14,13 @@ pub(crate) const fn is_custom_exception_checking_enabled(settings: &LinterSettin
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/20936
+pub(crate) const fn is_recursive_exception_base_checking_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/15541
 pub(crate) const fn is_suspicious_function_reference_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()

@@ -1,10 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_semantic::analyze::class::any_base_class;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_recursive_exception_base_checking_enabled;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -52,7 +54,7 @@ impl Violation for ErrorSuffixOnExceptionName {
 pub(crate) fn error_suffix_on_exception_name(
     checker: &Checker,
     class_def: &Stmt,
-    arguments: Option<&Arguments>,
+    _arguments: Option<&Arguments>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {
@@ -60,15 +62,25 @@ pub(crate) fn error_suffix_on_exception_name(
         return;
     }
 
-    if !arguments.is_some_and(|arguments| {
-        arguments.args.iter().any(|base| {
-            if let Expr::Name(ast::ExprName { id, .. }) = &base {
-                id == "Exception" || id.ends_with("Error")
-            } else {
-                false
-            }
-        })
-    }) {
+    let Some(class_def) = class_def.as_class_def_stmt() else {
+        return;
+    };
+
+    let mut is_exception_base = |base: &Expr| {
+        if let Expr::Name(ast::ExprName { id, .. }) = base {
+            id == "Exception" || id.ends_with("Error")
+        } else {
+            false
+        }
+    };
+
+    let has_exception_base = if is_recursive_exception_base_checking_enabled(checker.settings()) {
+        any_base_class(class_def, checker.semantic(), &mut is_exception_base)
+    } else {
+        class_def.bases().iter().any(is_exception_base)
+    };
+
+    if !has_exception_base {
         return;
     }
 
