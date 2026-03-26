@@ -1245,6 +1245,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty =
             self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
 
+        if !value_ty.qualifiers().is_empty()
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_FORM, type_alias.value.as_ref())
+        {
+            builder.into_diagnostic("Type qualifiers are not allowed in type alias definitions");
+        }
+
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
         // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
