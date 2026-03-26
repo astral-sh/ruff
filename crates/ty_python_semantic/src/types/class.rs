@@ -9,7 +9,6 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 pub(crate) use self::static_literal::StaticClassLiteral;
-use self::typed_dict::synthesize_typed_dict_update_member;
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
