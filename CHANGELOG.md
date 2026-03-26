@@ -13,7 +13,7 @@ Released on 2026-03-26.
 
 ### Bug fixes
 
-- \[`flake8-async`\] `ASYNC115`: autofix to use full qualified `anyio.lowlevel` import ([#24166](https://github.com/astral-sh/ruff/pull/24166))
+- \[`flake8-async`\] Use fully-qualified `anyio.lowlevel` import in autofix (`ASYNC115`) ([#24166](https://github.com/astral-sh/ruff/pull/24166))
 - \[`flake8-bandit`\] Check tuple arguments for partial paths in `S607` ([#24080](https://github.com/astral-sh/ruff/pull/24080))
 - \[`pyflakes`\] Skip `undefined-name` (`F821`) for conditionally deleted variables ([#24088](https://github.com/astral-sh/ruff/pull/24088))
 - `E501`/`W505`/formatter: Exclude nested pragma comments from line width calculation ([#24071](https://github.com/astral-sh/ruff/pull/24071))
@@ -23,10 +23,10 @@ Released on 2026-03-26.
 ### Rule changes
 
 - \[`eradicate`\] ignore `ty: ignore` comments in `ERA001` ([#24192](https://github.com/astral-sh/ruff/pull/24192))
-- \[`flake8-bandit`\] Treat sys.executable as trusted input in S603 ([#24106](https://github.com/astral-sh/ruff/pull/24106))
+- \[`flake8-bandit`\] Treat `sys.executable` as trusted input in `S603` ([#24106](https://github.com/astral-sh/ruff/pull/24106))
 - \[`flake8-self`\] Recognize `Self` annotation and `self` assignment in `SLF001` ([#24144](https://github.com/astral-sh/ruff/pull/24144))
 - \[`pyflakes`\] `F507`: Fix false negative for non-tuple RHS in `%`-formatting ([#24142](https://github.com/astral-sh/ruff/pull/24142))
-- \[`refurb`\] Parenthesize generator arguments in FURB142 fixer (#21098) ([#24200](https://github.com/astral-sh/ruff/pull/24200))
+- \[`refurb`\] Parenthesize generator arguments in `FURB142` fixer ([#24200](https://github.com/astral-sh/ruff/pull/24200))
 
 ### Performance
 
@@ -43,8 +43,6 @@ Released on 2026-03-26.
 
 ### Other changes
 
-- Bump the npm version before publish ([#24178](https://github.com/astral-sh/ruff/pull/24178))
-- Use the `release` environment in `publish-docs` ([#24214](https://github.com/astral-sh/ruff/pull/24214))
 - Use trusted publishing for NPM packages ([#24171](https://github.com/astral-sh/ruff/pull/24171))
 
 ### Contributors
