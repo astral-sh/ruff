@@ -352,17 +352,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return true;
         }
 
-        if let Some(fields_type) = fields_type
-            && !fields_type.is_assignable_to(db, KnownClass::Dict.to_instance(db))
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Invalid argument to parameter `fields` of `TypedDict()`"
-            ));
-            diagnostic.set_primary_message(format_args!(
-                "Expected a dict literal, found `{}`",
-                fields_type.display(db)
-            ));
+        if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
+            if let Some(fields_type) = fields_type {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Expected a dict literal for parameter `fields` of `TypedDict()`"
+                ));
+                diagnostic.set_primary_message(format_args!("Found `{}`", fields_type.display(db)));
+            } else {
+                builder.into_diagnostic(
+                    "Expected a dict literal for parameter `fields` of `TypedDict()`",
+                );
+            }
         }
 
         false

@@ -2313,8 +2313,14 @@ from typing_extensions import TypedDict
 # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `TypedDict()`"
+# error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
 Bad2 = TypedDict("Bad2", "not a dict")
+
+def get_fields() -> dict[str, object]:
+    return {"name": str}
+
+# error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+Bad2b = TypedDict("Bad2b", get_fields())
 
 # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
 Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
