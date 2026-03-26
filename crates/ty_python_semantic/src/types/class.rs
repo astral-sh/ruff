@@ -2295,16 +2295,11 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     /// Get the MRO for this `TypedDict`.
     ///
-    /// `TypedDict` classes inherit from `dict` at runtime, so the MRO is:
-    /// [self, dict, object]
+    /// Functional `TypedDict` classes have the same MRO as class-based ones:
+    /// [self, TypedDict, object]
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let dict_class = KnownClass::Dict
-            .to_class_literal(db)
-            .as_class_literal()
-            .expect("dict should be a class literal")
-            .default_specialization(db);
         let object_class = KnownClass::Object
             .to_class_literal(db)
             .as_class_literal()
@@ -2312,7 +2307,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             .default_specialization(db);
         Mro::from([
             self_base,
-            ClassBase::Class(dict_class),
+            ClassBase::TypedDict,
             ClassBase::Class(object_class),
         ])
     }
