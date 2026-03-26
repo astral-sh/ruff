@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -24,15 +26,18 @@ use crate::types::{
 };
 
 /// Synthesize the `__getitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_getitem<'a, 'db>(
+pub(super) fn synthesize_typed_dict_getitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let overloads = fields.into_iter().map(|(field_name, field)| {
+        let field_name = field_name.borrow();
+        let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
         Signature::new(
             Parameters::new(
@@ -56,17 +61,18 @@ where
 }
 
 /// Synthesize the `__setitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_setitem<'a, 'db>(
+pub(super) fn synthesize_typed_dict_setitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let mut writeable_fields = fields
         .into_iter()
-        .filter(|(_, field)| !field.is_read_only())
+        .filter(|(_, field)| !(*field).borrow().is_read_only())
         .peekable();
 
     if writeable_fields.peek().is_none() {
@@ -91,6 +97,8 @@ where
     }
 
     let overloads = writeable_fields.map(|(field_name, field)| {
+        let field_name = field_name.borrow();
+        let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
         Signature::new(
             Parameters::new(
@@ -116,17 +124,18 @@ where
 }
 
 /// Synthesize the `__delitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_delitem<'a, 'db>(
+pub(super) fn synthesize_typed_dict_delitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let mut deletable_fields = fields
         .into_iter()
-        .filter(|(_, field)| !field.is_required())
+        .filter(|(_, field)| !(*field).borrow().is_required())
         .peekable();
 
     if deletable_fields.peek().is_none() {
@@ -149,6 +158,7 @@ where
     }
 
     let overloads = deletable_fields.map(|(field_name, _)| {
+        let field_name = field_name.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
         Signature::new(
             Parameters::new(
@@ -172,17 +182,20 @@ where
 }
 
 /// Synthesize the `get` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_get<'a, 'db>(
+pub(super) fn synthesize_typed_dict_get<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let overloads = fields
         .into_iter()
         .flat_map(|(field_name, field)| {
+            let field_name = field_name.borrow();
+            let field = field.borrow();
             let key_type = Type::string_literal(db, field_name.as_str());
 
             let get_sig = Signature::new(
@@ -275,17 +288,20 @@ where
 }
 
 /// Synthesize the `update` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_update<'a, 'db>(
+pub(super) fn synthesize_typed_dict_update<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let keyword_parameters: Vec<_> = fields
         .into_iter()
         .map(|(field_name, field)| {
+            let field_name = field_name.borrow();
+            let field = field.borrow();
             let ty = if field.is_read_only() {
                 Type::Never
             } else {
@@ -334,18 +350,21 @@ where
 }
 
 /// Synthesize the `pop` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_pop<'a, 'db>(
+pub(super) fn synthesize_typed_dict_pop<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let overloads = fields
         .into_iter()
-        .filter(|(_, field)| !field.is_required())
+        .filter(|(_, field)| !(*field).borrow().is_required())
         .flat_map(|(field_name, field)| {
+            let field_name = field_name.borrow();
+            let field = field.borrow();
             let key_type = Type::string_literal(db, field_name.as_str());
 
             let pop_sig = Signature::new(
@@ -394,15 +413,18 @@ where
 }
 
 /// Synthesize the `setdefault` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_setdefault<'a, 'db>(
+pub(super) fn synthesize_typed_dict_setdefault<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
-    fields: impl IntoIterator<Item = (&'a Name, &'a TypedDictField<'db>)>,
+    fields: impl IntoIterator<Item = (N, F)>,
 ) -> Type<'db>
 where
-    'db: 'a,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
 {
     let overloads = fields.into_iter().map(|(field_name, field)| {
+        let field_name = field_name.borrow();
+        let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
 
         Signature::new(

@@ -1559,21 +1559,58 @@ impl<'db> StaticClassLiteral<'db> {
                 name @ ("__getitem__" | "__setitem__" | "__delitem__" | "get" | "pop"
                 | "setdefault" | "update"),
             ) => {
-                let td_fields: Vec<_> = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| (name.clone(), TypedDictField::from_field(field)))
-                    .collect();
-                let fields_iter = td_fields.iter().map(|(n, f)| (n, f));
+                let td_fields = self.fields(db, specialization, field_policy);
 
                 Some(match name {
-                    "__getitem__" => synthesize_typed_dict_getitem(db, instance_ty, fields_iter),
-                    "__setitem__" => synthesize_typed_dict_setitem(db, instance_ty, fields_iter),
-                    "__delitem__" => synthesize_typed_dict_delitem(db, instance_ty, fields_iter),
-                    "get" => synthesize_typed_dict_get(db, instance_ty, fields_iter),
-                    "pop" => synthesize_typed_dict_pop(db, instance_ty, fields_iter),
-                    "setdefault" => synthesize_typed_dict_setdefault(db, instance_ty, fields_iter),
-                    "update" => synthesize_typed_dict_update(db, instance_ty, fields_iter),
+                    "__getitem__" => synthesize_typed_dict_getitem(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "__setitem__" => synthesize_typed_dict_setitem(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "__delitem__" => synthesize_typed_dict_delitem(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "get" => synthesize_typed_dict_get(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "pop" => synthesize_typed_dict_pop(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "setdefault" => synthesize_typed_dict_setdefault(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
+                    "update" => synthesize_typed_dict_update(
+                        db,
+                        instance_ty,
+                        td_fields
+                            .iter()
+                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
+                    ),
                     _ => unreachable!(),
                 })
             }
