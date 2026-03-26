@@ -357,9 +357,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
             | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
 
-            (todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _) => Some(todo),
-
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.
             // This is different from treating it as a union, where we'd check all combinations.
