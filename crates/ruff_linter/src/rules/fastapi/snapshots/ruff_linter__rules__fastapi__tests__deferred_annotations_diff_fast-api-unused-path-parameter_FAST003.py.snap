@@ -32,121 +32,121 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
-   --> FAST003.py:197:12
+   --> FAST003.py:219:12
     |
-196 | # Errors
-197 | @app.get("/{id}")
+218 | # Errors
+219 | @app.get("/{id}")
     |            ^^^^
-198 | async def get_id_pydantic_full(
-199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+220 | async def get_id_pydantic_full(
+221 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
     |
 help: Add `id` to function signature
-196 | # Errors
-197 | @app.get("/{id}")
-198 | async def get_id_pydantic_full(
+218 | # Errors
+219 | @app.get("/{id}")
+220 | async def get_id_pydantic_full(
     -     params: Annotated[PydanticParams, Depends(PydanticParams)],
-199 +     params: Annotated[PydanticParams, Depends(PydanticParams)], id,
-200 | ): ...
-201 | @app.get("/{id}")
-202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+221 +     params: Annotated[PydanticParams, Depends(PydanticParams)], id,
+222 | ): ...
+223 | @app.get("/{id}")
+224 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
-   --> FAST003.py:201:12
+   --> FAST003.py:223:12
     |
-199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
-200 | ): ...
-201 | @app.get("/{id}")
+221 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+222 | ): ...
+223 | @app.get("/{id}")
     |            ^^^^
-202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-203 | @app.get("/{id}")
+224 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+225 | @app.get("/{id}")
     |
 help: Add `id` to function signature
-199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
-200 | ): ...
-201 | @app.get("/{id}")
+221 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
+222 | ): ...
+223 | @app.get("/{id}")
     - async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-202 + async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()], id): ...
-203 | @app.get("/{id}")
-204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
-205 | 
+224 + async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()], id): ...
+225 | @app.get("/{id}")
+226 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+227 | 
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_callable_dep` signature
-   --> FAST003.py:314:19
+   --> FAST003.py:336:19
     |
-314 | @app.get("/things/{thing_id}")
+336 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-315 | async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
+337 | async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
     |
 help: Add `thing_id` to function signature
-312 | 
-313 | 
-314 | @app.get("/things/{thing_id}")
+334 | 
+335 | 
+336 | @app.get("/things/{thing_id}")
     - async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
-315 + async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)], thing_id): ...
-316 | 
-317 | 
-318 | # OK: `Depends(CallableQuery())` passes an instance, so FastAPI uses `__call__`,
+337 + async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)], thing_id): ...
+338 | 
+339 | 
+340 | # OK: `Depends(CallableQuery())` passes an instance, so FastAPI uses `__call__`,
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_callable_dep_missing` signature
-   --> FAST003.py:345:19
+   --> FAST003.py:367:19
     |
-345 | @app.get("/things/{thing_id}")
+367 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-346 | async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+368 | async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
     |
 help: Add `thing_id` to function signature
-343 | 
-344 | 
-345 | @app.get("/things/{thing_id}")
+365 | 
+366 | 
+367 | @app.get("/things/{thing_id}")
     - async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
-346 + async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)], thing_id): ...
-347 | 
-348 | 
-349 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+368 + async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)], thing_id): ...
+369 | 
+370 | 
+371 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_init_and_call_instance` signature
-   --> FAST003.py:351:19
+   --> FAST003.py:373:19
     |
-349 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
-350 | # `__call__`, which has `other` — not `thing_id`.
-351 | @app.get("/things/{thing_id}")
+371 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+372 | # `__call__`, which has `other` — not `thing_id`.
+373 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-352 | async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
+374 | async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
     |
 help: Add `thing_id` to function signature
-349 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
-350 | # `__call__`, which has `other` — not `thing_id`.
-351 | @app.get("/things/{thing_id}")
+371 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+372 | # `__call__`, which has `other` — not `thing_id`.
+373 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
-352 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
-353 | 
-354 | 
-355 | # Error: class with no __init__ and no __call__; FastAPI calls __init__ which
+374 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
+375 | 
+376 | 
+377 | # Error: class with no __init__ and no __call__; FastAPI calls __init__ which
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_empty_class_dep` signature
-   --> FAST003.py:361:19
+   --> FAST003.py:383:19
     |
-361 | @app.get("/things/{thing_id}")
+383 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-362 | async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
+384 | async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
     |
 help: Add `thing_id` to function signature
-359 | 
-360 | 
-361 | @app.get("/things/{thing_id}")
+381 | 
+382 | 
+383 | @app.get("/things/{thing_id}")
     - async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
-362 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
-363 | 
-364 | 
-365 | # Same instance patterns as default values (not Annotated).
+384 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
+385 | 
+386 | 
+387 | # Same instance patterns as default values (not Annotated).
 note: This is an unsafe fix and may change runtime behavior

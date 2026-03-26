@@ -235,6 +235,8 @@ enum Dependency<'a> {
 }
 
 impl<'a> Dependency<'a> {
+    const MAX_ALIAS_DEPTH: usize = 8;
+
     fn parameter_names(&self) -> Option<&[&'a str]> {
         match self {
             Self::Unknown => None,
@@ -268,13 +270,31 @@ impl<'a> Dependency<'a> {
             return Some(dependency);
         }
 
-        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
+        Self::from_annotation(parameter.annotation()?, semantic, 0)
+    }
 
-        if !semantic.match_typing_expr(value, "Annotated") {
-            return None;
+    fn from_annotation(
+        annotation: &'a Expr,
+        semantic: &SemanticModel<'a>,
+        alias_depth: usize,
+    ) -> Option<Self> {
+        if alias_depth > Self::MAX_ALIAS_DEPTH {
+            return Some(Self::Unknown);
         }
 
-        let Expr::Tuple(tuple) = slice.as_ref() else {
+        if let Some(ExprSubscript { value, slice, .. }) = annotation.as_subscript_expr() {
+            if semantic.match_typing_expr(value, "Annotated") {
+                return Self::from_annotated_slice(slice, semantic);
+            }
+        }
+
+        let alias_name = annotation.as_name_expr()?;
+        let alias_annotation = Self::resolve_local_alias_annotation(alias_name, semantic)?;
+        Self::from_annotation(alias_annotation, semantic, alias_depth + 1)
+    }
+
+    fn from_annotated_slice(slice: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
+        let Expr::Tuple(tuple) = slice else {
             return None;
         };
 
@@ -297,6 +317,55 @@ impl<'a> Dependency<'a> {
             Some(Self::Multiple)
         } else {
             Some(dependency)
+        }
+    }
+
+    fn resolve_local_alias_annotation(
+        name: &'a ast::ExprName,
+        semantic: &SemanticModel<'a>,
+    ) -> Option<&'a Expr> {
+        let binding_id = semantic.global_scope().get(name.id.as_str())?;
+        let binding = semantic.binding(binding_id);
+        let source = binding.source?;
+        let statement = semantic.statement(source);
+
+        match statement {
+            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                if targets.len() == 1
+                    && targets[0]
+                        .as_name_expr()
+                        .is_some_and(|target| target.id == name.id)
+                {
+                    Some(value.as_ref())
+                } else {
+                    None
+                }
+            }
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                if target
+                    .as_name_expr()
+                    .is_some_and(|target| target.id == name.id)
+                {
+                    value.as_deref()
+                } else {
+                    None
+                }
+            }
+            ast::Stmt::TypeAlias(ast::StmtTypeAlias {
+                name: alias_name,
+                value,
+                ..
+            }) => {
+                if alias_name
+                    .as_name_expr()
+                    .is_some_and(|alias_name| alias_name.id == name.id)
+                {
+                    Some(value.as_ref())
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 
