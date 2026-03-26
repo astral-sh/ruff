@@ -2333,6 +2333,20 @@ Bad6 = TypedDict("Bad6", {"name": str}, **kw)
 
 # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
 Bad7 = TypedDict(*tup, **kw)
+
+kwargs = {"x": int}
+
+# error: [invalid-argument-type] "Expected a dict literal with string-literal keys for parameter `fields` of `TypedDict()`"
+# error: [invalid-type-form]
+Bad8 = TypedDict("Bad8", {**kwargs})
+
+def get_name() -> str:
+    return "x"
+
+name = get_name()
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+Bad9 = TypedDict("Bad9", {name: int})
 ```
 
 ## Error cases
