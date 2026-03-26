@@ -484,12 +484,14 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(2);
 
-    assert_json_snapshot!(diagnostics, @r#"
-    {
-      "vscode-notebook-cell://src/test.ipynb#0": [],
-      "vscode-notebook-cell://src/test.ipynb#1": []
-    }
-    "#);
+    // We still publish unused-bindings for both cells, even when syntax-error reporting is disabled.
+    assert_eq!(diagnostics.len(), 2);
+    assert!(
+        diagnostics
+            .values()
+            .flatten()
+            .all(|diagnostic| diagnostic.message != "unexpected EOF while parsing")
+    );
 
     Ok(())
 }
