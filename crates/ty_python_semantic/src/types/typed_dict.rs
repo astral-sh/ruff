@@ -537,8 +537,6 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 /// Get the [`TypedDictSchema`] for a [`DynamicTypedDictLiteral`].
-///
-/// This is a helper function for use by class.rs to access the computed field types.
 pub(super) fn dynamic_typed_dict_schema<'db>(
     db: &'db dyn Db,
     class: DynamicTypedDictLiteral<'db>,
