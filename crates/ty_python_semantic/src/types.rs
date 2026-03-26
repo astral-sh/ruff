@@ -1057,6 +1057,15 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
+            Type::TypeVar(typevar) => {
+                let TypeVarBoundOrConstraints::UpperBound(bound) =
+                    typevar.typevar(db).bound_or_constraints(db)?
+                else {
+                    return None;
+                };
+                bound.nominal_class(db)
+            }
             _ => None,
         }
     }

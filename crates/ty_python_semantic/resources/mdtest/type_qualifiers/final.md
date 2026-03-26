@@ -1138,6 +1138,29 @@ class E:
         self.x = 2  # Error: `self` is the second parameter, not the implicit receiver
 ```
 
+## Cross-module final attribute assignment
+
+Assigning to an inherited `Final` attribute where the base class is in a different module:
+
+`base.py`:
+
+```py
+from typing import Final
+
+class Base:
+    x: Final[int] = 1
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    def f(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
 ## Full diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -1184,6 +1207,55 @@ class C:
 
 def __init__(c: C):
     c.x = 2  # error: [invalid-assignment]
+```
+
+Class-body `Final` declaration without value:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int]  # error: [final-without-value]
+
+    def f(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
+`__init__` assignment after class-body value:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 1
+
+    def __init__(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
+Inherited final attribute assignment:
+
+```py
+from typing import Final
+
+class Base:
+    x: Final[int] = 1
+
+class Child(Base):
+    def f(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
+Method-local `Final` annotation should not point at non-`Final` class annotation:
+
+```py
+from typing import Final
+
+class C:
+    x: int
+
+    def f(self):
+        self.x: Final[int] = 1  # error: [invalid-assignment]
 ```
 
 `Final` declaration without value:
