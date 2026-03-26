@@ -2236,6 +2236,14 @@ PartialMovie = TypedDict("PartialMovie", {"name": str, "year": int}, total=False
 # All fields are optional
 partial = PartialMovie()
 partial_with_name = PartialMovie(name="The Matrix")
+
+# Non-bool arguments are rejected:
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
+
+# TODO: Non-literal bool arguments should also be rejected per the spec:
+def f(total: bool) -> None:
+    TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
 ```
 
 ## Function syntax with `closed`
@@ -2247,6 +2255,14 @@ from typing_extensions import TypedDict
 
 # closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+
+# Non-bool arguments are rejected:
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
+
+# TODO: Non-literal bool arguments should also be rejected per the spec:
+def f(closed: bool) -> None:
+    ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
 ```
 
 ## Function syntax with `extra_items`
