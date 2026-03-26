@@ -39,8 +39,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // with an unknown set of fields.
         let fallback = || {
             let spec = &[KnownClass::Str.to_instance(db), Type::object()];
-            let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-            IntersectionType::from_elements(db, [str_object_map.to_meta_type(db), Type::unknown()])
+            let str_object_map = KnownClass::Mapping.to_specialized_subclass_of(db, spec);
+            IntersectionType::from_two_elements(db, str_object_map, Type::unknown())
         };
 
         let Some(name_arg) = args.first() else {

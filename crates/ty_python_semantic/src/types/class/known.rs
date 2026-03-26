@@ -1076,6 +1076,20 @@ impl KnownClass {
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
+    pub(crate) fn to_specialized_subclass_of<'t, 'db, T>(
+        self,
+        db: &'db dyn Db,
+        specialization: T,
+    ) -> Type<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        self.to_specialized_class_type(db, specialization)
+            .map(|class_type| SubclassOfType::from(db, class_type))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+    }
+
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
