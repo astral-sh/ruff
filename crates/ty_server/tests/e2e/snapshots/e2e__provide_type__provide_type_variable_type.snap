@@ -5,6 +5,6 @@ expression: "&provide_type_response"
 ---
 {
   "types": [
-    "T1@A | T2@f"
+    "T1@foo.A | T2@foo.A.f"
   ]
 }

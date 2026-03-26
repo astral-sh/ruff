@@ -4,14 +4,14 @@ use crate::document::RangeExt;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
-use crate::session::client::Client;
 use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 use lsp_types::request::Request;
 use lsp_types::{Range, TextDocumentIdentifier, Url};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::find_node::covering_node;
 use serde::{Deserialize, Serialize};
 use ty_project::ProjectDatabase;
 use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
