@@ -89,7 +89,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
                 SupportedCommand::Format => {
-                    let fixes = super::format::format_full_document(&snapshot, Some(client))?;
+                    let fixes = super::format::format_full_document(&snapshot, client)?;
                     edit_tracker
                         .set_fixes_for_document(fixes, version)
                         .with_failure_code(ErrorCode::InternalError)?;
