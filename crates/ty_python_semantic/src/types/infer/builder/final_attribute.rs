@@ -50,31 +50,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .current_function_definition()
             .is_some_and(|func| func.name.id == "__init__");
 
-        if !is_in_init {
-            if let Some(builder) = self
+        let report_not_in_init = || {
+            let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
-                builder.into_diagnostic(format_args!(
-                    "Cannot assign to final attribute `{attribute}` on type `{}`; \
-                    `Final` attributes can only be assigned in the class body or `__init__`",
-                    object_ty.display(db)
-                ));
-            }
+            else {
+                return;
+            };
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot assign to final attribute `{attribute}` on type `{}`",
+                object_ty.display(db)
+            ));
+            diagnostic.set_primary_message(
+                "`Final` attributes can only be assigned in the class body or `__init__`",
+            );
+        };
+
+        if !is_in_init {
+            report_not_in_init();
             return true;
         }
 
         let Some(class_ty) = self.class_context_of_current_method() else {
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
-                builder.into_diagnostic(format_args!(
-                    "Cannot assign to final attribute `{attribute}` on type `{}`; \
-                    `Final` attributes can only be assigned in the class body or `__init__`",
-                    object_ty.display(db)
-                ));
-            }
+            report_not_in_init();
             return true;
         };
 
@@ -88,16 +86,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let is_current_class_instance =
             is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
         if !is_current_class_instance {
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
-                builder.into_diagnostic(format_args!(
-                    "Cannot assign to final attribute `{attribute}` on type `{}`; \
-                    `Final` attributes can only be assigned in the class body or `__init__`",
-                    object_ty.display(db)
-                ));
-            }
+            report_not_in_init();
             return true;
         }
 
@@ -112,9 +101,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .context
                     .report_lint(&INVALID_ASSIGNMENT, target.range())
                 {
-                    diag_builder.into_diagnostic(format_args!(
-                        "Cannot assign to final attribute `{attribute}` in `__init__` \
-                        because it already has a value at class level"
+                    let mut diagnostic =
+                        diag_builder.into_diagnostic("Invalid assignment to final attribute");
+                    diagnostic.set_primary_message(format_args!(
+                        "`{attribute}` already has a value in the class body"
                     ));
                 }
 

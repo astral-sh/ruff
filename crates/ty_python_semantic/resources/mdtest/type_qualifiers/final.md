@@ -651,7 +651,7 @@ class Foo(Protocol):
 
 def bar(x: Foo, value: int):
     reveal_type(x.value)  # revealed: int
-    # error: [invalid-assignment] "Cannot assign to final attribute `value` on type `Foo`; `Final` attributes can only be assigned in the class body or `__init__`"
+    # error: [invalid-assignment] "Cannot assign to final attribute `value` on type `Foo`: `Final` attributes can only be assigned in the class body or `__init__`"
     x.value = value
 ```
 

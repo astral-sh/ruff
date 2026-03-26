@@ -78,12 +78,12 @@ info: rule `invalid-assignment` is enabled by default
 ```
 
 ```
-error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`; `Final` attributes can only be assigned in the class body or `__init__`
+error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
   --> src/mdtest_snippet.py:17:9
    |
 16 |     def f(self):
 17 |         self.x = 2  # error: [invalid-assignment]
-   |         ^^^^^^
+   |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
 18 | from typing import Final
    |
 info: rule `invalid-assignment` is enabled by default
@@ -91,12 +91,12 @@ info: rule `invalid-assignment` is enabled by default
 ```
 
 ```
-error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`; `Final` attributes can only be assigned in the class body or `__init__`
+error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`
   --> src/mdtest_snippet.py:24:5
    |
 23 | def __init__(c: C):
 24 |     c.x = 2  # error: [invalid-assignment]
-   |     ^^^
+   |     ^^^ `Final` attributes can only be assigned in the class body or `__init__`
 25 | from typing import Final
    |
 info: rule `invalid-assignment` is enabled by default
