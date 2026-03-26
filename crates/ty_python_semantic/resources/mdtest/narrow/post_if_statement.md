@@ -256,3 +256,16 @@ async def main(val: int | None):
         await stop()
     reveal_type(val)  # revealed: int
 ```
+
+## Narrowing in global scope
+
+```py
+data: dict[str, str] = {}
+api_key = data.get("api_key")
+
+if not api_key:
+    exit(1)
+
+# TODO: Should be str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str | None
+```

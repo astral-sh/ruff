@@ -294,24 +294,16 @@ def _(x: Literal["foo", b"bar"] | int):
 ## Narrowing due to guard
 
 ```py
-def get_object() -> object:
-    return object()
-
-x = get_object()
-
-reveal_type(x)  # revealed: object
-
-match x:
-    case str() | float() if type(x) is str:
-        reveal_type(x)  #  revealed: str
-    case "foo" | 42 | None if isinstance(x, int):
-        reveal_type(x)  #  revealed: int
-    case False if x:
-        reveal_type(x)  #  revealed: Never
-    case "foo" if x := "bar":
-        reveal_type(x)  # revealed: Literal["bar"]
-
-reveal_type(x)  # revealed: object
+def _(x: object):
+    match x:
+        case str() | float() if type(x) is str:
+            reveal_type(x)  #  revealed: str
+        case "foo" | 42 | None if isinstance(x, int):
+            reveal_type(x)  #  revealed: int
+        case False if x:
+            reveal_type(x)  #  revealed: Never
+        case "foo" if x := "bar":
+            reveal_type(x)  # revealed: Literal["bar"]
 ```
 
 ## Guard and reveal_type in guard
