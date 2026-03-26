@@ -79,11 +79,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return fallback();
         };
 
-        let fields_arg = args.get(1);
         let name_type = self.infer_expression(name_arg, TypeContext::default());
+        let fields_arg = args.get(1);
 
         let fields_type = fields_arg.and_then(|fields_arg| {
             if matches!(fields_arg, ast::Expr::Dict(_)) {
+                // the `fields` arg contains annotation expressions,
+                // so inference is deferred until a later stage
                 None
             } else {
                 Some(self.infer_expression(fields_arg, TypeContext::default()))

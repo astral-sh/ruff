@@ -2224,6 +2224,7 @@ TD = TypedDict("TD", {}, extra_items="TD | None")
 reveal_type(TD)  # revealed: <class 'TD'>
 
 class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
+
 reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
