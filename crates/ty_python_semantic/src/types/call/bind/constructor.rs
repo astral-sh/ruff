@@ -212,7 +212,7 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
-        let mut single_constructor_overload = None;
+        let mut constructor_instance_return_type = None;
 
         // If any matched overload's signature return type, when resolved with the inferred
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
@@ -233,8 +233,8 @@ impl<'db> ConstructorBinding<'db> {
             // type" or have downstream constructors.
             if !self.constructor_kind().is_init() {
                 match analyze_constructor_overloads(db, constructor_class_literal, callable) {
-                    ConstructorOverloadAnalysis::ContinueConstruction { single_overload } => {
-                        single_constructor_overload = single_overload;
+                    ConstructorOverloadAnalysis::ContinueConstruction { return_type } => {
+                        constructor_instance_return_type = return_type;
 
                         // For layered mixed-constructor handling (metaclass `__call__` mixed
                         // with downstream constructor logic), if the downstream constructor
@@ -255,14 +255,13 @@ impl<'db> ConstructorBinding<'db> {
         let combined_return = self.instance_return_type(db);
 
         // Allow a constructor to return a subtype of "instance of the class being constructed".
-        if let (Some(constructor_class_literal), Some(overload)) =
-            (constructor_class_literal, single_constructor_overload)
+        if let (Some(constructor_class_literal), Some(return_ty)) =
+            (constructor_class_literal, constructor_instance_return_type)
         {
-            if classify_constructor_return(db, constructor_class_literal, overload.return_ty)
-                .is_instance()
-                && overload.return_ty.is_subtype_of(db, combined_return)
+            if classify_constructor_return(db, constructor_class_literal, return_ty).is_instance()
+                && return_ty.is_subtype_of(db, combined_return)
             {
-                return overload.return_ty;
+                return return_ty;
             }
         }
 
@@ -479,10 +478,8 @@ impl ConstructorReturnKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum ConstructorOverloadAnalysis<'a, 'db> {
-    ContinueConstruction {
-        single_overload: Option<&'a Binding<'db>>,
-    },
+enum ConstructorOverloadAnalysis<'db> {
+    ContinueConstruction { return_type: Option<Type<'db>> },
     ShortCircuit(Type<'db>),
 }
 
@@ -498,6 +495,10 @@ fn is_subtype_of_class_literal<'db>(
         .any(|base| base.class_literal(db) == class_literal)
 }
 
+/// Classify a return type as either being an instance of the given `class_literal` or not, for
+/// purposes of deciding whether downstream constructors should be checked. Some cases are obvious,
+/// some are judgment calls (and we follow the judgment of the typing spec). For example, an
+/// explicit `Any` is considered "not an instance", but an `Unknown` is considered "an instance".
 fn classify_constructor_return<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
@@ -527,6 +528,7 @@ fn classify_constructor_return<'db>(
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => ConstructorReturnKind::NotInstance,
         // But a missing return annotation should be considered instance.
+        // TODO is an explicit annotation that resolves to `Unknown` as instance or not?
         Type::Dynamic(_) => ConstructorReturnKind::Instance,
         // A `Never` constructor return is terminal and does not run downstream construction.
         Type::Never => ConstructorReturnKind::NotInstance,
@@ -549,11 +551,11 @@ fn overload_returns_instance<'db>(
     classify_constructor_return(db, class_literal, overload.return_ty).is_instance()
 }
 
-fn analyze_constructor_overloads<'a, 'db>(
+fn analyze_constructor_overloads<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
-    callable: &'a CallableBinding<'db>,
-) -> ConstructorOverloadAnalysis<'a, 'db> {
+    callable: &CallableBinding<'db>,
+) -> ConstructorOverloadAnalysis<'db> {
     let mut matching_overloads = callable.matching_overloads().map(|(_, overload)| overload);
 
     if let Some(first_matching_overload) = matching_overloads.next() {
@@ -575,9 +577,7 @@ fn analyze_constructor_overloads<'a, 'db>(
                     .iter()
                     .all(|overload| overload_returns_instance(db, class_literal, overload)) =>
         {
-            ConstructorOverloadAnalysis::ContinueConstruction {
-                single_overload: None,
-            }
+            ConstructorOverloadAnalysis::ContinueConstruction { return_type: None }
         }
         _ => ConstructorOverloadAnalysis::ShortCircuit(callable.return_type()),
     }
@@ -588,11 +588,11 @@ fn analyze_selected_constructor_overloads<'a, 'db, I>(
     class_literal: ClassLiteral<'db>,
     first_overload: &'a Binding<'db>,
     overloads: I,
-) -> ConstructorOverloadAnalysis<'a, 'db>
+) -> ConstructorOverloadAnalysis<'db>
 where
     I: IntoIterator<Item = &'a Binding<'db>>,
 {
-    let mut single_overload = Some(first_overload);
+    let mut return_type = Some(first_overload.return_ty);
     let first_return_is_instance =
         classify_constructor_return(db, class_literal, first_overload.return_ty).is_instance();
     let mut saw_instance_return = first_return_is_instance;
@@ -601,7 +601,7 @@ where
     let mut saw_distinct_non_instance_return = false;
 
     for overload in overloads {
-        single_overload = None;
+        return_type = None;
 
         if classify_constructor_return(db, class_literal, overload.return_ty).is_instance() {
             saw_instance_return = true;
@@ -613,7 +613,7 @@ where
     }
 
     if saw_instance_return {
-        return ConstructorOverloadAnalysis::ContinueConstruction { single_overload };
+        return ConstructorOverloadAnalysis::ContinueConstruction { return_type };
     }
 
     match first_non_instance_return {
@@ -623,7 +623,7 @@ where
         Some(first_non_instance_return) => {
             ConstructorOverloadAnalysis::ShortCircuit(first_non_instance_return)
         }
-        None => ConstructorOverloadAnalysis::ContinueConstruction { single_overload },
+        None => ConstructorOverloadAnalysis::ContinueConstruction { return_type },
     }
 }
 
