@@ -99,6 +99,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if has_starred || has_double_starred {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
+                if let Some(arg) = &kw.arg {
+                    if !matches!(arg.id.as_str(), "total" | "closed" | "extra_items")
+                        && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Argument `{}` does not match any known parameter of function `TypedDict`",
+                            arg.id
+                        ));
+                    }
+                }
             }
             return fallback();
         }
