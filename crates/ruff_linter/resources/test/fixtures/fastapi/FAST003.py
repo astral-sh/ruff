@@ -186,6 +186,9 @@ async def takes_other_alias(other: int): ...
 
 ThingDepAlias = Annotated[dict, Depends(takes_thing_id_alias)]
 ThingDepAliasChain = ThingDepAlias
+ThingDepAnnAlias: type[Annotated[dict, Depends(takes_thing_id_alias)]] = Annotated[
+    dict, Depends(takes_thing_id_alias)
+]
 type ThingDepTypeAlias = Annotated[dict, Depends(takes_thing_id_alias)]
 ThingDepMissingAlias = Annotated[dict, Depends(takes_other_alias)]
 
@@ -194,6 +197,8 @@ ThingDepMissingAlias = Annotated[dict, Depends(takes_other_alias)]
 async def read_thing_alias_dep(query: ThingDepAlias): ...
 @app.get("/alias-chain/{thing_id}")
 async def read_thing_alias_chain_dep(query: ThingDepAliasChain): ...
+@app.get("/alias-annassign/{thing_id}")
+async def read_thing_alias_annassign_dep(query: ThingDepAnnAlias): ...
 @app.get("/alias-type/{thing_id}")
 async def read_thing_type_alias_dep(query: ThingDepTypeAlias): ...
 
