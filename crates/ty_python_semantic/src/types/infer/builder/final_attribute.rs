@@ -1,15 +1,13 @@
-use std::ops::DerefMut;
-
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
-use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceExpr, ScopedPlaceId};
 use crate::semantic_index::semantic_index;
-use crate::types::{TypeVarBoundOrConstraints, declaration_type};
+use crate::types::TypeVarBoundOrConstraints;
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
@@ -19,7 +17,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
     fn annotate_final_declaration(
         &self,
-        diagnostic: &mut impl DerefMut<Target = Diagnostic>,
+        diagnostic: &mut Diagnostic,
         declaration: Definition<'db>,
     ) {
         let db = self.db();
@@ -82,32 +80,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             let use_def = class_index.use_def_map(class_scope_id);
-            let place_and_quals =
-                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id))
-                    .ignore_conflicting_declarations();
-            if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
-                return None;
+
+            let place_and_quals_result =
+                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+
+            let Some(declaration) = place_and_quals_result.first_declaration else {
+                continue;
+            };
+
+            if !place_and_quals_result
+                .ignore_conflicting_declarations()
+                .qualifiers
+                .contains(TypeQualifiers::FINAL)
+            {
+                continue;
             }
 
-            let mut final_declarations = use_def
-                .end_of_scope_symbol_declarations(symbol_id)
-                .filter_map(|declaration| {
-                    let DefinitionState::Defined(definition) = declaration.declaration else {
-                        return None;
-                    };
-
-                    declaration_type(db, definition)
-                        .qualifiers()
-                        .contains(TypeQualifiers::FINAL)
-                        .then_some(definition)
-                });
-            let final_declaration = final_declarations.next()?;
-
-            if final_declarations.next().is_some() {
-                return None;
-            }
-
-            return Some(final_declaration);
+            return Some(declaration);
         }
 
         None
