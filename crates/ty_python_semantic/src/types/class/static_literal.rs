@@ -2063,24 +2063,18 @@ impl<'db> StaticClassLiteral<'db> {
             return self.own_fields(db, specialization, field_policy);
         }
 
-        let matching_classes_in_mro: Vec<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> =
-            self.iter_mro(db, specialization)
-                .filter_map(|superclass| {
-                    let class = superclass.into_class()?;
-                    // Dynamic classes don't have fields (no class body).
-                    let (class_literal, specialization) = class.static_class_literal(db)?;
-                    if field_policy.matches(db, class_literal.into(), specialization) {
-                        Some((class_literal, specialization))
-                    } else {
-                        None
-                    }
-                })
-                // We need to collect into a `Vec` here because we iterate the MRO in reverse order
-                .collect();
-
-        matching_classes_in_mro
-            .into_iter()
+        self.iter_mro(db, specialization)
             .rev()
+            .filter_map(|superclass| {
+                let class = superclass.into_class()?;
+                // Dynamic classes don't have fields (no class body).
+                let (class_literal, specialization) = class.static_class_literal(db)?;
+                if field_policy.matches(db, class_literal.into(), specialization) {
+                    Some((class_literal, specialization))
+                } else {
+                    None
+                }
+            })
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // KW_ONLY sentinels are markers, not real fields. Exclude them so
             // they cannot shadow an inherited field with the same name.
