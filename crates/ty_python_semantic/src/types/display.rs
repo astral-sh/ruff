@@ -1,7 +1,7 @@
 //! Display implementations for types.
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -93,6 +93,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Types that are currently being displayed in fully qualified form.
+    /// Used to break recursive qualified-display cycles.
+    pub visited_qualified_types: Rc<RefCell<FxHashSet<Type<'db>>>>,
     /// Whether to fully qualify every name
     pub fully_qualified: bool,
 }
@@ -864,23 +867,31 @@ impl<'db> DisplayRepresentation<'db> {
             return f(writer);
         }
 
-        thread_local! {
-            static RECURSION_COUNTER: Cell<usize> = const { Cell::new(0) };
+        if self
+            .settings
+            .visited_qualified_types
+            .borrow()
+            .contains(&self.ty)
+        {
+            return self
+                .ty
+                .display_with(self.db, self.settings.not_fully_qualified())
+                .fmt_detailed(writer);
         }
 
-        RECURSION_COUNTER.with(|counter| {
-            let current = counter.get();
-            counter.set(current + 1);
+        self.settings
+            .visited_qualified_types
+            .borrow_mut()
+            .insert(self.ty);
 
-            if current > 32 {
-                counter.set(current);
-                return writer.write_str("typing.Any");
-            }
+        let result = f(writer);
 
-            let result = f(writer);
-            counter.set(current);
-            result
-        })
+        self.settings
+            .visited_qualified_types
+            .borrow_mut()
+            .remove(&self.ty);
+
+        result
     }
 
     fn with_type_and_generic_context(
