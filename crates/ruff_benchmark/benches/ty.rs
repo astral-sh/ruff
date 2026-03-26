@@ -579,8 +579,9 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     }
     writeln!(&mut code).ok();
 
+    writeln!(&mut code, "def main():").ok();
     for i in 0..NUM_ENUM_MEMBERS {
-        writeln!(&mut code, "print(E.m{i})").ok();
+        writeln!(&mut code, "    print(E.m{i})").ok();
     }
 
     criterion.bench_function("ty_micro[many_enum_members]", |b| {
