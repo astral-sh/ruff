@@ -119,6 +119,7 @@ use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 mod annotation_expression;
 mod binary_expressions;
 mod class;
+mod dict;
 mod function;
 mod imports;
 mod named_tuple;
@@ -6915,41 +6916,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
-        // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
-        // then validate and return the TypedDict type.
-        if let Some(tcx) = call_expression_tcx.annotation
-            && let Some(typed_dict) = tcx
-                .filter_union(self.db(), Type::is_typed_dict)
-                .as_typed_dict()
-            && callable_type
-                .as_class_literal()
-                .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
-            && arguments.args.is_empty()
-            && arguments
-                .keywords
-                .iter()
-                .all(|keyword| keyword.arg.is_some())
+        if callable_type
+            .as_class_literal()
+            .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
+            && let Some(ty) =
+                self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
         {
-            let items = typed_dict.items(self.db());
-            for keyword in &arguments.keywords {
-                if let Some(arg_name) = &keyword.arg {
-                    let value_tcx = items
-                        .get(arg_name.id.as_str())
-                        .map(|field| TypeContext::new(Some(field.declared_ty)))
-                        .unwrap_or_default();
-                    self.infer_expression(&keyword.value, value_tcx);
-                }
-            }
-
-            validate_typed_dict_constructor(
-                &self.context,
-                typed_dict,
-                arguments,
-                func.as_ref().into(),
-                |expr| self.expression_type(expr),
-            );
-
-            return Type::TypedDict(typed_dict);
+            return ty;
         }
 
         // Handle 3-argument `type(name, bases, dict)`.
