@@ -8,11 +8,9 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-use self::typed_dict::synthesize_typed_dict_update_member;
-pub(super) use self::typed_dict::{
-    DynamicTypedDictAnchor, DynamicTypedDictLiteral,
-};
 pub(crate) use self::static_literal::StaticClassLiteral;
+use self::typed_dict::synthesize_typed_dict_update_member;
+pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
     TypeQualifiers, class_base::ClassBase, function::FunctionType,
@@ -56,10 +54,10 @@ use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 
 mod dynamic_literal;
-mod typed_dict;
 mod known;
 mod named_tuple;
 mod static_literal;
+mod typed_dict;
 
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]

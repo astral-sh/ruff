@@ -560,18 +560,10 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
 
     let deferred_inference = infer_deferred_types(db, definition);
 
-    let total = node
-        .arguments
-        .keywords
-        .iter()
-        .find_map(|keyword| {
-            (keyword
-                .arg
-                .as_ref()
-                .is_some_and(|arg| arg.id.as_str() == "total"))
-            .then(|| definition_expression_type(db, definition, &keyword.value))
-        })
-        .is_none_or(|total_ty| !total_ty.bool(db).is_always_false());
+    let total = node.arguments.find_keyword("total").is_none_or(|total_kw| {
+        let total_ty = definition_expression_type(db, definition, &total_kw.value);
+        !total_ty.bool(db).is_always_false()
+    });
 
     if let Some(fields_arg) = node.arguments.args.get(1) {
         let ast::Expr::Dict(dict_expr) = fields_arg else {
