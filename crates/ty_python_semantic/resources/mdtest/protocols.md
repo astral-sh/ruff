@@ -1579,6 +1579,29 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Declared instance attribute members
+
+Declared protocol instance attributes should be available both on protocol-typed values and through
+`self` inside protocol methods, with `Self` rebinding appropriately.
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+
+class Linked(Protocol):
+    value: int
+    next: Self
+
+    def advance(self) -> Self:
+        reveal_type(self.value)  # revealed: int
+        reveal_type(self.next)  # revealed: Self@advance
+        return self.next
+
+def f(x: Linked) -> None:
+    reveal_type(x.value)  # revealed: int
+    reveal_type(x.next)  # revealed: Linked
+```
+
 ## Subtyping of protocols with property members
 
 A read-only property on a protocol can be satisfied by a mutable attribute, a read-only property, a

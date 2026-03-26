@@ -731,7 +731,7 @@ class Foo(Protocol):
     value: Final[int] = 42
 
     def foo(self, value: int):
-        # TODO: should emit an invalid-assignment error
+        # error: [invalid-assignment] "Cannot assign to final attribute `value` on type `Self@foo`: `Final` attributes can only be assigned in the class body or `__init__`"
         self.value = value
 
 def bar(x: Foo, value: int):

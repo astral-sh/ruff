@@ -6254,10 +6254,8 @@ fn self_typevar_owner_class_literal<'db>(
     bound_typevar
         .typevar(db)
         .upper_bound(db)
-        .and_then(|ty| match ty {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-            _ => None,
-        })
+        .and_then(|ty| ty.nominal_class(db))
+        .map(|class| class.class_literal(db))
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -6300,11 +6298,12 @@ impl<'db> SelfBinding<'db> {
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         let class_literal = match self_type {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)
             }
-            _ => None,
+            _ => self_type
+                .nominal_class(db)
+                .map(|class| class.class_literal(db)),
         };
 
         Self {
