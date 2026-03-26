@@ -87,43 +87,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
                     Ok(found) => found.node(),
                     Err(_) => return None,
                 };
-
-                let ty = match node {
-                    AnyNodeRef::ExprBoolOp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprNamed(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprBinOp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprUnaryOp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprLambda(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprIf(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprDict(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprSet(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprListComp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprSetComp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprDictComp(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprGenerator(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprAwait(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprYield(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprYieldFrom(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprCompare(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprCall(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprFString(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprTString(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprStringLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprBytesLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprNumberLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprBooleanLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprNoneLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprEllipsisLiteral(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprAttribute(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprSubscript(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprStarred(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprName(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprList(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprTuple(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprSlice(expr) => expr.inferred_type(&model),
-                    AnyNodeRef::ExprIpyEscapeCommand(expr) => expr.inferred_type(&model),
-                    _ => return None,
-                };
+                let ty = node.as_expr_ref()?.inferred_type(&model);
 
                 ty.map(|ty| {
                     ty.display_with(db, DisplaySettings::default().fully_qualified())
