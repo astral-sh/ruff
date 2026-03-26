@@ -43,6 +43,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             IntersectionType::from_two_elements(db, str_object_map, Type::unknown())
         };
 
+        // Emit diagnostic for unsupported variadic arguments.
+        if (has_starred || has_double_starred)
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, call_expr)
+        {
+            let arg_type = if has_starred && has_double_starred {
+                "Variadic positional and keyword arguments are"
+            } else if has_starred {
+                "Variadic positional arguments are"
+            } else {
+                "Variadic keyword arguments are"
+            };
+            builder.into_diagnostic(format_args!(
+                "{arg_type} not supported in `TypedDict()` calls"
+            ));
+        }
+
         let Some(name_arg) = args.first() else {
             for arg in args {
                 self.infer_expression(arg, TypeContext::default());
