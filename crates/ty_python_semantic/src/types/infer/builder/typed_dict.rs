@@ -273,7 +273,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for kw in &arguments.keywords {
             if let Some(arg) = &kw.arg {
                 match arg.id.as_str() {
-                    "total" | "closed" | "extra_items" => continue,
+                    "total" | "closed" => continue,
+                    "extra_items" => {
+                        self.infer_annotation_expression(
+                            &kw.value,
+                            DeferredExpressionState::Deferred,
+                        );
+                    }
                     _ => {
                         self.infer_annotation_expression(
                             &kw.value,
