@@ -261,11 +261,15 @@ class C(metaclass=Meta):
 C.META_FINAL_A = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_B` on type `<class 'C'>`"
 C.META_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
+C.META_FINAL_A += 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
 C.CLASS_FINAL_A = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_B` on type `<class 'C'>`"
 C.CLASS_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
+C.CLASS_FINAL_A += 1
 
 c = C()
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `C`"
@@ -278,6 +282,93 @@ c.INSTANCE_FINAL_A = 2
 c.INSTANCE_FINAL_B = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `C`"
 c.INSTANCE_FINAL_C = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_A` on type `C`"
+c.INSTANCE_FINAL_A += 1
+```
+
+### Attributes via indirections
+
+`Final` attribute assignments are also detected through type aliases, `NewType`s, and type
+variables:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, NewType
+
+class Foo:
+    x: Final = 42
+
+NT = NewType("NT", Foo)
+
+n = NT(Foo())
+n.x = 42  # error: [invalid-assignment]
+
+def f[T: Foo](x: T) -> T:
+    x.x = 56  # error: [invalid-assignment]
+    return x
+
+type TA = Foo
+
+def g(x: TA):
+    x.x = 56  # error: [invalid-assignment]
+```
+
+### Attributes on unions and intersections
+
+When the object type is a union, we still detect `Final` attribute assignments for elements that
+declare the attribute as `Final`:
+
+```py
+from typing import Final
+
+class HasFinal:
+    x: Final[int] = 42
+
+class NotFinal:
+    x: int = 42
+
+def union_both_final(arg: HasFinal | HasFinal):
+    arg.x = 1  # error: [invalid-assignment]
+
+def union_one_final(arg: HasFinal | NotFinal):
+    arg.x = 1  # error: [invalid-assignment]
+
+def union_augmented(arg: HasFinal | NotFinal):
+    # error: [invalid-assignment]
+    arg.x += 1
+```
+
+Intersections also detect `Final` attribute assignments:
+
+```py
+from typing import Final
+from ty_extensions import Intersection
+
+class HasFinal:
+    x: Final[int] = 42
+
+class NotFinal:
+    x: int = 42
+
+class Other:
+    pass
+
+def intersection_with_final(arg: Intersection[HasFinal, Other]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_both_final(arg: Intersection[HasFinal, HasFinal]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_one_final(arg: Intersection[HasFinal, NotFinal]):
+    arg.x = 1  # error: [invalid-assignment]
+
+def intersection_augmented(arg: Intersection[HasFinal, NotFinal]):
+    # error: [invalid-assignment]
+    arg.x += 1
 ```
 
 ## Mutability
@@ -624,8 +715,29 @@ from typing import Final
 
 class C:
     def some_method(self):
-        # TODO: This should be an error
+        # error: [invalid-assignment]
         self.x: Final[int] = 1
+```
+
+### Protocol members
+
+Assignments to `Final` protocol members are also invalid, both through a protocol-typed value and
+through `self` inside the protocol method body.
+
+```py
+from typing import Final, Protocol
+
+class Foo(Protocol):
+    value: Final[int] = 42
+
+    def foo(self, value: int):
+        # TODO: should emit an invalid-assignment error
+        self.value = value
+
+def bar(x: Foo, value: int):
+    reveal_type(x.value)  # revealed: int
+    # error: [invalid-assignment] "Cannot assign to final attribute `value` on type `Foo`: `Final` attributes can only be assigned in the class body or `__init__`"
+    x.value = value
 ```
 
 ### Explicit `Final` redeclaration
@@ -889,7 +1001,7 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import Final, Self
+from typing import Final, Generic, Self, TypeVar
 
 class ClassA:
     ID4: Final[int]  # OK because initialized in __init__
@@ -907,8 +1019,17 @@ class ClassB:
     def __init__(self):  # Without Self annotation
         self.ID5 = 1  # Should also be OK
 
+T = TypeVar("T")
+
+class ClassC(Generic[T]):
+    value: Final[T]
+
+    def __init__(self: Self, value: T):
+        self.value = value
+
 reveal_type(ClassA().ID4)  # revealed: int
 reveal_type(ClassB().ID5)  # revealed: int
+reveal_type(ClassC(1).value)  # revealed: int
 ```
 
 ## Reassignment to Final in `__init__`
@@ -1003,9 +1124,18 @@ class D:
 
     def __init__(self, other: "D"):
         self.y = 1  # OK: Assigning to self
-        # TODO: Should error - assigning to non-self parameter
-        # Requires tracking which parameter the base expression refers to
-        other.y = 2
+        # error: [invalid-assignment] "Cannot assign to final attribute `y`"
+        other.y = 2  # Error: not the implicit `self` parameter
+
+# When the first parameter is not named `self`, only the first parameter
+# is treated as the implicit receiver.
+class E:
+    x: Final[int]
+
+    def __init__(sssself, self: "E"):
+        sssself.x = 1  # OK: first parameter is the implicit receiver
+        # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+        self.x = 2  # Error: `self` is the second parameter, not the implicit receiver
 ```
 
 ## Full diagnostics
@@ -1030,6 +1160,30 @@ Imported `Final` symbol:
 from _stat import ST_INO
 
 ST_INO = 1  # error: [invalid-assignment]
+```
+
+Instance attribute assignment outside `__init__`:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 1
+
+    def f(self):
+        self.x = 2  # error: [invalid-assignment]
+```
+
+Standalone function named `__init__`:
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 1
+
+def __init__(c: C):
+    c.x = 2  # error: [invalid-assignment]
 ```
 
 `Final` declaration without value:
