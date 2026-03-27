@@ -1363,6 +1363,30 @@ mod tests {
     }
 
     #[test]
+    fn del_builtin_shadowing_restores_builtin() {
+        flakes("print = 0; del print; print(1)", &[]);
+    }
+
+    #[test]
+    fn del_configured_builtin_shadowing_restores_builtin() {
+        let diagnostics = test_snippet(
+            r#"
+def _(message):
+    return message
+messages = [_("x"), _("y"), _("z")]
+del _
+for message in messages:
+    print(_(message))
+"#,
+            &LinterSettings {
+                builtins: vec!["_".to_string()],
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
     fn del_global() {
         // Del a global binding from a function.
         flakes(

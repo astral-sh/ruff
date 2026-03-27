@@ -535,6 +535,28 @@ impl<'a> SemanticModel<'a> {
                             }
                         }
 
+                        let deletion_range = self.bindings[binding_id].range;
+                        if deletion_range.start() < name.range.start() {
+                            if let Some(builtin_id) = self.scopes[scope_id]
+                                .shadowed_bindings(binding_id)
+                                .skip(1)
+                                .find(|shadowed_id| {
+                                    matches!(self.bindings[*shadowed_id].kind, BindingKind::Builtin)
+                                })
+                            {
+                                let reference_id = self.resolved_references.push(
+                                    self.scope_id,
+                                    self.node_id,
+                                    ExprContext::Load,
+                                    self.flags,
+                                    name.range,
+                                );
+                                self.bindings[builtin_id].references.push(reference_id);
+                                self.resolved_names.insert(name.into(), builtin_id);
+                                return ReadResult::Resolved(builtin_id);
+                            }
+                        }
+
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
