@@ -58,7 +58,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// # commonprefix works on non-path strings
 /// os.path.commonprefix(["12345", "12378"])  # "123"
-/// os.path.commonpath(["12345", "12378"])    # ""
+/// os.path.commonpath(["12345", "12378"])  # ""
 /// ```
 ///
 /// ## References
