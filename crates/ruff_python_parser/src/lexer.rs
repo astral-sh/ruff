@@ -1786,7 +1786,6 @@ impl<'src> Lexer<'src> {
             pending_indentation: self.pending_indentation,
             interpolated_strings_checkpoint: self.interpolated_strings.checkpoint(),
             errors_position: self.errors.len(),
-            current_cell: self.current_cell,
         }
     }
 
@@ -1804,7 +1803,6 @@ impl<'src> Lexer<'src> {
             pending_indentation,
             interpolated_strings_checkpoint,
             errors_position,
-            current_cell: _,
         } = checkpoint;
 
         if self.has_cells {
