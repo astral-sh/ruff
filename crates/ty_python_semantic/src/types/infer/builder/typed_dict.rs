@@ -6,6 +6,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    report_cannot_pop_required_field_on_typed_dict, report_invalid_key_on_typed_dict,
 };
 use crate::types::typed_dict::{
     FunctionalTypedDictSpec, TypedDictSchema, functional_typed_dict_field,
@@ -370,5 +371,67 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         false
+    }
+
+    /// Check `pop()` and `setdefault()` calls on a `TypedDict` for a known literal key,
+    /// emitting diagnostics for invalid keys or pop on required fields.
+    ///
+    /// Returns `Some(Unknown)` when a diagnostic was emitted (the caller should return
+    /// this directly); returns `None` to let normal overload resolution proceed.
+    pub(super) fn check_typed_dict_mutation_method(
+        &mut self,
+        value_type: Type<'db>,
+        method_name: &str,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        if !arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let first_arg = arguments.args.first()?;
+        let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            value: key_literal, ..
+        }) = first_arg
+        else {
+            return None;
+        };
+
+        let key = key_literal.to_str();
+
+        let Type::TypedDict(typed_dict_ty) = value_type else {
+            return None;
+        };
+
+        let items = typed_dict_ty.items(self.db());
+
+        if let Some((_, field)) = items
+            .iter()
+            .find(|(field_name, _)| field_name.as_str() == key)
+        {
+            if method_name == "pop" && field.is_required() {
+                report_cannot_pop_required_field_on_typed_dict(
+                    &self.context,
+                    first_arg.into(),
+                    Type::TypedDict(typed_dict_ty),
+                    key,
+                );
+                return Some(Type::unknown());
+            }
+
+            return None;
+        }
+
+        let key_ty = Type::string_literal(self.db(), key);
+        report_invalid_key_on_typed_dict(
+            &self.context,
+            first_arg.into(),
+            first_arg.into(),
+            Type::TypedDict(typed_dict_ty),
+            None,
+            key_ty,
+            items,
+        );
+
+        Some(Type::unknown())
     }
 }
