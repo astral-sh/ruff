@@ -455,8 +455,8 @@ pub(crate) use todo_type;
 /// Represents an instance of `builtins.property`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
-    getter: Option<Type<'db>>,
-    setter: Option<Type<'db>>,
+    pub getter: Option<Type<'db>>,
+    pub setter: Option<Type<'db>>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(

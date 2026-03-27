@@ -46,9 +46,8 @@ use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, definitions_for_attribute,
-    semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_for_name,
+    HasType, SemanticModel, definitions_for_attribute, semantic_index::definition::DefinitionKind,
+    types::Type, types::ide_support::definition_for_name,
 };
 
 /// Semantic token types supported by the language server.
@@ -501,8 +500,11 @@ impl<'db> SemanticTokenVisitor<'db> {
                     // Module accessed as an attribute (e.g., from os import path)
                     token_type.add(SemanticTokenType::Namespace);
                 }
-                Type::PropertyInstance(_) => {
+                Type::PropertyInstance(property) => {
                     token_type.add(SemanticTokenType::Property);
+                    if property.setter(db).is_none() {
+                        modifiers |= SemanticTokenModifier::READONLY;
+                    }
                 }
                 _ => {
                     token_type = UnifiedTokenType::Fallback;
