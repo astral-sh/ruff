@@ -33,6 +33,14 @@ use rustc_hash::FxHashMap;
 /// import bar
 /// ```
 ///
+/// ## Preview
+/// When [preview] is enabled, this rule also flags annotated variable
+/// redeclarations. For example, `bar: int = 1` followed by `bar: int = 2`
+/// will be flagged as a redefinition of an unused variable, whereas plain
+/// reassignments like `bar = 1` followed by `bar = 2` remain unflagged.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+///
 /// ## Options
 ///
 /// This rule ignores dummy variables, as determined by:
