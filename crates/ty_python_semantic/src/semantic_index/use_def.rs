@@ -307,6 +307,11 @@ pub(crate) struct UseDefMap<'db> {
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
+    /// A bitset-like map indicating whether each binding definition has at least one use.
+    ///
+    /// This uses the same index as `all_definitions`.
+    used_bindings: IndexVec<ScopedDefinitionId, bool>,
+
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
 
@@ -394,6 +399,14 @@ pub(crate) enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
+    pub(crate) fn all_definitions_with_usage(
+        &self,
+    ) -> impl Iterator<Item = (ScopedDefinitionId, DefinitionState<'db>, bool)> + '_ {
+        self.all_definitions
+            .iter_enumerated()
+            .map(|(id, &state)| (id, state, self.used_bindings[id]))
+    }
+
     pub(crate) fn bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -895,6 +908,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
+    /// Tracks whether each binding definition has at least one use.
+    ///
+    /// Uses the same index as `all_definitions`.
+    used_bindings: IndexVec<ScopedDefinitionId, bool>,
+
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
 
@@ -947,6 +965,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
+            used_bindings: IndexVec::from_iter([false]),
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
@@ -962,6 +981,13 @@ impl<'db> UseDefMapBuilder<'db> {
             enclosing_snapshots: EnclosingSnapshots::default(),
             is_class_scope,
         }
+    }
+
+    fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
+        let def_id = self.all_definitions.push(state);
+        let used_id = self.used_bindings.push(false);
+        debug_assert_eq!(def_id, used_id);
+        def_id
     }
 
     pub(super) fn mark_unreachable(&mut self) {
@@ -1031,7 +1057,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition
             .insert(binding, bindings.clone());
 
-        let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
+        let def_id = self.push_definition(DefinitionState::Defined(binding));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1279,9 +1305,7 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
-        let def_id = self
-            .all_definitions
-            .push(DefinitionState::Defined(declaration));
+        let def_id = self.push_definition(DefinitionState::Defined(declaration));
 
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
@@ -1311,9 +1335,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
-        let def_id = self
-            .all_definitions
-            .push(DefinitionState::Defined(definition));
+        let def_id = self.push_definition(DefinitionState::Defined(definition));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1347,7 +1369,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
-        let def_id = self.all_definitions.push(DefinitionState::Deleted);
+        let def_id = self.push_definition(DefinitionState::Deleted);
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1380,12 +1402,16 @@ impl<'db> UseDefMapBuilder<'db> {
             let bindings = match place {
                 ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
                 ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
-            };
+            }
+            .clone();
+
+            let binding_definition_ids = bindings.iter().map(|live_binding| live_binding.binding);
+            self.mark_definition_ids_used(binding_definition_ids);
 
             self.multi_bindings_by_use
                 .entry(use_id)
                 .or_default()
-                .push(bindings.clone());
+                .push(bindings);
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
@@ -1393,10 +1419,26 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
+        let binding_definition_ids = bindings.iter().map(|live_binding| live_binding.binding);
+        self.mark_definition_ids_used(binding_definition_ids);
+
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self.bindings_by_use.push(bindings);
         debug_assert_eq!(use_id, new_use);
+    }
+
+    pub(super) fn mark_enclosing_snapshot_bindings_used(
+        &mut self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+    ) {
+        let Some(EnclosingSnapshot::Bindings(bindings)) = self.enclosing_snapshots.get(snapshot_id)
+        else {
+            return;
+        };
+
+        let binding_definition_ids = bindings.iter().map(|b| b.binding).collect::<Vec<_>>();
+        self.mark_definition_ids_used(binding_definition_ids.into_iter());
     }
 
     pub(super) fn record_range_reachability(&mut self, range: TextRange) {
@@ -1456,6 +1498,28 @@ impl<'db> UseDefMapBuilder<'db> {
                 *constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
             }
             None => {}
+        }
+    }
+
+    fn mark_definition_ids_used(
+        &mut self,
+        definition_ids: impl Iterator<Item = ScopedDefinitionId>,
+    ) {
+        for definition_id in definition_ids {
+            self.mark_definition_used(definition_id);
+        }
+    }
+
+    fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
+        if definition_id.is_unbound() {
+            return;
+        }
+
+        if matches!(
+            self.all_definitions[definition_id],
+            DefinitionState::Defined(_)
+        ) {
+            self.used_bindings[definition_id] = true;
         }
     }
 
@@ -1565,6 +1629,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
+        self.used_bindings.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.member_states.shrink_to_fit();
         self.reachable_symbol_definitions.shrink_to_fit();
@@ -1657,6 +1722,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         UseDefMap {
             all_definitions: self.all_definitions,
+            used_bindings: self.used_bindings,
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
             interned_bindings,
