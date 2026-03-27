@@ -144,9 +144,10 @@ class AlsoWrong:
 `InitVar` annotations are not allowed outside of dataclass attribute annotations:
 
 ```py
+from typing import TypedDict
 from dataclasses import InitVar, dataclass
 
-# error: [invalid-type-form] "`InitVar` annotations are only allowed in class-body scopes"
+# error: [invalid-type-form] "`InitVar` is only allowed in dataclass fields"
 x: InitVar[int] = 1
 
 # error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in parameter annotations"
@@ -158,7 +159,11 @@ def g() -> InitVar[int]:
     return 1
 
 class C:
-    # TODO: this would ideally be an error
+    # error: [invalid-type-form] "`InitVar` is only allowed in dataclass fields"
+    x: InitVar[int]
+
+class D(TypedDict):
+    # error: [invalid-type-form] "`InitVar` is not allowed in TypedDict fields"
     x: InitVar[int]
 
 @dataclass

@@ -85,25 +85,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ) -> TypeAndQualifiers<'db> {
             let special_case = match ty {
                 Type::SpecialForm(special_form) => match special_form {
-                    SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => {
-                        if let Some(builder) =
-                            builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                        {
-                            builder.into_diagnostic(
-                                "`InitVar` may not be used without a type argument",
-                            );
+                    SpecialFormType::TypeQualifier(qualifier) => {
+                        match qualifier {
+                            TypeQualifier::InitVar
+                            | TypeQualifier::ReadOnly
+                            | TypeQualifier::NotRequired
+                            | TypeQualifier::Required => {
+                                if let Some(builder) =
+                                    builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "`{}` may not be used without a type argument",
+                                        qualifier.name(),
+                                    ));
+                                }
+                            }
+                            TypeQualifier::ClassVar | TypeQualifier::Final => {}
                         }
+
                         Some(TypeAndQualifiers::new(
                             Type::unknown(),
                             TypeOrigin::Declared,
-                            TypeQualifiers::INIT_VAR,
+                            TypeQualifiers::from(qualifier),
                         ))
                     }
-                    SpecialFormType::TypeQualifier(qualifier) => Some(TypeAndQualifiers::new(
-                        Type::unknown(),
-                        TypeOrigin::Declared,
-                        TypeQualifiers::from(qualifier),
-                    )),
                     SpecialFormType::TypeAlias if pep_613_policy == PEP613Policy::Allowed => {
                         Some(TypeAndQualifiers::declared(ty))
                     }

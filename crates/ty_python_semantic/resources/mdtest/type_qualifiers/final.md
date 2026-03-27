@@ -662,7 +662,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Final, ClassVar, Annotated
+from typing import Final, ClassVar, Annotated, TypedDict
 from ty_extensions import reveal_mro
 
 LEGAL_A: Final[int] = 1
@@ -703,6 +703,18 @@ class Foo(Final[tuple[int]]): ...
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
 # revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
 reveal_mro(Foo)
+
+class Foo(TypedDict):
+    # error: [invalid-type-form] "`Final` is not allowed in TypedDict fields"
+    # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
+    a: Final[int] = 42
+    # error: [invalid-type-form] "`Final` is not allowed in TypedDict fields"
+    # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
+    b: Final = 56
+    # error: [invalid-type-form] "`Final` is not allowed in TypedDict fields"
+    c: Final[int]
+    # error: [invalid-type-form] "`Final` is not allowed in TypedDict fields"
+    d: Final
 ```
 
 ### Attribute assignment outside `__init__`

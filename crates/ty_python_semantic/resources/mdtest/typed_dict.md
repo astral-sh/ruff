@@ -2772,9 +2772,9 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
-### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations
+### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations or return annotations
 
-```py
+```pyi
 from typing_extensions import Required, NotRequired, ReadOnly
 
 def bad(
@@ -2785,29 +2785,62 @@ def bad(
     # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in parameter annotations"
     c: ReadOnly[int],
 ): ...
+
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in return type annotations"
+def bad2() -> Required[int]: ...
+
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in return type annotations"
+def bad2() -> NotRequired[int]: ...
+
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in return type annotations"
+def bad2() -> ReadOnly[int]: ...
 ```
 
-### `Required` and `NotRequired` not allowed outside `TypedDict`
+### `Required`, `NotRequired` and `ReadOnly` require exactly one argument
 
 ```py
-from typing_extensions import Required, NotRequired, TypedDict
+from typing_extensions import TypedDict, ReadOnly, Required, NotRequired
+
+class Foo(TypedDict):
+    a: Required  # error: [invalid-type-form] "`Required` may not be used without a type argument"
+    b: Required[()]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 0"
+    c: Required[int, str]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 2"
+    d: NotRequired  # error: [invalid-type-form] "`NotRequired` may not be used without a type argument"
+    e: NotRequired[()]  # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 0"
+    # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 2"
+    f: NotRequired[int, str]
+    g: ReadOnly  # error: [invalid-type-form] "`ReadOnly` may not be used without a type argument"
+    h: ReadOnly[()]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 0"
+    i: ReadOnly[int, str]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 2"
+```
+
+### `Required`, `NotRequired` and `ReadOnly` are not allowed outside `TypedDict`
+
+```py
+from typing_extensions import Required, NotRequired, TypedDict, ReadOnly
 
 # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
 x: Required[int]
 # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
 y: NotRequired[str]
+# error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+z: ReadOnly[str]
 
 class MyClass:
     # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
     x: Required[int]
     # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
     y: NotRequired[str]
+    # error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+    z: ReadOnly[str]
 
 def f():
     # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
     x: Required[int] = 1
     # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
     y: NotRequired[str] = ""
+    # error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+    z: ReadOnly[str]
 
 # fine
 MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
