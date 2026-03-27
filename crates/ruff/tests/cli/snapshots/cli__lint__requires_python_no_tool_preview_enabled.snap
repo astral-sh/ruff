@@ -73,10 +73,14 @@ file_resolver.project_root = "[TMP]/"
 linter.exclude = []
 linter.project_root = "[TMP]/"
 linter.rules.enabled = [
+	mutable-argument-default (B006),
 	non-pep604-annotation-union (UP007),
 ]
-linter.rules.warn = []
+linter.rules.warn = [
+	mutable-argument-default (B006),
+]
 linter.rules.should_fix = [
+	mutable-argument-default (B006),
 	non-pep604-annotation-union (UP007),
 ]
 linter.per_file_ignores = {}
