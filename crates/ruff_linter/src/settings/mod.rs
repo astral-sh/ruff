@@ -387,7 +387,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_003)), // B003
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_004)), // B004
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_005)), // B005
-    RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_006)), // B006
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_008)), // B008
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_009)), // B009
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_010)), // B010

@@ -874,7 +874,11 @@ impl LintConfiguration {
         let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
 
         // The warn set keeps track of which rules have severity `Warning`.
-        let mut warn_set: RuleSet = RuleSet::empty();
+        let mut warn_set: RuleSet = if preview.mode.is_enabled() {
+            RuleSet::from_rule(Rule::MutableArgumentDefault)
+        } else {
+            RuleSet::empty()
+        };
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
