@@ -47,7 +47,7 @@ use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
     HasType, SemanticModel, definitions_for_attribute, semantic_index::definition::DefinitionKind,
-    types::Type, types::ide_support::definition_for_name,
+    types::PropertyInstanceType, types::Type, types::ide_support::definition_for_name,
 };
 
 /// Semantic token types supported by the language server.
@@ -467,6 +467,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
         }
 
+        let db = self.model.db();
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
 
@@ -475,7 +476,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         let elements = if let Some(union) = ty.as_union() {
-            union.elements(self.model.db())
+            union.elements(db)
         } else {
             std::slice::from_ref(&ty)
         };
@@ -526,24 +527,34 @@ impl<'db> SemanticTokenVisitor<'db> {
         (SemanticTokenType::Variable, modifiers)
     }
 
-    /// Check if an attribute access refers to a property by examining the attribute's
-    /// definition. This is needed because instance-level property access (e.g., `obj.prop`)
-    /// resolves through the descriptor protocol, so the inferred type is the property's
-    /// return type rather than a `PropertyInstance`.
-    fn is_property_from_definition(&self, attr: &ast::ExprAttribute) -> bool {
+    /// Returns the `PropertyInstanceType` for an attribute access if the attribute
+    /// is a property, by examining the attribute's definition. This is needed because
+    /// instance-level property access (e.g., `obj.prop`) resolves through the descriptor
+    /// protocol, so the inferred type is the property's return type rather than a
+    /// `PropertyInstance`.
+    fn property_from_definition<'a>(
+        &self,
+        attr: &ast::ExprAttribute,
+    ) -> Option<PropertyInstanceType<'a>>
+    where
+        'db: 'a,
+    {
         let db = self.model.db();
         let definitions = definitions_for_attribute(self.model, attr);
-        definitions.iter().any(|resolved| {
-            let Some(definition) = resolved.definition() else {
-                return false;
-            };
+        definitions.iter().find_map(|resolved| {
+            let definition = resolved.definition()?;
             if let DefinitionKind::Function(func_ref) = definition.kind(db) {
                 let def_model = SemanticModel::new(db, definition.file(db));
                 let parsed = parsed_module(db, definition.file(db)).load(db);
                 let func_node = func_ref.node(&parsed);
-                matches!(func_node.inferred_type(&def_model), Some(ty) if ty.is_property_instance())
+                if let Some(Type::PropertyInstance(property)) = func_node.inferred_type(&def_model)
+                {
+                    Some(property)
+                } else {
+                    None
+                }
             } else {
-                false
+                None
             }
         })
     }
@@ -921,11 +932,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
-                let (token_type, modifiers) = if self.is_property_from_definition(attr) {
-                    (SemanticTokenType::Property, SemanticTokenModifier::empty())
-                } else {
-                    self.classify_from_type_for_attribute(ty, &attr.attr)
-                };
+                let (token_type, modifiers) =
+                    if let Some(property) = self.property_from_definition(attr) {
+                        let mut modifiers = SemanticTokenModifier::empty();
+                        if property.setter(self.model.db()).is_none() {
+                            modifiers |= SemanticTokenModifier::READONLY;
+                        }
+                        (SemanticTokenType::Property, modifiers)
+                    } else {
+                        self.classify_from_type_for_attribute(ty, &attr.attr)
+                    };
                 self.add_token(&attr.attr, token_type, modifiers);
             }
             ast::Expr::NumberLiteral(_) => {
