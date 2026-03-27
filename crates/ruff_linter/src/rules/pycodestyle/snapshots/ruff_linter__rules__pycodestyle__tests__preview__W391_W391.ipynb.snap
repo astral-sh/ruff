@@ -50,20 +50,15 @@ help: Remove trailing newlines
 14 | 
 
 W391 [*] Too many newlines at end of cell
-  --> W391.ipynb:17:1
+  --> W391.ipynb:19:1
    |
-16 |   1+1
-17 | /
-18 | |
-19 | |
+19 | /
 20 | |
    | |__^
    |
 help: Remove trailing newlines
-15 | 
-16 | 1+1
 17 | 
-   - 
-   - 
+18 | 
+19 | 
    - 
    -
