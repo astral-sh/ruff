@@ -9,6 +9,54 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
+/// Checks for monkeypatching and mocking calls that use a string literal as
+/// an attribute name.
+///
+/// ## Why is this bad?
+/// String literals used as attribute names in monkeypatching and mocking APIs
+/// are opaque references that IDE refactoring tools cannot track. When the
+/// target attribute is renamed, the string literal remains unchanged, causing
+/// the patch to silently fail at runtime.
+///
+/// Use a symbolic reference (e.g., `obj.attr.__name__`) so that mechanical
+/// renames automatically update the reference.
+///
+/// ## Example
+/// ```python
+/// def test_foo(monkeypatch):
+///     monkeypatch.setattr(module, "my_func", replacement)
+///
+///
+/// def test_bar(mocker):
+///     mocker.patch.object(module, "my_func")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo(monkeypatch):
+///     monkeypatch.setattr(module, module.my_func.__name__, replacement)
+///
+///
+/// def test_bar(mocker):
+///     mocker.patch.object(module, module.my_func.__name__)
+/// ```
+///
+/// ## References
+/// - [pytest documentation: monkeypatching](https://docs.pytest.org/en/stable/how-to/monkeypatch.html)
+/// - [Python documentation: `unittest.mock.patch.object`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch.object)
+/// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.15.7")]
+pub(crate) struct PytestMonkeypatchAttrStringLiteral;
+
+impl Violation for PytestMonkeypatchAttrStringLiteral {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Use a symbolic attribute reference instead of a string literal when patching".to_string()
+    }
+}
+
+/// ## What it does
 /// Checks for mocked calls that use a dummy `lambda` function instead of
 /// `return_value`.
 ///
@@ -107,6 +155,46 @@ fn check_patch_call(checker: &Checker, call: &ast::ExprCall, index: usize) {
     }
 
     checker.report_diagnostic(PytestPatchWithLambda, call.func.range());
+}
+
+/// PT032
+pub(crate) fn monkeypatch_attr_string_literal(checker: &Checker, call: &ast::ExprCall) {
+    let Some(name) = UnqualifiedName::from_expr(&call.func) else {
+        return;
+    };
+
+    let attr_param: Option<&str> = match name.segments() {
+        ["monkeypatch", "setattr" | "delattr"] => {
+            // `monkeypatch.setattr` has a 2-argument string form:
+            // `monkeypatch.setattr("pkg.module.attr", value)` where arg[1] is
+            // the replacement value, not the attribute name. Skip that form.
+            let first_arg = call.arguments.find_argument_value("target", 0);
+            if first_arg.is_some_and(|a| matches!(a, Expr::StringLiteral(_))) {
+                return;
+            }
+            Some("name")
+        }
+        [
+            "mocker" | "class_mocker" | "module_mocker" | "package_mocker" | "session_mocker"
+            | "mock",
+            "patch",
+            "object",
+        ]
+        | ["unittest", "mock", "patch", "object"] => Some("attribute"),
+        _ => None,
+    };
+
+    let Some(param_name) = attr_param else {
+        return;
+    };
+
+    let Some(arg) = call.arguments.find_argument_value(param_name, 1) else {
+        return;
+    };
+
+    if matches!(arg, Expr::StringLiteral(_)) {
+        checker.report_diagnostic(PytestMonkeypatchAttrStringLiteral, arg.range());
+    }
 }
 
 /// PT008

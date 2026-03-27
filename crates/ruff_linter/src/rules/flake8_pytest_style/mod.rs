@@ -342,6 +342,12 @@ mod tests {
         Settings::default(),
         "PT031"
     )]
+    #[test_case(
+        Rule::PytestMonkeypatchAttrStringLiteral,
+        Path::new("PT032.py"),
+        Settings::default(),
+        "PT032"
+    )]
     fn test_pytest_style(
         rule_code: Rule,
         path: &Path,

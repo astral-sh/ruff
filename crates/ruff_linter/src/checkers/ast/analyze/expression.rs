@@ -1015,6 +1015,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::RepeatedKeywordArgument) {
                 pylint::rules::repeated_keyword_argument(checker, call);
             }
+            if checker.is_rule_enabled(Rule::PytestMonkeypatchAttrStringLiteral) {
+                flake8_pytest_style::rules::monkeypatch_attr_string_literal(checker, call);
+            }
             if checker.is_rule_enabled(Rule::PytestPatchWithLambda) {
                 flake8_pytest_style::rules::patch_with_lambda(checker, call);
             }

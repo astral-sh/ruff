@@ -1,0 +1,107 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:63:33
+   |
+62 | def test_monkeypatch_setattr_string_literal(monkeypatch):
+63 |     monkeypatch.setattr(module, "my_func", lambda: None)  # PT032
+   |                                 ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:67:33
+   |
+66 | def test_monkeypatch_setattr_string_literal_raising(monkeypatch):
+67 |     monkeypatch.setattr(module, "my_func", lambda: None, raising=False)  # PT032
+   |                                 ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:71:38
+   |
+70 | def test_monkeypatch_setattr_string_keyword(monkeypatch):
+71 |     monkeypatch.setattr(module, name="my_func", value=lambda: None)  # PT032
+   |                                      ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:75:33
+   |
+74 | def test_monkeypatch_delattr_string_literal(monkeypatch):
+75 |     monkeypatch.delattr(module, "my_func")  # PT032
+   |                                 ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:79:38
+   |
+78 | def test_monkeypatch_delattr_string_keyword(monkeypatch):
+79 |     monkeypatch.delattr(module, name="my_func")  # PT032
+   |                                      ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:83:33
+   |
+82 | def test_mocker_patch_object_string_literal(mocker):
+83 |     mocker.patch.object(module, "my_func")  # PT032
+   |                                 ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:87:43
+   |
+86 | def test_mocker_patch_object_string_keyword(mocker):
+87 |     mocker.patch.object(module, attribute="my_func")  # PT032
+   |                                           ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:91:39
+   |
+90 | def test_mocker_patch_object_string_literal_class_mocker(class_mocker):
+91 |     class_mocker.patch.object(module, "my_func")  # PT032
+   |                                       ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:95:40
+   |
+94 | def test_mocker_patch_object_string_literal_module_mocker(module_mocker):
+95 |     module_mocker.patch.object(module, "my_func")  # PT032
+   |                                        ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+  --> PT032.py:99:41
+   |
+98 | def test_mocker_patch_object_string_literal_package_mocker(package_mocker):
+99 |     package_mocker.patch.object(module, "my_func")  # PT032
+   |                                         ^^^^^^^^^
+   |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+   --> PT032.py:103:41
+    |
+102 | def test_mocker_patch_object_string_literal_session_mocker(session_mocker):
+103 |     session_mocker.patch.object(module, "my_func")  # PT032
+    |                                         ^^^^^^^^^
+    |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+   --> PT032.py:107:31
+    |
+106 | def test_mocker_patch_object_string_literal_mock(mock):
+107 |     mock.patch.object(module, "my_func")  # PT032
+    |                               ^^^^^^^^^
+    |
+
+PT032 Use a symbolic attribute reference instead of a string literal when patching
+   --> PT032.py:111:45
+    |
+110 | def test_unittest_mock_patch_object_string_literal():
+111 |     with unittest.mock.patch.object(module, "my_func"):  # PT032
+    |                                             ^^^^^^^^^
+112 |         pass
+    |
