@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::CellMetadata;
 use crate::schema::{Cell, SourceValue};
+use crate::{CellMetadata, SYNTHETIC_CELL_SEPARATOR};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -336,7 +336,7 @@ impl CellOffsets {
         self.ranges().map(|range| {
             let end = range
                 .end()
-                .checked_sub(TextSize::new(1))
+                .checked_sub(TextSize::of(SYNTHETIC_CELL_SEPARATOR))
                 .expect("cell ranges should include the synthetic separator newline");
             TextRange::new(range.start(), end)
         })

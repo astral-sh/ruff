@@ -77,9 +77,24 @@ fn notebook_newline_diagnostics(
     cell_offsets: &CellOffsets,
     context: &LintContext,
 ) {
+    let mut remaining_tokens = &tokens[..];
+
     for range in cell_offsets.content_ranges() {
-        let mut tokens_iter = tokens.in_range(range).iter().rev().peekable();
+        let start_index = remaining_tokens
+            .iter()
+            .position(|token| token.end() > range.start())
+            .unwrap_or(remaining_tokens.len());
+        remaining_tokens = &remaining_tokens[start_index..];
+
+        let end_index = remaining_tokens
+            .iter()
+            .position(|token| token.start() >= range.end())
+            .unwrap_or(remaining_tokens.len());
+        let (cell_tokens, rest) = remaining_tokens.split_at(end_index);
+
+        let mut tokens_iter = cell_tokens.iter().rev().peekable();
         newline_diagnostic(&mut tokens_iter, true, context);
+        remaining_tokens = rest;
     }
 }
 
