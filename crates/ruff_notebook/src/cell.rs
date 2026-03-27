@@ -329,6 +329,18 @@ impl CellOffsets {
             .tuple_windows()
             .map(|(start, end)| TextRange::new(*start, *end))
     }
+
+    /// Returns an iterator over the concatenated source ranges covered by each cell's actual
+    /// contents, excluding Ruff's synthetic trailing newline separator.
+    pub fn content_ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.ranges().map(|range| {
+            let end = range
+                .end()
+                .checked_sub(TextSize::new(1))
+                .expect("cell ranges should include the synthetic separator newline");
+            TextRange::new(range.start(), end)
+        })
+    }
 }
 
 impl Deref for CellOffsets {
