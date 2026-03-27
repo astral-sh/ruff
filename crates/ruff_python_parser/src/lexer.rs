@@ -1449,10 +1449,8 @@ impl<'src> Lexer<'src> {
                 // At a cell boundary, report the nesting error and advance past the boundary.
                 // Remaining dedents will be flushed on subsequent next_token() calls.
                 self.cursor.next_cell();
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::Eof,
-                    self.token_range(),
-                ));
+                return self
+                    .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
             }
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
