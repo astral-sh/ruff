@@ -347,6 +347,20 @@ my_isinstance(1, 1)
 my_isinstance(1, (int, (str, 1)))
 ```
 
+## Materialization of self-referential generic PEP 613 type aliases
+
+```py
+from typing import TypeAlias, TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
+```
+
 ## Conditionally imported on Python < 3.10
 
 ```toml

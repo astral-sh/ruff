@@ -86,6 +86,35 @@ fn divergent_type() {
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
+    let visitor = ApplyTypeMappingVisitor::default();
+    let top_div = div.materialize(&db, MaterializationKind::Top, &visitor);
+    let bottom_div = div.materialize(&db, MaterializationKind::Bottom, &visitor);
+
+    assert!(top_div.is_divergent());
+    assert!(bottom_div.is_divergent());
+    assert!(top_div.is_object());
+    assert!(!top_div.is_never());
+    assert!(!bottom_div.is_object());
+    assert!(bottom_div.is_never());
+    assert_eq!(top_div.negate(&db), bottom_div);
+    assert_eq!(bottom_div.negate(&db), top_div);
+    assert!(
+        KnownClass::Int
+            .to_instance(&db)
+            .is_assignable_to(&db, top_div)
+    );
+    assert!(!top_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
+    assert!(bottom_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
+    assert!(
+        !KnownClass::Int
+            .to_instance(&db)
+            .is_assignable_to(&db, bottom_div)
+    );
+    assert_eq!(top_div.recursive_type_normalized_impl(&db, div, true), None);
+    assert_eq!(
+        bottom_div.recursive_type_normalized_impl(&db, div, true),
+        None
+    );
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
