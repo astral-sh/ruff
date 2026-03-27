@@ -1050,10 +1050,9 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let checker = TypeRelationChecker::new(
+        let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
-            TypeRelation::Subtyping,
             &relation_visitor,
             &disjointness_visitor,
         );
@@ -1556,6 +1555,24 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the converter input type for a dataclass field, if the field has a `converter`.
+    pub(super) fn converter_input_type_for_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.converter_input_type_for_field(db, name)
+            }
+            Self::Generic(generic) => generic
+                .origin(db)
+                .converter_input_type_for_field(db, name)
+                .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => None,
+        }
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
@@ -1843,6 +1860,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Fast path: if source and target are the same class (possibly with different
+        // specializations), we can compare them directly without walking the MRO.
+        match (source, target) {
+            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+                return self.always();
+            }
+            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
+                if source_alias.origin(db) == target_alias.origin(db) =>
+            {
+                return self.check_specialization_pair(
+                    db,
+                    source_alias.specialization(db),
+                    target_alias.specialization(db),
+                );
+            }
+            _ => {}
+        }
+
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match self.relation {
@@ -1945,6 +1980,10 @@ pub(crate) enum FieldKind<'db> {
         kw_only: Option<bool>,
         /// The name for this field in the `__init__` signature, if specified.
         alias: Option<Box<str>>,
+        /// The converter types for this field, if a `converter` was specified.
+        /// The first element is the input type (first positional parameter), the second is the
+        /// output type (return type of the converter callable).
+        converter: Option<(Type<'db>, Type<'db>)>,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -2003,6 +2042,47 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) => TypeVarVariance::Bivariant,
         }
     }
+}
+
+pub(super) fn synthesize_typed_dict_update_member<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    keyword_parameters: &[Parameter<'db>],
+) -> Type<'db> {
+    let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
+        Type::TypedDict(typed_dict.to_update_patch(db))
+    } else {
+        instance_ty
+    };
+
+    let value_ty = UnionBuilder::new(db)
+        .add(update_patch_ty)
+        .add(KnownClass::Iterable.to_specialized_instance(
+            db,
+            &[Type::heterogeneous_tuple(
+                db,
+                [KnownClass::Str.to_instance(db), Type::object()],
+            )],
+        ))
+        .build();
+
+    let update_signature = Signature::new(
+        Parameters::new(
+            db,
+            [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(value_ty)
+                    .with_default_type(Type::none(db)),
+            ]
+            .into_iter()
+            .chain(keyword_parameters.iter().cloned()),
+        ),
+        Type::none(db),
+    );
+
+    Type::function_like_callable(db, update_signature)
 }
 
 /// Performs member lookups over an MRO (Method Resolution Order).

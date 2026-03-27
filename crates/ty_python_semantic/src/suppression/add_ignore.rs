@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 
 use crate::Db;
 use crate::lint::LintId;
-use crate::suppression::{SuppressionTarget, Suppressions, suppressions};
+use crate::suppression::{SuppressionKind, SuppressionTarget, Suppressions, suppressions};
 
 /// Creates fixes to suppress all violations in `ids_with_range`.
 ///
@@ -183,7 +183,10 @@ fn append_to_existing_or_add_end_of_line_suppression(
         up_to_line_end.trim_end_matches(|c| !matches!(c, '\n' | '\r') && c.is_whitespace());
     let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();
 
-    let insertion = format!("  # ty:ignore[{codes}]", codes = Codes(codes));
+    let insertion = format!(
+        "  # ty:ignore[{codes}]",
+        codes = Codes(SuppressionKind::Ty, codes)
+    );
 
     Fix::safe_edit(if trailing_whitespace_len == TextSize::ZERO {
         Edit::insertion(insertion, line_end)
@@ -218,9 +221,9 @@ fn add_to_existing_suppression(
     let up_to_last_code = before_closing_paren.trim_end();
 
     let insertion = if up_to_last_code.ends_with(',') {
-        format!(" {codes}", codes = Codes(codes))
+        format!(" {codes}", codes = Codes(existing.kind, codes))
     } else {
-        format!(", {codes}", codes = Codes(codes))
+        format!(", {codes}", codes = Codes(existing.kind, codes))
     };
 
     let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
@@ -231,10 +234,18 @@ fn add_to_existing_suppression(
     )))
 }
 
-struct Codes<'a>(&'a [LintName]);
+struct Codes<'a>(SuppressionKind, &'a [LintName]);
 
 impl std::fmt::Display for Codes<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.join(", ").entries(self.0).finish()
+        let mut joiner = f.join(", ");
+
+        let namespace = if self.0.is_type_ignore() { "ty:" } else { "" };
+
+        for item in self.1 {
+            joiner.entry(&format_args!("{namespace}{item}"));
+        }
+
+        joiner.finish()
     }
 }

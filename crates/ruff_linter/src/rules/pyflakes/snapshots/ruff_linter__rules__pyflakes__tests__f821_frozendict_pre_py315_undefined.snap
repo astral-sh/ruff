@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `frozendict`. Consider specifying `requires-python = ">= 3.15"` or `tool.ruff.target-version = "py315"` in your `pyproject.toml` file.
+ --> <filename>:1:1
+  |
+1 | frozendict
+  | ^^^^^^^^^^
+  |

@@ -188,6 +188,9 @@ isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 <!-- snapshot-diagnostics -->
 
 ```py
-raise NotImplemented()  # error: [call-non-callable]
-raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+def _():
+    raise NotImplemented()  # error: [call-non-callable]
+
+def _():
+    raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
 ```

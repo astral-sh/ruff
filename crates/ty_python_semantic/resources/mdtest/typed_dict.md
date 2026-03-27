@@ -45,10 +45,100 @@ reveal_type(bob["age"])  # revealed: int | None
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
+If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
+extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
+
+```py
+from typing import Any
+
+class FormatterConfig(TypedDict, total=False):
+    format: str
+
+def takes_formatter(config: FormatterConfig | dict[str, Any]) -> None: ...
+
+takes_formatter({"format": "%(message)s"})
+takes_formatter({"factory": object(), "facility": "local0"})
+```
+
 Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
 bob.update(age=26)
+bob.update({"age": 27})
+
+class NamePatch(TypedDict, total=False):
+    name: str
+
+name_update: NamePatch = {"name": "Bobby"}
+string_key_updates: list[tuple[str, str]] = [("name", "Bobby")]
+bad_key_updates: list[tuple[int, str]] = [(1, "Bobby")]
+
+bob.update(name_update)
+bob.update({"name": "Robert"})
+bob.update([("name", "Bobby")])
+bob.update([("age", 27)])
+bob.update(name_update, age=26)
+bob.update([("name", "Bobby")], age=26)
+
+# error: [invalid-argument-type]
+bob.update(age="bad")
+
+# error: [unknown-argument]
+bob.update(other=1)
+
+# error: [invalid-argument-type]
+bob.update(name_update, age="bad")
+
+# error: [unknown-argument]
+bob.update(name_update, other=1)
+
+# error: [invalid-argument-type]
+# error: [invalid-key]
+bob.update({"other": 1})
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+bob.update({"age": "bad"})
+
+bob.update([("other", 1)])
+
+bob.update([("age", "bad")])
+
+bob.update(string_key_updates)
+
+# error: [invalid-argument-type]
+bob.update(bad_key_updates)
+```
+
+`update()` treats the patch operand as partial even when the target `TypedDict` uses `Required` and
+`NotRequired`:
+
+```py
+from typing_extensions import NotRequired, Required
+
+class Movie(TypedDict, total=False):
+    title: Required[str]
+    year: int
+    director: NotRequired[str]
+
+class MissingRequiredTitle(TypedDict, total=False):
+    year: int
+
+movie: Movie = {"title": "Alien"}
+missing_required_title: MissingRequiredTitle = {"year": 1986}
+
+movie.update(year=1986)
+movie.update(director="Cameron")
+movie.update({"title": "Aliens"})
+movie.update({"director": "Cameron"})
+movie.update(missing_required_title)
+
+# error: [invalid-argument-type]
+movie.update(title=1986)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+movie.update({"director": 1986})
 ```
 
 PEP 584-style immutable updates preserve the `TypedDict` type when the other operand is compatible:
@@ -438,6 +528,13 @@ class Foo(TypedDict):
 
 x1: Foo | None = {"foo": 1}
 reveal_type(x1)  # revealed: Foo
+
+# A union with no dict-compatible fallback should still validate eagerly against the
+# TypedDict arm.
+# error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `Foo` constructor"
+# error: [invalid-key] "Unknown key "bar" for TypedDict `Foo`"
+x1_bad: Foo | None = {"bar": 1}
+reveal_type(x1_bad)  # revealed: Foo | None
 
 class Bar(TypedDict):
     bar: int
@@ -1560,16 +1657,61 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
+## `update()` with `ReadOnly` items
+
+`update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
+therefore cannot be present:
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class ReadOnlyPerson(TypedDict):
+    id: ReadOnly[int]
+    age: int
+
+class AgePatch(TypedDict, total=False):
+    age: int
+
+class IdPatch(TypedDict, total=False):
+    id: int
+
+class ImpossibleIdPatch(TypedDict, total=False):
+    id: NotRequired[Never]
+
+person: ReadOnlyPerson = {"id": 1, "age": 30}
+age_patch: AgePatch = {"age": 31}
+id_patch: IdPatch = {"id": 2}
+impossible_id_patch: ImpossibleIdPatch = {}
+
+person.update(age_patch)
+
+# error: [invalid-argument-type]
+person.update(id_patch)
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+person.update({"id": 2})
+
+# error: [invalid-argument-type]
+person.update(id=2)
+
+person.update(impossible_id_patch)
+```
+
 ## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
 from typing_extensions import NotRequired
 
+class Inner(TypedDict):
+    inner: int
+
 class Person(TypedDict):
     name: str
     age: int | None
     extra: NotRequired[str]
+    inner: NotRequired[Inner]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
@@ -1589,6 +1731,10 @@ def _(p: Person) -> None:
 
     # The type of the default parameter can be anything:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # Even another typed dict:
+    # TODO: This should evaluate to `Inner`.
+    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner | dict[str, int]
 
     # We allow access to unknown keys (they could be set for a subtype of Person)
     reveal_type(p.get("unknown"))  # revealed: Unknown | None

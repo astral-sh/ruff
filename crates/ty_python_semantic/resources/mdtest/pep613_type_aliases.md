@@ -237,8 +237,7 @@ from typing_extensions import Callable, Concatenate, TypeAliasType
 MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
-    # TODO: should be (int, / ...) -> str
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
 
 T = TypeVar("T")
 
@@ -270,8 +269,7 @@ def _(x: ListOrDict[int]):
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
 
 def _(c: MyAlias7[int]):
-    # TODO: should be (int, / ...) -> None
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (int, /, *args: Any, **kwargs: Any) -> None
 ```
 
 ## Imported
@@ -486,6 +484,19 @@ bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 # `Unpack` is not a type qualifier, and so the error message in our diagnostic
 # shouldn't say that it is.
 differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+```
+
+## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing import TypeAlias
+from typing_extensions import TypeGuard, TypeIs
+
+RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
+RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
+
+AliasIs: TypeAlias = RecursiveIs
+AliasGuard: TypeAlias = RecursiveGuard
 ```
 
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

@@ -1397,10 +1397,14 @@ fn add_argument_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
+    let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
         match node {
-            ast::AnyNodeRef::ExprCall(call) => {
-                if call.arguments.range().contains_range(cursor.range) {
+            ast::AnyNodeRef::Arguments(_) => {
+                in_arguments = true;
+            }
+            ast::AnyNodeRef::ExprCall(_) => {
+                if in_arguments {
                     add_function_arg_completions(db, model.file(), cursor, completions);
                 }
                 return;
@@ -5463,6 +5467,21 @@ def test_point(p2: Point):
 "#,
         );
         builder.build().contains("orthogonal_direction");
+    }
+
+    // https://github.com/astral-sh/ty/issues/3087
+    #[test]
+    fn no_panic_argument_completion_before_paren() {
+        let builder = completion_test_builder(
+            r#"
+list[int]<CURSOR>()
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"<No completions found after filtering out completions>",
+        );
     }
 
     #[test]

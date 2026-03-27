@@ -41,7 +41,6 @@ pub(crate) struct InferContext<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     no_type_check: InNoTypeCheck,
-    multi_inference: bool,
     bomb: DebugDropBomb,
 }
 
@@ -52,7 +51,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             scope,
             module,
             file: scope.file(db),
-            multi_inference: false,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             no_type_check: InNoTypeCheck::default(),
             bomb: DebugDropBomb::new(
@@ -98,9 +96,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        if !self.is_in_multi_inference() {
-            self.diagnostics.get_mut().extend(other);
-        }
+        self.diagnostics.get_mut().extend(other);
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
@@ -165,18 +161,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
-    /// Returns `true` if the current expression is being inferred for a second
-    /// (or subsequent) time, with a potentially different bidirectional type
-    /// context.
-    pub(super) fn is_in_multi_inference(&self) -> bool {
-        self.multi_inference
-    }
-
-    /// Set the multi-inference state, returning the previous value.
-    pub(super) fn set_multi_inference(&mut self, multi_inference: bool) -> bool {
-        std::mem::replace(&mut self.multi_inference, multi_inference)
-    }
-
     pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) -> InNoTypeCheck {
         std::mem::replace(&mut self.no_type_check, no_type_check)
     }
@@ -211,9 +195,23 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         }
     }
 
+    /// Check whether a diagnostic emitted at `range` is in reachable code.
+    ///
+    /// This checks both whether the scope itself is reachable and whether the
+    /// specific statement or expression containing this range is reachable.
+    fn is_range_reachable(&self, range: TextRange) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let scope_id = self.scope.file_scope_id(self.db);
+        index.is_range_reachable(self.db, scope_id, range)
+    }
+
     /// Are we currently inferring types in a stub file?
     pub(crate) fn in_stub(&self) -> bool {
         self.file.is_stub(self.db())
+    }
+
+    pub(crate) fn defuse(&mut self) {
+        self.bomb.defuse();
     }
 
     #[must_use]
@@ -437,11 +435,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         if ctx.is_in_no_type_check() {
             return None;
         }
-        // If this lint is being reported as part of multi-inference of a given expression,
-        // silence it to avoid duplicated diagnostics.
-        if ctx.is_in_multi_inference() {
-            return None;
-        }
 
         Some((severity, source))
     }
@@ -458,6 +451,13 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let suppressions = suppressions(ctx.db(), ctx.file());
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
+            return None;
+        }
+
+        // Suppress diagnostics in unreachable code. This checks both whether
+        // the scope itself is unreachable and whether the specific statement or
+        // expression containing this diagnostic is unreachable.
+        if !ctx.is_range_reachable(range) {
             return None;
         }
 
@@ -522,11 +522,6 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
         if !ctx.db.should_check_file(ctx.file) {
-            return None;
-        }
-        // If this lint is being reported as part of multi-inference of a given expression,
-        // silence it to avoid duplicated diagnostics.
-        if ctx.is_in_multi_inference() {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

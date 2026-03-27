@@ -20,11 +20,11 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
@@ -139,6 +139,16 @@ impl<'db> Type<'db> {
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
             SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
+        ))
+    }
+
+    /// Synthesize a protocol instance type with a given set of methods.
+    pub(super) fn protocol_with_methods<'a, M>(db: &'db dyn Db, methods: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, methods)),
         ))
     }
 }
@@ -705,10 +715,9 @@ impl<'db> ProtocolInstanceType<'db> {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let checker = TypeRelationChecker::new(
+            let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
-                TypeRelation::Subtyping,
                 &relation_visitor,
                 &disjointness_visitor,
             );

@@ -329,6 +329,32 @@ impl PartialEq<UnixLibDir> for &str {
     }
 }
 
+/// The subdirectory name under a version-specific Python lib directory
+/// that contains installed packages.
+///
+/// For example, `site-packages` (the standard layout) or `dist-packages`
+/// (used by Debian/Ubuntu for system-managed packages).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::EnumIter)]
+enum InstallationDir {
+    SitePackages,
+    DistPackages,
+}
+
+impl InstallationDir {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::SitePackages => "site-packages",
+            Self::DistPackages => "dist-packages",
+        }
+    }
+}
+
+impl std::fmt::Display for InstallationDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// The Python runtime that produced the venv.
 ///
 /// We only need to distinguish cases that change the on-disk layout.
@@ -345,41 +371,6 @@ pub(crate) enum PythonImplementation {
 }
 
 impl PythonImplementation {
-    /// Return the relative path from `sys.prefix` to the `site-packages` directory
-    /// if this is a known implementation. Return `None` if this is an unknown implementation.
-    fn relative_site_packages_path(
-        self,
-        lib_dir: UnixLibDir,
-        version: Option<PythonVersion>,
-    ) -> Option<String> {
-        match self {
-            Self::CPython | Self::GraalPy => {
-                version.map(|version| format!("{lib_dir}/python{version}/site-packages"))
-            }
-            Self::PyPy => version.map(|version| format!("{lib_dir}/pypy{version}/site-packages")),
-            Self::Unknown => None,
-        }
-    }
-
-    /// Return the relative path from `sys.prefix` to the `dist-packages` directory
-    /// if this is a known implementation. Return `None` if this is an unknown implementation.
-    ///
-    /// `dist-packages` is a Debian/Ubuntu-specific directory where system-installed
-    /// Python packages are placed (as opposed to the standard `site-packages` location).
-    fn relative_dist_packages_path(
-        self,
-        lib_dir: UnixLibDir,
-        version: Option<PythonVersion>,
-    ) -> Option<String> {
-        match self {
-            Self::CPython | Self::GraalPy => {
-                version.map(|version| format!("{lib_dir}/python{version}/dist-packages"))
-            }
-            Self::PyPy => version.map(|version| format!("{lib_dir}/pypy{version}/dist-packages")),
-            Self::Unknown => None,
-        }
-    }
-
     /// Return the relative path from `sys.prefix` to the directory containing the python stdlib's
     /// .pys if this is a known implementation. Return `None` if this is an unknown implementation.
     fn relative_stdlib_path(self, version: Option<PythonVersion>) -> Option<String> {
@@ -1191,6 +1182,115 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
     }
 }
 
+/// Probe exact package directories under `prefix_dir` for a known Python version.
+///
+/// Discovers directories in the form `{prefix_dir}/{python,pypy}X.Y[t]/{suffix}`, where `suffix`
+/// will typically be `site-packages` (but sometimes `dist-packages` on Debian).
+///
+/// If implementation is `Unknown`, probe CPython-style paths first, then PyPy-style paths.
+fn probe_package_dirs(
+    prefix_dir: &SystemPath,
+    suffix: InstallationDir,
+    python_version: PythonVersion,
+    implementation: PythonImplementation,
+    system: &dyn System,
+    directories: &mut SitePackagesPaths,
+) {
+    // Try to insert the CPython-style package path into `directories`.
+    // Returns `true` if a matching directory was found, so the caller can
+    // decide whether to fall back to probing other implementations.
+    let probe_cpython_path = |directories: &mut SitePackagesPaths| {
+        let path = prefix_dir.join(format!("python{python_version}/{suffix}"));
+        if system.is_directory(&path) {
+            directories.insert(path);
+            true
+        } else if python_version.free_threaded_build_available() {
+            // CPython free-threaded (3.13+) variant: pythonX.Yt
+            let alt = prefix_dir.join(format!("python{python_version}t/{suffix}"));
+            if system.is_directory(&alt) {
+                directories.insert(alt);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    };
+
+    // Try to insert the PyPy-style package path into `directories`.
+    // Returns `true` if a matching directory was found.
+    let probe_pypy_path = |directories: &mut SitePackagesPaths| {
+        let path = prefix_dir.join(format!("pypy{python_version}/{suffix}"));
+        if system.is_directory(&path) {
+            directories.insert(path);
+            true
+        } else {
+            false
+        }
+    };
+
+    match implementation {
+        PythonImplementation::CPython | PythonImplementation::GraalPy => {
+            probe_cpython_path(directories);
+        }
+        PythonImplementation::PyPy => {
+            probe_pypy_path(directories);
+        }
+        PythonImplementation::Unknown => {
+            if !probe_cpython_path(directories) {
+                probe_pypy_path(directories);
+            }
+        }
+    }
+}
+
+/// Discover package directories under `prefix_dir` when the Python version is unknown.
+///
+/// Scans `prefix_dir` for subdirectories matching `{python,pypy}3.X` and checks each
+/// for the given `suffixes` (typically `site-packages` and `dist-packages`).
+fn discover_package_dirs(
+    prefix_dir: &SystemPath,
+    suffixes: &(impl IntoIterator<Item = InstallationDir> + Clone),
+    implementation: PythonImplementation,
+    system: &dyn System,
+    directories: &mut SitePackagesPaths,
+) {
+    let Ok(dir_iter) = system.read_directory(prefix_dir) else {
+        return;
+    };
+
+    for entry_result in dir_iter {
+        let Ok(entry) = entry_result else { continue };
+        if !entry.file_type().is_directory() {
+            continue;
+        }
+        let path = entry.into_path();
+        let name = path.file_name().unwrap_or_else(|| {
+            panic!("File name should be non-null because path is guaranteed to be a child of `{prefix_dir}`")
+        });
+
+        let matches_implementation = match implementation {
+            PythonImplementation::CPython | PythonImplementation::GraalPy => {
+                name.starts_with("python3.")
+            }
+            PythonImplementation::PyPy => name.starts_with("pypy3."),
+            PythonImplementation::Unknown => {
+                name.starts_with("python3.") || name.starts_with("pypy3.")
+            }
+        };
+
+        if matches_implementation {
+            for suffix in suffixes.clone() {
+                let candidate = path.join(suffix.as_str());
+                if system.is_directory(&candidate) {
+                    directories.insert(candidate);
+                }
+            }
+        }
+    }
+}
+
 /// Attempt to retrieve the `site-packages` directories
 /// associated with a given Python installation.
 ///
@@ -1248,38 +1348,59 @@ fn site_packages_directories_from_sys_prefix(
     // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
 
     let mut directories = SitePackagesPaths::default();
+    let is_debian_system_prefix = sys_prefix_path.as_str() == "/usr";
 
-    // If we were able to figure out what Python version this installation is,
-    // we should be able to avoid iterating through all items in the `lib/` and `lib64/` directories:
-    for lib_dir in UnixLibDir::iter() {
-        if let Some(expected_relative_path) =
-            implementation.relative_site_packages_path(lib_dir, python_version)
-        {
-            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
-            if system.is_directory(&expected_absolute_path) {
-                directories.insert(expected_absolute_path);
-            } else if matches!(implementation, PythonImplementation::CPython)
-                && python_version.is_some_and(PythonVersion::free_threaded_build_available)
-            {
-                // CPython free-threaded (3.13+) variant: pythonX.Yt
-                let alternative_path = sys_prefix_path.join(format!(
-                    "{lib_dir}/python{}t/site-packages",
-                    python_version.unwrap()
-                ));
-                if system.is_directory(&alternative_path) {
-                    directories.insert(alternative_path);
-                }
-            }
+    // On Debian/Ubuntu with sys.prefix=/usr, pip-installed packages go to
+    // /usr/local/lib/pythonX.Y/dist-packages and take priority over system
+    // packages in /usr/lib (they appear earlier in sys.path at runtime).
+    // Insert these first for correct precedence.
+    // Only check /usr/local/lib (not lib64): Debian/Ubuntu pip installs
+    // do not use /usr/local/lib64.
+    if let Some(python_version) = python_version {
+        if is_debian_system_prefix {
+            probe_package_dirs(
+                SystemPath::new("/usr/local/lib"),
+                InstallationDir::DistPackages,
+                python_version,
+                implementation,
+                system,
+                &mut directories,
+            );
         }
 
-        // Also check for `dist-packages`, which is used on Debian/Ubuntu for system-installed packages
-        if let Some(expected_relative_path) =
-            implementation.relative_dist_packages_path(lib_dir, python_version)
-        {
-            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
-            if system.is_directory(&expected_absolute_path) {
-                directories.insert(expected_absolute_path);
+        for lib_dir in UnixLibDir::iter() {
+            let prefix = sys_prefix_path.join(lib_dir);
+            for suffix in InstallationDir::iter() {
+                probe_package_dirs(
+                    &prefix,
+                    suffix,
+                    python_version,
+                    implementation,
+                    system,
+                    &mut directories,
+                );
             }
+        }
+    } else {
+        if is_debian_system_prefix {
+            discover_package_dirs(
+                SystemPath::new("/usr/local/lib"),
+                &[InstallationDir::DistPackages],
+                implementation,
+                system,
+                &mut directories,
+            );
+        }
+
+        for lib_dir in UnixLibDir::iter() {
+            let prefix = sys_prefix_path.join(lib_dir);
+            discover_package_dirs(
+                &prefix,
+                &InstallationDir::iter(),
+                implementation,
+                system,
+                &mut directories,
+            );
         }
     }
 
@@ -1296,69 +1417,10 @@ fn site_packages_directories_from_sys_prefix(
         }
     }
 
-    if !directories.is_empty() {
-        return Ok(directories);
-    }
-
-    // Either we couldn't figure out the version before calling this function
-    // (e.g., from a `pyvenv.cfg` file if this was a venv),
-    // or we couldn't find a `site-packages` folder at the expected location given
-    // the parsed version
-    //
-    // Note: the `python3.x` part of the `site-packages` path can't be computed from
-    // the `--python-version` the user has passed, as they might be running Python 3.12 locally
-    // even if they've requested that we type check their code "as if" they're running 3.8.
-    let mut found_at_least_one_lib_dir = false;
-
-    for lib_dir in UnixLibDir::iter() {
-        let Ok(directory_iterator) = system.read_directory(&sys_prefix_path.join(lib_dir)) else {
-            tracing::debug!("Could not find a `<sys.prefix>/{lib_dir}` directory; continuing");
-            continue;
-        };
-
-        found_at_least_one_lib_dir = true;
-
-        for entry_result in directory_iterator {
-            let Ok(entry) = entry_result else {
-                continue;
-            };
-
-            if !entry.file_type().is_directory() {
-                continue;
-            }
-
-            let path = entry.into_path();
-
-            let name = path.file_name().unwrap_or_else(|| panic!(
-                "File name should be non-null because path is guaranteed to be a child of `{lib_dir}`",
-            ));
-
-            // Check for version-specific directories (e.g., python3.12, pypy3.10)
-            if name.starts_with("python3.") || name.starts_with("pypy3.") {
-                // Check both site-packages and dist-packages
-                let site_packages = path.join("site-packages");
-                if system.is_directory(&site_packages) {
-                    directories.insert(site_packages);
-                }
-
-                let dist_packages = path.join("dist-packages");
-                if system.is_directory(&dist_packages) {
-                    directories.insert(dist_packages);
-                }
-            }
-
-            // Also check Debian's python3 directory (without minor version)
-            if name == "python3" {
-                let dist_packages = path.join("dist-packages");
-                if system.is_directory(&dist_packages) {
-                    directories.insert(dist_packages);
-                }
-            }
-        }
-    }
-
     if directories.is_empty() {
-        if found_at_least_one_lib_dir {
+        let any_lib_dir =
+            UnixLibDir::iter().any(|lib_dir| system.is_directory(&sys_prefix_path.join(lib_dir)));
+        if any_lib_dir {
             Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
                 sys_prefix_path.to_owned(),
                 system.dyn_clone(),
@@ -1849,6 +1911,24 @@ mod tests {
         implementation_field: Option<&'static str>,
     }
 
+    impl VirtualEnvironmentTestCase {
+        fn implementation(&self) -> PythonImplementation {
+            let Some((_, implementation)) = self
+                .implementation_field
+                .and_then(|field| field.split_once('='))
+            else {
+                return PythonImplementation::CPython;
+            };
+
+            match implementation.trim().to_ascii_lowercase().as_str() {
+                "cpython" => PythonImplementation::CPython,
+                "graalvm" => PythonImplementation::GraalPy,
+                "pypy" => PythonImplementation::PyPy,
+                _ => PythonImplementation::Unknown,
+            }
+        }
+    }
+
     struct PythonEnvironmentTestCase {
         system: TestSystem,
         minor_version: u8,
@@ -1863,16 +1943,12 @@ mod tests {
             let PythonEnvironmentTestCase {
                 system,
                 minor_version,
-                free_threaded,
+                free_threaded: _,
                 origin: _,
                 virtual_env,
             } = self;
             let memory_fs = system.memory_file_system();
-            let unix_site_packages = if *free_threaded {
-                format!("lib/python3.{minor_version}t/site-packages")
-            } else {
-                format!("lib/python3.{minor_version}/site-packages")
-            };
+            let unix_site_packages = self.unix_site_packages();
 
             let system_install_sys_prefix =
                 SystemPathBuf::from(&*format!("/Python3.{minor_version}"));
@@ -2022,6 +2098,14 @@ mod tests {
             let site_packages_directories = venv.site_packages_directories(&self.system).unwrap();
             let expected_venv_site_packages = if cfg!(target_os = "windows") {
                 SystemPathBuf::from(r"\.venv\Lib\site-packages")
+            } else if matches!(
+                self.virtual_env_implementation(),
+                PythonImplementation::PyPy
+            ) {
+                SystemPathBuf::from(&*format!(
+                    "/.venv/lib/pypy3.{}/site-packages",
+                    self.minor_version
+                ))
             } else if self.free_threaded {
                 SystemPathBuf::from(&*format!(
                     "/.venv/lib/python3.{}t/site-packages",
@@ -2088,6 +2172,13 @@ mod tests {
             let minor_version = self.minor_version;
             if cfg!(target_os = "windows") {
                 SystemPathBuf::from(&*format!(r"\Python3.{minor_version}\Lib\site-packages"))
+            } else if matches!(
+                self.virtual_env_implementation(),
+                PythonImplementation::PyPy
+            ) {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/pypy3.{minor_version}/site-packages"
+                ))
             } else if self.free_threaded {
                 SystemPathBuf::from(&*format!(
                     "/Python3.{minor_version}/lib/python3.{minor_version}t/site-packages"
@@ -2103,6 +2194,13 @@ mod tests {
             let minor_version = self.minor_version;
             if cfg!(target_os = "windows") {
                 SystemPathBuf::from(&*format!(r"\Python3.{minor_version}\Lib"))
+            } else if matches!(
+                self.virtual_env_implementation(),
+                PythonImplementation::PyPy
+            ) {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/pypy3.{minor_version}"
+                ))
             } else if self.free_threaded {
                 SystemPathBuf::from(&*format!(
                     "/Python3.{minor_version}/lib/python3.{minor_version}t"
@@ -2112,6 +2210,30 @@ mod tests {
                     "/Python3.{minor_version}/lib/python3.{minor_version}"
                 ))
             }
+        }
+
+        fn unix_site_packages(&self) -> String {
+            let minor_version = self.minor_version;
+
+            match self.virtual_env_implementation() {
+                PythonImplementation::PyPy => format!("lib/pypy3.{minor_version}/site-packages"),
+                PythonImplementation::CPython
+                | PythonImplementation::GraalPy
+                | PythonImplementation::Unknown => {
+                    if self.free_threaded {
+                        format!("lib/python3.{minor_version}t/site-packages")
+                    } else {
+                        format!("lib/python3.{minor_version}/site-packages")
+                    }
+                }
+            }
+        }
+
+        fn virtual_env_implementation(&self) -> PythonImplementation {
+            self.virtual_env
+                .as_ref()
+                .map(VirtualEnvironmentTestCase::implementation)
+                .unwrap_or(PythonImplementation::CPython)
         }
     }
 
@@ -2615,6 +2737,179 @@ mod tests {
         );
     }
 
+    /// Test that the `PyPy` layout is probed directly when both the implementation and version are
+    /// known, without falling back to the sibling CPython layout.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_pypy_site_packages_when_version_known() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let pypy_site_packages = sys_prefix.join("lib/pypy3.12/site-packages");
+        let cpython_site_packages = sys_prefix.join("lib/python3.12/site-packages");
+
+        memory_fs.create_directory_all(&pypy_site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&cpython_site_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::PyPy,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/env/lib/pypy3.12/site-packages"),
+            "Expected to find /env/lib/pypy3.12/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/env/lib/python3.12/site-packages"),
+            "Should NOT find CPython site-packages when implementation=PyPy, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/pythonX.Y/dist-packages is discovered when sys.prefix=/usr
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_usr_local_dist_packages_in_system_environment() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let usr_local_dist_packages =
+            SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&usr_local_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/pythonX.Y/dist-packages appears before
+    /// /usr/lib/pythonX.Y/dist-packages, matching the runtime sys.path precedence
+    /// where pip-installed packages take priority over apt-installed packages.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn usr_local_dist_packages_precedes_sys_prefix_dist_packages() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let usr_lib_dist = sys_prefix.join("lib/python3.12/dist-packages");
+        let usr_local_dist = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&usr_lib_dist).unwrap();
+        memory_fs.create_directory_all(&usr_local_dist).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        let local_pos = dirs
+            .iter()
+            .position(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages")
+            .expect("/usr/local/lib/python3.12/dist-packages should be found");
+        let sys_pos = dirs
+            .iter()
+            .position(|p| p.as_str() == "/usr/lib/python3.12/dist-packages")
+            .expect("/usr/lib/python3.12/dist-packages should be found");
+        assert!(
+            local_pos < sys_pos,
+            "/usr/local should precede /usr/lib for correct precedence, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib paths are NOT added when sys.prefix != "/usr"
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_add_usr_local_when_sys_prefix_is_not_usr() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Simulate a pyenv-style installation (sys.prefix != "/usr")
+        let sys_prefix = SystemPathBuf::from("/home/user/.pyenv/versions/3.12.0");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        // Also create a /usr/local path to ensure it isn't picked up
+        let usr_local_dist = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs.create_directory_all(&usr_local_dist).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter().all(|p| !p.as_str().starts_with("/usr/local")),
+            "Expected no /usr/local paths when sys.prefix != /usr, got: {dirs:?}"
+        );
+    }
+
     /// Test that dist-packages are found during fallback enumeration (when version is unknown
     /// and Debian's python3/dist-packages does not exist)
     #[test]
@@ -2695,6 +2990,348 @@ mod tests {
             dirs.iter()
                 .any(|p| p.as_str().contains("python3/dist-packages")),
             "Expected to find Debian's python3/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib/pythonX.Y/dist-packages is found during fallback enumeration
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_usr_local_dist_packages_in_fallback_enumeration() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        // Only create the /usr/local path; no /usr/lib dirs so phase 1 finds nothing
+        let usr_local_dist_packages =
+            SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+        memory_fs
+            .create_directory_all(&usr_local_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages in fallback, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when the implementation is known to be CPython, fallback enumeration does not
+    /// discover `PyPy` package directories even if they exist alongside the CPython layout.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn fallback_enumeration_for_cpython_excludes_pypy_directories() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let cpython_site_packages = sys_prefix.join("lib/python3.11/site-packages");
+        let pypy_site_packages = sys_prefix.join("lib/pypy3.11/site-packages");
+
+        memory_fs
+            .create_directory_all(&cpython_site_packages)
+            .unwrap();
+        memory_fs.create_directory_all(&pypy_site_packages).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/env/lib/python3.11/site-packages"),
+            "Expected to find /env/lib/python3.11/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/env/lib/pypy3.11/site-packages"),
+            "Should NOT find PyPy site-packages when implementation=CPython, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when the implementation is known to be `PyPy`, fallback enumeration does not
+    /// discover CPython package directories even if they exist alongside the `PyPy` layout.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn fallback_enumeration_for_pypy_excludes_cpython_directories() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let pypy_site_packages = sys_prefix.join("lib/pypy3.11/site-packages");
+        let cpython_site_packages = sys_prefix.join("lib/python3.11/site-packages");
+
+        memory_fs.create_directory_all(&pypy_site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&cpython_site_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::PyPy,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/env/lib/pypy3.11/site-packages"),
+            "Expected to find /env/lib/pypy3.11/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/env/lib/python3.11/site-packages"),
+            "Should NOT find CPython site-packages when implementation=PyPy, got: {dirs:?}"
+        );
+    }
+
+    /// Test that /usr/local/lib is NOT enumerated when version+implementation are both known,
+    /// preventing packages from a different Python version from being included.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_enumerate_usr_local_for_wrong_version_when_version_known() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        // Create the correct version's path AND a wrong version's path under /usr/local
+        let correct = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+        let wrong = SystemPathBuf::from("/usr/local/lib/python3.11/dist-packages");
+
+        memory_fs.create_directory_all(&correct).unwrap();
+        memory_fs.create_directory_all(&wrong).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/usr/local/lib/python3.11/dist-packages"),
+            "Should NOT find python3.11 packages when version=3.12 is known, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when version is known but implementation is Unknown, probing /usr/local/lib
+    /// still excludes wrong-version directories.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_include_wrong_version_when_implementation_unknown() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let correct = SystemPathBuf::from("/usr/local/lib/python3.12/dist-packages");
+        let wrong = SystemPathBuf::from("/usr/local/lib/python3.11/dist-packages");
+
+        memory_fs.create_directory_all(&correct).unwrap();
+        memory_fs.create_directory_all(&wrong).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/usr/local/lib/python3.12/dist-packages"),
+            "Expected to find /usr/local/lib/python3.12/dist-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/usr/local/lib/python3.11/dist-packages"),
+            "Should NOT find python3.11 packages when version=3.12 is known, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when the version is known but the implementation is Unknown, CPython-style
+    /// paths are preferred over PyPy-style paths if both layouts exist.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn unknown_known_version_prefers_cpython_layout() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let cpython_site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let pypy_site_packages = sys_prefix.join("lib/pypy3.12/site-packages");
+
+        memory_fs
+            .create_directory_all(&cpython_site_packages)
+            .unwrap();
+        memory_fs.create_directory_all(&pypy_site_packages).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert_eq!(
+            dirs,
+            vec![SystemPathBuf::from("/env/lib/python3.12/site-packages")]
+        );
+    }
+
+    /// Test that when the version is known but the implementation is Unknown, we can still
+    /// discover a matching-version `PyPy` site-packages directory without widening to a
+    /// wrong-version CPython directory.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn includes_matching_version_pypy_without_wrong_version_cpython_when_unknown() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let correct = sys_prefix.join("lib/pypy3.12/site-packages");
+        let wrong = sys_prefix.join("lib/python3.11/site-packages");
+
+        memory_fs.create_directory_all(&correct).unwrap();
+        memory_fs.create_directory_all(&wrong).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/env/lib/pypy3.12/site-packages"),
+            "Expected to find /env/lib/pypy3.12/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/env/lib/python3.11/site-packages"),
+            "Should NOT find python3.11 packages when version=3.12 is known, got: {dirs:?}"
+        );
+    }
+
+    /// Test that when the version is known, finding the matching site-packages directory does not
+    /// cause exact-path probing for dist-packages to widen to a wrong-version directory.
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn does_not_include_wrong_version_dist_packages_when_exact_dist_missing() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/env");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let wrong_dist_packages = sys_prefix.join("lib/python3.11/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&wrong_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/env/lib/python3.12/site-packages"),
+            "Expected to find /env/lib/python3.12/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/env/lib/python3.11/dist-packages"),
+            "Should NOT find python3.11 dist-packages when version=3.12 is known, got: {dirs:?}"
         );
     }
 }

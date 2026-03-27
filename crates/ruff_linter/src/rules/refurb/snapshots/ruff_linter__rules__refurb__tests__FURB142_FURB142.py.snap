@@ -386,6 +386,8 @@ FURB142 [*] Use of `set.add()` in a for loop
 100 | / for x in (1,) if True else (2,):
 101 | |     s.add(x)
     | |____________^
+102 |
+103 |   # https://github.com/astral-sh/ruff/issues/21098
     |
 help: Replace with `.update()`
 97  | for x in lambda: 0:
@@ -394,3 +396,43 @@ help: Replace with `.update()`
     - for x in (1,) if True else (2,):
     -     s.add(x)
 100 + s.update((1,) if True else (2,))
+101 | 
+102 | # https://github.com/astral-sh/ruff/issues/21098
+103 | for x in ("abc", "def"):
+
+FURB142 [*] Use of `set.add()` in a for loop
+   --> FURB142.py:104:1
+    |
+103 |   # https://github.com/astral-sh/ruff/issues/21098
+104 | / for x in ("abc", "def"):
+105 | |     s.add(c for c in x)
+    | |_______________________^
+106 |
+107 |   # don't add extra parens for already parenthesized generators
+    |
+help: Replace with `.update()`
+101 |     s.add(x)
+102 | 
+103 | # https://github.com/astral-sh/ruff/issues/21098
+    - for x in ("abc", "def"):
+    -     s.add(c for c in x)
+104 + s.update((c for c in x) for x in ("abc", "def"))
+105 | 
+106 | # don't add extra parens for already parenthesized generators
+107 | for x in ("abc", "def"):
+
+FURB142 [*] Use of `set.add()` in a for loop
+   --> FURB142.py:108:1
+    |
+107 |   # don't add extra parens for already parenthesized generators
+108 | / for x in ("abc", "def"):
+109 | |     s.add((c for c in x))
+    | |_________________________^
+    |
+help: Replace with `.update()`
+105 |     s.add(c for c in x)
+106 | 
+107 | # don't add extra parens for already parenthesized generators
+    - for x in ("abc", "def"):
+    -     s.add((c for c in x))
+108 + s.update((c for c in x) for x in ("abc", "def"))

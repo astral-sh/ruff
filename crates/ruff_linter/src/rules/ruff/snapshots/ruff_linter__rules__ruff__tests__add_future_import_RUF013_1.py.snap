@@ -10,10 +10,10 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
 help: Convert to `T | None`
 1 | # No `typing.Optional` import
-2 + from __future__ import annotations
+2 | 
 3 | 
-4 | 
   - def f(arg: int = None):  # RUF013
+4 + from __future__ import annotations
 5 + def f(arg: int | None = None):  # RUF013
 6 |     pass
 note: This is an unsafe fix and may change runtime behavior
