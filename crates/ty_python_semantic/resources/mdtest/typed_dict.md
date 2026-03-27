@@ -1814,6 +1814,19 @@ def union_get(u: HasX | OptX) -> None:
     reveal_type(u.get("x"))  # revealed: int | None
 ```
 
+`pop()` also uses the field type as bidirectional context for the default argument:
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class Config(TypedDict, total=False):
+    data: dict[str, int]
+
+def _(c: Config) -> None:
+    reveal_type(c.pop("data", {}))  # revealed: dict[str, int]
+```
+
 Synthesized `pop()` overloads on `TypedDict` unions correctly handle per-arm requiredness:
 
 ```py
