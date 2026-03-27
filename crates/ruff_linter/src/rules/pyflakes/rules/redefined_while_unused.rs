@@ -1,11 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
+use ruff_python_semantic::{Binding, BindingKind, Imported, Scope, ScopeId, SemanticModel};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::preview::is_annotated_assignment_redefinition_enabled;
 use crate::{Fix, FixAvailability, Violation};
 
 use rustc_hash::FxHashMap;
@@ -79,9 +81,15 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             }
 
             // If the shadowing binding isn't considered a "redefinition" of the
-            // shadowed binding, abort.
+            // shadowed binding, abort — unless both are annotated assignments
+            // and preview mode is enabled (see #23802).
             if !binding.redefines(shadowed) {
-                continue;
+                if !(is_annotated_assignment_redefinition_enabled(checker.settings())
+                    && is_annotated_assignment(binding, checker.semantic())
+                    && is_annotated_assignment(shadowed, checker.semantic()))
+                {
+                    continue;
+                }
             }
 
             if shadow.same_scope() {
@@ -223,4 +231,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             }
         }
     }
+}
+
+fn is_annotated_assignment(binding: &Binding, semantic: &SemanticModel) -> bool {
+    binding
+        .statement(semantic)
+        .is_some_and(Stmt::is_ann_assign_stmt)
 }
