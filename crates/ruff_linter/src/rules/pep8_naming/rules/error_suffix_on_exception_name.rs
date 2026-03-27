@@ -65,7 +65,7 @@ pub(crate) fn error_suffix_on_exception_name(
         return;
     };
 
-    let mut is_exception_base = |base: &Expr| {
+    let is_exception_base = |base: &Expr| {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             id == "Exception" || id.ends_with("Error")
         } else {
@@ -74,7 +74,7 @@ pub(crate) fn error_suffix_on_exception_name(
     };
 
     let has_exception_base = if is_recursive_exception_base_checking_enabled(checker.settings()) {
-        any_base_class(class_def, checker.semantic(), &mut is_exception_base)
+        any_base_class(class_def, checker.semantic(), &is_exception_base)
     } else {
         class_def.bases().iter().any(is_exception_base)
     };

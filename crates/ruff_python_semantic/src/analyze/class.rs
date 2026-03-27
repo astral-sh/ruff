@@ -13,24 +13,30 @@ use ruff_python_ast::{
 };
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
-pub fn any_qualified_base_class(
+pub fn any_qualified_base_class<F>(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &dyn Fn(QualifiedName) -> bool,
-) -> bool {
-    any_base_class(class_def, semantic, &mut |expr| {
+    func: F,
+) -> bool
+where
+    F: Fn(QualifiedName) -> bool,
+{
+    any_base_class(class_def, semantic, |expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(func)
+            .is_some_and(&func)
     })
 }
 
 /// Return `true` if any base class matches an [`Expr`] predicate.
-pub fn any_base_class(
+pub fn any_base_class<F>(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &mut dyn FnMut(&Expr) -> bool,
-) -> bool {
+    mut func: F,
+) -> bool
+where
+    F: FnMut(&Expr) -> bool,
+{
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
@@ -69,7 +75,7 @@ pub fn any_base_class(
         return false;
     }
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    inner(class_def, semantic, &mut func, &mut FxHashSet::default())
 }
 
 /// Returns an iterator over all base classes, beginning with the
@@ -292,7 +298,7 @@ pub fn any_member_declaration(
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
 pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
             [
@@ -407,7 +413,7 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
 /// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
     let mut maybe = false;
-    let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
+    let is_base_class = any_base_class(class_def, semantic, |expr| match expr {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
