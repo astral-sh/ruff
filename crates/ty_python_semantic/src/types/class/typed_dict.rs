@@ -18,7 +18,6 @@ use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
     FunctionalTypedDictSpec, TypedDictField, TypedDictSchema, deferred_functional_typed_dict_spec,
-    dynamic_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Type,
@@ -676,26 +675,20 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let instance_ty = self.to_instance(db);
-        let schema = dynamic_typed_dict_schema(db, self);
 
         let synthesized = match name {
-            "__getitem__" => Some(synthesize_typed_dict_getitem(db, instance_ty, schema)),
-            "__setitem__" => Some(synthesize_typed_dict_setitem(db, instance_ty, schema)),
-            "__delitem__" => Some(synthesize_typed_dict_delitem(db, instance_ty, schema)),
-            "get" => Some(synthesize_typed_dict_get(db, instance_ty, schema)),
-            "update" => Some(synthesize_typed_dict_update(db, instance_ty, schema)),
-            "pop" => Some(synthesize_typed_dict_pop(db, instance_ty, schema)),
-            "setdefault" => Some(synthesize_typed_dict_setdefault(db, instance_ty, schema)),
-            "__or__" | "__ror__" | "__ior__" => {
-                Some(synthesize_typed_dict_merge(db, instance_ty, name))
-            }
-            _ => None,
+            "__getitem__" => synthesize_typed_dict_getitem(db, instance_ty, self.items(db)),
+            "__setitem__" => synthesize_typed_dict_setitem(db, instance_ty, self.items(db)),
+            "__delitem__" => synthesize_typed_dict_delitem(db, instance_ty, self.items(db)),
+            "get" => synthesize_typed_dict_get(db, instance_ty, self.items(db)),
+            "update" => synthesize_typed_dict_update(db, instance_ty, self.items(db)),
+            "pop" => synthesize_typed_dict_pop(db, instance_ty, self.items(db)),
+            "setdefault" => synthesize_typed_dict_setdefault(db, instance_ty, self.items(db)),
+            "__or__" | "__ror__" | "__ior__" => synthesize_typed_dict_merge(db, instance_ty, name),
+            _ => return Member::default(),
         };
 
-        match synthesized {
-            Some(ty) => Member::definitely_declared(ty),
-            None => Member::default(),
-        }
+        Member::definitely_declared(synthesized)
     }
 
     /// Look up a class-level member by name (including superclasses).
