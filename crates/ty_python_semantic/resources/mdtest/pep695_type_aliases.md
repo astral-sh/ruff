@@ -58,9 +58,7 @@ type Bad5 = Required[int]  # error: [invalid-type-form] "Type qualifiers are not
 type Bad6 = NotRequired[int]  # error: [invalid-type-form] "Type qualifiers are not allowed in type alias definitions"
 type Bad7 = ReadOnly[int]  # error: [invalid-type-form] "Type qualifiers are not allowed in type alias definitions"
 type Bad8 = InitVar[int]  # error: [invalid-type-form] "Type qualifiers are not allowed in type alias definitions"
-# error: [invalid-type-form] "`InitVar` may not be used without a type argument"
-# error: [invalid-type-form] "Type qualifiers are not allowed in type alias definitions"
-type Bad9 = InitVar
+type Bad9 = InitVar  # error: [invalid-type-form] "Type qualifiers are not allowed in type alias definitions"
 ```
 
 ## Type aliases in type aliases

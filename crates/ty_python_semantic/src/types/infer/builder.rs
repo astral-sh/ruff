@@ -1242,16 +1242,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        let value_ty =
-            self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
-
-        if !value_ty.qualifiers().is_empty()
-            && let Some(builder) = self
-                .context
-                .report_lint(&INVALID_TYPE_FORM, type_alias.value.as_ref())
-        {
-            builder.into_diagnostic("Type qualifiers are not allowed in type alias definitions");
-        }
+        let value_ty = self
+            .infer_type_alias_value_expression(&type_alias.value, DeferredExpressionState::None);
+        self.report_invalid_type_qualifier_in_type_alias_definition(
+            type_alias.value.as_ref(),
+            value_ty.qualifiers(),
+        );
 
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
@@ -1281,6 +1277,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Replace with `Divergent`.
             self.expressions
                 .insert(type_alias.value.as_ref().into(), expanded);
+        }
+    }
+
+    fn report_invalid_type_qualifier_in_type_alias_definition(
+        &mut self,
+        value: &ast::Expr,
+        qualifiers: TypeQualifiers,
+    ) {
+        let is_valid_special_form = |ty: Type<'db>| match ty {
+            Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => false,
+            Type::ClassLiteral(literal) => !literal.is_known(self.db(), KnownClass::InitVar),
+            _ => true,
+        };
+
+        let is_invalid = match value {
+            ast::Expr::Subscript(subscript) => {
+                !is_valid_special_form(self.expression_type(&subscript.value))
+            }
+            _ => !is_valid_special_form(self.expression_type(value)),
+        };
+
+        if (is_invalid || !qualifiers.is_empty())
+            && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
+        {
+            builder.into_diagnostic("Type qualifiers are not allowed in type alias definitions");
         }
     }
 
@@ -4248,28 +4269,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
-                let is_valid_special_form = |ty: Type<'db>| match ty {
-                    Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => false,
-                    Type::ClassLiteral(literal) => {
-                        !literal.is_known(self.db(), KnownClass::InitVar)
-                    }
-                    _ => true,
-                };
-
-                let is_invalid = match value {
-                    ast::Expr::Subscript(sub) => {
-                        !is_valid_special_form(self.expression_type(&sub.value))
-                    }
-                    _ => !is_valid_special_form(self.expression_type(value)),
-                };
-
-                if is_invalid
-                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
-                {
-                    builder.into_diagnostic(
-                        "Type qualifiers are not allowed in type alias definitions",
-                    );
-                }
+                self.report_invalid_type_qualifier_in_type_alias_definition(
+                    value,
+                    TypeQualifiers::empty(),
+                );
 
                 let inferred_ty =
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inferred_ty {

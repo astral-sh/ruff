@@ -16,9 +16,18 @@ use crate::types::{
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum PEP613Policy {
-    Allowed,
-    Disallowed,
+/// Controls the top-level semantics used when interpreting an annotation expression.
+///
+/// PEP 695 type-alias values mostly reuse annotation-expression inference, but a few
+/// top-level special cases such as bare `InitVar` should behave like alias RHSs rather
+/// than ordinary annotations.
+enum AnnotationSemantics {
+    /// Ordinary annotation-expression semantics.
+    Default,
+    /// Annotation semantics for `x: TypeAlias = ...`.
+    Pep613TypeAlias,
+    /// Annotation semantics for `type X = ...`.
+    TypeAliasValue,
 }
 
 /// Annotation expressions.
@@ -29,7 +38,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
     ) -> TypeAndQualifiers<'db> {
-        self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Disallowed)
+        self.infer_annotation_expression_inner(
+            annotation,
+            deferred_state,
+            AnnotationSemantics::Default,
+        )
     }
 
     /// Infer the type of an annotation expression with the given [`DeferredExpressionState`],
@@ -39,7 +52,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
     ) -> TypeAndQualifiers<'db> {
-        self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Allowed)
+        self.infer_annotation_expression_inner(
+            annotation,
+            deferred_state,
+            AnnotationSemantics::Pep613TypeAlias,
+        )
+    }
+
+    /// Infer the type of a PEP 695 type alias value.
+    pub(super) fn infer_type_alias_value_expression(
+        &mut self,
+        annotation: &ast::Expr,
+        deferred_state: DeferredExpressionState,
+    ) -> TypeAndQualifiers<'db> {
+        self.infer_annotation_expression_inner(
+            annotation,
+            deferred_state,
+            AnnotationSemantics::TypeAliasValue,
+        )
     }
 
     /// Similar to [`infer_annotation_expression`], but accepts an optional annotation expression
@@ -58,7 +88,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
-        pep_613_policy: PEP613Policy,
+        annotation_semantics: AnnotationSemantics,
     ) -> TypeAndQualifiers<'db> {
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other deferred states.
         // However, if it's not a stringified annotation, we must still ensure that annotation expressions
@@ -75,7 +105,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let previous_check_unbound_typevars = self
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        let annotation_ty = self.infer_annotation_expression_impl(annotation, annotation_semantics);
         self.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
@@ -90,13 +120,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_annotation_expression_impl(
         &mut self,
         annotation: &ast::Expr,
-        pep_613_policy: PEP613Policy,
+        annotation_semantics: AnnotationSemantics,
     ) -> TypeAndQualifiers<'db> {
         fn infer_name_or_attribute<'db>(
             ty: Type<'db>,
             annotation: &ast::Expr,
             builder: &TypeInferenceBuilder<'db, '_>,
-            pep_613_policy: PEP613Policy,
+            annotation_semantics: AnnotationSemantics,
         ) -> TypeAndQualifiers<'db> {
             let special_case = match ty {
                 Type::SpecialForm(special_form) => match special_form {
@@ -105,7 +135,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         TypeOrigin::Declared,
                         TypeQualifiers::from(qualifier),
                     )),
-                    SpecialFormType::TypeAlias if pep_613_policy == PEP613Policy::Allowed => {
+                    SpecialFormType::TypeAlias
+                        if annotation_semantics == AnnotationSemantics::Pep613TypeAlias =>
+                    {
                         Some(TypeAndQualifiers::declared(ty))
                     }
                     _ => None,
@@ -113,7 +145,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
                 // Python version where the former doesn't exist.
                 Type::Union(union)
-                    if pep_613_policy == PEP613Policy::Allowed
+                    if annotation_semantics == AnnotationSemantics::Pep613TypeAlias
                         && union.elements(builder.db()).iter().all(|ty| {
                             matches!(
                                 ty,
@@ -126,8 +158,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )))
                 }
                 Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
-                    if let Some(builder) =
-                        builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                    if annotation_semantics != AnnotationSemantics::TypeAliasValue
+                        && let Some(builder) =
+                            builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
                     {
                         builder
                             .into_diagnostic("`InitVar` may not be used without a type argument");
@@ -192,7 +225,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     {
                         TypeAndQualifiers::declared(attribute_type)
                     } else {
-                        infer_name_or_attribute(attribute_type, annotation, self, pep_613_policy)
+                        infer_name_or_attribute(
+                            attribute_type,
+                            annotation,
+                            self,
+                            annotation_semantics,
+                        )
                     }
                 }
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
@@ -206,7 +244,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_name_expression(name),
                     annotation,
                     self,
-                    pep_613_policy,
+                    annotation_semantics,
                 ),
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
@@ -244,7 +282,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     let inner_annotation_ty = self
                                         .infer_annotation_expression_impl(
                                             inner_annotation,
-                                            PEP613Policy::Disallowed,
+                                            AnnotationSemantics::Default,
                                         );
 
                                     self.store_expression_type(
@@ -263,7 +301,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 report_invalid_arguments_to_annotated(&self.context, subscript);
                                 self.infer_annotation_expression_impl(
                                     slice,
-                                    PEP613Policy::Disallowed,
+                                    AnnotationSemantics::Default,
                                 )
                             }
                         }
@@ -276,7 +314,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let type_and_qualifiers = if let [argument] = arguments {
                                 let type_and_qualifiers = self.infer_annotation_expression_impl(
                                     argument,
-                                    PEP613Policy::Disallowed,
+                                    AnnotationSemantics::Default,
                                 );
 
                                 // Emit a diagnostic if ClassVar and Final are combined in a class that is
@@ -335,7 +373,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 for element in arguments {
                                     self.infer_annotation_expression_impl(
                                         element,
-                                        PEP613Policy::Disallowed,
+                                        AnnotationSemantics::Default,
                                     );
                                 }
                                 if let Some(builder) =
@@ -369,14 +407,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let type_and_qualifiers = if let [argument] = arguments {
                             self.infer_annotation_expression_impl(
                                 argument,
-                                PEP613Policy::Disallowed,
+                                AnnotationSemantics::Default,
                             )
                             .with_qualifier(TypeQualifiers::INIT_VAR)
                         } else {
                             for element in arguments {
                                 self.infer_annotation_expression_impl(
                                     element,
-                                    PEP613Policy::Disallowed,
+                                    AnnotationSemantics::Default,
                                 );
                             }
                             if let Some(builder) =
