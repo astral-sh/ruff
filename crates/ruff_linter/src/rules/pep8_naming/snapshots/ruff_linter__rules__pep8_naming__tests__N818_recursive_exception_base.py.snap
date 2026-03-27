@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N818 Exception name `CustomBase` should be named with an Error suffix
- --> N818_preview.py:5:7
-  |
-5 | class CustomBase(Exception):
-  |       ^^^^^^^^^^
-6 |     pass
-  |
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
 
+--- Summary ---
+Removed: 0
+Added: 3
+
+--- Added ---
 N818 Exception name `Child` should be named with an Error suffix
   --> N818_preview.py:9:7
    |
@@ -16,6 +17,7 @@ N818 Exception name `Child` should be named with an Error suffix
    |       ^^^^^
 10 |     pass
    |
+
 
 N818 Exception name `GrandChild` should be named with an Error suffix
   --> N818_preview.py:13:7
@@ -25,13 +27,6 @@ N818 Exception name `GrandChild` should be named with an Error suffix
 14 |     pass
    |
 
-N818 Exception name `ValidationErrr` should be named with an Error suffix
-  --> N818_preview.py:17:7
-   |
-17 | class ValidationErrr(ValueError):
-   |       ^^^^^^^^^^^^^^
-18 |     pass
-   |
 
 N818 Exception name `NestedValidation` should be named with an Error suffix
   --> N818_preview.py:21:7

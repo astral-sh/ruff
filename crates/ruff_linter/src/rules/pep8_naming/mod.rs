@@ -15,7 +15,7 @@ mod tests {
     use crate::rules::pep8_naming::settings::IgnoreNames;
     use crate::rules::{flake8_import_conventions, pep8_naming};
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"))]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"))]
@@ -187,24 +187,19 @@ mod tests {
 
     #[test]
     fn preview_error_suffix_on_exception_name() -> Result<()> {
-        let diagnostics = test_path(
+        assert_diagnostics_diff!(
+            "N818_recursive_exception_base.py",
             Path::new("pep8_naming").join("N818_preview.py").as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Disabled,
+                ..settings::LinterSettings::for_rule(Rule::ErrorSuffixOnExceptionName)
+            },
             &settings::LinterSettings {
                 preview: settings::types::PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(Rule::ErrorSuffixOnExceptionName)
-            },
-        )?;
-        assert_diagnostics!("preview_N818_N818_preview.py", diagnostics);
-        Ok(())
-    }
+            }
+        );
 
-    #[test]
-    fn stable_error_suffix_on_exception_name() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pep8_naming").join("N818_preview.py").as_path(),
-            &settings::LinterSettings::for_rule(Rule::ErrorSuffixOnExceptionName),
-        )?;
-        assert_diagnostics!("stable_N818_N818_preview.py", diagnostics);
         Ok(())
     }
 }
