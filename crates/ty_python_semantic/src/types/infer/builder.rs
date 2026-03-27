@@ -5036,6 +5036,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bindings: &mut Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
+        // Cache expressions inferred across speculative inference attempts.
+        //
+        // This is important to avoid exponential blowup for deeply nested generic calls,
+        // as inner expressions are repeatedly inferred with the same type context.
+        let teardown = self.setup_expression_cache();
+
+        let result = self.infer_and_check_argument_types_impl(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+        );
+
+        if teardown {
+            self.teardown_expression_cache();
+        }
+
+        result
+    }
+
+    fn infer_and_check_argument_types_impl(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &mut Bindings<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
 
@@ -5356,12 +5385,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut seen = FxHashSet::default();
 
-                // Cache expressions inferred across speculative inference attempts.
-                //
-                // This is important to avoid exponential blowup for deeply nested generic calls,
-                // as inner expressions are repeatedly inferred with the same type context.
-                let teardown = self.setup_expression_cache();
-
                 for (parameter, parameter_tcx) in parameter_types {
                     if !seen.insert(parameter.annotated_type()) {
                         continue;
@@ -5375,10 +5398,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (argument_index, ast_argument, parameter_tcx),
                     );
                     argument_types.insert(parameter.annotated_type(), inferred_ty);
-                }
-
-                if teardown {
-                    self.teardown_expression_cache();
                 }
             }
         }
