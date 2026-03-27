@@ -439,6 +439,10 @@ fn typed_dict_subscript<'db>(
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
+    if !typed_dict.has_known_fields(db) {
+        return Ok(Type::unknown());
+    }
+
     if slice_ty.is_dynamic() {
         return Ok(Type::unknown());
     }

@@ -1204,6 +1204,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut valid = true;
                 let slice_ty = infer_slice_ty(self, TypeContext::default());
+
+                if !typed_dict.has_known_fields(db) {
+                    infer_rhs_value(self, TypeContext::default());
+                    return true;
+                }
+
                 let Some(keys) = key_literals(db, slice_ty) else {
                     let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
 
@@ -1513,6 +1519,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let db = self.db();
 
+        if object_ty
+            .as_typed_dict()
+            .is_some_and(|typed_dict| !typed_dict.has_known_fields(db))
+        {
+            return;
+        }
+
         let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
             if let Some(full_object_ty) = full_object_ty {
                 diagnostic.info(format_args!(
@@ -1684,6 +1697,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Check if a type supports subscript deletion (has `__delitem__`).
     fn can_delete_subscript(&self, object_ty: Type<'db>, slice_ty: Type<'db>) -> bool {
         let db = self.db();
+        if object_ty
+            .as_typed_dict()
+            .is_some_and(|typed_dict| !typed_dict.has_known_fields(db))
+        {
+            return true;
+        }
+
         object_ty
             .try_call_dunder(
                 db,

@@ -3721,7 +3721,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(Type::TypedDict(typed_dict)) = argument_type {
+        if let Some(Type::TypedDict(typed_dict)) = argument_type
+            && typed_dict.has_known_fields(db)
+        {
             // Special case TypedDict because we know which keys are present.
             for (name, field) in typed_dict.items(db) {
                 let _ = self.match_keyword(

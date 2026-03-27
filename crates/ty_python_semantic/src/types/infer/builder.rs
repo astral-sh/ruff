@@ -7168,6 +7168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_type = self.expression_type(value);
 
             if let Type::TypedDict(typed_dict_ty) = value_type
+                && typed_dict_ty.has_known_fields(self.db())
                 && matches!(attr.id.as_str(), "pop" | "setdefault")
                 && !arguments.args.is_empty()
 

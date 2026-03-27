@@ -643,6 +643,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         self.spec(db).items(db)
     }
 
+    pub(crate) fn has_known_fields(self, db: &'db dyn Db) -> bool {
+        self.spec(db).has_known_fields(db)
+    }
+
     /// Get the MRO for this `TypedDict`.
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:

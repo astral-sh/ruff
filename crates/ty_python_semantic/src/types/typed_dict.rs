@@ -156,6 +156,19 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
+    pub(crate) fn has_known_fields(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Class(defining_class) => {
+                if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
+                    class.has_known_fields(db)
+                } else {
+                    true
+                }
+            }
+            Self::Synthesized(_) => true,
+        }
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -689,6 +702,11 @@ pub(super) struct TypedDictKeyAssignment<'a, 'db, 'ast> {
 impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     pub(super) fn validate(&self) -> bool {
         let db = self.context.db();
+
+        if !self.typed_dict.has_known_fields(db) {
+            return true;
+        }
+
         let items = self.typed_dict.items(db);
 
         // Check if key exists in `TypedDict`
@@ -840,6 +858,11 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
 ) -> bool {
     let db = context.db();
+
+    if !typed_dict.has_known_fields(db) {
+        return true;
+    }
+
     let items = typed_dict.items(db);
 
     let required_keys: OrderSet<Name> = items
@@ -956,6 +979,10 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+
+    if !typed_dict.has_known_fields(db) {
+        return;
+    }
 
     // Check for a single positional argument that is a dict literal
     let has_positional_dict_literal = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
@@ -1092,7 +1119,12 @@ fn validate_from_keywords<'db, 'ast>(
 
             // Never and Dynamic types are special: they can have any keys, so we skip
             // validation and mark all required keys as provided.
-            if unpacked_type.is_never() || unpacked_type.is_dynamic() {
+            if unpacked_type.is_never()
+                || unpacked_type.is_dynamic()
+                || unpacked_type
+                    .as_typed_dict()
+                    .is_some_and(|typed_dict| !typed_dict.has_known_fields(db))
+            {
                 for (key_name, field) in typed_dict.items(db) {
                     if field.is_required() {
                         provided_keys.insert(key_name.clone());
