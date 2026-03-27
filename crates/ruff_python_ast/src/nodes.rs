@@ -1572,46 +1572,6 @@ impl StringLiteralFlags {
             StringLiteralPrefix::Empty
         }
     }
-
-    /// Choose flags that avoid producing escape sequences when wrapping `text`.
-    ///
-    /// Follows the same fallback order as Ruff's formatter: preferred quote, then
-    /// the opposite quote style, then triple-quoted preferred, then triple-quoted
-    /// opposite. Returns `self` unchanged only when all four options would still
-    /// produce escapes.
-    #[must_use]
-    pub fn without_escapes_for(self, text: &str) -> Self {
-        let quote = self.quote_style();
-
-        if !text.contains(quote.as_char()) {
-            return self;
-        }
-
-        let opposite = quote.opposite();
-        if !text.contains(opposite.as_char()) {
-            return self.with_quote_style(opposite);
-        }
-
-        let triple_str = match quote {
-            Quote::Double => r#"""""#,
-            Quote::Single => "'''",
-        };
-        if !text.contains(triple_str) {
-            return self.with_triple_quotes(TripleQuotes::Yes);
-        }
-
-        let opposite_triple_str = match opposite {
-            Quote::Double => r#"""""#,
-            Quote::Single => "'''",
-        };
-        if !text.contains(opposite_triple_str) {
-            return self
-                .with_quote_style(opposite)
-                .with_triple_quotes(TripleQuotes::Yes);
-        }
-
-        self
-    }
 }
 
 impl StringFlags for StringLiteralFlags {

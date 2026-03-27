@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use ruff_python_ast::StringFlags;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
@@ -418,6 +418,40 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     filtered
 }
 
+/// Choose string literal flags that avoid producing escape sequences in the quoted annotation.
+///
+/// Follows the same fallback order as Ruff's formatter: preferred quote, then the opposite
+/// quote style, then triple-quoted preferred, then triple-quoted opposite. Returns the
+/// original flags unchanged only when all four options would still produce escapes.
+fn flags_avoiding_escape_sequences(
+    annotation: &str,
+    preferred: StringLiteralFlags,
+) -> StringLiteralFlags {
+    let quote = preferred.quote_style();
+
+    if !annotation.contains(quote.as_char()) {
+        return preferred;
+    }
+
+    let opposite = quote.opposite();
+    if !annotation.contains(opposite.as_char()) {
+        return preferred.with_quote_style(opposite);
+    }
+
+    if !annotation.contains(quote.as_triple_str()) {
+        return preferred.with_triple_quotes(TripleQuotes::Yes);
+    }
+
+    if !annotation.contains(opposite.as_triple_str()) {
+        return preferred
+            .with_quote_style(opposite)
+            .with_triple_quotes(TripleQuotes::Yes);
+    }
+
+    // All options exhausted; the output will contain escapes, but this is an extreme edge case.
+    preferred
+}
+
 pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     stylist: &'a Stylist<'a>,
@@ -449,7 +483,7 @@ impl<'a> QuoteAnnotator<'a> {
         let annotation = subgenerator.expr(&expr_without_forward_references);
         // Pick flags that avoid escape sequences (e.g. triple quotes when the
         // annotation contains the preferred quote character).
-        let flags = self.flags.without_escapes_for(&annotation);
+        let flags = flags_avoiding_escape_sequences(&annotation, self.flags);
         // Build the quoted string directly instead of going through the
         // generator's `StringLiteral` path, because its `UnicodeEscape` logic
         // does not account for triple-quoted strings and would still escape
