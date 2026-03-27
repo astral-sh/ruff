@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 
 static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::new([
-        "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import",
+        "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import", "yield",
     ])
     .unwrap()
 });
