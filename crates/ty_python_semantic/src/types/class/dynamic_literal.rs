@@ -9,8 +9,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     semantic_index::{definition::Definition, scope::ScopeId},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        ClassBase, ClassLiteral, ClassType, DataclassFlags, DataclassParams, KnownClass,
+        MemberLookupPolicy, SubclassOfType, Type,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
@@ -462,6 +462,27 @@ impl<'db> DynamicClassLiteral<'db> {
         ORDERING_METHODS
             .iter()
             .any(|name| !self.own_class_member(db, name).is_undefined())
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        let transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
+            } else {
+                None
+            };
+        self.dataclass_params(db)
+            .is_some_and(|params| params.flags(db).contains(param))
+            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.

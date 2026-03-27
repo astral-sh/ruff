@@ -32,7 +32,7 @@ use crate::types::relation::{
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionBuilder, TypeContext, TypeMapping, UnionBuilder,
     VarianceInferable,
 };
@@ -693,6 +693,19 @@ impl<'db> ClassLiteral<'db> {
             }
         }
     }
+
+    pub(crate) fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        match self {
+            Self::Static(class) => class.has_dataclass_param(db, field_policy, param),
+            Self::Dynamic(class) => class.has_dataclass_param(db, field_policy, param),
+            Self::DynamicNamedTuple(_) => false,
+        }
+    }
 }
 
 impl<'db> From<StaticClassLiteral<'db>> for ClassLiteral<'db> {
@@ -790,6 +803,15 @@ impl<'db> ClassType<'db> {
                 Some(generic.specialization(db)),
             ),
         }
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(self, db: &'db dyn Db, param: DataclassFlags) -> bool {
+        let (literal, specialization) = self.class_literal_and_specialization(db);
+        let Some(field_policy) = CodeGeneratorKind::from_class(db, literal, specialization) else {
+            return false;
+        };
+        literal.has_dataclass_param(db, field_policy, param)
     }
 
     /// Returns the statement-defined class literal and specialization for this class.
