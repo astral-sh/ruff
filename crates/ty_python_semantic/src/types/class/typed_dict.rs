@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 
+use itertools::Either;
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -234,7 +235,7 @@ where
             // overload so that `td.get("key", {})` can use the field type as
             // bidirectional inference context for the default argument.
             if field.is_required() {
-                vec![get_sig, get_with_default_sig]
+                Either::Left([get_sig, get_with_default_sig].into_iter())
             } else {
                 let get_with_typed_default_sig = Signature::new(
                     Parameters::new(
@@ -250,7 +251,9 @@ where
                     ),
                     field.declared_ty,
                 );
-                vec![get_sig, get_with_typed_default_sig, get_with_default_sig]
+                Either::Right(
+                    [get_sig, get_with_typed_default_sig, get_with_default_sig].into_iter(),
+                )
             }
         })
         // Fallback overloads for unknown keys
