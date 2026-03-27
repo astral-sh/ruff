@@ -2,63 +2,63 @@
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 ---
 TD003 Missing issue link for this TODO
-  --> TD003.py:15:3
+  --> TD003.py:29:3
    |
-14 | # TDO003 - errors
-15 | # TODO: this comment has no
+28 | # TDO003 - errors
+29 | # TODO: this comment has no
    |   ^^^^
-16 | # link after it
+30 | # link after it
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:18:3
+  --> TD003.py:32:3
    |
-16 | # link after it
-17 |
-18 | # TODO: here's a TODO with no link after it
+30 | # link after it
+31 |
+32 | # TODO: here's a TODO with no link after it
    |   ^^^^
-19 | def foo(x):
-20 |     return x
+33 | def foo(x):
+34 |     return x
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:31:3
+  --> TD003.py:45:3
    |
-29 | # TDO-3870
-30 |
-31 | # TODO: here's a TODO without an issue link
+43 | # TDO-3870
+44 |
+45 | # TODO: here's a TODO without an issue link
    |   ^^^^
-32 | # TODO: followed by a new TODO with an issue link
-33 | # TDO-3870
+46 | # TODO: followed by a new TODO with an issue link
+47 | # TDO-3870
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:35:9
+  --> TD003.py:49:9
    |
-33 | # TDO-3870
-34 |
-35 | # foo # TODO: no link!
+47 | # TDO-3870
+48 |
+49 | # foo # TODO: no link!
    |         ^^^^
-36 |
-37 | # TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
+50 |
+51 | # TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:41:3
+  --> TD003.py:55:3
    |
-39 | # TODO: #9627 A todo with a number on the same line
-40 |
-41 | # TODO: A todo with a random number, 5431
+53 | # TODO: #9627 A todo with a number on the same line
+54 |
+55 | # TODO: A todo with a random number, 5431
    |   ^^^^
-42 |
-43 | # TODO: here's a TODO on the last line with no link
+56 |
+57 | # TODO: here's a TODO on the last line with no link
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:43:3
+  --> TD003.py:57:3
    |
-41 | # TODO: A todo with a random number, 5431
-42 |
-43 | # TODO: here's a TODO on the last line with no link
+55 | # TODO: A todo with a random number, 5431
+56 |
+57 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
    |
