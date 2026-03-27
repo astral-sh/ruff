@@ -381,7 +381,7 @@ impl AliasGuard {
         let module = parsed_module(db, file).load(db);
         let place_table = index.place_table(self.guard_scope);
         let narrowed_places = PossiblyNarrowedPlacesBuilder::new(db, place_table)
-            .expression(expression.node_ref(db, &module));
+            .expression(expression.node_ref(db).node(&module));
         let mut guard_places = collect_narrowed_place_keys(place_table, &narrowed_places);
         let alias_key = PlaceKey::Symbol(self.alias_name.clone());
         if !guard_places.contains(&alias_key) {

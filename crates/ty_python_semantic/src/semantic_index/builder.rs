@@ -107,10 +107,9 @@ impl<'ast> ExprUseVisitor<'_, '_, 'ast> {
             self.builder.mark_symbol_used(symbol_id);
         }
         let use_id = self.builder.current_ast_ids().record_use(expr);
-        let node_key = NodeKey::from_node(expr);
         self.builder
             .current_use_def_map_mut()
-            .record_use(place_id, use_id, node_key);
+            .record_use(place_id, use_id);
     }
 }
 
@@ -368,7 +367,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             && let PlaceExpr::Member(member) = place_expr
             && member.is_instance_attribute_candidate()
             && self.current_first_parameter_name.is_some_and(|first| {
-                member.symbol_name() == first
+                member.expression().symbol_name() == first
                     && !self.is_symbol_bound_in_intermediate_eager_scopes(first, method_scope_id)
             })
         {
@@ -1329,7 +1328,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 match pred.node {
                     PredicateNode::Expression(expression) => {
                         let module = self.module;
-                        let expression_node = expression.node_ref(self.db, module);
+                        let expression_node = expression.node_ref(self.db).node(module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
                         self.add_alias_narrowed_places(expression_node, &mut places);
@@ -1503,7 +1502,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         Self::walk_alias_predicate_leaves(expr, &mut |leaf| {
             let key = ExpressionNodeKey::from(leaf);
             if let Some(alias_predicate) = self.alias_predicates.get(&key) {
-                let aliased_node = alias_predicate.expression.node_ref(self.db, self.module);
+                let aliased_node = alias_predicate
+                    .expression
+                    .node_ref(self.db)
+                    .node(self.module);
                 let aliased_places =
                     PossiblyNarrowedPlacesBuilder::new(self.db, self.current_place_table())
                         .expression(aliased_node);
