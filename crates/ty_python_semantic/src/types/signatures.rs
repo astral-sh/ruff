@@ -1165,6 +1165,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
+
+        // TODO: Combine error context
     }
 
     fn check_signature_pair_inner(

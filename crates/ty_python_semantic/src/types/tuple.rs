@@ -285,29 +285,46 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_fixed_length_tuple_vs_tuple_spec(
         &self,
         db: &'db dyn Db,
-        source: &FixedLengthTuple<Type<'db>>,
-        target: &TupleSpec<'db>,
+        source_tuple: &FixedLengthTuple<Type<'db>>,
+        target_tuple: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        match target {
+        match target_tuple {
             Tuple::Fixed(target) => {
-                let equal_length = source.0.len() == target.0.len();
+                let equal_length = source_tuple.0.len() == target.0.len();
 
                 if !equal_length && self.relation.is_assignability() {
-                    self.provide_error_context(format!(
-                        "a tuple of length {} is not assignable to a tuple of length {}",
-                        source.0.len(),
-                        target.0.len()
-                    ));
+                    self.provide_error_hint(|| {
+                        format!(
+                            "a tuple of length {} is not assignable to a tuple of length {}",
+                            source_tuple.0.len(),
+                            target_tuple.len().display_minimum(), // TODO: is display_minimum the right thing to use here?
+                        )
+                    });
                 }
 
+                let mut n = 1;
                 ConstraintSet::from_bool(self.constraints, equal_length).and(
                     db,
                     self.constraints,
                     || {
-                        (source.0.iter().zip(&target.0)).when_all(
+                        (source_tuple.0.iter().zip(&target.0)).when_all(
                             db,
                             self.constraints,
-                            |(&source, &target)| self.check_type_pair(db, source, target),
+                            |(&source, &target)| {
+                                let constraint_set = self.check_type_pair(db, source, target);
+                                if constraint_set.is_never_satisfied(db) {
+                                    self.provide_error_context(db, source, target, || {
+                                        format!(
+                                            "tuple element {n} of {count} is incompatible",
+                                            count = source_tuple.0.len()
+                                        )
+                                    });
+                                }
+
+                                n += 1;
+
+                                constraint_set
+                            },
                         )
                     },
                 )
@@ -317,7 +334,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut result = self.always();
-                let mut source_iter = source.0.iter();
+                let mut source_iter = source_tuple.0.iter();
                 for &target_ty in target.prefix_elements() {
                     let Some(&source_ty) = source_iter.next() else {
                         return self.never();

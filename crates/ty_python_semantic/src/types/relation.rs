@@ -331,7 +331,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -354,12 +354,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
     ) -> Result<(), TypeRelationErrorContext> {
+        if self.is_assignable_to(db, target) {
+            return Ok(());
+        }
+
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: Some(RefCell::new(TypeRelationErrorContext::new())),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -369,7 +373,11 @@ impl<'db> Type<'db> {
         if constraints.is_always_satisfied(db) {
             Ok(())
         } else {
-            Err(std::mem::take(&mut checker.error_context.borrow_mut()))
+            if let Some(error_context) = checker.error_context {
+                Err(std::mem::take(&mut error_context.borrow_mut()))
+            } else {
+                unreachable!("TypeRelationChecker was constructed with an error context");
+            }
         }
     }
 
@@ -458,7 +466,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -604,16 +612,20 @@ pub struct TypeRelationErrorContext {
 }
 
 impl TypeRelationErrorContext {
-    fn new() -> RefCell<Self> {
-        RefCell::new(Self { stack: Vec::new() })
+    fn new() -> Self {
+        Self { stack: Vec::new() }
     }
 
     fn push(&mut self, message: String) {
         self.stack.push(message);
     }
 
-    pub fn messages(&self) -> &[String] {
-        &self.stack
+    pub fn info_messages(&self) -> impl IntoIterator<Item = String> + '_ {
+        let mut messages = Vec::new();
+        for (indent, message) in self.stack.iter().rev().enumerate() {
+            messages.push(format!("{}{}", "  ".repeat(indent), message));
+        }
+        messages
     }
 }
 
@@ -622,7 +634,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    error_context: RefCell<TypeRelationErrorContext>,
+    error_context: Option<RefCell<TypeRelationErrorContext>>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -648,7 +660,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -666,7 +678,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -689,8 +701,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    pub(super) fn provide_error_context(&self, message: impl Into<String>) {
-        self.error_context.borrow_mut().push(message.into());
+    pub(super) fn provide_error_context(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        get_message: impl FnOnce() -> String,
+    ) {
+        if let Some(error_context) = &self.error_context {
+            let mut ctx = error_context.borrow_mut();
+
+            ctx.push(format!(
+                "type `{source}` is not assignable to `{target}`",
+                source = source.display(db),
+                target = target.display(db)
+            ));
+
+            ctx.push(format!("{message}:", message = get_message()));
+        }
+    }
+
+    pub(super) fn provide_error_hint(&self, get_message: impl FnOnce() -> String) {
+        if let Some(error_context) = &self.error_context {
+            let mut ctx = error_context.borrow_mut();
+            ctx.push(get_message());
+        }
     }
 
     fn with_recursion_guard(
@@ -1697,7 +1732,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -1778,7 +1813,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
-            error_context: TypeRelationErrorContext::new(),
+            error_context: None,
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
