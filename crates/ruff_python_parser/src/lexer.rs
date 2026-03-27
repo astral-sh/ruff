@@ -234,13 +234,6 @@ impl<'src> Lexer<'src> {
             self.current_range = self.token_range();
         }
 
-        if !self.current_kind.is_trivia() || self.current_kind.is_eof() {
-            eprintln!(
-                "TOKEN: kind={:?} range={:?} has_cells={} cell_start={:?}",
-                self.current_kind, self.current_range, self.has_cells, self.cell_start_offset
-            );
-        }
-
         self.current_kind
     }
 
