@@ -5,12 +5,18 @@ use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{
-    FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
+    FileScopeId,
+    definition::{Definition, DefinitionKind},
+    place_table,
+    scope::ScopeId,
+    semantic_index, use_def_map,
 };
 use crate::types::IntersectionType;
 use crate::types::{
-    CallableType, InvalidTypeExpression, InvalidTypeExpressionError, TypeDefinition,
-    TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
+    CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
+    TypeDefinition, TypeQualifiers,
+    generics::typing_self,
+    infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
 use ruff_db::files::File;
 use strum_macros::EnumString;
@@ -79,6 +85,8 @@ pub enum SpecialFormType {
     TypeOf,
     /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
+    /// The symbol `ty_extensions.RegularCallableTypeOf`
+    RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,
     /// The symbol `ty_extensions.Bottom`
@@ -143,6 +151,7 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
             | Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
@@ -213,6 +222,7 @@ impl SpecialFormType {
             Intersection,
             TypeOf,
             CallableTypeOf,
+            RegularCallableTypeOf,
             Top,
             Bottom,
             #[strum(serialize = "Self")]
@@ -253,6 +263,7 @@ impl SpecialFormType {
                     SpecialFormType::Annotated => Self::Annotated,
                     SpecialFormType::Callable => Self::Callable,
                     SpecialFormType::CallableTypeOf => Self::CallableTypeOf,
+                    SpecialFormType::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                     SpecialFormType::Concatenate => Self::Concatenate,
                     SpecialFormType::Intersection => Self::Intersection,
                     SpecialFormType::Literal => Self::Literal,
@@ -308,6 +319,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Annotated => Self::Annotated,
                 SpecialFormTypeBuilder::Callable => Self::Callable,
                 SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
+                SpecialFormTypeBuilder::RegularCallableTypeOf => Self::RegularCallableTypeOf,
                 SpecialFormTypeBuilder::Concatenate => Self::Concatenate,
                 SpecialFormTypeBuilder::Intersection => Self::Intersection,
                 SpecialFormTypeBuilder::Literal => Self::Literal,
@@ -409,7 +421,8 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => module.is_ty_extensions(),
+            | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf => module.is_ty_extensions(),
         }
     }
 
@@ -464,6 +477,7 @@ impl SpecialFormType {
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
             | Self::Callable
             | Self::TypingSelf
             | Self::TypeQualifier(_)
@@ -494,6 +508,7 @@ impl SpecialFormType {
             | Self::Annotated
             | Self::Bottom
             | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf
             | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Intersection
@@ -560,6 +575,7 @@ impl SpecialFormType {
             SpecialFormType::Intersection => "Intersection",
             SpecialFormType::TypeOf => "TypeOf",
             SpecialFormType::CallableTypeOf => "CallableTypeOf",
+            SpecialFormType::RegularCallableTypeOf => "RegularCallableTypeOf",
             SpecialFormType::Top => "Top",
             SpecialFormType::Bottom => "Bottom",
             SpecialFormType::Protocol => "Protocol",
@@ -604,6 +620,7 @@ impl SpecialFormType {
             | SpecialFormType::Intersection
             | SpecialFormType::TypeOf
             | SpecialFormType::CallableTypeOf
+            | SpecialFormType::RegularCallableTypeOf
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
         }
@@ -667,11 +684,51 @@ impl SpecialFormType {
                     });
                 };
 
-                Ok(
-                    typing_self(db, scope_id, typevar_binding_context, class.into())
-                        .map(Type::TypeVar)
-                        .unwrap_or(Type::SpecialForm(self)),
-                )
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
+
+                let in_staticmethod = typing_self.is_some_and(|typing_self| {
+                    let Some(binding_definition) = typing_self.binding_context(db).definition()
+                    else {
+                        return false;
+                    };
+
+                    if !matches!(binding_definition.kind(db), DefinitionKind::Function(_)) {
+                        return false;
+                    }
+
+                    binding_definition.name(db).as_deref() != Some("__new__")
+                        && function_known_decorator_flags(db, binding_definition)
+                            .contains(FunctionDecorators::STATICMETHOD)
+                });
+                if in_staticmethod {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::TypingSelfInStaticMethod
+                        ],
+                    });
+                }
+
+                let is_in_metaclass = KnownClass::Type
+                    .to_class_literal(db)
+                    .to_class_type(db)
+                    .is_some_and(|type_class| {
+                        class
+                            .default_specialization(db)
+                            .is_subclass_of(db, type_class)
+                    });
+                if is_in_metaclass {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::TypingSelfInMetaclass
+                        ],
+                    });
+                }
+
+                Ok(typing_self
+                    .map(Type::TypeVar)
+                    .unwrap_or(Type::SpecialForm(self)))
             }
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type
@@ -709,17 +766,23 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypeGuard
             | Self::Unpack
-            | Self::CallableTypeOf => Err(InvalidTypeExpressionError {
+            | Self::CallableTypeOf
+            | Self::RegularCallableTypeOf => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::RequiresOneArgument(self)
                 ],
                 fallback_type: Type::unknown(),
             }),
 
-            Self::Annotated | Self::Concatenate => Err(InvalidTypeExpressionError {
+            Self::Annotated => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::RequiresTwoArguments(self)
                 ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Concatenate => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Concatenate],
                 fallback_type: Type::unknown(),
             }),
 

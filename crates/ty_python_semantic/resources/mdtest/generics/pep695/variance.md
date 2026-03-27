@@ -531,6 +531,29 @@ static_assert(is_subtype_of(E[B], E[A]))
 static_assert(not is_subtype_of(E[A], E[B]))
 ```
 
+This also works for dataclass-transformers:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=False)
+class ModelBase:
+    def __init_subclass__(cls, frozen: bool = False) -> None:
+        pass
+
+class NonFrozenModel[T](ModelBase):
+    value: T
+
+static_assert(not is_subtype_of(NonFrozenModel[B], NonFrozenModel[A]))
+static_assert(not is_subtype_of(NonFrozenModel[A], NonFrozenModel[B]))
+
+class FrozenModel[T](ModelBase, frozen=True):
+    value: T
+
+static_assert(is_subtype_of(FrozenModel[B], FrozenModel[A]))
+static_assert(not is_subtype_of(FrozenModel[A], FrozenModel[B]))
+```
+
 #### Frozen dataclasses in Python 3.13 and later
 
 ```toml
@@ -555,6 +578,29 @@ class D[U]:
 
 static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+The same holds for dataclass-transformers:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelBase:
+    def __init_subclass__(cls, frozen: bool = True) -> None:
+        pass
+
+class DefaultFrozenModel[T](ModelBase):
+    value: T
+
+static_assert(not is_subtype_of(DefaultFrozenModel[B], DefaultFrozenModel[A]))
+static_assert(not is_subtype_of(DefaultFrozenModel[A], DefaultFrozenModel[B]))
+
+class ExplicitFrozenModel[T](ModelBase, frozen=True):
+    value: T
+
+static_assert(not is_subtype_of(ExplicitFrozenModel[B], ExplicitFrozenModel[A]))
+static_assert(not is_subtype_of(ExplicitFrozenModel[A], ExplicitFrozenModel[B]))
 ```
 
 #### NamedTuple

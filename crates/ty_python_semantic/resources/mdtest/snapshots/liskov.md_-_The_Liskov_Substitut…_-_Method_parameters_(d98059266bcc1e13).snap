@@ -2,7 +2,6 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
-
 ---
 mdtest name: liskov.md - The Liskov Substitution Principle - Method parameters
 mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
@@ -98,7 +97,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
 84 | 
 85 | class Sub23(Super4):
-86 |     def method(self, x, *args, y, **kwargs): ...  # error: [invalid-method-override]
+86 |     # This is not a liskov violation because this is a gradual callable as it contains both
+87 |     # `*args` and `**kwargs` without annotations, so it is compatible with any signature of
+88 |     # `method` on the superclass.
+89 |     def method(self, x, *args, y, **kwargs): ...
 ```
 
 # Diagnostics
@@ -296,27 +298,6 @@ error[invalid-method-override]: Invalid override of method `method`
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
 84 |
 85 | class Sub23(Super4):
-   |
-  ::: src/mdtest_snippet.pyi:74:9
-   |
-73 | class Super4:
-74 |     def method(self, *args: int, **kwargs: str): ...
-   |         --------------------------------------- `Super4.method` defined here
-75 |
-76 | class Sub20(Super4):
-   |
-info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
-
-```
-
-```
-error[invalid-method-override]: Invalid override of method `method`
-  --> src/mdtest_snippet.pyi:86:9
-   |
-85 | class Sub23(Super4):
-86 |     def method(self, x, *args, y, **kwargs): ...  # error: [invalid-method-override]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
    |
   ::: src/mdtest_snippet.pyi:74:9
    |

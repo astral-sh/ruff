@@ -256,6 +256,33 @@ class C:
 reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
+#### Nested augmented assignments after narrowing
+
+Augmented assignments to nested attributes (e.g., `self.inner.value += ...`) should work correctly
+after narrowing away `None` from the intermediate attribute. This is a regression test for a case
+where the combination of narrowing and augmented assignment on a nested attribute caused a false
+positive.
+
+```py
+from unknown_module import unknown  # error: [unresolved-import]
+
+class Inner:
+    value: int = 0
+
+class Outer:
+    def __init__(self) -> None:
+        self.inner = None
+        self.load()
+
+    def load(self) -> None:
+        self.inner = Inner() if unknown else unknown
+
+    def update(self) -> None:
+        if self.inner is None:
+            return
+        self.inner.value += unknown
+```
+
 #### Attributes defined in tuple unpackings
 
 ```py
@@ -623,8 +650,6 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
-            # TODO: Should not emit this diagnostic
-            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`
@@ -2504,6 +2529,20 @@ class C:
 C().x
 ```
 
+### Walrus reassignment of `self`
+
+```py
+class Other:
+    x: int = 1
+
+class C:
+    def __init__(self, other: Other) -> None:
+        (self := other).x = 1
+
+# error: [unresolved-attribute]
+reveal_type(C(Other()).x)  # revealed: Unknown
+```
+
 ### Assignment to `self` after nested function
 
 ```py
@@ -2703,7 +2742,7 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be Unknown | list[int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[int] | list[Unknown] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[int] | list[Divergent] | list[Unknown]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -2748,7 +2787,7 @@ class Toggle:
             self.y = True
 
 # Literal[True] or undefined
-reveal_type(Toggle().x)  # revealed: Literal[True] | Unknown
+reveal_type(Toggle().x)  # revealed: Unknown | Literal[True]
 reveal_type(Toggle().y)  # revealed: Unknown | Literal[True]
 ```
 
@@ -3055,9 +3094,9 @@ We give special diagnostics for this common case too:
 import foo
 import baz
 
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(foo.bar)  # revealed: Unknown
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(baz.bar)  # revealed: Unknown
 ```
 

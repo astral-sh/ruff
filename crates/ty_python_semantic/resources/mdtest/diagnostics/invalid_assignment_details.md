@@ -248,3 +248,95 @@ class Incompatible:
 def _(source: Incompatible):
     target: SupportsCheck = source  # error: [invalid-assignment]
 ```
+
+## Invariant generic classes
+
+We show a special diagnostic hint for invariant generic classes. For example, if you try to assign a
+`list[bool]` to a `list[int]`:
+
+```py
+def _(source: list[bool]):
+    target: list[int] = source  # error: [invalid-assignment]
+```
+
+We do the same for other invariant generic classes:
+
+```py
+from collections import ChainMap, Counter, OrderedDict, defaultdict, deque
+from collections.abc import MutableSequence, MutableMapping, MutableSet
+
+def _(source: set[bool]):
+    target: set[int] = source  # error: [invalid-assignment]
+
+def _(source: dict[str, bool]):
+    target: dict[str, int] = source  # error: [invalid-assignment]
+
+def _(source: dict[bool, str]):
+    target: dict[int, str] = source  # error: [invalid-assignment]
+
+def _(source: dict[bool, bool]):
+    target: dict[int, int] = source  # error: [invalid-assignment]
+
+def _(source: defaultdict[str, bool]):
+    target: defaultdict[str, int] = source  # error: [invalid-assignment]
+
+def _(source: defaultdict[bool, str]):
+    target: defaultdict[int, str] = source  # error: [invalid-assignment]
+
+def _(source: OrderedDict[str, bool]):
+    target: OrderedDict[str, int] = source  # error: [invalid-assignment]
+
+def _(source: OrderedDict[bool, str]):
+    target: OrderedDict[int, str] = source  # error: [invalid-assignment]
+
+def _(source: ChainMap[str, bool]):
+    target: ChainMap[str, int] = source  # error: [invalid-assignment]
+
+def _(source: ChainMap[bool, str]):
+    target: ChainMap[int, str] = source  # error: [invalid-assignment]
+
+def _(source: deque[bool]):
+    target: deque[int] = source  # error: [invalid-assignment]
+
+def _(source: Counter[bool]):
+    target: Counter[int] = source  # error: [invalid-assignment]
+
+def _(source: MutableSequence[bool]):
+    target: MutableSequence[int] = source  # error: [invalid-assignment]
+```
+
+We also show this hint for custom invariant generic classes:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class MyContainer(Generic[T]):
+    value: T
+
+def _(source: MyContainer[bool]):
+    target: MyContainer[int] = source  # error: [invalid-assignment]
+```
+
+We do *not* show this hint if the element types themselves wouldn't be assignable:
+
+```py
+def _(source: list[int]):
+    target: list[str] = source  # error: [invalid-assignment]
+```
+
+We do not emit any error if the collection types are covariant:
+
+```py
+from collections.abc import Sequence
+
+def _(source: list[bool]):
+    target: Sequence[int] = source
+
+def _(source: frozenset[bool]):
+    target: frozenset[int] = source
+
+def _(source: tuple[bool, bool]):
+    target: tuple[int, int] = source
+```

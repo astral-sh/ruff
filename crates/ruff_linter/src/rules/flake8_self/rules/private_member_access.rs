@@ -202,17 +202,34 @@ impl SameClassInstanceChecker {
 }
 
 impl TypeChecker for SameClassInstanceChecker {
-    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`
+    /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`, `Self`, `Annotated[Self, ...]`
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-        let Some(class_name) = find_class_name(annotation, semantic) else {
+        let inner = unwrap_annotated(annotation, semantic);
+
+        if semantic.match_typing_expr(inner, "Self") {
+            return true;
+        }
+
+        let Expr::Name(class_name) = inner else {
             return false;
         };
 
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        // `this = self` — a direct assignment from `self`, but only when
+        // `self` is actually a function parameter (not a local rebinding).
+        if let Expr::Name(name) = initializer
+            && name.id == "self"
+            && semantic
+                .resolve_name(name)
+                .is_some_and(|id| matches!(semantic.binding(id).kind, BindingKind::Argument))
+        {
+            return true;
+        }
+
         let Expr::Call(call) = initializer else {
             return false;
         };
@@ -241,21 +258,21 @@ impl TypeChecker for SameClassInstanceChecker {
     }
 }
 
-/// Convert `Annotated[C[T], ...]` to `C` (and similar) to `C` recursively.
-fn find_class_name<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a ast::ExprName> {
+/// Unwrap `Annotated[X, ...]` and `C[T]` to the innermost type expression.
+fn unwrap_annotated<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
     match expr {
-        Expr::Name(name) => Some(name),
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if semantic.match_typing_expr(value, "Annotated") {
-                let [expr, ..] = &slice.as_tuple_expr()?.elts[..] else {
-                    return None;
-                };
-
-                return find_class_name(expr, semantic);
+            if semantic.match_typing_expr(value, "Annotated")
+                && let Some(tuple) = slice.as_tuple_expr()
+                && let [inner, ..] = &tuple.elts[..]
+            {
+                return unwrap_annotated(inner, semantic);
             }
-
-            find_class_name(value, semantic)
+            if semantic.match_typing_expr(value, "Annotated") {
+                return expr;
+            }
+            unwrap_annotated(value, semantic)
         }
-        _ => None,
+        _ => expr,
     }
 }

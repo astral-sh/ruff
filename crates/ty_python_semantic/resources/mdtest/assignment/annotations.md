@@ -445,14 +445,21 @@ reveal_type(x8)  # revealed: Literal[True]
 x9: int | str = f2(True)
 reveal_type(x9)  # revealed: Literal[True]
 
-# TODO: Should not error. We could choose a concrete type here (pyright arbitrarily picks the
-# first), or keep the union (pyrefly does this). Mypy infers `list[int]` and errors.
-# error: [invalid-assignment]
 x10: list[int | str] | list[int | None] = [1, 2, 3]
-reveal_type(x10)  # revealed: list[int | str] | list[int | None]
+reveal_type(x10)  # revealed: list[int | str]
 
 x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[int]
+
+x12: list[int] | list[int | None] | list[str | None] = ["1", "2"]
+reveal_type(x12)  # revealed: list[str | None]
+
+x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
+reveal_type(x13)  # revealed: dict[str, list[str | None]]
+
+x14 = [{"a": [1], "b": 1}, {"a": [1]}]
+x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
+reveal_type(x14)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
 ```
 
 ## Annotations influence generic call argument inference
@@ -608,8 +615,7 @@ e: list[Any] | None = [1]
 reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
-# TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[int] | None
+reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.

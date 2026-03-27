@@ -228,6 +228,32 @@ mod tests {
         assert_diagnostics!(diagnostics);
     }
 
+    #[test]
+    fn f821_frozendict_py315_available() {
+        // frozendict is available starting in Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY315.into(),
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn f821_frozendict_pre_py315_undefined() {
+        // frozendict is not available before Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_diagnostics!(diagnostics);
+    }
+
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
@@ -1366,6 +1392,43 @@ mod tests {
         test = True
         if False:
             del(test)
+        assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_except() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            del(test)
+        else:
+            assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_orelse() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            print(test)
+        else:
+            del test
         assert(test)
         ",
             &[],

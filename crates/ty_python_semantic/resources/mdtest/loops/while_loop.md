@@ -383,6 +383,34 @@ while random():
 x
 ```
 
+### Statically unreachable `del` branches don't poison cyclic loopback
+
+This creates a loop-header cycle through `if x`, but the `del x` branch should still disappear once
+the loopback type settles:
+
+```py
+def random() -> bool:
+    return False
+
+x = 1
+while random():
+    if x:
+        x = 1
+    else:
+        del x
+    reveal_type(x)  # revealed: Literal[1]
+```
+
+Comparison-guarded `del` branches should also disappear once the loopback type settles:
+
+```py
+x = 1
+while x < 10:
+    if x == 4:
+        del x
+    reveal_type(x)  # revealed: Literal[1]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -405,13 +433,8 @@ x = 1
 y = 2
 while random():
     x, y = y, x
-    # Note that we get correct types in the "avoid oscillations" test case below, but not here. I
-    # believe the difference is that in this case the Salsa "cycle head" is the tuple on the RHS of
-    # the assignment, which triggers our recursive type handling, whereas below it's `x`.
-    # TODO: should be Literal[2, 1]
-    reveal_type(x)  # revealed: Divergent
-    # TODO: should be Literal[1, 2]
-    reveal_type(y)  # revealed: Divergent
+    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ### Tuple assignments are inferred correctly
@@ -423,8 +446,7 @@ def random() -> bool:
 x = 0
 while random():
     x, y = x + 1, None
-    # TODO: should be int
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: int
 ```
 
 ### Avoid oscillations
@@ -445,6 +467,42 @@ while random():
         x, y = y, x
     reveal_type(x)  # revealed: Literal[2, 1]
     reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Monotonic widening can keep stale loopback bindings reachable
+
+```py
+def random() -> bool:
+    return False
+
+x = 0
+while random():
+    reveal_type(x)  # revealed: Literal[0]
+    if x == 1:
+        x = 2
+```
+
+### Conditional unpacking and loop exits converge normally
+
+This reduced example from issue #3057 used to panic with "too many cycle iterations":
+
+```py
+def fetch(req) -> tuple:
+    return (True, None)
+
+def paginate():
+    bookmark = None
+    while True:
+        if bookmark is None:
+            req = None
+        else:
+            req = bookmark
+        ok, next_bookmark = fetch(req)
+        if not ok:
+            return
+        bookmark = next_bookmark
+        if bookmark is None or bookmark == 0:
+            break
 ```
 
 ### Loop bodies that are guaranteed to execute at least once
@@ -524,6 +582,9 @@ So, because we do monotonic widening in cycle recovery, we need to make sure tha
 `Divergent` expressions in narrowing constraints don't lead to too-wide-but-not-visibly-`Divergent`
 types. Instead, `Divergent` should "poison" any value we try to narrow against it, so that our cycle
 recovery logic doesn't carry that result forward.
+
+Addendum: #23563 fixed the implementation of `Type::cycle_normalized`, so that such "tainted
+previous values" are no longer unioned.
 
 ### `global` and `nonlocal` keywords in a loop
 

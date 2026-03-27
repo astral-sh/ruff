@@ -332,6 +332,29 @@ impl<'a> Checker<'a> {
         Generator::new(self.stylist.indentation(), self.stylist.line_ending())
     }
 
+    pub(crate) fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.semantic.current_scope().kind {
+            // Possible, but invalid positions.
+            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
+            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
+            // Valid position.
+            ScopeKind::Module => {}
+            // Impossible positions because lambdas and comprehensions can't contain statements.
+            ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => {}
+        }
+
+        for statement in self.semantic.current_statements().skip(1) {
+            if matches!(statement, Stmt::Try(_)) {
+                return Some(LazyImportContext::TryExceptBlocks);
+            }
+        }
+
+        None
+    }
+
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
     fn preferred_quote(&self) -> Quote {
@@ -803,26 +826,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {
-        match self.semantic.current_scope().kind {
-            // Possible, but invalid positions.
-            ScopeKind::Function(_) => return Some(LazyImportContext::Function),
-            ScopeKind::Class(_) => return Some(LazyImportContext::Class),
-            // Valid position.
-            ScopeKind::Module => {}
-            // Impossible positions because lambdas and comprehensions can't contain statements.
-            ScopeKind::Lambda(_)
-            | ScopeKind::Generator { .. }
-            | ScopeKind::Type
-            | ScopeKind::DunderClassCell => {}
-        }
-
-        for statement in self.semantic.current_statements().skip(1) {
-            if matches!(statement, Stmt::Try(_)) {
-                return Some(LazyImportContext::TryExceptBlocks);
-            }
-        }
-
-        None
+        self.lazy_import_context()
     }
 
     fn in_async_context(&self) -> bool {
@@ -1457,7 +1461,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.set_branch(branch);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
                 self.semantic.pop_branch();
 
                 self.semantic.push_branch();
@@ -1553,7 +1560,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
+            }
+            Stmt::For(ast::StmtFor {
+                node_index: _,
+                range: _,
+                is_async: _,
+                target,
+                iter,
+                body,
+                orelse,
+            }) => {
+                self.visit_expr(iter);
+                self.visit_expr(target);
+                self.visit_body(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
+                self.visit_body(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -1782,7 +1809,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
+                let flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ORELSE;
                 self.visit_expr(orelse);
+                self.semantic.flags = flags_snapshot;
             }
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::Not,
@@ -2328,6 +2358,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 2: Traversal
         walk_pattern(self, pattern);
+
+        // Step 4: Analysis
+        analyze::pattern(pattern, self);
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {
@@ -2859,7 +2892,10 @@ impl<'a> Checker<'a> {
 
         self.semantic.resolve_del(id, expr.range());
 
-        if helpers::on_conditional_branch(&mut self.semantic.current_statements()) {
+        if helpers::on_conditional_branch(&mut self.semantic.current_statements())
+            || self.semantic.in_exception_handler()
+            || self.semantic.in_orelse()
+        {
             return;
         }
 

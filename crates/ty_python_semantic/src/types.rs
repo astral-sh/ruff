@@ -4,7 +4,6 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -19,6 +18,7 @@ use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
+pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
@@ -50,7 +50,7 @@ use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::{ConstraintSetBuilder, Solutions};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -59,10 +59,10 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
 };
+pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
 };
-pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
@@ -757,6 +757,14 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+#[derive(Debug, Clone, Copy)]
+#[expect(clippy::struct_field_names)]
+struct GeneratorTypes<'db> {
+    yield_ty: Option<Type<'db>>,
+    send_ty: Option<Type<'db>>,
+    return_ty: Option<Type<'db>>,
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -840,49 +848,23 @@ impl<'db> Type<'db> {
         // types from each cycle iteration to ensure that our result is monotonic, even if we
         // encounter oscillation.
         //
-        // However, there are a couple of cases where we don't want to do that, and want to use the
-        // later cycle iteration's result directly. This introduces the theoretical possibility of
-        // cycle oscillation involving such types (because we are not strictly widening the type on
-        // each iteration), but so far we have not seen an example of that.
-        match (previous, self) {
-            // Avoid unioning two generic aliases of the same class together; this union will never
-            // simplify and is likely to cause downstream problems.
-            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
-                if prev_alias.origin(db) == curr_alias.origin(db) =>
-            {
-                self
-            }
-
-            // Similarly, don't union together two function literals, since there are several parts
-            // of our type inference machinery that assume that we infer a single FunctionLiteral
-            // type for each overload of each function definition.
-            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
-                if prev_function.definition(db) == curr_function.definition(db) =>
-            {
-                self
-            }
-
-            _ => {
-                // Also avoid unioning in a previous type which contains a Divergent from the
-                // current cycle, if the most-recent type does not. This cannot cause an
-                // oscillation, since Divergent is only introduced at the start of fixpoint
-                // iteration.
-                let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(db, ty, false, |nested_ty| {
-                        nested_ty
-                            .as_divergent()
-                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
-                    })
-                };
-                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
-                    self
-                } else {
-                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
-                    // Consider the case where the order of union types is different between the previous and current cycle.
-                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
-                    UnionType::from_elements_cycle_recovery(db, [previous, self])
-                }
-            }
+        // However, for the first couple iterations we are prone to get values including Divergent
+        // that will soon converge, but where unioning in the early value causes a loss of
+        // precision that we can't recover from. For example, a narrowing condition that looks like
+        // `is not Divergent` instead of `is not None` in the first iteration may cause us to lose
+        // the effect of that narrowing permanently, due to the union-previous-iteration behavior.
+        // So we avoid unioning in the first couple iterations, and just use the later iteration's
+        // result directly. We still ensure monotonicity after the first couple iterations, which
+        // still ensures convergence in cases that are prone to oscillation.
+        if cycle.iteration() <= 1 {
+            self
+        } else {
+            // The current type is unioned to the previous type. Unioning in the reverse order can
+            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+            // where the order of union types is different between the previous and current cycle.
+            // We should use the previous union type as the base and only add new element types in
+            // this cycle, if any.
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -1069,18 +1051,31 @@ impl<'db> Type<'db> {
         self.specialization_of_optional(db, None)
     }
 
+    /// If this type is a class instance, returns its class.
+    pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
+            Type::TypeVar(typevar) => {
+                let TypeVarBoundOrConstraints::UpperBound(bound) =
+                    typevar.typevar(db).bound_or_constraints(db)?
+                else {
+                    return None;
+                };
+                bound.nominal_class(db)
+            }
+            _ => None,
+        }
+    }
+
     fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<StaticClassLiteral<'_>>,
     ) -> Option<Specialization<'db>> {
-        let class_type = match self {
-            Type::NominalInstance(instance) => instance,
-            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
-            Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
-            _ => return None,
-        }
-        .class(db);
+        let class_type = self.nominal_class(db)?;
 
         let (class_literal, specialization) = class_type.static_class_literal(db)?;
         if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
@@ -1209,6 +1204,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn as_new_type(self) -> Option<NewType<'db>> {
+        match self {
+            Type::NewTypeInstance(new_type) => Some(new_type),
+            _ => None,
+        }
+    }
+
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
@@ -1232,13 +1234,6 @@ impl<'db> Type<'db> {
     pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
-        match self {
-            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
             _ => None,
         }
     }
@@ -1338,7 +1333,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(_))
     }
 
-    pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
+    pub const fn as_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),
             _ => None,
@@ -1435,11 +1430,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn is_literal_string(&self) -> bool {
-        self.as_literal_value()
-            .is_some_and(literal::LiteralValueType::is_literal_string)
-    }
-
     pub(crate) fn is_string_literal(&self) -> bool {
         self.as_literal_value()
             .is_some_and(literal::LiteralValueType::is_string)
@@ -1471,11 +1461,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1485,11 +1475,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string()
+                    || ty.is_subtype_of(db, Type::literal_string())
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || ty.is_bool(db)
-            || ty.is_literal_string()
+            || ty.is_subtype_of(db, Type::literal_string())
             || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
@@ -1664,7 +1654,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
@@ -1697,7 +1687,19 @@ impl<'db> Type<'db> {
     pub(crate) fn promote(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::Promote(PromotionMode::On),
+            &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
+            TypeContext::default(),
+        )
+    }
+
+    /// Recursively promote singleton types (like `None`, `EllipsisType`) to
+    /// `T | Unknown` within type parameters, without recursing into unions.
+    /// Used for collection literal inference so that `[None]` is inferred as
+    /// `list[None | Unknown]` rather than `list[None]`.
+    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly),
             TypeContext::default(),
         )
     }
@@ -1908,17 +1910,38 @@ impl<'db> Type<'db> {
         let generic_context = specialization.generic_context(db);
 
         // Collect the type mappings used to narrow the type context.
-        let tcx_mappings = {
-            let mut builder =
-                SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
-
-            if let Some(tcx) = tcx.annotation {
+        //
+        // We use a forward CSA check (`alias_instance ≤ tcx`) to infer what each typevar
+        // in the identity specialization maps to in the type context. For example, if
+        // `tcx = list[int]` and `alias_instance = list[T]`, the CSA produces `T = int`.
+        let tcx_mappings: FxHashMap<_, _> = tcx
+            .annotation
+            .and_then(|tcx| {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let _ = builder.infer_reverse(constraints, tcx, alias_instance);
-            }
-
-            builder.into_type_mappings()
-        };
+                let set = alias_instance.when_constraint_set_assignable_to(db, tcx, constraints);
+                match set.solutions(db, constraints) {
+                    Solutions::Constrained(solutions) => {
+                        let mut mappings = FxHashMap::default();
+                        for solution in solutions.iter() {
+                            for binding in solution {
+                                mappings
+                                    .entry(binding.bound_typevar.identity(db))
+                                    .and_modify(|existing| {
+                                        *existing = UnionType::from_two_elements(
+                                            db,
+                                            *existing,
+                                            binding.solution,
+                                        );
+                                    })
+                                    .or_insert(binding.solution);
+                            }
+                        }
+                        Some(mappings)
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap_or_default();
 
         for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
             let variance = type_var.variance_with_polarity(db, polarity);
@@ -2062,7 +2085,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(..)
@@ -2114,6 +2136,11 @@ impl<'db> Type<'db> {
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
+                false
+            }
+
+            Type::BoundMethod(_) => {
+                // Binding the same method to different instances yields different objects: `[].sort != [].sort`
                 false
             }
 
@@ -3393,6 +3420,35 @@ impl<'db> Type<'db> {
         }
     }
 
+    // Returns the value type of a `__getitem__` dunder call on this object.
+    //
+    // Returns `None` if `__getitem__` is undefined or results in a call error.
+    fn getitem_dunder_call(self, db: &'db dyn Db, key: Option<&str>) -> Option<Type<'db>> {
+        let key = key
+            .map(|key| Type::string_literal(db, key))
+            .unwrap_or(Type::unknown());
+
+        match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: getitem_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => getitem_method
+                .try_call(db, &CallArguments::positional([key]))
+                .ok()
+                .map(|bindings| bindings.return_type(db)),
+
+            _ => None,
+        }
+    }
+
     /// Returns the key and value types of this object if it was unpacked using `**`,
     /// or `None` if the object does not support unpacking.
     fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
@@ -3424,25 +3480,9 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        let value_ty = match self
-            .member_lookup_with_policy(
-                db,
-                Name::new_static("__getitem__"),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-        {
-            Place::Defined(DefinedPlace {
-                ty: getitem_method,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => getitem_method
-                .try_call(db, &CallArguments::positional([Type::unknown()]))
-                .ok()
-                .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-
-            _ => Type::unknown(),
-        };
+        let value_ty = self
+            .getitem_dunder_call(db, None)
+            .unwrap_or(Type::unknown());
 
         Some((key_ty, value_ty))
     }
@@ -4760,7 +4800,7 @@ impl<'db> Type<'db> {
     ///
     /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
     /// protocol.
-    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn generator_types(self, db: &'db dyn Db) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
         // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
@@ -4768,12 +4808,36 @@ impl<'db> Type<'db> {
 
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
+            let (_, Some(specialization)) = class.static_class_literal_specialized(db, None)?
+            else {
+                return None;
+            };
+
             if class.is_known(db, KnownClass::Generator)
-                && let Some((_, Some(specialization))) =
-                    class.static_class_literal_specialized(db, None)
-                && let [_, _, return_ty] = specialization.types(db)
+                && let [yield_ty, send_ty, return_ty] = specialization.types(db)
             {
-                Some(*return_ty)
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: Some(*return_ty),
+                })
+            } else if class.is_known(db, KnownClass::AsyncGenerator)
+                && let [yield_ty, send_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(*send_ty),
+                    return_ty: None,
+                })
+            } else if (class.is_known(db, KnownClass::Iterator)
+                || class.is_known(db, KnownClass::AsyncIterator))
+                && let [yield_ty] = specialization.types(db)
+            {
+                Some(GeneratorTypes {
+                    yield_ty: Some(*yield_ty),
+                    send_ty: Some(Type::none(db)),
+                    return_ty: Some(Type::none(db)),
+                })
             } else {
                 None
             }
@@ -4790,24 +4854,94 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            Type::Union(union) => {
+                let mut yield_builder = Some(UnionBuilder::new(db));
+                let mut send_builder = Some(UnionBuilder::new(db));
+                let mut return_builder = Some(UnionBuilder::new(db));
+
+                for ty in union.elements(db) {
+                    let gt = ty.generator_types(db)?;
+                    match gt.yield_ty {
+                        Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => send_builder = send_builder.map(|b| b.add(ty)),
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => return_builder = return_builder.map(|b| b.add(ty)),
+                        None => return_builder = None,
+                    }
+                }
+
+                Some(GeneratorTypes {
+                    yield_ty: yield_builder.map(UnionBuilder::build),
+                    send_ty: send_builder.map(UnionBuilder::build),
+                    return_ty: return_builder.map(UnionBuilder::build),
+                })
+            }
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
-                let mut any_success = false;
                 // Using `positive()` rather than `positive_elements_or_object()` is safe
                 // here because `object` is not a generator, so falling back to it would
                 // still return `None`.
+                let mut yield_builder = Some(IntersectionBuilder::new(db));
+                let mut send_builder = Some(IntersectionBuilder::new(db));
+                let mut return_builder = Some(IntersectionBuilder::new(db));
+                let mut any_success = false;
+
                 for ty in intersection.positive(db) {
-                    if let Some(return_ty) = ty.generator_return_type(db) {
-                        builder = builder.add_positive(return_ty);
-                        any_success = true;
+                    let Some(gt) = ty.generator_types(db) else {
+                        continue;
+                    };
+                    any_success = true;
+                    match gt.yield_ty {
+                        Some(ty) => {
+                            yield_builder = yield_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => yield_builder = None,
+                    }
+                    match gt.send_ty {
+                        Some(ty) => {
+                            send_builder = send_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => send_builder = None,
+                    }
+                    match gt.return_ty {
+                        Some(ty) => {
+                            return_builder = return_builder.map(|b| b.add_positive(ty));
+                        }
+                        None => return_builder = None,
                     }
                 }
-                any_success.then(|| builder.build())
+
+                if !any_success {
+                    return None;
+                }
+
+                Some(GeneratorTypes {
+                    yield_ty: yield_builder.map(IntersectionBuilder::build),
+                    send_ty: send_builder.map(IntersectionBuilder::build),
+                    return_ty: return_builder.map(IntersectionBuilder::build),
+                })
             }
-            ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
+            ty @ (Type::Dynamic(_) | Type::Never) => Some(GeneratorTypes {
+                yield_ty: Some(ty),
+                send_ty: Some(ty),
+                return_ty: Some(ty),
+            }),
             _ => None,
         }
+    }
+
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|generator_types| generator_types.return_ty)
+    }
+
+    fn generator_send_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.generator_types(db)
+            .and_then(|generator_types| generator_types.send_ty)
     }
 
     #[must_use]
@@ -5220,6 +5354,16 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
+        // `SingletonsOnly` promotion only recurses into `NominalInstance` types (tuples
+        // and specialized generics). For all other types, return early.
+        if matches!(
+            type_mapping,
+            TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
+        ) && !matches!(self, Type::NominalInstance(_))
+        {
+            return self;
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -5228,7 +5372,7 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
-                    TypeMapping::Promote(PromotionMode::On) => {
+                    TypeMapping::Promote(PromotionMode::On, _) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
                             type_mapping,
@@ -5252,11 +5396,19 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) => {
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)) => {
                 match instance.known_class(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
                     _ => instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                }
+            }
+
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
+                if instance.is_singleton(db) {
+                    UnionType::from_two_elements(db, self, Type::unknown())
+                } else {
+                    instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
             }
 
@@ -5334,7 +5486,7 @@ impl<'db> Type<'db> {
                 }
                 // Promotion should remove negative contributions from intersections,
                 // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On)) {
+                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
                     for negative in intersection.negative(db) {
                         builder = builder.add_negative(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
@@ -5345,9 +5497,23 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.with_type(
+                    db,
+                    type_is
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
-            Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+                type_guard.with_type(
+                    db,
+                    type_guard
+                        .return_type(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
             Type::TypeAlias(alias) => {
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
@@ -5367,12 +5533,6 @@ impl<'db> Type<'db> {
                 let mapped = visitor.visit(self, || {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
-
-                        // For UniqueSpecialization, get raw value type, apply specialization, then apply mapping.
-                        TypeMapping::UniqueSpecialization { .. } => {
-                            let value_type = alias.raw_value_type(db);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                        }
 
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
@@ -5398,7 +5558,6 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -5406,18 +5565,18 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off) => self,
-                TypeMapping::Promote(PromotionMode::On) => self.promote_impl(db),
+                TypeMapping::Promote(PromotionMode::Off, _) |
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
 
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Promote(_) |
+                TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
@@ -5754,6 +5913,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, &known_instance.repr(db).to_string())
             }
+            ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -6078,6 +6238,14 @@ impl PromotionMode {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub enum PromotionKind {
+    /// Default promotion behaviour: recurse into nested types
+    Regular,
+    /// Singleton promotion is shallow: it doesn't recurse
+    SingletonsOnly,
+}
+
 /// Returns the [`ClassLiteral`] that "owns" a `Self` typevar (i.e., the class from its upper bound).
 fn self_typevar_owner_class_literal<'db>(
     db: &'db dyn Db,
@@ -6086,10 +6254,8 @@ fn self_typevar_owner_class_literal<'db>(
     bound_typevar
         .typevar(db)
         .upper_bound(db)
-        .and_then(|ty| match ty {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-            _ => None,
-        })
+        .and_then(|ty| ty.nominal_class(db))
+        .map(|class| class.class_literal(db))
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -6132,11 +6298,12 @@ impl<'db> SelfBinding<'db> {
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         let class_literal = match self_type {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)
             }
-            _ => None,
+            _ => self_type
+                .nominal_class(db)
+                .map(|class| class.class_literal(db)),
         };
 
         Self {
@@ -6185,14 +6352,9 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
-    /// Resets any specializations to contain unique synthetic type variables.
-    UniqueSpecialization {
-        // A list of synthetic type variables, and the types they replaced.
-        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
-    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    Promote(PromotionMode),
+    Promote(PromotionMode, PromotionKind),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -6241,8 +6403,7 @@ impl<'db> TypeMapping<'_, 'db> {
                     }),
                 )
             }
-            TypeMapping::UniqueSpecialization { .. }
-            | TypeMapping::Promote(_)
+            TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -6285,9 +6446,8 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization: specialization.clone(),
                 materialization_kind: materialization_kind.flip(),
             },
-            TypeMapping::Promote(mode) => TypeMapping::Promote(mode.flip()),
+            TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
@@ -6515,24 +6675,17 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        context: &InferContext,
-        node: &impl Ranged,
-        is_reachable: bool,
-    ) -> Type<'db> {
+    fn into_fallback_type(self, context: &InferContext, node: &impl Ranged) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
-        if is_reachable {
-            for error in invalid_expressions {
-                let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
-                    continue;
-                };
-                let diagnostic = builder.into_diagnostic(error.reason(context.db()));
-                error.add_subdiagnostics(context.db(), diagnostic, node);
-            }
+        for error in invalid_expressions {
+            let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
+                continue;
+            };
+            let diagnostic = builder.into_diagnostic(error.reason(context.db()));
+            error.add_subdiagnostics(context.db(), diagnostic, node);
         }
         fallback_type
     }
@@ -6568,12 +6721,19 @@ enum InvalidTypeExpression<'db> {
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
     /// assignment
     TypeAlias,
+    /// Same for `typing.Concatenate`, anywhere except for as the first parameter of a `Callable`
+    /// type expression
+    Concatenate,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
+    /// `typing.Self` cannot be used in `@staticmethod` definitions.
+    TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in metaclass definitions.
+    TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
@@ -6643,6 +6803,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::TypingSelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
@@ -6664,6 +6830,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Bare ParamSpec `{}` is not valid in this context in a type expression",
                         paramspec.name(self.db)
+                    ),
+                    InvalidTypeExpression::Concatenate => f.write_str(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
                     ),
                 }
             }
@@ -6722,7 +6891,7 @@ impl<'db> InvalidTypeExpression<'db> {
         // casing for this function.
         } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
             && function.name(db) == "callable"
-            && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
+            && let function_body_scope = function.literal(db).last_definition.body_scope(db)
             && function_body_scope
                 .scope(db)
                 .parent()
@@ -6737,6 +6906,10 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::Concatenate) {
+            diagnostic.info("`typing.Concatenate` is only valid:");
+            diagnostic.info(" - as the first argument to `typing.Callable`");
+            diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
     }
 }
@@ -7327,3 +7500,9 @@ impl EvaluationMode {
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Type, [u8; 16]);
+
+// Make sure that `LiteralValueTypeInner` stays at 12 bytes.
+// The `LiteralFlags` byte must fit in the discriminant's padding.
+#[cfg(not(debug_assertions))]
+#[cfg(target_pointer_width = "64")]
+static_assertions::assert_eq_size!(literal::LiteralValueType, [u8; 12]);

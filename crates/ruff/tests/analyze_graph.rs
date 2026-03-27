@@ -247,6 +247,311 @@ fn string_detection() -> Result<()> {
 }
 
 #[test]
+fn string_detection_attribute() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        import ruff.b
+    "#})?;
+    root.child("ruff")
+        .child("b.py")
+        .write_str(indoc::indoc! {r#"
+        import pydoc
+
+        cls = pydoc.locate("ruff.c.MyClass")
+    "#})?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    // Without string detection, no edge from b.py to c.py.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With string detection and min-dots=1, "ruff.c.MyClass" should resolve to ruff/c.py
+    // by falling back from the unresolvable full name to the parent module.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With the default min-dots=2, the fallback from "ruff.c.MyClass" (2 dots)
+    // would land on "ruff.c" (1 dot), which is below the threshold — so no edge.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// If the full string resolves as a module, no fallback should occur—the graph
+/// should point at the exact file, not its parent.
+#[test]
+fn string_detection_exact_module() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        cls = "ruff.b"
+    "#})?;
+    root.child("ruff").child("b.py").write_str("")?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Multiple trailing components should be stripped until a module is found.
+/// `"ruff.c.Outer.Inner"` should resolve to `ruff/c.py`.
+#[test]
+fn string_detection_deep_attribute() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        cls = "ruff.c.Outer.Inner"
+    "#})?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// With `min_dots=2` (the default), a string with 3+ dots can still fall back
+/// as long as the resolved prefix retains at least 2 dots.
+/// `"a.b.c.d.Cls"` (4 dots) → fallback to `"a.b.c.d"` (3 dots, ≥ 2) ✓.
+#[test]
+fn string_detection_min_dots_deep_fallback() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("a").child("__init__.py").write_str("")?;
+    root.child("a")
+        .child("b")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("a")
+        .child("b")
+        .child("c")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("a")
+        .child("b")
+        .child("c")
+        .child("d.py")
+        .write_str("")?;
+    root.child("a")
+        .child("b")
+        .child("main.py")
+        .write_str(indoc::indoc! {r#"
+        cls = "a.b.c.d.MyClass"
+    "#})?;
+
+    // Default min_dots=2: "a.b.c.d" has 3 dots (≥ 2), so fallback succeeds.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "a/__init__.py": [],
+          "a/b/__init__.py": [],
+          "a/b/c/__init__.py": [],
+          "a/b/c/d.py": [],
+          "a/b/main.py": [
+            "a/b/c/d.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// A string that passes the dot filter but where no prefix resolves to an
+/// existing module should produce no edge.
+#[test]
+fn string_detection_unresolvable() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        cls = "nonexistent.module.Class"
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// String import fallback should work with `src` configuration, resolving
+/// through non-root source directories.
+#[test]
+fn string_detection_with_src() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["lib"]
+
+        [analyze]
+        detect-string-imports = true
+        string-imports-min-dots = 1
+    "#})?;
+
+    root.child("lib")
+        .child("mylib")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("lib")
+        .child("mylib")
+        .child("sub.py")
+        .write_str("")?;
+
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str(indoc::indoc! {r#"
+        cls = "mylib.sub.MyClass"
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "lib/mylib/sub.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+#[test]
 fn string_detection_from_config() -> Result<()> {
     let tempdir = TempDir::new()?;
 

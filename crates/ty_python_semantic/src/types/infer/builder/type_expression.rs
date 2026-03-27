@@ -5,14 +5,15 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
-use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
-use crate::types::signatures::Signature;
+use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
@@ -25,9 +26,6 @@ use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic}
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         let previous_deferred_state = self.deferred_state;
 
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
@@ -76,9 +74,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -93,11 +88,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.inference_flags,
                         )
                         .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &self.context,
-                                expression,
-                                self.is_reachable(expression),
-                            )
+                            error.into_fallback_type(&self.context, expression)
                         });
                     self.check_for_unbound_type_variable(expression, ty)
                 }
@@ -117,13 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.typevar_binding_context,
                         self.inference_flags,
                     )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")
@@ -160,20 +145,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if !self.deferred_state.is_deferred()
                             && !self.scope.scope(self.db()).in_type_checking_block()
                         {
-                            let previous_state =
-                                self.set_multi_inference_state(MultiInferenceState::Ignore);
-                            let was_in_multi_inference = self.context.set_multi_inference(true);
+                            let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
                             // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
                             // in that case.
-                            let left_type_value =
-                                self.infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value =
-                                self.infer_expression(&binary.right, TypeContext::default());
-                            self.multi_inference_state = previous_state;
-                            self.context.set_multi_inference(was_in_multi_inference);
+                            let left_type_value = speculative_builder
+                                .infer_expression(&binary.left, TypeContext::default());
+                            let right_type_value = speculative_builder
+                                .infer_expression(&binary.right, TypeContext::default());
 
                             let dunder_fails = Type::try_call_bin_op(
                                 self.db(),
@@ -264,14 +245,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             && !binary.left.is_string_literal_expr()
                                             && !binary.right.is_string_literal_expr()
                                         {
-                                            diagnostic.info(
-                                                "PEP 604 `|` unions are only available on \
-                                                Python 3.10+ unless they are quoted",
-                                            );
-                                            add_inferred_python_version_hint_to_diagnostic(
+                                            note_py_version_too_old_for_pep_604(
                                                 self.db(),
+                                                self.index,
                                                 &mut diagnostic,
-                                                "inferring types",
                                             );
                                         } else if python_version < PythonVersion::PY314 {
                                             diagnostic.info(
@@ -484,7 +461,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Lambda(lambda_expression) => {
                 if !self.deferred_state.in_string_annotation() {
-                    self.infer_lambda_expression(lambda_expression);
+                    self.infer_lambda_expression(lambda_expression, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
@@ -931,6 +908,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
             let slice_ty = builder.infer_type_expression(slice);
+            if matches!(slice_ty, Type::ProtocolInstance(_)) {
+                return SubclassOfType::from(
+                    builder.db(),
+                    todo_type!("type[T] for protocols").expect_dynamic(),
+                );
+            }
             SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
                 match slice_ty {
                     Type::Callable(_) => invalid_type_argument(builder, slice),
@@ -1407,15 +1390,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::Union(union) => {
                 self.infer_type_expression(slice);
-                let previous_slice_inference_state = std::mem::replace(
-                    &mut self.inner_expression_inference_state,
-                    InnerExpressionInferenceState::Get,
-                );
-                let union = union.map(self.db(), |element| {
-                    self.infer_subscript_type_expression(subscript, *element)
-                });
-                self.inner_expression_inference_state = previous_slice_inference_state;
-                union
+                union.map(self.db(), |element| {
+                    let mut speculative_builder = self.speculate();
+                    let subscript_ty =
+                        speculative_builder.infer_subscript_type_expression(subscript, *element);
+                    self.context.extend(&speculative_builder.context.finish());
+                    subscript_ty
+                })
             }
             _ => {
                 self.infer_type_expression(slice);
@@ -1589,7 +1570,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         subscript,
                     )
                     .in_type_expression(db, self.scope(), None, self.inference_flags)
-                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
+                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript));
                 // Only store on the tuple slice; non-tuple cases are handled by
                 // `infer_subscript_load_impl` via `infer_expression`.
                 if arguments_slice.is_tuple_expr() {
@@ -1752,7 +1733,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 type_of_type
             }
 
-            SpecialFormType::CallableTypeOf => {
+            SpecialFormType::CallableTypeOf | SpecialFormType::RegularCallableTypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
@@ -1779,9 +1760,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type
-                    .try_upcast_to_callable(db)
-                    .map(|callables| callables.into_type(self.db()))
+                let Some(callable_type) =
+                    argument_type.try_upcast_to_callable(db).map(|callables| {
+                        if special_form == SpecialFormType::RegularCallableTypeOf {
+                            callables
+                                .map(|callable| callable.into_regular(db))
+                                .into_type(db)
+                        } else {
+                            callables.into_type(db)
+                        }
+                    })
                 else {
                     if let Some(builder) = self
                         .context
@@ -1831,17 +1819,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     Type::unknown()
                 }
-                _ => TypeIsType::unbound(
-                    self.db(),
-                    // N.B. Using the top materialization here is a pragmatic decision
-                    // that makes us produce more intuitive results given how
-                    // `TypeIs` is used in the real world (in particular, in typeshed).
-                    // However, there's some debate about whether this is really
-                    // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
-                    // for more discussion.
-                    self.infer_type_expression(arguments_slice)
-                        .top_materialization(self.db()),
-                ),
+                _ => {
+                    let narrowed = self.infer_type_expression(arguments_slice);
+                    let expanded = narrowed.expand_eagerly(self.db());
+
+                    if expanded.is_divergent() {
+                        expanded
+                    } else {
+                        TypeIsType::unbound(
+                            self.db(),
+                            // N.B. Using the top materialization here is a pragmatic decision
+                            // that makes us produce more intuitive results given how
+                            // `TypeIs` is used in the real world (in particular, in typeshed).
+                            // However, there's some debate about whether this is really
+                            // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
+                            // for more discussion.
+                            narrowed.top_materialization(self.db()),
+                        )
+                    }
+                }
             },
             SpecialFormType::TypeGuard => match arguments_slice {
                 ast::Expr::Tuple(_) => {
@@ -1864,6 +1860,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ),
             },
             SpecialFormType::Concatenate => {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                    ));
+                    diag.info("`typing.Concatenate` is only valid:");
+                    diag.info(" - as the first argument to `typing.Callable`");
+                    diag.info(" - as a type argument for a `ParamSpec` parameter");
+                }
+
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
                 } else {
@@ -1889,21 +1894,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                let num_arguments = arguments.len();
-                let inferred_type = if num_arguments < 2 {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` expected at least 2 parameters but got {num_arguments}",
-                        ));
-                    }
-                    Type::unknown()
-                } else {
-                    todo_type!("`Concatenate[]` special form")
-                };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, inferred_type);
+                    self.store_expression_type(arguments_slice, Type::unknown());
                 }
-                inferred_type
+
+                Type::unknown()
             }
             SpecialFormType::Unpack => {
                 let inner_ty = self.infer_type_expression(arguments_slice);
@@ -2172,8 +2167,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             ast::Expr::Subscript(subscript) => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
+
+                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
+                    return Some(self.infer_concatenate_special_form(subscript));
+                }
+
                 self.infer_subscript_type_expression(subscript, value_ty);
-                // TODO: Support `Concatenate[...]`
+
+                // Non-Concatenate subscript (e.g. Unpack): fall back to todo
                 return Some(Parameters::todo());
             }
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
@@ -2232,6 +2233,122 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+
+    /// Infer the parameter types represented by a `typing.Concatenate` special form.
+    pub(super) fn infer_concatenate_special_form(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+    ) -> Parameters<'db> {
+        let arguments_slice = &*subscript.slice;
+        let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+            &*tuple.elts
+        } else {
+            std::slice::from_ref(arguments_slice)
+        };
+
+        let (last_arg, prefix_args) = match arguments.split_last() {
+            Some((last_arg, prefix_args)) if !prefix_args.is_empty() => (last_arg, prefix_args),
+            _ => {
+                for argument in arguments {
+                    self.infer_type_expression(argument);
+                }
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Special form `typing.Concatenate` expected at least 2 parameters \
+                            but got {}",
+                        arguments.len()
+                    ));
+                }
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, Type::unknown());
+                }
+                return Parameters::gradual_form();
+            }
+        };
+
+        let prefix_params = prefix_args
+            .iter()
+            .map(|arg| {
+                Parameter::positional_only(None)
+                    .with_annotated_type(self.infer_type_expression(arg))
+            })
+            .collect();
+
+        let parameters = self
+            .infer_concatenate_tail(last_arg)
+            .map(|tail| Parameters::concatenate(self.db(), prefix_params, tail));
+
+        if arguments_slice.is_tuple_expr() {
+            // TODO: What type to store for the argument slice in `Concatenate` because
+            // `Parameters` is not a `Type` variant?
+            self.store_expression_type(arguments_slice, Type::unknown());
+        }
+
+        parameters.unwrap_or_else(Parameters::unknown)
+    }
+
+    /// Infer the last argument to a `typing.Concatenate` special form, which can be either `...`
+    /// (for gradual typing), a `ParamSpec` type variable, or a string annotation that evaluates to
+    /// a `ParamSpec` type variable.
+    fn infer_concatenate_tail(&mut self, expr: &ast::Expr) -> Option<ConcatenateTail<'db>> {
+        match expr {
+            ast::Expr::EllipsisLiteral(_) => Some(ConcatenateTail::Gradual),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                if expr.as_name_expr().is_some_and(ast::ExprName::is_invalid) {
+                    return None;
+                }
+                let previously_allowed_paramspec = self
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                let expr_type = self.infer_type_expression_no_store(expr);
+                self.inference_flags.set(
+                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                    previously_allowed_paramspec,
+                );
+                let Type::TypeVar(typevar) = expr_type else {
+                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    return None;
+                };
+                if !typevar.is_paramspec(self.db()) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    return None;
+                }
+                Some(ConcatenateTail::ParamSpec(typevar))
+            }
+            ast::Expr::StringLiteral(string) => {
+                let Some(parsed) = parse_string_annotation(&self.context, string) else {
+                    report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
+                    return None;
+                };
+
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                let node_key = self.enclosing_node_key(string.into());
+
+                if !matches!(
+                    parsed.expr(),
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                ) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
+                    return None;
+                }
+
+                let previous_deferred_state = std::mem::replace(
+                    &mut self.deferred_state,
+                    DeferredExpressionState::InStringAnnotation(node_key),
+                );
+                let result = self.infer_concatenate_tail(parsed.expr());
+                self.deferred_state = previous_deferred_state;
+
+                result
+            }
+            _ => {
+                let ty = self.infer_type_expression(expr);
+                report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                None
+            }
+        }
     }
 
     /// Checks if the inferred type is an unbound type variable and reports a diagnostic if so.

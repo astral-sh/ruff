@@ -186,6 +186,7 @@ static ALWAYS_AVAILABLE_BUILTINS: &[&str] = &[
 static PY310_PLUS_BUILTINS: &[&str] = &["EncodingWarning", "aiter", "anext"];
 static PY311_PLUS_BUILTINS: &[&str] = &["BaseExceptionGroup", "ExceptionGroup"];
 static PY313_PLUS_BUILTINS: &[&str] = &["PythonFinalizationError"];
+static PY315_PLUS_BUILTINS: &[&str] = &["frozendict"];
 
 /// Return the list of builtins for the given Python minor version.
 ///
@@ -206,6 +207,11 @@ pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<It
     } else {
         None
     };
+    let py315_builtins = if minor_version >= 15 {
+        Some(PY315_PLUS_BUILTINS)
+    } else {
+        None
+    };
     let ipython_builtins = if is_notebook {
         Some(IPYTHON_BUILTINS)
     } else {
@@ -216,6 +222,7 @@ pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<It
         .into_iter()
         .chain(py311_builtins)
         .chain(py313_builtins)
+        .chain(py315_builtins)
         .chain(ipython_builtins)
         .flatten()
         .chain(ALWAYS_AVAILABLE_BUILTINS)
@@ -403,6 +410,7 @@ pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bo
         ) | (10.., "EncodingWarning" | "aiter" | "anext")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
             | (13.., "PythonFinalizationError")
+            | (15.., "frozendict")
     )
 }
 
@@ -415,6 +423,8 @@ pub fn version_builtin_was_added(name: &str) -> Option<u8> {
         Some(11)
     } else if PY313_PLUS_BUILTINS.contains(&name) {
         Some(13)
+    } else if PY315_PLUS_BUILTINS.contains(&name) {
+        Some(15)
     } else if ALWAYS_AVAILABLE_BUILTINS.contains(&name) {
         Some(0)
     } else {

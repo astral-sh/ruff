@@ -21,14 +21,67 @@ export function stringify(settings: Settings): string {
 }
 
 /**
- * Persist the configuration to a URL.
+ * Save the configuration and return a shareable URL.
+ */
+async function shareUrl(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<string> {
+  const id = await savePlayground({ settingsSource, pythonSource });
+  return `${window.location.origin}/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Persist the configuration and copy a shareable URL to clipboard.
  */
 export async function persist(
   settingsSource: string,
   pythonSource: string,
 ): Promise<void> {
-  const id = await savePlayground({ settingsSource, pythonSource });
-  await navigator.clipboard.writeText(`${window.location.origin}/${id}`);
+  const url = await shareUrl(settingsSource, pythonSource);
+  await navigator.clipboard.writeText(url);
+}
+
+/**
+ * Persist the configuration and copy a markdown link to clipboard.
+ */
+export async function copyAsMarkdownLink(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<void> {
+  const url = await shareUrl(settingsSource, pythonSource);
+  await navigator.clipboard.writeText(`[Playground](${url})`);
+}
+
+/**
+ * Persist the configuration and copy markdown with code to clipboard.
+ */
+export async function copyAsMarkdown(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<void> {
+  const [url, toml] = await Promise.all([
+    shareUrl(settingsSource, pythonSource),
+    import("smol-toml"),
+  ]);
+
+  let settingsBlock: string;
+  try {
+    settingsBlock = `\`\`\`toml\n${toml.stringify(JSON.parse(settingsSource))}\n\`\`\``;
+  } catch {
+    settingsBlock = `\`\`\`json\n${settingsSource}\n\`\`\``;
+  }
+
+  await navigator.clipboard.writeText(
+    `## [Playground](${url})
+
+\`\`\`py
+${pythonSource}
+\`\`\`
+
+${settingsBlock}
+`,
+  );
 }
 
 /**

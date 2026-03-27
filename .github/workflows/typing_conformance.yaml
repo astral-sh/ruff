@@ -19,8 +19,8 @@ on:
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
-      # It's tempting to skip all Python files in every directory,
-      # but changes to Python files in `ty_vendored` can affect the output of mypy_primer,
+      # It's tempting to skip all Python files in every directory, but changes to
+      # Python files in `ty_vendored` can affect the output of the ecosystem analysis,
       # so we apply a narrow exemption for all files in the corpus directory instead.
       - "!crates/ty_python_semantic/resources/corpus/**"
 
@@ -34,7 +34,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: 7f8f6bbcaac9be6cde08c886f32aab64a3d597d2
+  CONFORMANCE_SUITE_COMMIT: 1df1565c69730d88ce6877009d268ba1d602af1e
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -56,7 +56,7 @@ jobs:
           path: typing
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "ruff"
 
