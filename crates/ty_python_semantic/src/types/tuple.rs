@@ -289,17 +289,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match target {
-            Tuple::Fixed(target) => ConstraintSet::from_bool(
-                self.constraints,
-                source.0.len() == target.0.len(),
-            )
-            .and(db, self.constraints, || {
-                (source.0.iter().zip(&target.0)).when_all(
+            Tuple::Fixed(target) => {
+                let equal_length = source.0.len() == target.0.len();
+
+                if !equal_length && self.relation.is_assignability() {
+                    // TODO: add explanation to error_context
+                }
+
+                ConstraintSet::from_bool(self.constraints, equal_length).and(
                     db,
                     self.constraints,
-                    |(&source, &target)| self.check_type_pair(db, source, target),
+                    || {
+                        (source.0.iter().zip(&target.0)).when_all(
+                            db,
+                            self.constraints,
+                            |(&source, &target)| self.check_type_pair(db, source, target),
+                        )
+                    },
                 )
-            }),
+            }
 
             Tuple::Variable(target) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
