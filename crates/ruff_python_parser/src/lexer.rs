@@ -1760,8 +1760,6 @@ impl<'src> Lexer<'src> {
     }
 
     /// Retrieves the current offset of the cursor within the source code.
-    // SAFETY: Lexer doesn't allow files larger than 4GB
-    #[expect(clippy::cast_possible_truncation)]
     #[inline]
     fn offset(&self) -> TextSize {
         self.cell_start_offset + self.cell_text_len - self.cursor.text_len()
