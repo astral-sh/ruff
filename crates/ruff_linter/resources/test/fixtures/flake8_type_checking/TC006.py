@@ -110,3 +110,10 @@ def f():
     from typing import cast, Literal
 
     cast(Literal['"'], '"')  # TC006
+
+
+def f():
+    # Regression test for escaped control characters in quoted type expressions
+    from typing import cast, Literal
+
+    cast(Literal["\n"], "\n")  # TC006

@@ -272,3 +272,22 @@ help: Add quotes
 111 | 
     -     cast(Literal['"'], '"')  # TC006
 112 +     cast("""Literal['"']""", '"')  # TC006
+113 | 
+114 | 
+115 | def f():
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:119:10
+    |
+117 |     from typing import cast, Literal
+118 |
+119 |     cast(Literal["\n"], "\n")  # TC006
+    |          ^^^^^^^^^^^^^
+    |
+help: Add quotes
+116 |     # Regression test for escaped control characters in quoted type expressions
+117 |     from typing import cast, Literal
+118 | 
+    -     cast(Literal["\n"], "\n")  # TC006
+119 +     cast("Literal['\n']", "\n")  # TC006
+note: This is an unsafe fix and may change runtime behavior

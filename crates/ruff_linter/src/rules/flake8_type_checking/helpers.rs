@@ -420,41 +420,37 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
 
 /// Choose string literal flags that avoid producing escape sequences in the quoted annotation.
 ///
-/// When the annotation text contains the preferred quote character, we switch to triple-quoted
-/// strings to avoid escape sequences. If that also fails, we try the opposite quote style.
+/// Follows the same fallback order as Ruff's formatter: preferred quote, then the opposite
+/// quote style, then triple-quoted preferred, then triple-quoted opposite. Returns the
+/// original flags unchanged only when all four options would still produce escapes.
 fn flags_avoiding_escape_sequences(
     annotation: &str,
     preferred: StringLiteralFlags,
 ) -> StringLiteralFlags {
     let quote = preferred.quote_style();
-    let quote_char = quote.as_char();
 
-    if !annotation.contains(quote_char) {
+    if !annotation.contains(quote.as_char()) {
         return preferred;
     }
 
-    // The annotation contains the preferred quote char; try triple-quoted string.
-    let triple_quote_str = match quote {
-        Quote::Double => r#"""""#,
-        Quote::Single => "'''",
-    };
-    if !annotation.contains(triple_quote_str) {
-        return preferred.with_triple_quotes(TripleQuotes::Yes);
-    }
-
-    // Try the opposite quote style.
     let opposite = quote.opposite();
-    let opposite_char = opposite.as_char();
-    if !annotation.contains(opposite_char) {
+    if !annotation.contains(opposite.as_char()) {
         return preferred.with_quote_style(opposite);
     }
 
-    // Try opposite triple-quoted.
-    let opposite_triple = match opposite {
+    let triple_str = match quote {
         Quote::Double => r#"""""#,
         Quote::Single => "'''",
     };
-    if !annotation.contains(opposite_triple) {
+    if !annotation.contains(triple_str) {
+        return preferred.with_triple_quotes(TripleQuotes::Yes);
+    }
+
+    let opposite_triple_str = match opposite {
+        Quote::Double => r#"""""#,
+        Quote::Single => "'''",
+    };
+    if !annotation.contains(opposite_triple_str) {
         return preferred
             .with_quote_style(opposite)
             .with_triple_quotes(TripleQuotes::Yes);

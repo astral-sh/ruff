@@ -12,7 +12,7 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{
-    TypingReference, filter_contained, quote_annotation,
+    QuoteEdit, TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
@@ -569,13 +569,20 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                     binding.references.iter().filter_map(|reference_id| {
                         let reference = checker.semantic().reference(*reference_id);
                         if reference.in_runtime_context() {
-                            Some(quote_annotation(
-                                reference.expression_id()?,
-                                checker.semantic(),
-                                checker.stylist(),
-                                checker.locator(),
-                                checker.default_string_flags(),
-                            ).edit)
+                            Some({
+                                let QuoteEdit {
+                                    edit,
+                                    // Fix is already unsafe
+                                    has_unresolvable_escapes: _,
+                                } = quote_annotation(
+                                    reference.expression_id()?,
+                                    checker.semantic(),
+                                    checker.stylist(),
+                                    checker.locator(),
+                                    checker.default_string_flags(),
+                                );
+                                edit
+                            })
                         } else {
                             None
                         }
