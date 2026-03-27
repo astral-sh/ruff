@@ -545,9 +545,9 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
-                    | DynamicType::UnspecializedTypeVar
-                    | DynamicType::Divergent(_) => Parameters::unknown(),
+                    | DynamicType::UnspecializedTypeVar => Parameters::unknown(),
                 },
+                Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     return ty;
                 }

@@ -84,6 +84,8 @@ fn todo_types() {
 fn divergent_type() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    assert!(!div.is_dynamic());
+    assert!(!div.has_dynamic(&db));
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
@@ -152,6 +154,54 @@ fn divergent_type() {
         .recursive_type_normalized_impl(&db, div, false)
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
+
+    let recursive_tuple = Type::heterogeneous_tuple(
+        &db,
+        [
+            UnionType::from_elements(
+                &db,
+                [
+                    KnownClass::Int.to_instance(&db),
+                    Type::heterogeneous_tuple(
+                        &db,
+                        [
+                            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), div]),
+                            KnownClass::Str.to_instance(&db),
+                        ],
+                    ),
+                ],
+            ),
+            KnownClass::Str.to_instance(&db),
+        ],
+    );
+    let normalized = recursive_tuple
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
+    assert_eq!(normalized.display(&db).to_string(), "tuple[Divergent, str]");
+
+    let recursive_dict = KnownClass::Dict.to_specialized_instance(
+        &db,
+        &[
+            KnownClass::Str.to_instance(&db),
+            UnionType::from_elements(
+                &db,
+                [
+                    KnownClass::Int.to_instance(&db),
+                    KnownClass::Dict.to_specialized_instance(
+                        &db,
+                        &[
+                            KnownClass::Str.to_instance(&db),
+                            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), div]),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    );
+    let normalized = recursive_dict
+        .recursive_type_normalized_impl(&db, div, false)
+        .unwrap();
+    assert_eq!(normalized.display(&db).to_string(), "dict[str, Divergent]");
 
     let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
