@@ -3,9 +3,9 @@ use crate::semantic_index::definition::{DefinitionKind, DefinitionState};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
-use crate::types::{ClassBase, ClassType};
+use crate::types::ClassBase;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
@@ -40,16 +40,6 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     }
 }
 
-fn function_has_stub_body(function: &ast::StmtFunctionDef) -> bool {
-    let suite = ruff_python_ast::helpers::body_without_leading_docstring(&function.body);
-
-    suite.iter().all(|stmt| match stmt {
-        ast::Stmt::Pass(_) => true,
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
-        _ => false,
-    })
-}
-
 fn function_scope_is_overload_declaration(
     db: &dyn Db,
     index: &crate::semantic_index::SemanticIndex<'_>,
@@ -61,36 +51,8 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    let Some(function_type) = crate::types::binding_type(db, definition).as_function_literal()
-    else {
-        return false;
-    };
-
-    function_type
-        .iter_overloads_and_implementation(db)
-        .any(|overload| {
-            overload.body_scope(db).file_scope_id(db) == file_scope_id && overload.is_overload(db)
-        })
-}
-
-fn class_defines_member_named(db: &dyn Db, class: ClassType<'_>, member_name: &str) -> bool {
-    let Some((class_literal, specialization)) = class.static_class_literal(db) else {
-        // If we cannot inspect class members precisely, be conservative and avoid false positives.
-        return true;
-    };
-
-    let class_scope = class_literal.body_scope(db);
-    let class_place_table = crate::semantic_index::place_table(db, class_scope);
-
-    class_place_table
-        .symbol_id(member_name)
-        .is_some_and(|symbol_id| {
-            let symbol = class_place_table.symbol(symbol_id);
-            symbol.is_bound() || symbol.is_declared()
-        })
-        || class_literal
-            .own_synthesized_member(db, specialization, None, member_name)
-            .is_some()
+    crate::types::infer::function_known_decorator_flags(db, definition)
+        .contains(crate::types::FunctionDecorators::OVERLOAD)
 }
 
 // Returns true if a superclass in the method's MRO defines the same method name.
@@ -122,7 +84,9 @@ fn method_name_exists_in_superclass(
         .any(|class_base| match class_base {
             ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => false,
             ClassBase::Dynamic(_) => true,
-            ClassBase::Class(superclass) => class_defines_member_named(db, superclass, method_name),
+            ClassBase::Class(superclass) => !superclass
+                .own_class_member(db, None, method_name)
+                .is_undefined(),
         })
 }
 
@@ -159,10 +123,9 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
 
         let is_method_scope = index.class_definition_of_method(file_scope_id).is_some();
         let method_has_stub_body = is_method_scope
-            && scope
-                .node()
-                .as_function()
-                .is_some_and(|function| function_has_stub_body(function.node(&parsed)));
+            && scope.node().as_function().is_some_and(|function| {
+                crate::types::function::function_has_stub_body(function.node(&parsed))
+            });
         let function_is_overload_declaration =
             function_scope_is_overload_declaration(db, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
