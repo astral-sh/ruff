@@ -30,6 +30,10 @@ pub(super) struct Cursor<'src> {
 
     /// Index into `cell_offsets` indicating the current cell the cursor is in.
     current_cell: usize,
+
+    /// Whether cell offsets are set. Used to skip cell boundary checks on the hot path
+    /// for non-notebook sources, avoiding function call overhead on every token.
+    has_cells: bool,
 }
 
 impl<'src> Cursor<'src> {
@@ -42,11 +46,13 @@ impl<'src> Cursor<'src> {
             prev_char: EOF_CHAR,
             cell_offsets: &[],
             current_cell: 0,
+            has_cells: false,
         }
     }
 
     /// Set cell offsets for notebook cell boundary awareness.
     pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.has_cells = !cell_offsets.is_empty();
         self.cell_offsets = cell_offsets;
     }
 
@@ -101,7 +107,7 @@ impl<'src> Cursor<'src> {
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the position is past the end of the file or at a cell boundary.
     pub(super) fn first(&self) -> char {
-        if self.is_at_cell_boundary() {
+        if self.has_cells && self.is_at_cell_boundary() {
             return EOF_CHAR;
         }
         self.chars.clone().next().unwrap_or(EOF_CHAR)
@@ -149,13 +155,13 @@ impl<'src> Cursor<'src> {
 
     /// Returns `true` if the cursor is at the end of file or at a cell boundary.
     pub(super) fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty() || self.is_at_cell_boundary()
+        self.chars.as_str().is_empty() || (self.has_cells && self.is_at_cell_boundary())
     }
 
     /// Moves the cursor to the next character, returning the previous character.
     /// Returns [`None`] if there is no next character or at a cell boundary.
     pub(super) fn bump(&mut self) -> Option<char> {
-        if self.is_at_cell_boundary() {
+        if self.has_cells && self.is_at_cell_boundary() {
             return None;
         }
 
