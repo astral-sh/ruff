@@ -83,6 +83,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 pub(crate) fn suppressible_exception(
     checker: &Checker,
     stmt: &Stmt,
+    is_star: bool,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
@@ -101,8 +102,7 @@ pub(crate) fn suppressible_exception(
             | Stmt::Pass(_)]
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
-        || (stmt.as_try_stmt().is_some_and(|x| x.is_star)
-            && checker.target_version() <= PythonVersion::PY311)
+        || (is_star && checker.target_version() <= PythonVersion::PY311)
     {
         return;
     }
