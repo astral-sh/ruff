@@ -3,8 +3,7 @@ use crate::semantic_index::definition::{DefinitionKind, DefinitionState};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
-use crate::types::ClassBase;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 
@@ -55,41 +54,6 @@ fn function_scope_is_overload_declaration(
         .contains(crate::types::FunctionDecorators::OVERLOAD)
 }
 
-// Returns true if a superclass in the method's MRO defines the same method name.
-// Used to suppress unused-parameter diagnostics for likely overrides.
-fn method_name_exists_in_superclass(
-    db: &dyn Db,
-    index: &crate::semantic_index::SemanticIndex<'_>,
-    parsed: &ParsedModuleRef,
-    file_scope_id: FileScopeId,
-) -> bool {
-    let scope = index.scope(file_scope_id);
-    let Some(function) = scope.node().as_function() else {
-        return false;
-    };
-
-    let Some(class_definition) = index.class_definition_of_method(file_scope_id) else {
-        return false;
-    };
-
-    let method_name = function.node(parsed).name.as_str();
-    let Some(class_type) = crate::types::binding_type(db, class_definition).to_class_type(db)
-    else {
-        return false;
-    };
-
-    class_type
-        .iter_mro(db)
-        .skip(1)
-        .any(|class_base| match class_base {
-            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => false,
-            ClassBase::Dynamic(_) => true,
-            ClassBase::Class(superclass) => !superclass
-                .own_class_member(db, None, method_name)
-                .is_undefined(),
-        })
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct UnusedBinding {
     pub range: TextRange,
@@ -99,9 +63,9 @@ pub struct UnusedBinding {
 /// Collects unused local bindings for IDE-facing diagnostics.
 ///
 /// This intentionally reports only function-, lambda-, and comprehension-scope bindings.
-/// Even with local checks such as override detection, module- and class-scope bindings
-/// can still be observed indirectly (for example via imports or attribute access), so
-/// reporting them here would risk false positives without broader reference analysis.
+/// Module- and class-scope bindings can still be observed indirectly (for example via
+/// imports or attribute access), so reporting them here would risk false positives
+/// without broader reference analysis.
 #[salsa::tracked(returns(ref))]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
@@ -130,7 +94,6 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             function_scope_is_overload_declaration(db, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
-        let mut skip_unused_parameters_for_override = None;
 
         for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
             let DefinitionState::Defined(definition) = state else {
@@ -149,12 +112,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             let is_parameter = kind.is_parameter_def();
 
             if is_parameter
-                && (is_stub_file
-                    || function_is_overload_declaration
-                    || method_has_stub_body
-                    || *skip_unused_parameters_for_override.get_or_insert_with(|| {
-                        method_name_exists_in_superclass(db, index, &parsed, file_scope_id)
-                    }))
+                && (is_stub_file || function_is_overload_declaration || method_has_stub_body)
             {
                 continue;
             }
@@ -352,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn skips_unused_parameter_for_overriding_method() -> anyhow::Result<()> {
+    fn reports_unused_parameter_for_overriding_method() -> anyhow::Result<()> {
         let source = dedent(
             "
             class Test:
@@ -361,17 +319,17 @@ mod tests {
 
             class Test2(Test):
                 def a(self, bar):
-                    ...
+                    return 0
             ",
         );
 
         let names = collect_unused_names(&source)?;
-        assert_eq!(names, Vec::<String>::new());
+        assert_eq!(names, vec!["bar"]);
         Ok(())
     }
 
     #[test]
-    fn skips_unused_parameter_for_indirect_override() -> anyhow::Result<()> {
+    fn reports_unused_parameter_for_indirect_override() -> anyhow::Result<()> {
         let source = dedent(
             "
             class A:
@@ -383,12 +341,12 @@ mod tests {
 
             class C(B):
                 def a(self, bar):
-                    ...
+                    return 0
             ",
         );
 
         let names = collect_unused_names(&source)?;
-        assert_eq!(names, Vec::<String>::new());
+        assert_eq!(names, vec!["bar"]);
         Ok(())
     }
 
@@ -427,7 +385,7 @@ mod tests {
         );
 
         let names = collect_unused_names(&source)?;
-        assert_eq!(names, vec!["local_dead"]);
+        assert_eq!(names, vec!["bar", "local_dead"]);
         Ok(())
     }
 
