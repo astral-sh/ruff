@@ -1,137 +1,90 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:18:9
+PERF202 Global variables accessed in loop body 5 times: `MY_GLOBAL_CONSTANT_C`
+  --> PERF202.py:18:5
    |
-16 |     items = (1, 2, 3, 4)
-17 |     for item in list(items):
-18 |         GLOBAL_VAR  # PERF202
-   |         ^^^^^^^^^^
-   |
-
-PERF202 Global variable `MY_GLOBAL_CONSTANT_C` accessed in loop body
-  --> PERF202.py:26:22
-   |
-24 |     total = MY_GLOBAL_CONSTANT_A
-25 |     for i in range(10_000):
-26 |         total += i * MY_GLOBAL_CONSTANT_C  # PERF202
-   |                      ^^^^^^^^^^^^^^^^^^^^
+16 | def global_in_binary_exprs():
+17 |     total = 0
+18 |     for i in range(10_000):  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+19 |         total += i * MY_GLOBAL_CONSTANT_C
+20 |         total += i + MY_GLOBAL_CONSTANT_C
    |
 
-PERF202 Global variable `MY_GLOBAL_VARIABLE` accessed in loop body
-  --> PERF202.py:35:9
+PERF202 Global variables accessed in loop body 5 times: `MY_GLOBAL_CONSTANT_C`
+  --> PERF202.py:29:5
    |
-33 |     total = MY_GLOBAL_CONSTANT_A
-34 |     for i in range(10_000):
-35 |         MY_GLOBAL_VARIABLE += total  # PERF202
-   |         ^^^^^^^^^^^^^^^^^^
-36 |         total += i
-   |
-
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:42:15
-   |
-40 | def while_loop():
-41 |     while True:
-42 |         print(GLOBAL_VAR)  # PERF202
-   |               ^^^^^^^^^^
-43 |         break
+27 | def augmented_assign_in_loop():
+28 |     total = 0
+29 |     for i in range(10_000):  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+30 |         total += MY_GLOBAL_CONSTANT_C
+31 |         total -= MY_GLOBAL_CONSTANT_C
    |
 
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:49:13
+PERF202 Global variables accessed in loop body 6 times: `MY_GLOBAL_CONSTANT_C`, `MY_GLOBAL_CONSTANT_A`, `THRESHOLD`, `GLOBAL_VAR`
+  --> PERF202.py:40:5
    |
-47 | def multiple_globals():
-48 |     for i in range(10):
-49 |         a = GLOBAL_VAR  # PERF202
-   |             ^^^^^^^^^^
-50 |         b = ANOTHER_GLOBAL  # PERF202
-   |
-
-PERF202 Global variable `ANOTHER_GLOBAL` accessed in loop body
-  --> PERF202.py:50:13
-   |
-48 |     for i in range(10):
-49 |         a = GLOBAL_VAR  # PERF202
-50 |         b = ANOTHER_GLOBAL  # PERF202
-   |             ^^^^^^^^^^^^^^
+38 | def multiple_globals_in_exprs():
+39 |     total = 0
+40 |     for i in range(10_000):  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+41 |         total += i * MY_GLOBAL_CONSTANT_C
+42 |         total += i * MY_GLOBAL_CONSTANT_A
    |
 
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:57:19
+PERF202 Global variables accessed in loop body 5 times: `THRESHOLD`, `SENTINEL`
+  --> PERF202.py:52:5
    |
-55 |     for i in range(10):
-56 |         for j in range(10):
-57 |             print(GLOBAL_VAR)  # PERF202
-   |                   ^^^^^^^^^^
-   |
-
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:63:15
-   |
-61 | async def async_loop():
-62 |     async for item in some_aiter():
-63 |         print(GLOBAL_VAR)  # PERF202
-   |               ^^^^^^^^^^
+50 | def comparison_and_bool_exprs():
+51 |     results = []
+52 |     for item in range(10_000):  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |         if item > THRESHOLD and item < THRESHOLD * 2:
+54 |             pass
    |
 
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:70:19
+PERF202 Global variables accessed in loop body 5 times: `THRESHOLD`
+  --> PERF202.py:67:5
    |
-68 |     for i in range(10):
-69 |         if i > 5:
-70 |             print(GLOBAL_VAR)  # PERF202
-   |                   ^^^^^^^^^^
-71 |         elif GLOBAL_VAR:  # PERF202
-72 |             pass
-   |
-
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:71:14
-   |
-69 |         if i > 5:
-70 |             print(GLOBAL_VAR)  # PERF202
-71 |         elif GLOBAL_VAR:  # PERF202
-   |              ^^^^^^^^^^
-72 |             pass
-73 |         try:
+65 |     total = 0
+66 |     i = 0
+67 |     while i < 10_000:  # PERF202
+   |     ^^^^^^^^^^^^^^^^
+68 |         total += i * THRESHOLD
+69 |         total -= THRESHOLD
    |
 
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:74:19
+PERF202 Global variables accessed in loop body 5 times: `THRESHOLD`
+  --> PERF202.py:81:5
    |
-72 |             pass
-73 |         try:
-74 |             print(GLOBAL_VAR)  # PERF202
-   |                   ^^^^^^^^^^
-75 |         except Exception:
-76 |             pass
-   |
-
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:78:19
-   |
-76 |             pass
-77 |         with open("f") as fh:
-78 |             print(GLOBAL_VAR)  # PERF202
-   |                   ^^^^^^^^^^
+79 |     total = 0
+80 |     i = 0
+81 |     while total < THRESHOLD:  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+82 |         total += i * THRESHOLD
+83 |         total -= THRESHOLD
    |
 
-PERF202 Global variable `GLOBAL_DICT` accessed in loop body
-  --> PERF202.py:84:13
+PERF202 Global variables accessed in loop body 5 times: `THRESHOLD`
+  --> PERF202.py:92:5
    |
-82 | def subscript_global():
-83 |     for i in range(10):
-84 |         x = GLOBAL_DICT[i]  # PERF202
-   |             ^^^^^^^^^^^
+90 | async def async_loop_exprs():
+91 |     total = 0
+92 |     async for item in some_aiter():  # PERF202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+93 |         total += item * THRESHOLD
+94 |         total -= THRESHOLD
    |
 
-PERF202 Global variable `GLOBAL_VAR` accessed in loop body
-  --> PERF202.py:90:14
-   |
-88 | def comprehension_in_loop():
-89 |     for i in range(10):
-90 |         x = [GLOBAL_VAR for _ in range(5)]  # PERF202
-   |              ^^^^^^^^^^
-   |
+PERF202 Global variables accessed in loop body 5 times: `THRESHOLD`
+   --> PERF202.py:103:5
+    |
+101 | # Global in comprehension inside loop, in binary expr
+102 | def comprehension_in_loop():
+103 |     for i in range(10):  # PERF202
+    |     ^^^^^^^^^^^^^^^^^^
+104 |         x = [j + THRESHOLD for j in range(5)]
+105 |         y = [j * THRESHOLD for j in range(5)]
+    |
