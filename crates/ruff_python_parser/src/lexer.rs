@@ -92,6 +92,11 @@ pub struct Lexer<'src> {
     /// The text length of the current cell. Used to compute absolute cursor offset
     /// since `cursor.source_length` is modified by `start_token()`.
     cell_text_len: TextSize,
+
+    /// When set, `next_token()` uses this range instead of computing it from the cursor.
+    /// Used when `consume_end()` advances to a new cell, since `token_range()` would then
+    /// use the new cell's cursor coordinates.
+    range_from_consume_end: Option<TextRange>,
 }
 
 impl<'src> Lexer<'src> {
@@ -131,6 +136,7 @@ impl<'src> Lexer<'src> {
             cell_start_offset: TextSize::new(0),
             has_cells: false,
             cell_text_len: source.text_len(),
+            range_from_consume_end: None,
         };
 
         if start_offset == TextSize::new(0) {
@@ -219,8 +225,20 @@ impl<'src> Lexer<'src> {
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
-        if !matches!(self.current_kind, TokenKind::Unknown) {
+        // Clear range_from_consume_end since it's not for this token.
+        if matches!(self.current_kind, TokenKind::Unknown) {
+            self.range_from_consume_end = None;
+        } else if let Some(range) = self.range_from_consume_end.take() {
+            self.current_range = range;
+        } else {
             self.current_range = self.token_range();
+        }
+
+        if !self.current_kind.is_trivia() || self.current_kind.is_eof() {
+            eprintln!(
+                "TOKEN: kind={:?} range={:?} has_cells={} cell_start={:?}",
+                self.current_kind, self.current_range, self.has_cells, self.cell_start_offset
+            );
         }
 
         self.current_kind
@@ -1492,7 +1510,8 @@ impl<'src> Lexer<'src> {
             self.nesting = 0;
             if at_cell_boundary {
                 // At a cell boundary, report the nesting error and advance past the boundary.
-                // Remaining dedents will be flushed on subsequent next_token() calls.
+                // Save the range BEFORE advancing since the cursor will be replaced.
+                self.range_from_consume_end = Some(self.token_range());
                 self.advance_to_next_cell();
                 return self
                     .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
@@ -1510,7 +1529,9 @@ impl<'src> Lexer<'src> {
         let token = self.flush_to_logical_line_start(end_token);
 
         // When all dedents are flushed at a cell boundary, advance past it.
+        // Save the range BEFORE advancing since the cursor will be replaced.
         if at_cell_boundary && token == end_token {
+            self.range_from_consume_end = Some(self.token_range());
             self.advance_to_next_cell();
         }
 
@@ -3005,6 +3026,52 @@ t"{(lambda x:{x})}"
     case bar:
         pass";
         assert_snapshot!(lex_jupyter_source(source));
+    }
+
+    #[test]
+    fn test_notebook_single_cell_token_ranges() {
+        use ruff_text_size::TextSize;
+        let source = "import random\n";
+        let cell_offsets = [TextSize::new(0)];
+        let mut lexer = Lexer::new(source, Mode::Ipython, TextSize::default());
+        lexer.set_cell_offsets(&cell_offsets);
+        loop {
+            let kind = lexer.next_token();
+            if kind.is_eof() {
+                break;
+            }
+            let range = lexer.current_range();
+            assert!(
+                range.start() <= range.end(),
+                "Token {:?} has invalid range: start={:?} > end={:?}",
+                kind,
+                range.start(),
+                range.end()
+            );
+        }
+    }
+
+    #[test]
+    fn test_notebook_multi_cell_token_ranges() {
+        use ruff_text_size::TextSize;
+        let source = "import random\nx = 1\n";
+        let cell_offsets = [TextSize::new(0), TextSize::new(14)];
+        let mut lexer = Lexer::new(source, Mode::Ipython, TextSize::default());
+        lexer.set_cell_offsets(&cell_offsets);
+        loop {
+            let kind = lexer.next_token();
+            if kind.is_eof() {
+                break;
+            }
+            let range = lexer.current_range();
+            assert!(
+                range.start() <= range.end(),
+                "Token {:?} has invalid range: start={:?} > end={:?}",
+                kind,
+                range.start(),
+                range.end()
+            );
+        }
     }
 
     fn lex_fstring_error(source: &str) -> InterpolatedStringErrorType {

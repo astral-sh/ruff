@@ -777,15 +777,19 @@ fn parse_unchecked_source(
     let options = ParseOptions::from(source_type).with_target_version(target_version);
 
     let source = source_kind.source_code();
-    let mut parser = ruff_python_parser::Parser::new(source, options);
-
-    // For notebooks, set cell offsets so the lexer can reset indent state at cell boundaries.
-    if let Some(nb) = source_kind.as_ipy_notebook() {
-        parser.set_cell_offsets(nb.cell_offsets().as_ref());
-    }
+    let cell_offsets = source_kind
+        .as_ipy_notebook()
+        .map(|nb| nb.cell_offsets().as_ref())
+        .unwrap_or(&[]);
+    let parser = ruff_python_parser::Parser::new_starts_at(
+        source,
+        ruff_text_size::TextSize::new(0),
+        options,
+        cell_offsets,
+    );
 
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
-    // `ruff_python_parser::parse_unchecked_source`. We use `Parser::new` (and thus
+    // `ruff_python_parser::parse_unchecked_source`. We use `Parser::new_starts_at` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
     parser
         .parse()

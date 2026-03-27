@@ -30,9 +30,19 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
-    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+    pub(crate) fn from_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        cell_offsets: &'src [TextSize],
+    ) -> Self {
         let lexer = Lexer::new(source, mode, start_offset);
         let mut source = TokenSource::new(lexer);
+
+        // Set cell offsets BEFORE the first bump so the lexer is cell-aware from the start.
+        if !cell_offsets.is_empty() {
+            source.set_cell_offsets(cell_offsets);
+        }
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();

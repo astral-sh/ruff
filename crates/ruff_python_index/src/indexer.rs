@@ -42,6 +42,16 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for token in tokens {
+            if token.start() < prev_end {
+                eprintln!(
+                    "OVERLAPPING TOKEN: prev_end={:?} token.start={:?} kind={:?}",
+                    prev_end,
+                    token.start(),
+                    token.kind()
+                );
+                // Show all tokens so far
+                break;
+            }
             let trivia = &source[TextRange::new(prev_end, token.start())];
 
             // Get the trivia between the previous and the current token and detect any newlines.
