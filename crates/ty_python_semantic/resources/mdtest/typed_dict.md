@@ -1827,9 +1827,6 @@ def union_get(u: HasX | OptX) -> None:
 `pop()` also uses the field type as bidirectional context for the default argument:
 
 ```py
-from typing import TypedDict
-from typing_extensions import NotRequired
-
 class Config(TypedDict, total=False):
     data: dict[str, int]
 
