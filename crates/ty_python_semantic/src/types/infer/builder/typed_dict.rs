@@ -80,16 +80,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_type = self.infer_expression(name_arg, TypeContext::default());
         let fields_arg = args.get(1);
 
-        let fields_type = fields_arg.and_then(|fields_arg| {
-            if matches!(fields_arg, ast::Expr::Dict(_)) {
-                // the `fields` arg contains annotation expressions,
-                // so inference is deferred until a later stage
-                None
-            } else {
-                Some(self.infer_expression(fields_arg, TypeContext::default()))
-            }
-        });
-
         for arg in args.iter().skip(2) {
             self.infer_expression(arg, TypeContext::default());
         }
@@ -160,11 +150,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_annotation_expression(&kw.value, self.deferred_state);
                     }
                 }
-                field_name => {
+                unknown_kwarg => {
                     self.infer_expression(&kw.value, TypeContext::default());
                     if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
                         builder.into_diagnostic(format_args!(
-                            "Argument `{field_name}` does not match any known parameter of function `TypedDict`",
+                            "Argument `{unknown_kwarg}` does not match any known parameter of function `TypedDict`",
                         ));
                     }
                 }
@@ -201,7 +191,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if let Some(fields_arg) = fields_arg {
-            self.validate_fields_arg(fields_arg, fields_type);
+            self.validate_fields_arg(fields_arg);
         }
 
         let scope = self.scope();
@@ -253,9 +243,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return TypedDictSchema::default();
             };
 
-            let key_ty = self
-                .try_expression_type(key)
-                .unwrap_or_else(|| self.infer_expression(key, TypeContext::default()));
+            let key_ty = self.expression_type(key);
             let Some(key_literal) = key_ty.as_string_literal() else {
                 return TypedDictSchema::default();
             };
@@ -281,18 +269,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_typeddict_field_types(fields_arg);
         }
 
-        for kw in &arguments.keywords {
-            if let Some(arg) = &kw.arg {
-                match arg.id.as_str() {
-                    "total" | "closed" => continue,
-                    "extra_items" => {
-                        self.infer_annotation_expression(&kw.value, self.deferred_state);
-                    }
-                    _ => {
-                        self.infer_expression(&kw.value, TypeContext::default());
-                    }
-                }
-            }
+        if let Some(extra_items_kwarg) = arguments.find_keyword("extra_items") {
+            self.infer_annotation_expression(&extra_items_kwarg.value, self.deferred_state);
         }
     }
 
@@ -305,11 +283,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn validate_fields_arg(&mut self, fields_arg: &ast::Expr, fields_type: Option<Type<'db>>) {
+    fn validate_fields_arg(&mut self, fields_arg: &ast::Expr) {
         let db = self.db();
 
         if let ast::Expr::Dict(dict_expr) = fields_arg {
-            for item in &dict_expr.items {
+            for (i, item) in dict_expr.items.iter().enumerate() {
                 let ast::DictItem { key, value: _ } = item;
 
                 let Some(key) = key else {
@@ -320,6 +298,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Expected a dict literal with string-literal keys \
                                 for parameter `fields` of `TypedDict()`",
                         );
+                    }
+                    for item in &dict_expr.items[i + 1..] {
+                        if let Some(key) = &item.key {
+                            self.infer_expression(key, TypeContext::default());
+                        }
                     }
                     return;
                 };
@@ -334,20 +317,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diagnostic
                             .set_primary_message(format_args!("Found `{}`", key_ty.display(db)));
                     }
+                    for item in &dict_expr.items[i + 1..] {
+                        if let Some(key) = &item.key {
+                            self.infer_expression(key, TypeContext::default());
+                        }
+                    }
                     return;
                 }
             }
+        } else {
+            self.infer_expression(fields_arg, TypeContext::default());
 
-            return;
-        }
-
-        if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
-            if let Some(fields_type) = fields_type {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Expected a dict literal for parameter `fields` of `TypedDict()`"
-                ));
-                diagnostic.set_primary_message(format_args!("Found `{}`", fields_type.display(db)));
-            } else {
+            if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
                 builder.into_diagnostic(
                     "Expected a dict literal for parameter `fields` of `TypedDict()`",
                 );
