@@ -2,6 +2,9 @@
 # TODO: this comment has a link
 # https://github.com/astral-sh/ruff/issues/3870
 
+# TODO: this comment has a link with some text afterwards
+# https://github.com/astral-sh/ruff/issues/3870 is the url of the ticket in our internal jira
+
 # TODO: this comment has an issue
 # TDO-3870
 
