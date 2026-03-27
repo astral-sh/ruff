@@ -200,9 +200,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.deferred.insert(definition);
         }
 
-        let fields_are_known = fields_arg
-            .map(|fields_arg| self.typeddict_fields_are_known(fields_arg, fields_type))
-            .unwrap_or(true);
+        if let Some(fields_arg) = fields_arg {
+            self.validate_fields_arg(fields_arg, fields_type);
+        }
 
         let scope = self.scope();
         let anchor = match definition {
@@ -218,12 +218,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .expect("call node should not be NodeIndex::NONE");
 
                 let schema = if let Some(fields_arg) = fields_arg {
-                    if fields_are_known {
-                        self.infer_dangling_typeddict_spec(fields_arg, total)
-                    } else {
-                        self.infer_typeddict_field_types(fields_arg);
-                        TypedDictSchema::default()
-                    }
+                    self.infer_dangling_typeddict_spec(fields_arg, total)
                 } else {
                     TypedDictSchema::default()
                 };
@@ -310,11 +305,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn typeddict_fields_are_known(
-        &mut self,
-        fields_arg: &ast::Expr,
-        fields_type: Option<Type<'db>>,
-    ) -> bool {
+    fn validate_fields_arg(&mut self, fields_arg: &ast::Expr, fields_type: Option<Type<'db>>) {
         let db = self.db();
 
         if let ast::Expr::Dict(dict_expr) = fields_arg {
@@ -330,7 +321,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 for parameter `fields` of `TypedDict()`",
                         );
                     }
-                    return false;
+                    return;
                 };
 
                 let key_ty = self.infer_expression(key, TypeContext::default());
@@ -343,11 +334,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diagnostic
                             .set_primary_message(format_args!("Found `{}`", key_ty.display(db)));
                     }
-                    return false;
+                    return;
                 }
             }
 
-            return true;
+            return;
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
@@ -362,7 +353,5 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
             }
         }
-
-        false
     }
 }

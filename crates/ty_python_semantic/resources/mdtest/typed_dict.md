@@ -2423,7 +2423,6 @@ Bad9 = TypedDict("Bad9", {name: int})
 Bad10 = TypedDict("Bad10", {name: 42})
 
 # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-# error: [invalid-type-form]
 class Bad11(TypedDict("Bad11", {name: 42})): ...
 ```
 
