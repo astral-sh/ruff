@@ -18,10 +18,12 @@ desperate search-paths are used for resolving absolute imports (`import a.b.c`) 
 desperate search-paths are used for resolving relative imports (`from .c import x`).
 
 Only the closest directory that contains either a `pyproject.toml` or `ty.toml` is a valid relative
-desperate search-path.
+desperate search-path. If the importing file is under a well-known src-layout subdirectory (e.g.
+`src/`, `python/`) of that directory, the subdirectory is preferred instead.
 
 All ancestor directories that *do not* contain an `__init__.py(i)` are valid absolute desperate
-search-paths.
+search-paths. Additionally, when a `pyproject.toml` or `ty.toml` is found, any src-layout heuristic
+subdirectories (`src/`, `python/`) are also added as search-paths.
 
 (Distracting detail: to ensure relative desperate search-paths are always valid absolute desperate
 search-paths, a directory that contains an `__init__.py(i)` *and* either a `pyproject.toml` or
@@ -709,4 +711,101 @@ x: str = "2"
 ```text
 name = "a"
 version = "0.1.0"
+```
+
+### `src`-layout auto-detection
+
+When a project uses a `src/` layout with a `pyproject.toml`, the desperate resolver should
+automatically discover the `src/` directory as a source root, even without explicit configuration.
+Scripts in test directories can absolute-import the package under `src/`, and files inside `src/`
+get correct module names for relative imports.
+
+`proj/pyproject.toml`:
+
+```text
+name = "proj"
+version = "0.1.0"
+```
+
+`proj/src/foo/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`proj/src/foo/bar.py`:
+
+```py
+from foo import x
+from . import baz
+
+reveal_type(x)  # revealed: int
+reveal_type(baz.y)  # revealed: str
+```
+
+`proj/src/foo/baz.py`:
+
+```py
+y: str = "hello"
+```
+
+`proj/tests/test_foo.py`:
+
+```py
+from foo import x
+import foo
+
+reveal_type(x)  # revealed: int
+reveal_type(foo.x)  # revealed: int
+```
+
+### `src`-layout auto-detection with multiple projects
+
+Two projects each using a `src/` layout. Absolute imports within each project should resolve to that
+project's package without cross-contamination, purely via desperate resolution.
+
+`a/pyproject.toml`:
+
+```text
+name = "a"
+version = "0.1.0"
+```
+
+`a/src/mypkg/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`a/tests/test1.py`:
+
+```py
+from mypkg import x
+import mypkg
+
+reveal_type(x)  # revealed: int
+reveal_type(mypkg.x)  # revealed: int
+```
+
+`b/pyproject.toml`:
+
+```text
+name = "b"
+version = "0.1.0"
+```
+
+`b/src/mypkg/__init__.py`:
+
+```py
+x: str = "2"
+```
+
+`b/tests/test1.py`:
+
+```py
+from mypkg import x
+import mypkg
+
+reveal_type(x)  # revealed: str
+reveal_type(mypkg.x)  # revealed: str
 ```

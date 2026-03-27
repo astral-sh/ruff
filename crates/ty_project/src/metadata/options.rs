@@ -31,6 +31,7 @@ use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
+    discover_src_layout_roots,
 };
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
@@ -307,49 +308,7 @@ impl Options {
                 .map(|root| root.absolute(project_root, system))
                 .collect()
         } else {
-            let mut roots = vec![];
-            let is_package = |dir: &SystemPath| {
-                system.is_file(&dir.join("__init__.py"))
-                    || system.is_file(&dir.join("__init__.pyi"))
-            };
-
-            // Check for `./src` directory (src-layout)
-            let src = project_root.join("src");
-            if system.is_directory(&src) && !is_package(&src) {
-                tracing::debug!(
-                    "Including `./src` in `environment.root` because a `./src` directory exists and is not a package"
-                );
-                roots.push(src);
-            }
-
-            // Check for `./<project-name>/<project-name>` directory (src-layout with project-named folder)
-            // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
-            let project_name_dir = project_root.join(project_name);
-            if system.is_directory(&project_name_dir.join(project_name))
-                && !is_package(&project_name_dir)
-                && !roots.contains(&project_name_dir)
-            {
-                tracing::debug!(
-                    "Including `./{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists and `./{project_name}` is not a package"
-                );
-                roots.push(project_name_dir);
-            }
-
-            // Check for `./python` directory (maturin-based rust/python projects)
-            // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
-            let python = project_root.join("python");
-            if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
-                tracing::debug!(
-                    "Including `./python` in `environment.root` because a `./python` directory exists and is not a package"
-                );
-                roots.push(python);
-            }
-
-            // The project root is always included, and should always come last
-            // (after any subdirectories such as `./src`, `./<project-name>`, and/or `./python`).
-            roots.push(project_root.to_path_buf());
-
-            roots
+            discover_src_layout_roots(system, project_root, Some(project_name))
         };
 
         // collect the existing site packages

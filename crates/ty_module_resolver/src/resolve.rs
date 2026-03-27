@@ -358,10 +358,67 @@ pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathI
     db.search_paths().iter(db, resolve_mode)
 }
 
+/// Discover additional source roots under `project_dir` using well-known Python project layout
+/// conventions. Returns subdirectories (before `project_dir` itself, for higher priority) that
+/// are plausible source roots:
+///
+/// - `./src` (standard src-layout)
+/// - `./<project_name>` if `<project_name>/<project_name>` exists (src-layout with
+///   project-named folder — e.g. the "src" folder for `psycopg` is called `psycopg` and the
+///   python files are in `psycopg/psycopg/_adapters_map.py`)
+/// - `./python` ([maturin]-based Rust/Python projects)
+///
+/// Only non-package directories (no `__init__.py(i)`) are included.
+/// The `project_dir` itself is always appended last (after any subdirectories such as
+/// `./src`, `./<project-name>`, and/or `./python`).
+///
+/// This is the canonical source of these heuristics; `ty_project::metadata::options` delegates
+/// to this function for its auto-detection of `environment.root`.
+///
+/// [maturin]: https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
+pub fn discover_src_layout_roots(
+    system: &dyn System,
+    project_dir: &SystemPath,
+    project_name: Option<&str>,
+) -> Vec<SystemPathBuf> {
+    let is_package = |dir: &SystemPath| {
+        system.is_file(&dir.join("__init__.py")) || system.is_file(&dir.join("__init__.pyi"))
+    };
+
+    let mut roots = Vec::new();
+
+    let src = project_dir.join("src");
+    if system.is_directory(&src) && !is_package(&src) {
+        tracing::debug!("Including `./src` as source root for `{project_dir}`");
+        roots.push(src);
+    }
+
+    if let Some(name) = project_name {
+        let project_name_dir = project_dir.join(name);
+        if system.is_directory(&project_name_dir.join(name))
+            && !is_package(&project_name_dir)
+            && !roots.contains(&project_name_dir)
+        {
+            tracing::debug!("Including `./{name}` as source root for `{project_dir}`");
+            roots.push(project_name_dir);
+        }
+    }
+
+    let python = project_dir.join("python");
+    if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
+        tracing::debug!("Including `./python` as source root for `{project_dir}`");
+        roots.push(python);
+    }
+
+    roots.push(project_dir.to_path_buf());
+    roots
+}
+
 /// Get the search-paths for desperate resolution of absolute imports in this file.
 ///
 /// Currently this is "all ancestor directories that don't contain an `__init__.py(i)`"
-/// (from closest-to-importing-file to farthest).
+/// (from closest-to-importing-file to farthest), plus any src-layout heuristic directories
+/// (e.g. `src/`, `python/`) discovered next to a `pyproject.toml` or `ty.toml`.
 ///
 /// (For paranoia purposes, all relative desperate search-paths are also absolute
 /// valid desperate search-paths, but don't worry about that.)
@@ -411,10 +468,20 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         // we want all of those to also be valid absolute desperate search-paths. It doesn't
         // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
         // not let something cursed and spooky happen, ok? d
-        if isnt_regular_package
-            || system.is_file(&candidate_path.join("pyproject.toml"))
-            || system.is_file(&candidate_path.join("ty.toml"))
-        {
+        let has_project_config = system.is_file(&candidate_path.join("pyproject.toml"))
+            || system.is_file(&candidate_path.join("ty.toml"));
+        if isnt_regular_package || has_project_config {
+            // When a project config is found, also add src-layout heuristic directories
+            // (src/, python/) so imports can resolve against them.
+            if has_project_config {
+                for root in discover_src_layout_roots(system, &candidate_path, None) {
+                    if root != candidate_path {
+                        if let Ok(sp) = SearchPath::first_party(system, root) {
+                            search_paths.push(sp);
+                        }
+                    }
+                }
+            }
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             search_paths.push(search_path);
         }
@@ -430,9 +497,12 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 /// Get the search-paths for desperate resolution of relative imports in this file.
 ///
 /// Currently this is "the closest ancestor dir that contains a pyproject.toml (or ty.toml)",
-/// which is a completely arbitrary decision. However it's fairly important that relative
-/// desperate search-paths pick a single "best" answer because every one is *valid* but one
-/// that's too long or too short may cause problems.
+/// or a src-layout heuristic subdirectory (e.g. `src/`) of that dir if the importing file
+/// lives under one. This avoids computing module names that include the subdirectory prefix
+/// (e.g. `src.foo` instead of `foo`).
+///
+/// It's fairly important that relative desperate search-paths pick a single "best" answer
+/// because every one is *valid* but one that's too long or too short may cause problems.
 ///
 /// For now this works well in common cases where we have some larger workspace that contains
 /// one or more python projects in sub-directories, and those python projects assume that
@@ -475,8 +545,14 @@ fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         if system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"))
         {
-            let search_path = SearchPath::first_party(system, candidate_path).ok()?;
-            return Some(search_path);
+            // If the importing file is under a src-layout subdirectory, prefer that
+            // so module names don't include the subdirectory prefix (e.g. `src.foo`).
+            for root in discover_src_layout_roots(system, &candidate_path, None) {
+                if root != candidate_path && importing_path.starts_with(&root) {
+                    return SearchPath::first_party(system, root).ok();
+                }
+            }
+            return SearchPath::first_party(system, candidate_path).ok();
         }
     }
 
