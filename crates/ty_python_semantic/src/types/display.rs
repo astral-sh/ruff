@@ -113,6 +113,8 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Whether to hide the return type in signature display.
+    pub hide_return_type: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -160,6 +162,14 @@ impl<'db> DisplaySettings<'db> {
     pub fn force_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Force,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn hide_return_type(&self) -> Self {
+        Self {
+            hide_return_type: true,
             ..self.clone()
         }
     }
@@ -2075,18 +2085,20 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .fmt_detailed(&mut f)?;
 
         // Return type
-        f.write_str(" -> ")?;
+        if !self.settings.hide_return_type {
+            f.write_str(" -> ")?;
 
-        let should_parenthesize_return_type =
-            should_parenthesize_callable_type(self.return_ty, self.db);
-        if should_parenthesize_return_type {
-            f.write_char('(')?;
-        }
-        self.return_ty
-            .display_with(self.db, settings.singleline())
-            .fmt_detailed(&mut f)?;
-        if should_parenthesize_return_type {
-            f.write_char(')')?;
+            let should_parenthesize_return_type =
+                should_parenthesize_callable_type(self.return_ty, self.db);
+            if should_parenthesize_return_type {
+                f.write_char('(')?;
+            }
+            self.return_ty
+                .display_with(self.db, settings.singleline())
+                .fmt_detailed(&mut f)?;
+            if should_parenthesize_return_type {
+                f.write_char(')')?;
+            }
         }
 
         if self.parameters.is_top() {

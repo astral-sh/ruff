@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::typed_dict_key_hover;
+use ty_python_semantic::types::ide_support::{constructor_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -44,6 +44,11 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
+        contents.push(HoverContent::Signature(signature));
+    } else if let GotoTarget::Call { .. } = goto_target
+        && let Some(ty) = goto_target.inferred_type(&model)
+        && let Some(signature) = constructor_signature(&model, &ty)
+    {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {

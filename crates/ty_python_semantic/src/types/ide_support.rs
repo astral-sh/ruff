@@ -1817,3 +1817,26 @@ fn class_literal_to_hierarchy_info(
         selection_range,
     }
 }
+
+pub fn constructor_signature(model: &SemanticModel, class: &Type) -> Option<String> {
+    let db = model.db();
+    let class_name = class.as_class_literal()?.name(db);
+    let callables = class.try_upcast_to_callable(db)?;
+
+    let init_signature = callables
+        .into_iter()
+        .flat_map(|callable| callable.signatures(db).overloads.iter())
+        .find(|sig| {
+            let Some(d) = sig.definition() else {
+                return false;
+            };
+            let Some(name) = d.name(db) else { return false };
+            name == "__init__"
+        })?;
+
+    let params = init_signature
+        .display_with(db, DisplaySettings::default().hide_return_type())
+        .to_string();
+
+    Some(format!("class {class_name}{params}"))
+}
