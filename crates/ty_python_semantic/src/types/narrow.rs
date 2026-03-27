@@ -11,6 +11,7 @@ use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -273,6 +274,11 @@ impl ClassInfoConstraintFunction {
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
                     .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+
+                // `InitVar` is a class at runtime, so can be used in `isinstance()`,
+                // but we can't represent internally the type that we should narrow to after an `isinstance()` check,
+                // so just intersect with `Any` in those cases.
+                SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => Some(Type::any()),
 
                 _ => None,
             },

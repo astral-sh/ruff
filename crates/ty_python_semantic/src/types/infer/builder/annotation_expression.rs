@@ -11,8 +11,7 @@ use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use crate::types::{
-    KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifier,
-    TypeQualifiers, todo_type,
+    SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifier, TypeQualifiers, todo_type,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -100,6 +99,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ) -> TypeAndQualifiers<'db> {
             let special_case = match ty {
                 Type::SpecialForm(special_form) => match special_form {
+                    SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => {
+                        if let Some(builder) =
+                            builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            builder.into_diagnostic(
+                                "`InitVar` may not be used without a type argument",
+                            );
+                        }
+                        Some(TypeAndQualifiers::new(
+                            Type::unknown(),
+                            TypeOrigin::Declared,
+                            TypeQualifiers::INIT_VAR,
+                        ))
+                    }
                     SpecialFormType::TypeQualifier(qualifier) => Some(TypeAndQualifiers::new(
                         Type::unknown(),
                         TypeOrigin::Declared,
@@ -124,19 +137,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Some(TypeAndQualifiers::declared(Type::SpecialForm(
                         SpecialFormType::TypeAlias,
                     )))
-                }
-                Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
-                    if let Some(builder) =
-                        builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                    {
-                        builder
-                            .into_diagnostic("`InitVar` may not be used without a type argument");
-                    }
-                    Some(TypeAndQualifiers::new(
-                        Type::unknown(),
-                        TypeOrigin::Declared,
-                        TypeQualifiers::INIT_VAR,
-                    ))
                 }
                 _ => None,
             };
@@ -360,41 +360,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             ),
                         ),
                     },
-                    Type::ClassLiteral(class) if class.is_known(self.db(), KnownClass::InitVar) => {
-                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
-                            &*tuple.elts
-                        } else {
-                            std::slice::from_ref(slice)
-                        };
-                        let type_and_qualifiers = if let [argument] = arguments {
-                            self.infer_annotation_expression_impl(
-                                argument,
-                                PEP613Policy::Disallowed,
-                            )
-                            .with_qualifier(TypeQualifiers::INIT_VAR)
-                        } else {
-                            for element in arguments {
-                                self.infer_annotation_expression_impl(
-                                    element,
-                                    PEP613Policy::Disallowed,
-                                );
-                            }
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                let num_arguments = arguments.len();
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `InitVar` expected exactly 1 argument, \
-                                    got {num_arguments}",
-                                ));
-                            }
-                            TypeAndQualifiers::declared(Type::unknown())
-                        };
-                        if slice.is_tuple_expr() {
-                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
-                        }
-                        type_and_qualifiers
-                    }
                     _ => TypeAndQualifiers::declared(
                         self.infer_subscript_type_expression_no_store(subscript, slice, value_ty),
                     ),

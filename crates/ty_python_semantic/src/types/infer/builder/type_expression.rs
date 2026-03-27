@@ -5,9 +5,8 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    add_type_expression_reference_link, note_py_version_too_old_for_pep_604,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -684,17 +683,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
-                Some(KnownClass::InitVar) => {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        let diagnostic = builder.into_diagnostic(
-                            "Type qualifier `dataclasses.InitVar` is not allowed in type \
-                            expressions (only in annotation expressions)",
-                        );
-                        add_type_expression_reference_link(diagnostic);
-                    }
-                    self.infer_expression(slice, TypeContext::default());
-                    Type::unknown()
-                }
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
             _ => self.infer_subscript_type_expression(subscript, value_ty),
