@@ -293,7 +293,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let equal_length = source.0.len() == target.0.len();
 
                 if !equal_length && self.relation.is_assignability() {
-                    // TODO: add explanation to error_context
+                    self.provide_error_context(format!(
+                        "a tuple of length {} is not assignable to a tuple of length {}",
+                        source.0.len(),
+                        target.0.len()
+                    ));
                 }
 
                 ConstraintSet::from_bool(self.constraints, equal_length).and(

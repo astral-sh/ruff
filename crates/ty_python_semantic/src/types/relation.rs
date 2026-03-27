@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -347,6 +349,30 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    pub fn check_assignability_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> Result<(), TypeRelationErrorContext> {
+        let builder = ConstraintSetBuilder::new();
+        let checker = TypeRelationChecker {
+            constraints: &builder,
+            inferable: InferableTypeVars::None,
+            relation: TypeRelation::Assignability,
+            error_context: TypeRelationErrorContext::new(),
+            given: ConstraintSet::from_bool(&builder, false),
+            relation_visitor: &HasRelationToVisitor::default(&builder),
+            disjointness_visitor: &IsDisjointVisitor::default(&builder),
+        };
+        let constraints = checker.check_type_pair(db, self, target);
+
+        if constraints.is_always_satisfied(db) {
+            Ok(())
+        } else {
+            Err(std::mem::take(&mut checker.error_context.borrow_mut()))
+        }
+    }
+
     /// Return true if this type is assignable to type `target` using constraint-set assignability.
     ///
     /// This uses `TypeRelation::ConstraintSetAssignability`, which encodes typevar relations into
@@ -572,14 +598,22 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
-#[derive(Clone)]
-struct TypeRelationErrorContext {
+#[derive(Clone, Default)]
+pub struct TypeRelationErrorContext {
     stack: Vec<String>,
 }
 
 impl TypeRelationErrorContext {
-    fn new() -> Self {
-        Self { stack: Vec::new() }
+    fn new() -> RefCell<Self> {
+        RefCell::new(Self { stack: Vec::new() })
+    }
+
+    fn push(&mut self, message: String) {
+        self.stack.push(message);
+    }
+
+    pub fn messages(&self) -> &[String] {
+        &self.stack
     }
 }
 
@@ -588,7 +622,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    pub(super) error_context: TypeRelationErrorContext,
+    error_context: RefCell<TypeRelationErrorContext>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -653,6 +687,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn never(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, false)
+    }
+
+    pub(super) fn provide_error_context(&self, message: impl Into<String>) {
+        self.error_context.borrow_mut().push(message.into());
     }
 
     fn with_recursion_guard(

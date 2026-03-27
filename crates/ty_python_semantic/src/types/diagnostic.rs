@@ -19,6 +19,7 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
+use crate::types::relation::TypeRelationErrorContext;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -3605,6 +3606,7 @@ pub(super) fn report_invalid_assignment<'db>(
     definition: Definition<'db>,
     target_ty: Type,
     value_ty: Type<'db>,
+    error_context: &TypeRelationErrorContext,
 ) {
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
@@ -3675,6 +3677,10 @@ pub(super) fn report_invalid_assignment<'db>(
             "Incompatible value of type `{}`",
             value_ty.display(context.db()),
         ));
+
+        for message in error_context.messages() {
+            diag.info(message);
+        }
 
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.primary_message().to_string();
