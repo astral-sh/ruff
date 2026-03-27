@@ -17,7 +17,7 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    FunctionalTypedDictSpec, TypedDictField, TypedDictSchema, deferred_functional_typed_dict_spec,
+    TypedDictField, TypedDictSchema, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Type,
@@ -544,7 +544,7 @@ pub enum DynamicTypedDictAnchor<'db> {
     ScopeOffset {
         scope: ScopeId<'db>,
         offset: u32,
-        spec: FunctionalTypedDictSpec<'db>,
+        schema: TypedDictSchema<'db>,
     },
 }
 
@@ -561,6 +561,7 @@ pub struct DynamicTypedDictLiteral<'db> {
     /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index, and the
     ///   eagerly computed spec is stored on the anchor.
+    #[returns(ref)]
     pub anchor: DynamicTypedDictAnchor<'db>,
 }
 
@@ -571,7 +572,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Returns the definition where this `TypedDict` is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicTypedDictAnchor::Definition(definition) => Some(definition),
+            DynamicTypedDictAnchor::Definition(definition) => Some(*definition),
             DynamicTypedDictAnchor::ScopeOffset { .. } => None,
         }
     }
@@ -580,7 +581,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => definition.scope(db),
-            DynamicTypedDictAnchor::ScopeOffset { scope, .. } => scope,
+            DynamicTypedDictAnchor::ScopeOffset { scope, .. } => *scope,
         }
     }
 
@@ -630,17 +631,13 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    fn spec(self, db: &'db dyn Db) -> FunctionalTypedDictSpec<'db> {
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_spec(db, definition)
+                deferred_functional_typed_dict_schema(db, *definition)
             }
-            DynamicTypedDictAnchor::ScopeOffset { spec, .. } => spec,
+            DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
-    }
-
-    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
-        self.spec(db).items(db)
     }
 
     /// Get the MRO for this `TypedDict`.

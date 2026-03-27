@@ -48,32 +48,6 @@ impl Default for TypedDictParams {
     }
 }
 
-/// A specification describing the fields of a functional `TypedDict`.
-///
-/// Assigned functional `TypedDict`s compute this lazily after deferred inference, while dangling
-/// calls store it eagerly on the anchor.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct FunctionalTypedDictSpec<'db> {
-    /// The fully materialized schema for this `TypedDict`.
-    #[returns(ref)]
-    pub(crate) items: TypedDictSchema<'db>,
-
-    /// Whether the fields are known statically.
-    pub(crate) has_known_fields: bool,
-}
-
-impl<'db> FunctionalTypedDictSpec<'db> {
-    pub(crate) fn known(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::new(db, items, true)
-    }
-
-    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
-        Self::new(db, TypedDictSchema::default(), false)
-    }
-}
-
-impl get_size2::GetSize for FunctionalTypedDictSpec<'_> {}
-
 pub(super) fn functional_typed_dict_field(
     declared_ty: Type<'_>,
     total: bool,
@@ -537,13 +511,14 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 #[salsa::tracked(
-    cycle_initial = deferred_functional_typed_dict_spec_initial,
+    returns(ref),
+    cycle_initial = |_, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
-pub(super) fn deferred_functional_typed_dict_spec<'db>(
+pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> FunctionalTypedDictSpec<'db> {
+) -> TypedDictSchema<'db> {
     let module = parsed_module(db, definition.file(db)).load(db);
     let node = definition
         .kind(db)
@@ -559,21 +534,21 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
         !total_ty.bool(db).is_always_false()
     });
 
+    let mut schema = TypedDictSchema::default();
+
     if let Some(fields_arg) = node.arguments.args.get(1) {
         let ast::Expr::Dict(dict_expr) = fields_arg else {
-            return FunctionalTypedDictSpec::unknown(db);
+            return schema;
         };
-
-        let mut schema = TypedDictSchema::default();
 
         for item in &dict_expr.items {
             let Some(key) = &item.key else {
-                return FunctionalTypedDictSpec::unknown(db);
+                return TypedDictSchema::default();
             };
 
             let key_ty = definition_expression_type(db, definition, key);
             let Some(key_lit) = key_ty.as_string_literal() else {
-                return FunctionalTypedDictSpec::unknown(db);
+                return TypedDictSchema::default();
             };
 
             let field_ty = deferred_inference
@@ -585,41 +560,9 @@ pub(super) fn deferred_functional_typed_dict_spec<'db>(
                 functional_typed_dict_field(field_ty, total),
             );
         }
-
-        return FunctionalTypedDictSpec::known(db, schema);
     }
 
-    let mut schema = TypedDictSchema::default();
-
-    for keyword in &node.arguments.keywords {
-        let Some(arg) = &keyword.arg else {
-            continue;
-        };
-
-        match arg.id.as_str() {
-            "total" | "closed" | "extra_items" => continue,
-            field_name => {
-                let field_ty = deferred_inference
-                    .try_expression_type(&keyword.value)
-                    .unwrap_or(Type::unknown());
-
-                schema.insert(
-                    Name::new(field_name),
-                    functional_typed_dict_field(field_ty, total),
-                );
-            }
-        }
-    }
-
-    FunctionalTypedDictSpec::known(db, schema)
-}
-
-fn deferred_functional_typed_dict_spec_initial<'db>(
-    db: &'db dyn Db,
-    _id: salsa::Id,
-    _definition: Definition<'db>,
-) -> FunctionalTypedDictSpec<'db> {
-    FunctionalTypedDictSpec::unknown(db)
+    schema
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

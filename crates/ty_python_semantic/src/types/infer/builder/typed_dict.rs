@@ -7,9 +7,7 @@ use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDict
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
-use crate::types::typed_dict::{
-    FunctionalTypedDictSpec, TypedDictSchema, functional_typed_dict_field,
-};
+use crate::types::typed_dict::{TypedDictSchema, functional_typed_dict_field};
 use crate::types::{IntersectionType, KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -219,21 +217,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .as_u32()
                     .expect("call node should not be NodeIndex::NONE");
 
-                let spec = if let Some(fields_arg) = fields_arg {
+                let schema = if let Some(fields_arg) = fields_arg {
                     if fields_are_known {
                         self.infer_dangling_typeddict_spec(fields_arg, total)
                     } else {
                         self.infer_typeddict_field_types(fields_arg);
-                        FunctionalTypedDictSpec::unknown(db)
+                        TypedDictSchema::default()
                     }
                 } else {
-                    FunctionalTypedDictSpec::known(db, TypedDictSchema::default())
+                    TypedDictSchema::default()
                 };
 
                 DynamicTypedDictAnchor::ScopeOffset {
                     scope,
                     offset: call_u32 - anchor_u32,
-                    spec,
+                    schema,
                 }
             }
         };
@@ -247,24 +245,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         fields_arg: &ast::Expr,
         total: bool,
-    ) -> FunctionalTypedDictSpec<'db> {
+    ) -> TypedDictSchema<'db> {
         let db = self.db();
         let mut schema = TypedDictSchema::default();
 
         let ast::Expr::Dict(dict_expr) = fields_arg else {
-            return FunctionalTypedDictSpec::unknown(db);
+            return schema;
         };
 
         for item in &dict_expr.items {
             let Some(key) = &item.key else {
-                return FunctionalTypedDictSpec::unknown(db);
+                return TypedDictSchema::default();
             };
 
             let key_ty = self
                 .try_expression_type(key)
                 .unwrap_or_else(|| self.infer_expression(key, TypeContext::default()));
             let Some(key_literal) = key_ty.as_string_literal() else {
-                return FunctionalTypedDictSpec::unknown(db);
+                return TypedDictSchema::default();
             };
 
             let annotation = self.infer_annotation_expression(&item.value, self.deferred_state);
@@ -275,7 +273,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        FunctionalTypedDictSpec::known(db, schema)
+        schema
     }
 
     /// Infer field types for functional `TypedDict` in deferred phase.
