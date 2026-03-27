@@ -475,3 +475,33 @@ RET505 Unnecessary `else` after `return` statement
 254 |         return False
     |
 help: Remove unnecessary `else`
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:343:5
+    |
+341 |     if cond:
+342 |         return 1
+343 |     else:
+    |     ^^^^
+344 |         try:
+345 |             foo()
+    |
+help: Remove unnecessary `else`
+340 | def try_except_else_inside_if():
+341 |     if cond:
+342 |         return 1
+343 +     try:
+344 +         foo()
+345 +     except Exception:
+346 +         return 2
+347 |     else:
+    -         try:
+    -             foo()
+    -         except Exception:
+    -             return 2
+    -         else:
+    -             return 3
+348 +         return 3
+349 | 
+350 | 
+351 | ###

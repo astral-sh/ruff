@@ -252,3 +252,155 @@ def has_untracted_files():
     else:
 \
         return False
+
+
+###
+# Errors (try/except/else)
+###
+def try_except_else_return():
+    try:
+        foo()
+    except Exception:
+        return 1
+    else:
+        return 2
+
+
+def try_except_else_return_multiple_handlers():
+    try:
+        foo()
+    except ValueError:
+        return 1
+    except TypeError:
+        return 2
+    else:
+        return 3
+
+
+# Mixed exit types across handlers - reports based on first handler's type (RET505)
+def try_except_else_mixed_exits():
+    try:
+        foo()
+    except ValueError:
+        return 1
+    except TypeError:
+        raise RuntimeError
+    else:
+        return 3
+
+
+# Bare except clause
+def try_bare_except_else_return():
+    try:
+        foo()
+    except:
+        return 1
+    else:
+        return 2
+
+
+# Multi-statement else body
+def try_except_else_multi_stmt():
+    try:
+        foo()
+    except Exception:
+        return 1
+    else:
+        x = 1
+        y = 2
+        return x + y
+
+
+# Comment on the else line
+def try_except_else_comment_on_else():
+    try:
+        foo()
+    except Exception:
+        return 1
+    else:  # some comment
+        return 2
+
+
+# Nested try/except/else inside another try/except/else
+def try_except_else_nested():
+    try:
+        foo()
+    except Exception:
+        return 1
+    else:
+        try:
+            bar()
+        except Exception:
+            return 2
+        else:
+            return 3
+
+
+# try/except/else nested inside if/else body
+def try_except_else_inside_if():
+    if cond:
+        return 1
+    else:
+        try:
+            foo()
+        except Exception:
+            return 2
+        else:
+            return 3
+
+
+###
+# Non-errors (try/except/else)
+###
+
+# Has finally block - else is semantically significant
+def try_except_else_finally_return():
+    try:
+        foo()
+    except Exception:
+        return 1
+    else:
+        return 2
+    finally:
+        cleanup()
+
+
+# Not all handlers return
+def try_except_else_partial_return():
+    try:
+        foo()
+    except ValueError:
+        return 1
+    except TypeError:
+        pass
+    else:
+        return 3
+
+
+# No else block
+def try_except_no_else():
+    try:
+        foo()
+    except Exception:
+        return 1
+
+
+# Return is conditional within the handler - last stmt is not a return
+def try_except_else_conditional_return():
+    try:
+        foo()
+    except Exception:
+        if cond:
+            return 1
+    else:
+        return 2
+
+
+# Except handler's last statement is an expression, not an exit
+def try_except_else_handler_no_exit():
+    try:
+        foo()
+    except Exception:
+        log(error)
+    else:
+        return 1

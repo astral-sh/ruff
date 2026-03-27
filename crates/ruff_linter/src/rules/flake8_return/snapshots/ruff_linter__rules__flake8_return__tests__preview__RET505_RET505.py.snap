@@ -1,0 +1,215 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 9
+
+--- Added ---
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:265:5
+    |
+263 |     except Exception:
+264 |         return 1
+265 |     else:
+    |     ^^^^
+266 |         return 2
+    |
+help: Remove unnecessary `else`
+262 |         foo()
+263 |     except Exception:
+264 |         return 1
+    -     else:
+    -         return 2
+265 +     return 2
+266 | 
+267 | 
+268 | def try_except_else_return_multiple_handlers():
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:276:5
+    |
+274 |     except TypeError:
+275 |         return 2
+276 |     else:
+    |     ^^^^
+277 |         return 3
+    |
+help: Remove unnecessary `else`
+273 |         return 1
+274 |     except TypeError:
+275 |         return 2
+    -     else:
+    -         return 3
+276 +     return 3
+277 | 
+278 | 
+279 | # Mixed exit types across handlers - reports based on first handler's type (RET505)
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:288:5
+    |
+286 |     except TypeError:
+287 |         raise RuntimeError
+288 |     else:
+    |     ^^^^
+289 |         return 3
+    |
+help: Remove unnecessary `else`
+285 |         return 1
+286 |     except TypeError:
+287 |         raise RuntimeError
+    -     else:
+    -         return 3
+288 +     return 3
+289 | 
+290 | 
+291 | # Bare except clause
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:298:5
+    |
+296 |     except:
+297 |         return 1
+298 |     else:
+    |     ^^^^
+299 |         return 2
+    |
+help: Remove unnecessary `else`
+295 |         foo()
+296 |     except:
+297 |         return 1
+    -     else:
+    -         return 2
+298 +     return 2
+299 | 
+300 | 
+301 | # Multi-statement else body
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:308:5
+    |
+306 |     except Exception:
+307 |         return 1
+308 |     else:
+    |     ^^^^
+309 |         x = 1
+310 |         y = 2
+    |
+help: Remove unnecessary `else`
+305 |         foo()
+306 |     except Exception:
+307 |         return 1
+    -     else:
+    -         x = 1
+    -         y = 2
+    -         return x + y
+308 +     x = 1
+309 +     y = 2
+310 +     return x + y
+311 | 
+312 | 
+313 | # Comment on the else line
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:320:5
+    |
+318 |     except Exception:
+319 |         return 1
+320 |     else:  # some comment
+    |     ^^^^
+321 |         return 2
+    |
+help: Remove unnecessary `else`
+317 |         foo()
+318 |     except Exception:
+319 |         return 1
+    -     else:  # some comment
+    -         return 2
+320 +     # some comment
+321 +     return 2
+322 | 
+323 | 
+324 | # Nested try/except/else inside another try/except/else
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:330:5
+    |
+328 |     except Exception:
+329 |         return 1
+330 |     else:
+    |     ^^^^
+331 |         try:
+332 |             bar()
+    |
+help: Remove unnecessary `else`
+327 |         foo()
+328 |     except Exception:
+329 |         return 1
+330 +     try:
+331 +         bar()
+332 +     except Exception:
+333 +         return 2
+334 |     else:
+    -         try:
+    -             bar()
+    -         except Exception:
+    -             return 2
+    -         else:
+    -             return 3
+335 +         return 3
+336 | 
+337 | 
+338 | # try/except/else nested inside if/else body
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:335:9
+    |
+333 |         except Exception:
+334 |             return 2
+335 |         else:
+    |         ^^^^
+336 |             return 3
+    |
+help: Remove unnecessary `else`
+332 |             bar()
+333 |         except Exception:
+334 |             return 2
+    -         else:
+    -             return 3
+335 +         return 3
+336 | 
+337 | 
+338 | # try/except/else nested inside if/else body
+
+
+RET505 [*] Unnecessary `else` after `return` statement
+   --> RET505.py:348:9
+    |
+346 |         except Exception:
+347 |             return 2
+348 |         else:
+    |         ^^^^
+349 |             return 3
+    |
+help: Remove unnecessary `else`
+345 |             foo()
+346 |         except Exception:
+347 |             return 2
+    -         else:
+    -             return 3
+348 +         return 3
+349 | 
+350 | 
+351 | ###

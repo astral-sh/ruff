@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+RET508 [*] Unnecessary `else` after `break` statement
+   --> RET508.py:171:9
+    |
+169 |         except Exception:
+170 |             break
+171 |         else:
+    |         ^^^^
+172 |             x = 1
+    |
+help: Remove unnecessary `else`
+168 |             foo()
+169 |         except Exception:
+170 |             break
+    -         else:
+    -             x = 1
+171 +         x = 1
+172 | 
+173 | 
+174 | def try_except_else_break_multiple_handlers():
+
+
+RET508 [*] Unnecessary `else` after `break` statement
+   --> RET508.py:183:9
+    |
+181 |         except TypeError:
+182 |             break
+183 |         else:
+    |         ^^^^
+184 |             x = 1
+    |
+help: Remove unnecessary `else`
+180 |             break
+181 |         except TypeError:
+182 |             break
+    -         else:
+    -             x = 1
+183 +         x = 1
+184 | 
+185 | 
+186 | ###

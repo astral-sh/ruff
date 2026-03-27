@@ -157,3 +157,55 @@ def elif2(x, y, w, z):
                 break
             else:
                 a = z
+
+
+###
+# Errors (try/except/else)
+###
+def try_except_else_break():
+    for i in range(10):
+        try:
+            foo()
+        except Exception:
+            break
+        else:
+            x = 1
+
+
+def try_except_else_break_multiple_handlers():
+    for i in range(10):
+        try:
+            foo()
+        except ValueError:
+            break
+        except TypeError:
+            break
+        else:
+            x = 1
+
+
+###
+# Non-errors (try/except/else)
+###
+def try_except_else_finally_break():
+    for i in range(10):
+        try:
+            foo()
+        except Exception:
+            break
+        else:
+            x = 1
+        finally:
+            cleanup()
+
+
+def try_except_else_partial_break():
+    for i in range(10):
+        try:
+            foo()
+        except ValueError:
+            break
+        except TypeError:
+            pass
+        else:
+            x = 1
