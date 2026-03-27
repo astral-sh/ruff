@@ -583,10 +583,17 @@ def foo(a: int, b: int) -> RecursiveT:
 
 ```py
 from typing_extensions import TypeGuard, TypeIs
+from collections.abc import Callable
 
 type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
 type RecursiveGuard = TypeGuard[RecursiveGuard]
 
 type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
 type AliasGuard = RecursiveGuard
+
+type CallableIs = TypeIs[Callable[[], CallableIs]]
+type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
+
+reveal_type(CallableIs)  # revealed: TypeAliasType
+reveal_type(CallableGuard)  # revealed: TypeAliasType
 ```
