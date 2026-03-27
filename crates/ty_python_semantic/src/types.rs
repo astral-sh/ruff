@@ -5019,6 +5019,12 @@ impl<'db> Type<'db> {
                 let ty = match class.known(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    Some(KnownClass::InitVar) => {
+                        return Err(InvalidTypeExpressionError {
+                            invalid_expressions: smallvec_inline![InvalidTypeExpression::InitVar],
+                            fallback_type: Type::unknown(),
+                        });
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
@@ -6730,6 +6736,7 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
+    InitVar,
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
     /// `typing.Self` cannot be used in metaclass definitions.
@@ -6801,6 +6808,10 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions, and only with exactly one argument)",
+                    ),
+                    InvalidTypeExpression::InitVar => f.write_str(
+                        "Type qualifier `dataclasses.InitVar` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
                     InvalidTypeExpression::TypingSelfInStaticMethod => {

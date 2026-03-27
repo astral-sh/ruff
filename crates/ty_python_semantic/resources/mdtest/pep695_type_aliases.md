@@ -40,6 +40,36 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
+## No type qualifiers
+
+The right-hand side of a type alias definition is a type expression, not an annotation expression.
+Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
+appear at the top level of a PEP 695 alias definition:
+
+```py
+from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
+from dataclasses import InitVar
+
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad1 = ClassVar[str]
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad2 = ClassVar
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+type Bad3 = Final[int]
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+type Bad4 = Final
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type expressions (only in annotation expressions)"
+type Bad5 = Required[int]
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type expressions (only in annotation expressions)"
+type Bad6 = NotRequired[int]
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type expressions (only in annotation expressions)"
+type Bad7 = ReadOnly[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad8 = InitVar[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)"
+type Bad9 = InitVar
+```
+
 ## Type aliases in type aliases
 
 ```py

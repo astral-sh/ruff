@@ -1242,8 +1242,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        let value_ty =
-            self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
+        let previous_check_unbound_typevars = self
+            .inference_flags
+            .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
+        let value_ty = self.infer_type_expression(&type_alias.value);
+        self.inference_flags.set(
+            InferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound_typevars,
+        );
 
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
@@ -1259,7 +1265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type IntOrStr = int | StrOrInt  # It's redundant, but OK
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
-        let expanded = value_ty.inner_type().expand_eagerly(self.db());
+        let expanded = value_ty.expand_eagerly(self.db());
         if expanded.is_divergent() {
             if let Some(builder) = self
                 .context
