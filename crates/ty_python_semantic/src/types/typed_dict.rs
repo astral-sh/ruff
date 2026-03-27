@@ -10,7 +10,7 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, DynamicTypedDictLiteral, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
@@ -534,14 +534,6 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             }
         }
     }
-}
-
-/// Get the [`TypedDictSchema`] for a [`DynamicTypedDictLiteral`].
-pub(super) fn dynamic_typed_dict_schema<'db>(
-    db: &'db dyn Db,
-    class: DynamicTypedDictLiteral<'db>,
-) -> &'db TypedDictSchema<'db> {
-    class.items(db)
 }
 
 #[salsa::tracked(

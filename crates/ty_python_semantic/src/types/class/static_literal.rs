@@ -661,8 +661,7 @@ impl<'db> StaticClassLiteral<'db> {
             return known.is_typed_dict_subclass();
         }
 
-        self.iter_mro(db, None)
-            .any(|base| matches!(base, ClassBase::TypedDict))
+        self.iter_mro(db, None).contains(&ClassBase::TypedDict)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
@@ -1349,6 +1348,12 @@ impl<'db> StaticClassLiteral<'db> {
             Some(Type::function_like_callable(db, signature))
         };
 
+        let td_fields = || {
+            self.fields(db, specialization, field_policy)
+                .iter()
+                .map(|(name, field)| (name, TypedDictField::from_field(field)))
+        };
+
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
@@ -1554,65 +1559,28 @@ impl<'db> StaticClassLiteral<'db> {
                         Type::heterogeneous_tuple(db, slots)
                     })
             }
-            (
-                CodeGeneratorKind::TypedDict,
-                name @ ("__getitem__" | "__setitem__" | "__delitem__" | "get" | "pop"
-                | "setdefault" | "update"),
-            ) => {
-                let td_fields = self.fields(db, specialization, field_policy);
-
-                Some(match name {
-                    "__getitem__" => synthesize_typed_dict_getitem(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "__setitem__" => synthesize_typed_dict_setitem(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "__delitem__" => synthesize_typed_dict_delitem(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "get" => synthesize_typed_dict_get(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "pop" => synthesize_typed_dict_pop(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "setdefault" => synthesize_typed_dict_setdefault(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    "update" => synthesize_typed_dict_update(
-                        db,
-                        instance_ty,
-                        td_fields
-                            .iter()
-                            .map(|(name, field)| (name, TypedDictField::from_field(field))),
-                    ),
-                    _ => unreachable!(),
-                })
+            (CodeGeneratorKind::TypedDict, "__getitem__") => {
+                Some(synthesize_typed_dict_getitem(db, instance_ty, td_fields()))
+            }
+            (CodeGeneratorKind::TypedDict, "__setitem__") => {
+                Some(synthesize_typed_dict_setitem(db, instance_ty, td_fields()))
+            }
+            (CodeGeneratorKind::TypedDict, "__delitem__") => {
+                Some(synthesize_typed_dict_delitem(db, instance_ty, td_fields()))
+            }
+            (CodeGeneratorKind::TypedDict, "get") => {
+                Some(synthesize_typed_dict_get(db, instance_ty, td_fields()))
+            }
+            (CodeGeneratorKind::TypedDict, "pop") => {
+                Some(synthesize_typed_dict_pop(db, instance_ty, td_fields()))
+            }
+            (CodeGeneratorKind::TypedDict, "setdefault") => Some(synthesize_typed_dict_setdefault(
+                db,
+                instance_ty,
+                td_fields(),
+            )),
+            (CodeGeneratorKind::TypedDict, "update") => {
+                Some(synthesize_typed_dict_update(db, instance_ty, td_fields()))
             }
             (CodeGeneratorKind::TypedDict, name @ ("__or__" | "__ror__" | "__ior__")) => {
                 Some(synthesize_typed_dict_merge(db, instance_ty, name))
