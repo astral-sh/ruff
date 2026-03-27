@@ -1,8 +1,8 @@
 use std::cmp::Reverse;
 
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::StringFlags;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
@@ -417,7 +417,6 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     }
     filtered
 }
-
 
 pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,

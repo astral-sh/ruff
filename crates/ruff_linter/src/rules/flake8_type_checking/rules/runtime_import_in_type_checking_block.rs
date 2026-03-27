@@ -11,9 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::{
-    QuoteEdit, filter_contained, quote_annotation,
-};
+use crate::rules::flake8_type_checking::helpers::{QuoteEdit, filter_contained, quote_annotation};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::{Fix, FixAvailability, Violation};
 
