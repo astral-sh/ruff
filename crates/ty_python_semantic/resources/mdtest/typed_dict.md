@@ -1760,9 +1760,6 @@ def _(p: Person) -> None:
 Synthesized `get()` on unions falls back to generic resolution when a key is missing from one arm:
 
 ```py
-from typing import TypedDict
-from typing_extensions import NotRequired
-
 class HasX(TypedDict):
     x: int
 
@@ -1784,9 +1781,6 @@ def union_get(u: HasX | OptX) -> None:
 Synthesized `pop()` overloads on `TypedDict` unions correctly handle per-arm requiredness:
 
 ```py
-from typing import TypedDict
-from typing_extensions import NotRequired
-
 class OptionalX(TypedDict):
     x: NotRequired[int]
 
@@ -1797,7 +1791,10 @@ class OptStrX(TypedDict):
     x: NotRequired[str]
 
 def _(v: OptionalX | RequiredX) -> None:
-    # error: [call-non-callable]
+    # TODO: it's correct that we emit an error,
+    # but this is a terrible error message:
+    #
+    # error: [call-non-callable] "Object of type `Overload[]` is not callable"
     reveal_type(v.pop("x"))  # revealed: Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
@@ -1809,8 +1806,6 @@ def union_pop_with_default(u: OptionalX | OptStrX) -> None:
 Synthesized `setdefault()` overloads on `TypedDict` unions:
 
 ```py
-from typing import TypedDict
-
 class IntX(TypedDict):
     x: int
 
