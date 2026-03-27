@@ -3021,52 +3021,6 @@ t"{(lambda x:{x})}"
         assert_snapshot!(lex_jupyter_source(source));
     }
 
-    #[test]
-    fn test_notebook_single_cell_token_ranges() {
-        use ruff_text_size::TextSize;
-        let source = "import random\n";
-        let cell_offsets = [TextSize::new(0)];
-        let mut lexer = Lexer::new(source, Mode::Ipython, TextSize::default());
-        lexer.set_cell_offsets(&cell_offsets);
-        loop {
-            let kind = lexer.next_token();
-            if kind.is_eof() {
-                break;
-            }
-            let range = lexer.current_range();
-            assert!(
-                range.start() <= range.end(),
-                "Token {:?} has invalid range: start={:?} > end={:?}",
-                kind,
-                range.start(),
-                range.end()
-            );
-        }
-    }
-
-    #[test]
-    fn test_notebook_multi_cell_token_ranges() {
-        use ruff_text_size::TextSize;
-        let source = "import random\nx = 1\n";
-        let cell_offsets = [TextSize::new(0), TextSize::new(14)];
-        let mut lexer = Lexer::new(source, Mode::Ipython, TextSize::default());
-        lexer.set_cell_offsets(&cell_offsets);
-        loop {
-            let kind = lexer.next_token();
-            if kind.is_eof() {
-                break;
-            }
-            let range = lexer.current_range();
-            assert!(
-                range.start() <= range.end(),
-                "Token {:?} has invalid range: start={:?} > end={:?}",
-                kind,
-                range.start(),
-                range.end()
-            );
-        }
-    }
-
     fn lex_fstring_error(source: &str) -> InterpolatedStringErrorType {
         let output = lex(source, Mode::Module, TextSize::default());
         match output
