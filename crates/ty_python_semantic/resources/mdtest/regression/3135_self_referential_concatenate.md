@@ -15,7 +15,6 @@ from typing import Concatenate
 
 from ty_extensions import TypeOf
 
-
 def foo[**P, T](
     x: Callable[Concatenate[TypeOf[foo], ...], T],
 ) -> Callable[Concatenate[TypeOf[foo], P], T]:
