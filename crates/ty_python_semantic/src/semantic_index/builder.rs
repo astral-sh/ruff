@@ -100,7 +100,7 @@ impl<'ast> ExprUseVisitor<'_, '_, 'ast> {
         };
 
         self.builder
-            .mark_instance_attribute_if_applicable(&mut place_expr);
+            .mark_instance_attribute_if_applicable(expr, &mut place_expr);
 
         let place_id = self.builder.add_place(place_expr);
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
@@ -362,12 +362,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// If `place_expr` is a member access on the first parameter of a method (e.g. `self.x`),
     /// mark it as an instance attribute.
-    fn mark_instance_attribute_if_applicable(&self, place_expr: &mut PlaceExpr) {
+    fn mark_instance_attribute_if_applicable(&self, expr: &ast::Expr, place_expr: &mut PlaceExpr) {
         if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
             && let PlaceExpr::Member(member) = place_expr
             && member.is_instance_attribute_candidate()
+            && let Some(attribute) = expr.as_attribute_expr()
             && self.current_first_parameter_name.is_some_and(|first| {
-                member.expression().symbol_name() == first
+                attribute
+                    .value
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == first)
                     && !self.is_symbol_bound_in_intermediate_eager_scopes(first, method_scope_id)
             })
         {
@@ -3358,7 +3362,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    self.mark_instance_attribute_if_applicable(&mut place_expr);
+                    self.mark_instance_attribute_if_applicable(expr, &mut place_expr);
 
                     let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                         (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
