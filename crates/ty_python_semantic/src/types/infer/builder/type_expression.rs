@@ -550,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Await(await_expression) => {
                 if !self.deferred_state.in_string_annotation() {
-                    self.infer_await_expression(await_expression);
+                    self.infer_await_expression(await_expression, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
