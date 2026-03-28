@@ -496,144 +496,108 @@ help: Remove `super()` parameters
 345 | # See: https://github.com/astral-sh/ruff/issues/24001
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:351:18
+   --> UP008.py:377:22
     |
-349 |         def __init__(self, foo):
-350 |             # TODO(charlie): false positive until nested class matching is fixed.
-351 |             super(C, self).__init__(foo)  # Should NOT trigger UP008
-    |                  ^^^^^^^^^
-    |
-help: Remove `super()` parameters
-348 |     class C(Base):
-349 |         def __init__(self, foo):
-350 |             # TODO(charlie): false positive until nested class matching is fixed.
-    -             super(C, self).__init__(foo)  # Should NOT trigger UP008
-351 +             super().__init__(foo)  # Should NOT trigger UP008
-352 | 
-353 | 
-354 | class HigherLevelsOfNesting:
-
-UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:359:22
-    |
-357 |             def __init__(self, foo):
-358 |                 # TODO(charlie): false positive until nested class matching is fixed.
-359 |                 super(Inner.C, self).__init__(foo)  # Should NOT trigger UP008
-    |                      ^^^^^^^^^^^^^^^
-    |
-help: Remove `super()` parameters
-356 |         class C(Base):
-357 |             def __init__(self, foo):
-358 |                 # TODO(charlie): false positive until nested class matching is fixed.
-    -                 super(Inner.C, self).__init__(foo)  # Should NOT trigger UP008
-359 +                 super().__init__(foo)  # Should NOT trigger UP008
-360 | 
-361 | 
-362 | # super() first arg is an attribute that only matches on the last segment,
-
-UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:379:22
-    |
-377 |         class C(Base):
-378 |             def __init__(self, foo):
-379 |                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+375 |         class C(Base):
+376 |             def __init__(self, foo):
+377 |                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
     |                      ^^^^^^^^^^^^^
-380 |
-381 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+378 |
+379 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
     |
 help: Remove `super()` parameters
-376 |     class B:
-377 |         class C(Base):
-378 |             def __init__(self, foo):
+374 |     class B:
+375 |         class C(Base):
+376 |             def __init__(self, foo):
     -                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
-379 +                 super().__init__(foo)  # UP008: matches full chain
-380 | 
-381 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
-382 | class Outer3:
+377 +                 super().__init__(foo)  # UP008: matches full chain
+378 | 
+379 | # Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+380 | class Outer3:
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:390:15
+   --> UP008.py:388:15
     |
-388 | class Whitespace(BaseClass):
-389 |     def f(self):
-390 |         super (Whitespace, self).f()  # can use super()
+386 | class Whitespace(BaseClass):
+387 |     def f(self):
+388 |         super (Whitespace, self).f()  # can use super()
     |               ^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-387 | 
-388 | class Whitespace(BaseClass):
-389 |     def f(self):
+385 | 
+386 | class Whitespace(BaseClass):
+387 |     def f(self):
     -         super (Whitespace, self).f()  # can use super()
-390 +         super ().f()  # can use super()
-391 | 
-392 | 
-393 | def function_local():
+388 +         super ().f()  # can use super()
+389 | 
+390 | 
+391 | def function_local():
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:397:22
+   --> UP008.py:395:22
     |
-395 |         class LocalInner(BaseClass):
-396 |             def f(self):
-397 |                 super(LocalOuter.LocalInner, self).f()  # can use super()
+393 |         class LocalInner(BaseClass):
+394 |             def f(self):
+395 |                 super(LocalOuter.LocalInner, self).f()  # can use super()
     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-394 |     class LocalOuter:
-395 |         class LocalInner(BaseClass):
-396 |             def f(self):
+392 |     class LocalOuter:
+393 |         class LocalInner(BaseClass):
+394 |             def f(self):
     -                 super(LocalOuter.LocalInner, self).f()  # can use super()
-397 +                 super().f()  # can use super()
-398 | 
-399 | 
-400 | class LambdaMethod(BaseClass):
+395 +                 super().f()  # can use super()
+396 | 
+397 | 
+398 | class LambdaMethod(BaseClass):
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:408:14
+   --> UP008.py:406:14
     |
-406 |     @classmethod
-407 |     def f(cls):
-408 |         super(ClassMethod, cls).f()  # can use super()
+404 |     @classmethod
+405 |     def f(cls):
+406 |         super(ClassMethod, cls).f()  # can use super()
     |              ^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-405 | class ClassMethod(BaseClass):
-406 |     @classmethod
-407 |     def f(cls):
+403 | class ClassMethod(BaseClass):
+404 |     @classmethod
+405 |     def f(cls):
     -         super(ClassMethod, cls).f()  # can use super()
-408 +         super().f()  # can use super()
-409 | 
-410 | 
-411 | class AsyncMethod(BaseClass):
+406 +         super().f()  # can use super()
+407 | 
+408 | 
+409 | class AsyncMethod(BaseClass):
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:413:14
+   --> UP008.py:411:14
     |
-411 | class AsyncMethod(BaseClass):
-412 |     async def f(self):
-413 |         super(AsyncMethod, self).f()  # can use super()
+409 | class AsyncMethod(BaseClass):
+410 |     async def f(self):
+411 |         super(AsyncMethod, self).f()  # can use super()
     |              ^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-410 | 
-411 | class AsyncMethod(BaseClass):
-412 |     async def f(self):
+408 | 
+409 | class AsyncMethod(BaseClass):
+410 |     async def f(self):
     -         super(AsyncMethod, self).f()  # can use super()
-413 +         super().f()  # can use super()
-414 | 
-415 | 
-416 | class OuterWithWhitespace:
+411 +         super().f()  # can use super()
+412 | 
+413 | 
+414 | class OuterWithWhitespace:
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:419:19
+   --> UP008.py:417:19
     |
-417 |     class Inner(BaseClass):
-418 |         def f(self):
-419 |             super (OuterWithWhitespace.Inner, self).f()  # can use super()
+415 |     class Inner(BaseClass):
+416 |         def f(self):
+417 |             super (OuterWithWhitespace.Inner, self).f()  # can use super()
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-416 | class OuterWithWhitespace:
-417 |     class Inner(BaseClass):
-418 |         def f(self):
+414 | class OuterWithWhitespace:
+415 |     class Inner(BaseClass):
+416 |         def f(self):
     -             super (OuterWithWhitespace.Inner, self).f()  # can use super()
-419 +             super ().f()  # can use super()
+417 +             super ().f()  # can use super()
