@@ -232,13 +232,16 @@ impl<'src> Lexer<'src> {
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
-        // Clear range_from_consume_end since it's not for this token.
-        if matches!(self.current_kind, TokenKind::Unknown) {
-            self.range_from_consume_end = None;
-        } else if let Some(range) = self.range_from_consume_end.take() {
-            self.current_range = range;
-        } else {
+        if !matches!(self.current_kind, TokenKind::Unknown) {
             self.current_range = self.token_range();
+        }
+        // Cell-boundary fixup: if consume_end() advanced to a new cell, the cursor
+        // range would be wrong. Only check on EOF/Dedent (the only kinds that can
+        // appear at cell boundaries) to avoid overhead on every token.
+        if self.current_kind.is_eof() || self.current_kind == TokenKind::Dedent {
+            if let Some(range) = self.range_from_consume_end.take() {
+                self.current_range = range;
+            }
         }
 
         self.current_kind
