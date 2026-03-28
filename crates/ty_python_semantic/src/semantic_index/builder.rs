@@ -65,7 +65,7 @@ use super::place::PlaceExprRef;
 mod except_handlers;
 mod loop_bindings_visitor;
 
-use crate::types::{PossiblyNarrowedPlacesBuilder, collect_narrowed_place_keys};
+use crate::types::PossiblyNarrowedPlacesBuilder;
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
@@ -157,13 +157,13 @@ impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
 
 struct NameUseCollector<'builder, 'db, 'ast> {
     builder: &'builder SemanticIndexBuilder<'db, 'ast>,
-    guard_names: FxHashSet<Name>,
+    target_names: FxHashSet<Name>,
     use_ids: FxHashMap<Name, ScopedUseId>,
 }
 
 impl<'ast> NameUseCollector<'_, '_, 'ast> {
-    fn record_guard_use(&mut self, name_expr: &'ast ast::ExprName) {
-        if !self.guard_names.contains(&name_expr.id) || self.use_ids.contains_key(&name_expr.id) {
+    fn collect_name_use(&mut self, name_expr: &'ast ast::ExprName) {
+        if !self.target_names.contains(&name_expr.id) || self.use_ids.contains_key(&name_expr.id) {
             return;
         }
 
@@ -179,7 +179,7 @@ impl<'ast> Visitor<'ast> for NameUseCollector<'_, '_, 'ast> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         match expr {
             ast::Expr::Name(name_expr) => {
-                self.record_guard_use(name_expr);
+                self.collect_name_use(name_expr);
                 walk_expr(self, expr);
             }
             ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
@@ -836,18 +836,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.ast_ids[scope_id]
     }
 
-    fn alias_guard_places(&self, alias: &NarrowingAlias<'ast>) -> Vec<PlaceKey> {
+    fn alias_guard_places(&self, alias: &NarrowingAlias<'ast>) -> FxHashSet<PlaceKey> {
         let place_table = &self.place_tables[alias.expression_scope];
         let narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(alias.expression);
-        collect_narrowed_place_keys(place_table, &narrowed_places)
+        place_table.place_keys(&narrowed_places)
     }
 
     fn alias_value_guards(&self, expression: &'ast ast::Expr) -> Box<[ReassignmentGuard]> {
         let place_table = self.current_place_table();
         let narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(expression);
-        let guard_names = collect_narrowed_place_keys(place_table, &narrowed_places)
+        let target_names = place_table
+            .place_keys(&narrowed_places)
             .into_iter()
             .filter_map(|place_key| match place_key {
                 PlaceKey::Symbol(name) => Some(name),
@@ -857,7 +858,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let mut collector = NameUseCollector {
             builder: self,
-            guard_names,
+            target_names,
             use_ids: FxHashMap::default(),
         };
         collector.visit_expr(expression);
@@ -1569,6 +1570,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     Self::walk_alias_predicate_leaves(value, f);
                 }
             }
+            // Narrowing alias ​​expansion only applies to Name, UnaryOp, and BoolOp.
             _ => {}
         }
     }

@@ -7,11 +7,12 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolT
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 use std::iter::FusedIterator;
 
 /// A structural key for a place expression that ignores semantic-index flags.
-#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize, salsa::Update)]
 pub(crate) enum PlaceKey {
     Symbol(Name),
     Member(MemberExpr),
@@ -308,6 +309,24 @@ impl PlaceTableBuilder {
                 ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
             }
         }
+    }
+
+    /// Collect `PlaceKey`s for all places and their parents.
+    pub(super) fn place_keys(&self, places: &FxHashSet<ScopedPlaceId>) -> FxHashSet<PlaceKey> {
+        let mut place_keys = FxHashSet::default();
+
+        for &place_id in places {
+            let place_expr = self.place(place_id);
+            let place_key = PlaceKey::from(place_expr);
+            place_keys.insert(place_key);
+
+            for parent_id in self.parents(place_expr) {
+                let parent_key = PlaceKey::from(self.place(parent_id));
+                place_keys.insert(parent_key);
+            }
+        }
+
+        place_keys
     }
 
     #[track_caller]

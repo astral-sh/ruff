@@ -1,9 +1,6 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{
-    ParentPlaceIter, PlaceExpr, PlaceExprRef, PlaceKey, PlaceTable, PlaceTableBuilder,
-    ScopedPlaceId,
-};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -2203,81 +2200,17 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     })
 }
 
-pub(crate) trait PlaceLookup {
-    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId>;
-    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_>;
-    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a>;
-}
-
-impl PlaceLookup for PlaceTableBuilder {
-    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
-        self.place_id(expression.into())
-    }
-
-    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
-        self.place(place_id)
-    }
-
-    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
-        self.parents(place_expr)
-    }
-}
-
-impl PlaceLookup for PlaceTable {
-    fn place_id<'e>(&self, expression: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
-        self.place_id(expression.into())
-    }
-
-    fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
-        self.place(place_id)
-    }
-
-    fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
-        self.parents(place_expr)
-    }
-}
-
-/// Collect `PlaceKey`s for all narrowed places and their parents from a predicate expression.
-///
-/// Used to determine which place bindings would invalidate a narrowing alias.
-pub(crate) fn collect_narrowed_place_keys(
-    place_table: &impl PlaceLookup,
-    narrowed_places: &PossiblyNarrowedPlaces,
-) -> Vec<PlaceKey> {
-    let mut place_keys = Vec::new();
-
-    for &place_id in narrowed_places {
-        let place_expr = place_table.place(place_id);
-        let place_key = PlaceKey::from(place_expr);
-        if !place_keys.contains(&place_key) {
-            place_keys.push(place_key);
-        }
-
-        for parent_id in place_table.parents(place_expr) {
-            let parent_key = PlaceKey::from(place_table.place(parent_id));
-            if !place_keys.contains(&parent_key) {
-                place_keys.push(parent_key);
-            }
-        }
-    }
-
-    place_keys
-}
-
 /// Builder for computing the conservative set of places that could possibly be narrowed.
 ///
 /// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
 /// *could* be narrowed, without performing type inference to determine the actual constraints.
-pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a, P = PlaceTableBuilder> {
+pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
     db: &'db dyn Db,
-    places: &'a P,
+    places: &'a PlaceTableBuilder,
 }
 
-impl<'db, 'a, P> PossiblyNarrowedPlacesBuilder<'db, 'a, P>
-where
-    P: PlaceLookup,
-{
-    pub(crate) fn new(db: &'db dyn Db, places: &'a P) -> Self {
+impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
+    pub(crate) fn new(db: &'db dyn Db, places: &'a PlaceTableBuilder) -> Self {
         Self { db, places }
     }
 
@@ -2327,7 +2260,7 @@ where
     fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id(&place_expr) {
+            if let Some(place) = self.places.place_id((&place_expr).into()) {
                 places.insert(place);
             }
         }
@@ -2352,7 +2285,7 @@ where
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
             if let ast::Expr::Subscript(subscript) = expr
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
-                && let Some(place) = self.places.place_id(&place_expr)
+                && let Some(place) = self.places.place_id((&place_expr).into())
             {
                 places.insert(place);
             }
@@ -2369,7 +2302,7 @@ where
         // Most narrowing calls narrow their first argument
         if let Some(first_arg) = expr_call.arguments.args.first() {
             if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                if let Some(place) = self.places.place_id(&place_expr) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
                     places.insert(place);
                 }
             }
@@ -2409,7 +2342,7 @@ where
             | ast::Expr::Subscript(_)
             | ast::Expr::Named(_) => {
                 if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(place) = self.places.place_id(&place_expr) {
+                    if let Some(place) = self.places.place_id((&place_expr).into()) {
                         places.insert(place);
                     }
                 }
@@ -2418,7 +2351,7 @@ where
             ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
                 if let Some(first_arg) = call.arguments.args.first() {
                     if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
-                        if let Some(place) = self.places.place_id(&place_expr) {
+                        if let Some(place) = self.places.place_id((&place_expr).into()) {
                             places.insert(place);
                         }
                     }
@@ -2440,7 +2373,7 @@ where
         // The match subject can always be narrowed by a pattern
         let subject_node = subject.node_ref(self.db).node(module);
         if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
-            if let Some(place) = self.places.place_id(&subject_place_expr) {
+            if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
                 places.insert(place);
             }
         }
@@ -2448,7 +2381,7 @@ where
         // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
         if let ast::Expr::Subscript(subscript) = subject_node {
             if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id(&place_expr) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
                     places.insert(place);
                 }
             }
