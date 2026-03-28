@@ -1831,8 +1831,6 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     let c = call_expr.func.inferred_type(model)?;
     let db = model.db();
     let class_name = c.as_class_literal()?.name(db);
-    let callable_type = c.try_upcast_to_callable(db)?.into_type(db);
-
     let display_sig = |signature: &Signature| {
         let params = signature
             .display_with(db, DisplaySettings::default().hide_return_type())
@@ -1840,13 +1838,23 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
         format!("class {class_name}{params}")
     };
+    let callable_type = c.try_upcast_to_callable(db)?.into_type(db);
+    let bindings = callable_type.bindings(db);
+
+    if let Some(binding) = bindings.single_element()
+        && binding.overloads().len() == 1
+    {
+        return binding
+            .overloads()
+            .first()
+            .map(|overload| display_sig(&overload.signature));
+    }
 
     if let Some(signature) = resolve_single_overload(model, callable_type, call_expr) {
         return Some(display_sig(&signature));
     }
 
-    let all_sigs: Vec<String> = callable_type
-        .bindings(db)
+    let all_sigs: Vec<String> = bindings
         .iter_flat()
         .flatten()
         .map(|binding| display_sig(&binding.signature))
