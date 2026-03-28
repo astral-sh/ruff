@@ -2804,6 +2804,27 @@ class Counter:
 reveal_type(Counter().count)  # revealed: Unknown | int
 ```
 
+### Inherited recursive instance attribute
+
+This also needs to converge when the initial attribute value is inherited from a base class. This is
+a regression test for <https://github.com/astral-sh/ty/issues/3149>.
+
+```py
+class Count:
+    def __init__(self: "Count"):
+        self.i = 0
+
+class PositiveCount(Count):
+    def increment(self: "PositiveCount"):
+        self.i = self.i + 1
+
+    def decrement(self: "PositiveCount"):
+        if self.i != 0:
+            self.i = self.i - 1
+
+reveal_type(PositiveCount().i)  # revealed: Unknown | int
+```
+
 We also handle infinitely nested generics:
 
 ```py

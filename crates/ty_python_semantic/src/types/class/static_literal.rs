@@ -53,6 +53,7 @@ use crate::{
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
+        set_theoretic::RecursivelyDefined,
         signatures::CallableSignature,
         tuple::{Tuple, TupleSpec, TupleType},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
@@ -3217,6 +3218,20 @@ fn implicit_attribute_initial<'db>(
     }
 }
 
+fn mark_type_recursively_defined<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::LiteralValue(literal) => {
+            Type::LiteralValue(literal.with_recursively_defined(RecursivelyDefined::Yes))
+        }
+        Type::Union(union) => Type::Union(UnionType::new(
+            db,
+            union.elements(db).to_vec().into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        )),
+        _ => ty,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
@@ -3229,6 +3244,7 @@ fn implicit_attribute_cycle_recover<'db>(
 ) -> Member<'db> {
     let inner = member
         .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
+        .cycle_normalized(db, previous_member.inner, cycle)
+        .map_type(|ty| mark_type_recursively_defined(db, ty));
     Member { inner }
 }
