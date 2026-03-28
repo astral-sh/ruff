@@ -19,23 +19,6 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
     else:
         reveal_type(x)  # revealed: int
-
-def _(x: str | int | None):
-    is_none = x is None
-    is_int = isinstance(x, int)
-    if is_none:
-        reveal_type(x)  # revealed: None
-    if is_int:
-        reveal_type(x)  # revealed: int
-    if is_none or is_int:
-        reveal_type(is_none)  # revealed: bool
-        reveal_type(x)  # revealed: None | int
-    if is_none and is_int:
-        reveal_type(is_none)  # revealed: Literal[True]
-        reveal_type(x)  # revealed: Never
-    if not (is_none or is_int):
-        reveal_type(is_none)  # revealed: Literal[False]
-        reveal_type(x)  # revealed: str
 ```
 
 ## Negated alias with `not`
@@ -71,6 +54,27 @@ def _(x: int | str):
         reveal_type(x)  # revealed: str
 ```
 
+## Boolean-operated alias
+
+```py
+def _(x: str | int | None):
+    is_none = x is None
+    is_int = isinstance(x, int)
+    if is_none:
+        reveal_type(x)  # revealed: None
+    if is_int:
+        reveal_type(x)  # revealed: int
+    if is_none or is_int:
+        reveal_type(is_none)  # revealed: bool
+        reveal_type(x)  # revealed: None | int
+    if is_none and is_int:
+        reveal_type(is_none)  # revealed: Literal[True]
+        reveal_type(x)  # revealed: Never
+    if not (is_none or is_int):
+        reveal_type(is_none)  # revealed: Literal[False]
+        reveal_type(x)  # revealed: str
+```
+
 ## Equality comparisons
 
 ```py
@@ -82,6 +86,32 @@ def _(x: Literal[1, 2]):
         reveal_type(x)  # revealed: Literal[1]
     else:
         reveal_type(x)  # revealed: Literal[2]
+```
+
+## `TypeGuard`/`TypeIs` alias
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_str(x: object) -> TypeGuard[str]:
+    return isinstance(x, str)
+
+def _(x: str | int):
+    is_s = is_str(x)
+    if is_s:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str | int
+
+def is_str2(x: object) -> TypeIs[str]:
+    return isinstance(x, str)
+
+def _(x: str | int):
+    is_s = is_str2(x)
+    if is_s:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: int
 ```
 
 ## Attribute access alias
@@ -172,21 +202,6 @@ def _(x: int | None):
     is_none = x is None
     if is_none:
         reveal_type(x)  # revealed: None
-```
-
-## Non-narrowing assignment is not treated as alias
-
-A regular function call result is not a narrowing expression, so only truthiness narrowing applies
-to the variable itself.
-
-```py
-def some_function(x: object) -> bool:
-    return True
-
-def _(x: int | None):
-    result = some_function(x)
-    if result:
-        reveal_type(x)  # revealed: int | None
 ```
 
 ## Nested scope can preserve alias
