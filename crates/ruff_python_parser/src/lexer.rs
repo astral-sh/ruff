@@ -159,12 +159,6 @@ impl<'src> Lexer<'src> {
     /// When the lexer crosses a cell boundary and the indent stack is not at root level,
     /// it will emit `Dedent` tokens to flush the stack.
     pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
-        // The notebook always appends a trailing offset at source.len() for the
-        // separator newline.  Trim it so we don't emit a spurious Dedent at EOF.
-        let source_end = self.source.text_len();
-        let end = cell_offsets.partition_point(|&offset| offset < source_end);
-        let cell_offsets = &cell_offsets[..end];
-
         self.has_cells = !cell_offsets.is_empty();
         self.cell_offsets = cell_offsets;
 
@@ -1536,8 +1530,9 @@ impl<'src> Lexer<'src> {
         // At a cell boundary with the indent stack at root level, just advance
         // to the next cell and re-enter lex_token.  No token is emitted — the
         // parser sees a continuous token stream across cell boundaries.
+        // Note: do NOT set range_from_consume_end here — the next cell's
+        // consume_end would pick it up and corrupt the EndOfFile token range.
         if at_cell_boundary && *self.indentations.current() == Indentation::root() {
-            self.range_from_consume_end = Some(self.token_range());
             self.advance_to_next_cell();
             // Re-enter lex_token to lex the next cell's first token.
             // The cursor is no longer empty, so it won't hit end-of-input.
