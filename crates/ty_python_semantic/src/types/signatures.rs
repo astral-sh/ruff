@@ -2607,9 +2607,9 @@ impl<'db> Parameters<'db> {
         Self {
             value: vec![
                 Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                    .with_annotated_type(Type::Dynamic(DynamicType::unknown())),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                    .with_annotated_type(Type::Dynamic(DynamicType::unknown())),
             ],
             kind: ParametersKind::Gradual,
         }

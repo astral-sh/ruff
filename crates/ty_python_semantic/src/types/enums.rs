@@ -5,11 +5,13 @@ use smallvec::SmallVec;
 
 use crate::{
     Db, FxIndexMap,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+    },
     semantic_index::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
         set_theoretic::builder::UnionBuilder,
     },
 };
@@ -346,9 +348,8 @@ pub(crate) fn enum_metadata<'db>(
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-
-            if !explicit_member_wrapper
-                && declarations.clone().any_reachable(db, |declaration| {
+            let allows_annotated_assignment_member =
+                !declarations.clone().any_reachable(db, |declaration| {
                     declaration.is_defined_and(|declaration| {
                         !matches!(
                             declaration.kind(db),
@@ -358,9 +359,42 @@ pub(crate) fn enum_metadata<'db>(
                                     .is_some()
                         )
                     })
-                })
-            {
-                return None;
+                });
+            let declared =
+                place_from_declarations(db, declarations).ignore_conflicting_declarations();
+
+            if !explicit_member_wrapper {
+                match declared {
+                    PlaceAndQualifiers {
+                        place:
+                            Place::Defined(DefinedPlace {
+                                ty: Type::Dynamic(DynamicType::Unknown(_)),
+                                ..
+                            }),
+                        qualifiers,
+                    } if qualifiers.contains(TypeQualifiers::FINAL) => {}
+                    PlaceAndQualifiers {
+                        place: Place::Undefined,
+                        ..
+                    } => {
+                        // Undeclared attributes are considered members.
+                    }
+                    PlaceAndQualifiers {
+                        place:
+                            Place::Defined(DefinedPlace {
+                                ty: Type::NominalInstance(instance),
+                                ..
+                            }),
+                        ..
+                    } if instance.has_known_class(db, KnownClass::Member) => {
+                        // If the attribute is specifically declared with `enum.member`, it is considered a member.
+                    }
+                    _ if allows_annotated_assignment_member => {}
+                    _ => {
+                        // Declared attributes are considered non-members.
+                        return None;
+                    }
+                }
             }
 
             Some((name.clone(), value_ty))

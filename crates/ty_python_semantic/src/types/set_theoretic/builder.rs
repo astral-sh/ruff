@@ -416,6 +416,8 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        self.recursively_defined = self.recursively_defined.or(ty.recursively_defined(self.db));
+        let ty = ty.without_recursive_provenance(self.db);
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
@@ -435,9 +437,6 @@ impl<'db> UnionBuilder<'db> {
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
                 }
-                self.recursively_defined = self
-                    .recursively_defined
-                    .or(union.recursively_defined(self.db));
                 if self.cycle_recovery && self.recursively_defined.is_yes() {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
@@ -463,8 +462,6 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::LiteralValue(literal) => {
-                self.recursively_defined =
-                    self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
                     // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
                     // add it to, or an existing element that is a super-type of string literals, which
@@ -863,7 +860,7 @@ impl<'db> UnionBuilder<'db> {
         }
         match types.len() {
             0 => None,
-            1 => Some(types[0]),
+            1 => Some(types[0].with_recursively_defined(self.db, self.recursively_defined)),
             _ => Some(Type::Union(UnionType::new(
                 self.db,
                 types.into_boxed_slice(),

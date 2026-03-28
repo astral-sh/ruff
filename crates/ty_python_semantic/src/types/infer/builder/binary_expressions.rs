@@ -372,11 +372,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
-            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+            (unknown @ Type::Dynamic(DynamicType::Unknown(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::Unknown(_)), _) => Some(unknown),
 
-            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(..)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(..)), _) => Some(unknown),
 
             (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
             | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),

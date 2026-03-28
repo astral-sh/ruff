@@ -30,11 +30,11 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
-use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
     IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
 };
+use self::set_theoretic::{KnownUnion, RecursivelyDefined};
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -777,7 +777,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn unknown() -> Self {
-        Self::Dynamic(DynamicType::Unknown)
+        Self::Dynamic(DynamicType::unknown())
     }
 
     pub(crate) fn divergent(id: salsa::Id) -> Self {
@@ -829,8 +829,42 @@ impl<'db> Type<'db> {
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
-            Type::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_))
+            Type::Dynamic(DynamicType::Unknown(_) | DynamicType::UnknownGeneric(..))
         )
+    }
+
+    pub(crate) fn recursively_defined(self, db: &'db dyn Db) -> RecursivelyDefined {
+        match self {
+            Type::Union(union) => union.recursively_defined(db),
+            Type::LiteralValue(literal) => literal.recursively_defined(),
+            Type::Dynamic(dynamic) => dynamic.recursively_defined(),
+            _ => RecursivelyDefined::No,
+        }
+    }
+
+    pub(crate) fn with_recursively_defined(
+        self,
+        db: &'db dyn Db,
+        recursively_defined: RecursivelyDefined,
+    ) -> Self {
+        match self {
+            Type::Union(union) => Type::Union(UnionType::new(
+                db,
+                union.elements(db).to_vec().into_boxed_slice(),
+                recursively_defined,
+            )),
+            Type::LiteralValue(literal) => {
+                Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
+            }
+            Type::Dynamic(dynamic) => {
+                Type::Dynamic(dynamic.with_recursively_defined(recursively_defined))
+            }
+            _ => self,
+        }
+    }
+
+    fn without_recursive_provenance(self, db: &'db dyn Db) -> Self {
+        self.with_recursively_defined(db, RecursivelyDefined::No)
     }
 
     pub(crate) const fn is_never(&self) -> bool {
@@ -972,8 +1006,8 @@ impl<'db> Type<'db> {
     pub(crate) fn is_todo(&self) -> bool {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
             DynamicType::Any
-            | DynamicType::Unknown
-            | DynamicType::UnknownGeneric(_)
+            | DynamicType::Unknown(_)
+            | DynamicType::UnknownGeneric(..)
             | DynamicType::UnspecializedTypeVar => false,
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
@@ -1013,9 +1047,7 @@ impl<'db> Type<'db> {
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
                 .is_some_and(ClassType::is_generic),
-            Type::Dynamic(dynamic) => {
-                matches!(dynamic, DynamicType::UnknownGeneric(_))
-            }
+            Type::Dynamic(dynamic) => matches!(dynamic, DynamicType::UnknownGeneric(..)),
             // Due to inheritance rules, enums cannot be generic.
             Type::LiteralValue(literal) if literal.is_enum() => false,
             // Once generic NewType is officially specified, handle it.
@@ -1749,8 +1781,8 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(dynamic) => match dynamic {
                 DynamicType::Any => true,
-                DynamicType::Unknown
-                | DynamicType::UnknownGeneric(_)
+                DynamicType::Unknown(_)
+                | DynamicType::UnknownGeneric(..)
                 | DynamicType::UnspecializedTypeVar
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoTypeVarTuple
@@ -5970,7 +6002,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) => {
+            Type::Dynamic(DynamicType::UnknownGeneric(generic_context, _)) => {
                 for variable in generic_context.variables(db) {
                     if let Some(variable) = matching_typevar(&variable) {
                         typevars.insert(variable);
@@ -6174,7 +6206,7 @@ impl<'db> Type<'db> {
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
             Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
-            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Dynamic(DynamicType::Unknown(_) | DynamicType::UnknownGeneric(..)) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -6661,19 +6693,27 @@ impl DivergentType {
     }
 }
 
+bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default, salsa::Update)]
+    pub struct DynamicFlags: u8 {
+        const RECURSIVELY_DEFINED = 1 << 0;
+    }
+}
+
+impl get_size2::GetSize for DynamicFlags {}
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
-    Unknown,
+    Unknown(DynamicFlags),
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.
     ///
     /// TODO: Once we implement <https://github.com/astral-sh/ty/issues/1711>, this variant might
     /// not be needed anymore.
-    UnknownGeneric(GenericContext<'db>),
+    UnknownGeneric(GenericContext<'db>, DynamicFlags),
     /// An unspecialized type variable during generic call inference.
     ///
     /// TODO: This variant should be removed once type variables are unified across nested generic
@@ -6698,9 +6738,52 @@ pub enum DynamicType<'db> {
     TodoTypeVarTuple,
 }
 
-impl DynamicType<'_> {
+impl<'db> DynamicType<'db> {
+    pub(crate) const fn unknown() -> Self {
+        Self::Unknown(DynamicFlags::empty())
+    }
+
+    pub(crate) fn unknown_generic(generic_context: GenericContext<'db>) -> Self {
+        Self::UnknownGeneric(generic_context, DynamicFlags::empty())
+    }
+
     fn recursive_type_normalized(self) -> Self {
         self
+    }
+
+    fn flags(self) -> DynamicFlags {
+        match self {
+            Self::Unknown(flags) | Self::UnknownGeneric(_, flags) => flags,
+            _ => DynamicFlags::empty(),
+        }
+    }
+
+    fn map_flags(self, f: impl FnOnce(DynamicFlags) -> DynamicFlags) -> Self {
+        match self {
+            Self::Unknown(flags) => Self::Unknown(f(flags)),
+            Self::UnknownGeneric(generic_context, flags) => {
+                Self::UnknownGeneric(generic_context, f(flags))
+            }
+            _ => self,
+        }
+    }
+
+    fn recursively_defined(self) -> RecursivelyDefined {
+        if self.flags().intersects(DynamicFlags::RECURSIVELY_DEFINED) {
+            RecursivelyDefined::Yes
+        } else {
+            RecursivelyDefined::No
+        }
+    }
+
+    fn with_recursively_defined(self, recursively_defined: RecursivelyDefined) -> Self {
+        self.map_flags(|mut flags| {
+            flags.set(
+                DynamicFlags::RECURSIVELY_DEFINED,
+                recursively_defined.is_yes(),
+            );
+            flags
+        })
     }
 
     pub(crate) fn is_todo(&self) -> bool {
@@ -6712,7 +6795,7 @@ impl std::fmt::Display for DynamicType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
-            DynamicType::Unknown | DynamicType::UnknownGeneric(_) => f.write_str("Unknown"),
+            DynamicType::Unknown(_) | DynamicType::UnknownGeneric(..) => f.write_str("Unknown"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type

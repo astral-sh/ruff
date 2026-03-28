@@ -543,8 +543,8 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::TodoStarredExpression
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
-                    | DynamicType::Unknown
-                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::Unknown(_)
+                    | DynamicType::UnknownGeneric(..)
                     | DynamicType::UnspecializedTypeVar => Parameters::unknown(),
                 },
                 Type::Divergent(_) => Parameters::unknown(),

@@ -423,7 +423,7 @@ impl<'db> BoundSuperType<'db> {
             };
 
         let owner = match owner_type {
-            Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
+            Type::Never => SuperOwnerKind::Dynamic(DynamicType::unknown()),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::ClassLiteral(class) => SuperOwnerKind::Class(ClassType::NonGeneric(class)),
@@ -636,7 +636,7 @@ impl<'db> BoundSuperType<'db> {
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
+            return Either::Left(ClassBase::Dynamic(DynamicType::unknown()).mro(db, None));
         };
 
         let mut pivot_found = false;

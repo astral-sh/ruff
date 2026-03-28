@@ -68,7 +68,7 @@ impl<'db> SubclassOfType<'db> {
             Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
             Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::SpecialForm(SpecialFormType::Unknown) => {
-                SubclassOfInner::Dynamic(DynamicType::Unknown)
+                SubclassOfInner::Dynamic(DynamicType::unknown())
             }
             _ => return None,
         };
@@ -369,7 +369,7 @@ pub(crate) enum SubclassOfInner<'db> {
 
 impl<'db> SubclassOfInner<'db> {
     pub(crate) const fn unknown() -> Self {
-        Self::Dynamic(DynamicType::Unknown)
+        Self::Dynamic(DynamicType::unknown())
     }
 
     pub(crate) const fn is_dynamic(self) -> bool {
@@ -423,7 +423,9 @@ impl<'db> SubclassOfInner<'db> {
             },
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(DynamicType::Unknown(_)) => {
+                SubclassOfInner::Dynamic(DynamicType::unknown())
+            }
             _ => return None,
         })
     }
