@@ -61,7 +61,16 @@ pub struct Parser<'src> {
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
     pub fn new(source: &'src str, options: ParseOptions) -> Self {
-        Parser::new_starts_at(source, TextSize::new(0), options, &[])
+        Parser::new_with_cell_offsets(source, options, &[])
+    }
+
+    /// Create a new parser with notebook cell offsets set before the first token is lexed.
+    pub fn new_with_cell_offsets(
+        source: &'src str,
+        options: ParseOptions,
+        cell_offsets: &'src [TextSize],
+    ) -> Self {
+        Parser::new_starts_at(source, TextSize::new(0), options, cell_offsets)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.

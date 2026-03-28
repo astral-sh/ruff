@@ -36,13 +36,11 @@ impl<'src> TokenSource<'src> {
         start_offset: TextSize,
         cell_offsets: &'src [TextSize],
     ) -> Self {
-        let lexer = Lexer::new(source, mode, start_offset);
-        let mut source = TokenSource::new(lexer);
-
-        // Set cell offsets BEFORE the first bump so the lexer is cell-aware from the start.
+        let mut lexer = Lexer::new(source, mode, start_offset);
         if !cell_offsets.is_empty() {
-            source.set_cell_offsets(cell_offsets);
+            lexer.set_cell_offsets(cell_offsets);
         }
+        let mut source = TokenSource::new(lexer);
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
