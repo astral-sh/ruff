@@ -697,18 +697,7 @@ pub fn call_signature_details<'db>(
     }
 }
 
-/// Given a call expression that has overloads, and whose overload is resolved to a
-/// single option by its arguments, return the type of the Signature.
-///
-/// This is only used for simplifying complex call types, so if we ever detect that
-/// the given callable type *is* simple, or that our answer *won't* be simple, we
-/// bail at out and return None, so that the original type can be used.
-///
-/// We do this because `Type::Signature` intentionally loses a lot of context, and
-/// so it has a "worse" display than say `Type::FunctionLiteral` or `Type::BoundMethod`,
-/// which this analysis would naturally wipe away. The contexts this function
-/// succeeds in are those where we would print a complicated/ugly type anyway.
-/// Resolve overloads for a callable type using actual call arguments,
+/// Resolve overloads for a callable type using call arguments,
 /// returning the single matching signature if exactly one matches.
 fn resolve_single_overload<'db>(
     model: &SemanticModel<'db>,
@@ -744,6 +733,17 @@ fn resolve_single_overload<'db>(
     resolved.pop()
 }
 
+/// Given a call expression that has overloads, and whose overload is resolved to a
+/// single option by its arguments, return the type of the Signature.
+///
+/// This is only used for simplifying complex call types, so if we ever detect that
+/// the given callable type *is* simple, or that our answer *won't* be simple, we
+/// bail at out and return None, so that the original type can be used.
+///
+/// We do this because `Type::Signature` intentionally loses a lot of context, and
+/// so it has a "worse" display than say `Type::FunctionLiteral` or `Type::BoundMethod`,
+/// which this analysis would naturally wipe away. The contexts this function
+/// succeeds in are those where we would print a complicated/ugly type anyway.
 pub fn call_type_simplified_by_overloads(
     model: &SemanticModel,
     call_expr: &ast::ExprCall,
