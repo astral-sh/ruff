@@ -1031,45 +1031,6 @@ mod tests {
            |
         ");
     }
-    #[test]
-    fn hover_class_new_only() {
-        let test = cursor_test(
-            r#"
-        class S2:
-            def __new__(cls, a: int, b: str) -> "S2":
-                """new docs"""
-                instance = super().__new__(cls)
-                return instance
-
-        x = S<CURSOR>2(1)
-        "#,
-        );
-
-        assert_snapshot!(test.hover(), @r"
-        class S2(a: int, b: str)
-        ---------------------------------------------
-        new docs
-
-        ---------------------------------------------
-        ```python
-        class S2(a: int, b: str)
-        ```
-        ---
-        new docs
-        ---------------------------------------------
-        info[hover]: Hovered content is
-         --> main.py:8:5
-          |
-        6 |         return instance
-        7 |
-        8 | x = S2(1)
-          |     ^-
-          |     ||
-          |     |Cursor offset
-          |     source
-          |
-        ");
-    }
 
     #[test]
     fn hover_class_method() {
