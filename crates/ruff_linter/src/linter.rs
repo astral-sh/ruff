@@ -781,8 +781,7 @@ fn parse_unchecked_source(
         .as_ipy_notebook()
         .map(|nb| nb.cell_offsets().as_ref())
         .unwrap_or(&[]);
-    let parser =
-        ruff_python_parser::Parser::new_with_cell_offsets(source, options, cell_offsets);
+    let parser = ruff_python_parser::Parser::new_with_cell_offsets(source, options, cell_offsets);
 
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `Parser::new_with_cell_offsets` (and thus
