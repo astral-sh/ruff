@@ -579,6 +579,26 @@ def foo(a: int, b: int) -> RecursiveT:
     return list(some_intermediate_var)
 ```
 
+### Recursive collection-union narrowing does not stack overflow
+
+```py
+from collections.abc import Mapping, MutableMapping
+
+type JSON = str | int | float | bool | list[JSON] | list[JSON_OBJECT] | dict[str, JSON] | None
+type JSON_OBJECT = dict[str, JSON]
+
+x: JSON = {}
+y: JSON = {"hello": 23}
+xm: Mapping[str, JSON] = {}
+xmm: MutableMapping[str, JSON] = {}
+
+def as_json_object() -> JSON_OBJECT:
+    return {"hello": 23}
+
+def as_json_mapping() -> Mapping[str, JSON]:
+    return {}
+```
+
 ### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
 
 ```py
