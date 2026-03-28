@@ -159,7 +159,14 @@ impl<'src> Lexer<'src> {
     /// When the lexer crosses a cell boundary and the indent stack is not at root level,
     /// it will emit `Dedent` tokens to flush the stack.
     pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
-        self.has_cells = !cell_offsets.is_empty();
+        // The notebook always appends a trailing offset at source.len() for the
+        // separator newline.  Trim it so we don't emit a spurious Dedent at EOF.
+        let source_end = self.source.text_len();
+        let end = cell_offsets.partition_point(|&offset| offset < source_end);
+        let cell_offsets = &cell_offsets[..end];
+
+        // Need at least two offsets for a cell boundary to exist.
+        self.has_cells = cell_offsets.len() > 1;
         self.cell_offsets = cell_offsets;
 
         if self.has_cells {
@@ -1527,6 +1534,17 @@ impl<'src> Lexer<'src> {
         }
 
         // Then flush to a logical line boundary (newline + dedents).
+        // At a cell boundary with the indent stack at root level, just advance
+        // to the next cell and re-enter lex_token.  No token is emitted — the
+        // parser sees a continuous token stream across cell boundaries.
+        if at_cell_boundary && *self.indentations.current() == Indentation::root() {
+            self.range_from_consume_end = Some(self.token_range());
+            self.advance_to_next_cell();
+            // Re-enter lex_token to lex the next cell's first token.
+            // The cursor is no longer empty, so it won't hit end-of-input.
+            return self.lex_token();
+        }
+
         let end_token = if at_cell_boundary {
             TokenKind::Dedent
         } else {
@@ -1537,7 +1555,9 @@ impl<'src> Lexer<'src> {
 
         // When all dedents are flushed at a cell boundary, advance past it.
         // Save the range BEFORE advancing since the cursor will be replaced.
-        if at_cell_boundary && token == end_token {
+        // This triggers when flush returns the expected end_token OR when it
+        // collapses a boundary Dedent to EndOfFile (stack already at root).
+        if at_cell_boundary && (token == end_token || token == TokenKind::EndOfFile) {
             self.range_from_consume_end = Some(self.token_range());
             self.advance_to_next_cell();
         }
