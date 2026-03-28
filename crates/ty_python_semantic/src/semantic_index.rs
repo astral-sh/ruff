@@ -393,6 +393,7 @@ impl AliasGuard {
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct AliasPredicate<'db> {
+    /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
     pub(crate) expression: Expression<'db>,
     pub(crate) guard: Option<AliasGuard>,
 }

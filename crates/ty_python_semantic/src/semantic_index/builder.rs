@@ -154,7 +154,7 @@ impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
     }
 }
 
-/// A narrowing alias: a variable whose RHS is a narrowing-capable expression
+/// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
 struct NarrowingAlias<'ast> {
@@ -408,10 +408,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .last()
             .is_some_and(|info| self.scopes[info.file_scope_id].kind().is_class())
         {
-            // Walk backwards through the contiguous chain of class scopes. The outermost
-            // class scope's saved `narrowing_aliases` is a snapshot from the enclosing
-            // function scope at the time we entered the class hierarchy — before any
-            // class-scope assignments could invalidate aliases.
             let mut inherited_aliases = None;
             for info in self.scope_stack.iter().rev() {
                 if self.scopes[info.file_scope_id].kind().is_class() {
@@ -776,9 +772,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
         match value {
-            // Bare names are handled above as chained aliases (`b = a` where `a` is already an alias).
+            // Bare names are handled as chained aliases (`b = a` where `a` is already an alias).
             // Other simple place expressions only add truthiness narrowing and are too common to
             // scan as alias candidates on every assignment.
+            // These will degrade performance, so we'll skip them.
             ast::Expr::Compare(_) | ast::Expr::Call(_) => true,
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
                 Self::can_register_narrowing_alias(&unary.operand)
@@ -1355,7 +1352,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Try to register a narrowing alias for a simple name assignment like `is_none = x is None`.
     ///
-    /// If the RHS is a narrowing-capable expression (would produce non-empty `PossiblyNarrowedPlaces`),
+    /// If the RHS is a narrowing expression (would produce non-empty `PossiblyNarrowedPlaces`),
     /// and the target is not itself one of the narrowed places, record the alias.
     fn try_register_narrowing_alias(&mut self, target: &ast::Expr, value: Option<&'ast ast::Expr>) {
         let Some(name) = target.as_name_expr() else {
@@ -1430,10 +1427,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn walk_alias_predicate_leaves<F>(expr: &ast::Expr, f: &mut F)
-    where
-        F: FnMut(&ast::Expr),
-    {
+    fn walk_alias_predicate_leaves(expr: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         match expr {
             ast::Expr::Name(_) => f(expr),
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
