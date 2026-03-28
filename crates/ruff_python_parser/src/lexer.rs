@@ -165,8 +165,7 @@ impl<'src> Lexer<'src> {
         let end = cell_offsets.partition_point(|&offset| offset < source_end);
         let cell_offsets = &cell_offsets[..end];
 
-        // Need at least two offsets for a cell boundary to exist.
-        self.has_cells = cell_offsets.len() > 1;
+        self.has_cells = !cell_offsets.is_empty();
         self.cell_offsets = cell_offsets;
 
         if self.has_cells {
