@@ -16,7 +16,7 @@ use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, call_type_simplified_by_overloads,
+    call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
     typed_dict_key_definition,
 };
@@ -687,6 +687,15 @@ impl GotoTarget<'_> {
                 .map(|definition| vec![definition]),
         };
         definitions.map(Definitions)
+    }
+
+    /// Get signature for class constructor
+    pub(crate) fn constructor_signature(&self, model: &SemanticModel) -> Option<String> {
+        if let GotoTarget::Call { call, .. } = self {
+            constructor_signature(model, call)
+        } else {
+            None
+        }
     }
 
     /// Returns the text representation of this goto target.

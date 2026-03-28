@@ -708,6 +708,42 @@ pub fn call_signature_details<'db>(
 /// so it has a "worse" display than say `Type::FunctionLiteral` or `Type::BoundMethod`,
 /// which this analysis would naturally wipe away. The contexts this function
 /// succeeds in are those where we would print a complicated/ugly type anyway.
+/// Resolve overloads for a callable type using actual call arguments,
+/// returning the single matching signature if exactly one matches.
+fn resolve_single_overload<'db>(
+    model: &SemanticModel<'db>,
+    callable_type: Type<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<Signature<'db>> {
+    let db = model.db();
+    let bindings = callable_type.bindings(db);
+
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
+    });
+
+    let constraints = ConstraintSetBuilder::new();
+    let mut resolved: Vec<_> = bindings
+        .match_parameters(db, &args)
+        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .iter()
+        .flat_map(super::call::bind::Bindings::iter_flat)
+        .flat_map(|binding| {
+            binding
+                .matching_overloads()
+                .map(|(_, overload)| overload.signature.clone())
+        })
+        .collect();
+
+    if resolved.len() != 1 {
+        return None;
+    }
+
+    resolved.pop()
+}
+
 pub fn call_type_simplified_by_overloads(
     model: &SemanticModel,
     call_expr: &ast::ExprCall,
@@ -715,48 +751,21 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
-    let bindings = callable_type.bindings(db);
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = bindings.single_element()
+    if let Some(binding) = callable_type.bindings(db).single_element()
         && binding.overloads().len() < 2
     {
         return None;
     }
 
-    // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    // Try to resolve overloads with the arguments/types we have
-    let constraints = ConstraintSetBuilder::new();
-    let mut resolved = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        // Only use the Ok
-        .iter()
-        .flat_map(super::call::bind::Bindings::iter_flat)
-        .flat_map(|binding| {
-            binding.matching_overloads().map(|(_, overload)| {
-                overload
-                    .signature
-                    .display_with(db, DisplaySettings::default().multiline())
-                    .to_string()
-            })
-        })
-        .collect::<Vec<_>>();
-
-    // If at the end of this we still got multiple signatures (or no signatures), give up
-    if resolved.len() != 1 {
-        return None;
-    }
-
-    resolved.pop()
+    let signature = resolve_single_overload(model, callable_type, call_expr)?;
+    Some(
+        signature
+            .display_with(db, DisplaySettings::default().multiline())
+            .to_string(),
+    )
 }
 
 /// Returns the definitions of the binary operation along with its callable type.
@@ -1818,25 +1827,14 @@ fn class_literal_to_hierarchy_info(
     }
 }
 
-pub fn constructor_signature(model: &SemanticModel, class: &Type) -> Option<String> {
+pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
+    let c = call_expr.func.inferred_type(model)?;
     let db = model.db();
-    let class_name = class.as_class_literal()?.name(db);
-    let callables = class.try_upcast_to_callable(db)?;
-
-    let init_signature = callables
-        .into_iter()
-        .flat_map(|callable| callable.signatures(db).overloads.iter())
-        .find(|sig| {
-            let Some(d) = sig.definition() else {
-                return false;
-            };
-            let Some(name) = d.name(db) else { return false };
-            name == "__init__"
-        })?;
-
-    let params = init_signature
+    let class_name = c.as_class_literal()?.name(db);
+    let callable_type = c.try_upcast_to_callable(db)?.into_type(db);
+    let signature = resolve_single_overload(model, callable_type, call_expr)?;
+    let params = signature
         .display_with(db, DisplaySettings::default().hide_return_type())
         .to_string();
-
     Some(format!("class {class_name}{params}"))
 }

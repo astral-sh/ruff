@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::{constructor_signature, typed_dict_key_hover};
+use ty_python_semantic::types::ide_support::typed_dict_key_hover;
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -45,10 +45,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
         contents.push(HoverContent::Signature(signature));
-    } else if let GotoTarget::Call { .. } = goto_target
-        && let Some(ty) = goto_target.inferred_type(&model)
-        && let Some(signature) = constructor_signature(&model, &ty)
-    {
+    } else if let Some(signature) = goto_target.constructor_signature(&model) {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
@@ -701,6 +698,199 @@ mod tests {
            |     source
            |
         ");
+    }
+
+    #[test]
+    fn hover_dataclass_class_init() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+
+                Everyone loves my class!!
+
+            '''
+            a: int
+            b: str
+
+        x = MyCla<CURSOR>ss(0, "")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class MyClass(a: int, b: str)
+        ---------------------------------------------
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ---------------------------------------------
+        ```python
+        class MyClass(a: int, b: str)
+        ```
+        ---
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
+        Everyone loves my class!!
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:17:5
+           |
+        15 |     b: str
+        16 |
+        17 | x = MyClass(0, "")
+           |     ^^^^^-^
+           |     |    |
+           |     |    Cursor offset
+           |     source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_class_typed_init() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            def __init__(self, a: int, b: str):
+                self.a = a
+                self.b = b
+
+        x = MyCla<CURSOR>ss(0, "hello")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class MyClass(a: int, b: str)
+        ---------------------------------------------
+        ```python
+        class MyClass(a: int, b: str)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:7:5
+          |
+        5 |         self.b = b
+        6 |
+        7 | x = MyClass(0, "hello")
+          |     ^^^^^-^
+          |     |    |
+          |     |    Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_dataclass_synthesized_init() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class Test:
+            a: int
+            b: int
+
+        x = Te<CURSOR>st(1, 2)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class Test(a: int, b: int)
+        ---------------------------------------------
+        ```python
+        class Test(a: int, b: int)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:5
+          |
+        7 |     b: int
+        8 |
+        9 | x = Test(1, 2)
+          |     ^^-^
+          |     | |
+          |     | Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_class_no_init() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            pass
+
+        x = MyCla<CURSOR>ss()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class MyClass()
+        ---------------------------------------------
+        ```python
+        class MyClass()
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:5
+          |
+        3 |     pass
+        4 |
+        5 | x = MyClass()
+          |     ^^^^^-^
+          |     |    |
+          |     |    Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_class_with_new() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            def __new__(cls, a: int, b: str) -> "MyClass":
+                instance = super().__new__(cls)
+                return instance
+
+        x = MyCla<CURSOR>ss(0, "hello")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class MyClass(a: int, b: str)
+        ---------------------------------------------
+        ```python
+        class MyClass(a: int, b: str)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:7:5
+          |
+        5 |         return instance
+        6 |
+        7 | x = MyClass(0, "hello")
+          |     ^^^^^-^
+          |     |    |
+          |     |    Cursor offset
+          |     source
+          |
+        "#);
     }
 
     #[test]
