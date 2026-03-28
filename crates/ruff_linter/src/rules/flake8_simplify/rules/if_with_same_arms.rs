@@ -130,7 +130,7 @@ fn merge_branches(
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
-    comment_ranges: &ruff_python_ast::CommentRanges,
+    comment_ranges: &CommentRanges,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
