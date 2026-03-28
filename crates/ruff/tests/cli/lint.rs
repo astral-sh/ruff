@@ -4508,6 +4508,80 @@ warn = ["F401"]
 }
 
 #[test]
+fn warn_outer_select_inner_precedence() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+
+    test.write_file("try.py", "import os")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    try.py:1:8: error[F401] [*] `os` imported but unused
+    Found 1 diagnostic.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn warn_outer_rule_select_inner_prefix_precedence() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+preview = true
+warn = ["F401"]
+"#,
+    )?;
+    test.write_file(
+        ".ruff.toml",
+        r#"
+extend = "ruff.toml"
+[lint]
+select = ["F"]
+"#,
+    )?;
+
+    test.write_file("try.py", "import os")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "try.py"]),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    try.py:1:8: error[F401] [*] `os` imported but unused
+    Found 1 diagnostic.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn ignore_overrides_warn() -> Result<()> {
     let test = CliTest::new()?;
     test.write_file(
