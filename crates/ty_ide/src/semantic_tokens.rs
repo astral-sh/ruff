@@ -1787,7 +1787,7 @@ b: list["int | str"] | None
 c: "list[int | str] | None"
 d: "list[int | str]" | "None"
 e: 'list["int | str"] | "None"'
-f: """'list["int | str"]' | 'None'""" 
+f: """'list["int | str"]' | 'None'"""
 "#,
         );
 
@@ -2148,7 +2148,7 @@ class Baz:
         prop: str = \"hello\"
 
 baz = Baz()
-s = baz.method 
+s = baz.method
 t = baz.CONSTANT
 r = baz.prop
 q = Baz.prop
@@ -2383,7 +2383,7 @@ class MyClass:
     def __init__(self): pass
 
     """unrelated string"""
-    
+
     x: str = "hello"
 "#,
         );
@@ -2414,7 +2414,7 @@ What a good module wooo
 def my_func(): pass
 
 """unrelated string"""
-    
+
 x: str = "hello"
 "#,
         );

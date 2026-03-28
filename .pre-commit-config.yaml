@@ -26,6 +26,9 @@ repos:
     hooks:
       - id: check-merge-conflict
         priority: 0
+      - id: trailing-whitespace
+        types: [rust]
+        priority: 0
       - id: end-of-file-fixer
         # Don't run this on all files: the absence of trailing newlines is often
         # intentional in parser/linter/formatter tests

@@ -867,24 +867,24 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        Here \_this\_ and \_\_\_that\_\_ should be escaped  
-        Here *this* and **that** should be untouched  
-        Here `this` and ``that`` should be untouched  
-          
-        Here `_this_` and ``__that__`` should be untouched  
-        Here `_this_` ``__that__`` should be untouched  
-        `_this_too_should_be_untouched_`  
-          
-        Here `_this_```__that__`` should be untouched but this\_is\_escaped  
-        Here ``_this_```__that__` should be untouched but this\_is\_escaped  
-          
-        Here `_this_ and _that_ should be escaped (but isn't)  
-        Here \_this\_ and \_that\_` should be escaped  
-        `Here _this_ and _that_ should be escaped (but isn't)  
-        Here \_this\_ and \_that\_ should be escaped`  
-          
-        Here ```_is_``__a__`_balanced_``_mess_```  
-        Here ```_is_`````__a__``\_random\_````_mess__````  
+        Here \_this\_ and \_\_\_that\_\_ should be escaped
+        Here *this* and **that** should be untouched
+        Here `this` and ``that`` should be untouched
+
+        Here `_this_` and ``__that__`` should be untouched
+        Here `_this_` ``__that__`` should be untouched
+        `_this_too_should_be_untouched_`
+
+        Here `_this_```__that__`` should be untouched but this\_is\_escaped
+        Here ``_this_```__that__` should be untouched but this\_is\_escaped
+
+        Here `_this_ and _that_ should be escaped (but isn't)
+        Here \_this\_ and \_that\_` should be escaped
+        `Here _this_ and _that_ should be escaped (but isn't)
+        Here \_this\_ and \_that\_ should be escaped`
+
+        Here ```_is_``__a__`_balanced_``_mess_```
+        Here ```_is_`````__a__``\_random\_````_mess__````
         ```_is_`````__a__``\_random\_````_mess__````
         ");
     }
@@ -911,7 +911,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:    
+        Check out this great example code:
         ```````````python
             x_y = "hello"
 
@@ -949,7 +949,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code    
+        Check out this great example code
         ```````````python
             x_y = "hello"
 
@@ -988,8 +988,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code  
-        &nbsp;&nbsp;&nbsp;&nbsp;    
+        Check out this great example code
+        &nbsp;&nbsp;&nbsp;&nbsp;
         ```````````python
             x_y = "hello"
 
@@ -1025,7 +1025,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:  
+        Check out this great example code:
         ```````````python
             x_y = "hello"
 
@@ -1059,7 +1059,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code:    
+        Check out this great example code:
         ```````````python
             x_y = "hello"
 
@@ -1096,18 +1096,18 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        The thing you need to understand is that computers are hard.  
-          
-        **Warning:**  
-        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,  
-        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Listen:  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;- Computers  
-        &nbsp;&nbsp;&nbsp;&nbsp;- Are  
-        &nbsp;&nbsp;&nbsp;&nbsp;- Hard  
-          
+        The thing you need to understand is that computers are hard.
+
+        **Warning:**
+        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,
+        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.
+
+        &nbsp;&nbsp;&nbsp;&nbsp;Listen:
+
+        &nbsp;&nbsp;&nbsp;&nbsp;- Computers
+        &nbsp;&nbsp;&nbsp;&nbsp;- Are
+        &nbsp;&nbsp;&nbsp;&nbsp;- Hard
+
         &nbsp;&nbsp;&nbsp;&nbsp;Ok!?!?!?
         "#);
     }
@@ -1135,18 +1135,18 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        Some much-updated docs  
-          
-        **Added in version 3.0:**  
-        &nbsp;&nbsp;&nbsp;Function added  
-          
-        **Changed in version 4.0:**  
-        &nbsp;&nbsp;&nbsp;The `spam` argument was added  
-        **Changed in version 4.1:**  
-        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
-          
-        &nbsp;&nbsp;&nbsp;You really shouldnt use it  
-          
+        Some much-updated docs
+
+        **Added in version 3.0:**
+        &nbsp;&nbsp;&nbsp;Function added
+
+        **Changed in version 4.0:**
+        &nbsp;&nbsp;&nbsp;The `spam` argument was added
+        **Changed in version 4.1:**
+        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.
+
+        &nbsp;&nbsp;&nbsp;You really shouldnt use it
+
         And that's the docs
         ");
     }
@@ -1163,7 +1163,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        **wow this is some changes Deprecated since version 1.2.3:**  
+        **wow this is some changes Deprecated since version 1.2.3:**
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
     }
@@ -1185,8 +1185,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ```python
         >>> thing.do_thing()
         wow it did the thing
@@ -1212,8 +1212,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         `````python
         x_y = thing_do();
         ``` # this should't close the fence!
@@ -1238,8 +1238,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ~~~~~python
         x_y = thing_do();
         ~~~ # this should't close the fence!
@@ -1269,15 +1269,15 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...  
-          
-        Returns:  
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        My cool func...
+
+        Returns:
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details
         `````python
             x_y = thing_do();
             ``` # this should't close the fence!
             a_b = other_thing();
-        `````  
+        `````
         &nbsp;&nbsp;&nbsp;&nbsp;And so on.
         ");
     }
@@ -1303,15 +1303,15 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...  
-          
-        Returns:  
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        My cool func...
+
+        Returns:
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details
         ~~~~~~python
             x_y = thing_do();
             ~~~ # this should't close the fence!
             a_b = other_thing();
-        ~~~~~~  
+        ~~~~~~
         &nbsp;&nbsp;&nbsp;&nbsp;And so on.
         ");
     }
@@ -1329,8 +1329,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ````python
         x_y = thing_do();
         ````
@@ -1350,8 +1350,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ~~~~~python
         x_y = thing_do();
         ~~~~~
@@ -1373,8 +1373,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ``````we still think this is a codefence```
             x_y = thing_do();
         ```````````` and are sloppy as heck with indentation and closing shrugggg
@@ -1396,8 +1396,8 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func:  
-          
+        My cool func:
+
         ~~~~~~we still think this is a codefence~~~
             x_y = thing_do();
         ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
@@ -1419,9 +1419,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some code!  
-          
-          
+        Here's some code!
+
+
         ```````````python
             def main() {
                 print("hello world!")
@@ -1445,9 +1445,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some Rust code!  
-          
-          
+        Here's some Rust code!
+
+
         ```````````rust
             fn main() {
                 println!("hello world!");
@@ -1467,7 +1467,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        wow this is some code  
+        wow this is some code
         ```````````abc
             x = 2
         ```````````
@@ -1489,9 +1489,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some code!  
-          
-          
+        Here's some code!
+
+
         ```````````python
             fn main() {
                 println!("hello world!");
@@ -1515,9 +1515,9 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some Rust code!  
-          
-          
+        Here's some Rust code!
+
+
         ```````````rust
             fn main() {
                 print("hello world!")
@@ -1543,14 +1543,14 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description  
-          
+        This is a function description
+
         ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```````````  
+        ```````````
         As you can see it did the thing!
         ");
     }
@@ -1572,14 +1572,14 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description  
-          
+        This is a function description
+
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```````````  
+        ```````````
         As you can see it did the thing!
         ");
     }
@@ -1621,7 +1621,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description:    
+        This is a function description:
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
@@ -1645,7 +1645,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        And so you can see that  
+        And so you can see that
         ```````````python
             >>> thing.do_thing()
             wow it did the thing
@@ -1695,15 +1695,15 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation  
-          
-        Returns:  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation
+
+        Returns:
         &nbsp;&nbsp;&nbsp;&nbsp;str: The return value description
         ");
     }
@@ -1766,21 +1766,21 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
-          
-        Returns  
-        -------  
-        str  
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description
+        param2 : int
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        param3
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
+
+        Returns
+        -------
+        str
         &nbsp;&nbsp;&nbsp;&nbsp;The return value description
         ");
     }
@@ -1823,13 +1823,13 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        Insert an entry into the list of warnings filters (at the front).  
-          
-        'param1' -- The first parameter description  
-        'param2' -- The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        'param3' -- A parameter without type annotation  
-          
+        Insert an entry into the list of warnings filters (at the front).
+
+        'param1' -- The first parameter description
+        'param2' -- The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        'param3' -- A parameter without type annotation
+
         ```````````python
         >>> print repr(foo.__doc__)
         '\n    This is the second line of the docstring.\n    '
@@ -1902,15 +1902,15 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter  
-          
-        Parameters  
-        ----------  
-        param3 : bool  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter
+
+        Parameters
+        ----------
+        param3 : bool
         &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
@@ -1957,13 +1957,13 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        :param str param1: The first parameter description  
-        :param int param2: The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        :param param3: A parameter without type annotation  
-        :returns: The return value description  
+        This is a function description.
+
+        :param str param1: The first parameter description
+        :param int param2: The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        :param param3: A parameter without type annotation
+        :returns: The return value description
         :rtype: str
         ");
     }
@@ -2022,17 +2022,17 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
-          
-        :param int param2: reST-style parameter  
-        :param param3: Another reST-style parameter  
-          
-        Parameters  
-        ----------  
-        param4 : bool  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter
+
+        :param int param2: reST-style parameter
+        :param param3: Another reST-style parameter
+
+        Parameters
+        ----------
+        param4 : bool
         &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
@@ -2095,21 +2095,21 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
-          
-        Returns  
-        -------  
-        str  
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description
+        param2 : int
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        param3
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
+
+        Returns
+        -------
+        str
         &nbsp;&nbsp;&nbsp;&nbsp;The return value description
         ");
     }
@@ -2163,16 +2163,16 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.  
-          
-        Parameters  
-        ----------  
-        param1 : str  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
-        param2 : int  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
-        param3  
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description
+        param2 : int
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.
+        param3
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
         ");
     }
@@ -2223,10 +2223,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_windows.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
@@ -2239,10 +2239,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_mac.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
@@ -2255,10 +2255,10 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_unix.render_markdown(), @"
-        This is a function description.  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        This is a function description.
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
     }
@@ -2292,13 +2292,13 @@ Done.
         // The blank line between foo() and bar() should be preserved inside the code block,
         // NOT cause the code block to end early with bar() rendered as regular text.
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Example:  
-          
+        Example:
+
         ```````````python
         >>> print("hello")
         hello
-        ```````````  
-        Code example:    
+        ```````````
+        Code example:
         ```````````python
             def foo():
                 pass
