@@ -62,6 +62,21 @@ x = {1: a, 2: b}
 reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ```
 
+## Structural protocol context
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from typing import Union
+
+def f(m: SupportsKeysAndGetItem[Union[str, int], object]) -> None: ...
+
+d: dict[Union[str, int], object] = {}
+
+f({1: "x"})
+d.update({1: "x"})
+d |= {1: "x"}
+```
+
 ## Mixed dict
 
 ```py
