@@ -64,3 +64,35 @@ f"{repr(1)=}"
 f"{str('hello')=}"
 f"{ascii('hello')=}"
 f"{repr('hello')=}"
+
+# Fix should be unsafe when it deletes a comment (https://github.com/astral-sh/ruff/issues/19745)
+f"{ascii(
+    # comment
+    1
+)}"
+
+f"{repr(
+    # comment
+    1
+)}"
+
+f"{str(
+    # comment
+    1
+)}"
+
+# Fix should be safe when the comment is preserved inside extra parentheses
+f"{ascii((
+    # comment
+    1
+))}"
+
+f"{repr((
+    # comment
+    1
+))}"
+
+f"{str((
+    # comment
+    1
+))}"
