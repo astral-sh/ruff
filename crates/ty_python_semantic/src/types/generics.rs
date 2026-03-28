@@ -18,7 +18,8 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor,
+    TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1269,11 +1270,13 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let invariant_relation_visitor = InvariantRelationVisitor::default(constraints);
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
+            &invariant_relation_visitor,
         );
         checker.check_specialization_pair(db, self, other)
     }
@@ -1354,6 +1357,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// have a relation (subtyping or assignability), taking into account
     /// that the two types may come from a top or bottom materialization.
     fn check_relation_in_invariant_position(
+        &self,
+        db: &'db dyn Db,
+        source_type: Type<'db>,
+        source_materialization: Option<MaterializationKind>,
+        target_type: Type<'db>,
+        target_materialization: Option<MaterializationKind>,
+    ) -> ConstraintSet<'db, 'c> {
+        if matches!(self.relation, TypeRelation::Redundancy { .. }) {
+            return self.invariant_relation_visitor.visit(
+                (
+                    source_type,
+                    source_materialization,
+                    target_type,
+                    target_materialization,
+                    self.relation,
+                ),
+                || {
+                    self.check_relation_in_invariant_position_impl(
+                        db,
+                        source_type,
+                        source_materialization,
+                        target_type,
+                        target_materialization,
+                    )
+                },
+            );
+        }
+
+        self.check_relation_in_invariant_position_impl(
+            db,
+            source_type,
+            source_materialization,
+            target_type,
+            target_materialization,
+        )
+    }
+
+    fn check_relation_in_invariant_position_impl(
         &self,
         db: &'db dyn Db,
         source_type: Type<'db>,

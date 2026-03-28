@@ -579,6 +579,16 @@ def foo(a: int, b: int) -> RecursiveT:
     return list(some_intermediate_var)
 ```
 
+### Recursive collection context doesn't stack overflow (issue 3136)
+
+```py
+type JSON = str | int | float | bool | list[JSON] | list[JSON_OBJECT] | dict[str, JSON] | None
+type JSON_OBJECT = dict[str, JSON]
+
+x: JSON_OBJECT = {"hello": 23}
+reveal_type(x["hello"])  # revealed: Literal[23]
+```
+
 ### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
 
 ```py

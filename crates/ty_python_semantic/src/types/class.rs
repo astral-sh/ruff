@@ -27,7 +27,8 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, InvariantRelationVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
@@ -1050,11 +1051,13 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let invariant_relation_visitor = InvariantRelationVisitor::default(&constraints);
         let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
+            &invariant_relation_visitor,
         );
         checker
             .check_class_pair(db, self, target)

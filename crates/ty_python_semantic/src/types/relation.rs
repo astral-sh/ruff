@@ -12,8 +12,9 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, MaterializationKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
+    UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -327,6 +328,7 @@ impl<'db> Type<'db> {
             given: assuming,
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            invariant_relation_visitor: &InvariantRelationVisitor::default(constraints),
         };
         checker.check_type_pair(db, self, target)
     }
@@ -425,6 +427,7 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            invariant_relation_visitor: &InvariantRelationVisitor::default(constraints),
         };
         checker.check_type_pair(db, self, target)
     }
@@ -442,8 +445,22 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, &ConstraintSetBuilder::new())
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+        fn is_equivalent_to_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            self_ty
+                .when_equivalent_to(db, other, &ConstraintSetBuilder::new())
+                .is_always_satisfied(db)
+        }
+
+        if self == other {
+            return true;
+        }
+
+        is_equivalent_to_impl(db, self, other)
     }
 
     pub(crate) fn when_equivalent_to<'c>(
@@ -457,6 +474,7 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &HasRelationToVisitor::default(constraints),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            invariant_relation_visitor: &InvariantRelationVisitor::default(constraints),
         };
         checker.check_type_pair(db, self, other)
     }
@@ -495,6 +513,7 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor: &IsDisjointVisitor::default(constraints),
             relation_visitor: &HasRelationToVisitor::default(constraints),
+            invariant_relation_visitor: &InvariantRelationVisitor::default(constraints),
         };
         checker.check_type_pair(db, self, other)
     }
@@ -522,6 +541,33 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
+/// A cycle detector for invariant redundancy checks.
+///
+/// Invariant positions require proving the relation in both directions. For recursive types this
+/// can re-enter the same invariant subproblem before either direction has been established. In
+/// redundancy mode we need that cycle to evaluate to `false`, otherwise distinct recursive
+/// variants can collapse together.
+pub(crate) type InvariantRelationVisitor<'db, 'c> = CycleDetector<
+    InvariantRelation,
+    (
+        Type<'db>,
+        Option<MaterializationKind>,
+        Type<'db>,
+        Option<MaterializationKind>,
+        TypeRelation,
+    ),
+    ConstraintSet<'db, 'c>,
+>;
+
+#[derive(Debug)]
+pub(crate) struct InvariantRelation;
+
+impl<'db, 'c> InvariantRelationVisitor<'db, 'c> {
+    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        InvariantRelationVisitor::new(ConstraintSet::from_bool(constraints, false))
+    }
+}
+
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
@@ -537,6 +583,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    pub(super) invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
@@ -545,6 +592,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
@@ -553,6 +601,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            invariant_relation_visitor,
         }
     }
 
@@ -560,6 +609,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
@@ -568,6 +618,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            invariant_relation_visitor,
         }
     }
 
@@ -1538,6 +1589,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            invariant_relation_visitor: self.invariant_relation_visitor,
         }
     }
 
@@ -1548,6 +1600,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            invariant_relation_visitor: self.invariant_relation_visitor,
         }
     }
 }
@@ -1564,6 +1617,7 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
@@ -1575,6 +1629,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            invariant_relation_visitor: self.invariant_relation_visitor,
         }
     }
 
@@ -1614,6 +1669,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
@@ -1622,6 +1678,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        invariant_relation_visitor: &'a InvariantRelationVisitor<'db, 'c>,
     ) -> Self {
         Self {
             constraints,
@@ -1629,6 +1686,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
+            invariant_relation_visitor,
         }
     }
 
@@ -1643,6 +1701,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            invariant_relation_visitor: self.invariant_relation_visitor,
         }
     }
 
@@ -1652,6 +1711,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            invariant_relation_visitor: self.invariant_relation_visitor,
         }
     }
 
