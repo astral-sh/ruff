@@ -1526,19 +1526,6 @@ impl<'src> Lexer<'src> {
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
-        // Then flush to a logical line boundary (newline + dedents).
-        // At a cell boundary with the indent stack at root level, just advance
-        // to the next cell and re-enter lex_token.  No token is emitted — the
-        // parser sees a continuous token stream across cell boundaries.
-        // Note: do NOT set range_from_consume_end here — the next cell's
-        // consume_end would pick it up and corrupt the EndOfFile token range.
-        if at_cell_boundary && *self.indentations.current() == Indentation::root() {
-            self.advance_to_next_cell();
-            // Re-enter lex_token to lex the next cell's first token.
-            // The cursor is no longer empty, so it won't hit end-of-input.
-            return self.lex_token();
-        }
-
         let end_token = if at_cell_boundary {
             TokenKind::Dedent
         } else {
@@ -1552,6 +1539,13 @@ impl<'src> Lexer<'src> {
         // This triggers when flush returns the expected end_token OR when it
         // collapses a boundary Dedent to EndOfFile (stack already at root).
         if at_cell_boundary && (token == end_token || token == TokenKind::EndOfFile) {
+            // At root level, the flush returned a spurious Dedent (no actual
+            // dedent happened).  Skip it — re-enter lex_token for the next
+            // cell instead of emitting a Dedent the parser can't handle.
+            if token == TokenKind::Dedent && *self.indentations.current() == Indentation::root() {
+                self.advance_to_next_cell();
+                return self.lex_token();
+            }
             self.range_from_consume_end = Some(self.token_range());
             self.advance_to_next_cell();
         }
