@@ -5,11 +5,11 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    add_type_expression_reference_link, note_py_version_too_old_for_pep_604,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
+    report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
-use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -27,9 +27,6 @@ use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic}
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         let previous_deferred_state = self.deferred_state;
 
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
@@ -78,9 +75,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.inner_expression_inference_state.is_get() {
-            return self.expression_type(expression);
-        }
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -152,20 +146,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if !self.deferred_state.is_deferred()
                             && !self.scope.scope(self.db()).in_type_checking_block()
                         {
-                            let previous_state =
-                                self.set_multi_inference_state(MultiInferenceState::Ignore);
-                            let was_in_multi_inference = self.context.set_multi_inference(true);
+                            let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
                             // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
                             // in that case.
-                            let left_type_value =
-                                self.infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value =
-                                self.infer_expression(&binary.right, TypeContext::default());
-                            self.multi_inference_state = previous_state;
-                            self.context.set_multi_inference(was_in_multi_inference);
+                            let left_type_value = speculative_builder
+                                .infer_expression(&binary.left, TypeContext::default());
+                            let right_type_value = speculative_builder
+                                .infer_expression(&binary.right, TypeContext::default());
 
                             let dunder_fails = Type::try_call_bin_op(
                                 self.db(),
@@ -472,7 +462,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Lambda(lambda_expression) => {
                 if !self.deferred_state.in_string_annotation() {
-                    self.infer_lambda_expression(lambda_expression);
+                    self.infer_lambda_expression(lambda_expression, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
@@ -560,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Await(await_expression) => {
                 if !self.deferred_state.in_string_annotation() {
-                    self.infer_await_expression(await_expression);
+                    self.infer_await_expression(await_expression, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,
@@ -694,6 +684,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
+                Some(KnownClass::InitVar) => {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        let diagnostic = builder.into_diagnostic(
+                            "Type qualifier `dataclasses.InitVar` is not allowed in type \
+                            expressions (only in annotation expressions)",
+                        );
+                        add_type_expression_reference_link(diagnostic);
+                    }
+                    self.infer_expression(slice, TypeContext::default());
+                    Type::unknown()
+                }
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
             _ => self.infer_subscript_type_expression(subscript, value_ty),
@@ -919,6 +920,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
             let slice_ty = builder.infer_type_expression(slice);
+            if matches!(slice_ty, Type::ProtocolInstance(_)) {
+                return SubclassOfType::from(
+                    builder.db(),
+                    todo_type!("type[T] for protocols").expect_dynamic(),
+                );
+            }
             SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
                 match slice_ty {
                     Type::Callable(_) => invalid_type_argument(builder, slice),
@@ -1395,15 +1402,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::Union(union) => {
                 self.infer_type_expression(slice);
-                let previous_slice_inference_state = std::mem::replace(
-                    &mut self.inner_expression_inference_state,
-                    InnerExpressionInferenceState::Get,
-                );
-                let union = union.map(self.db(), |element| {
-                    self.infer_subscript_type_expression(subscript, *element)
-                });
-                self.inner_expression_inference_state = previous_slice_inference_state;
-                union
+                union.map(self.db(), |element| {
+                    let mut speculative_builder = self.speculate();
+                    let subscript_ty =
+                        speculative_builder.infer_subscript_type_expression(subscript, *element);
+                    self.context.extend(&speculative_builder.context.finish());
+                    subscript_ty
+                })
             }
             _ => {
                 self.infer_type_expression(slice);

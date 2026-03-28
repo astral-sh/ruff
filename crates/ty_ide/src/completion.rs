@@ -724,7 +724,7 @@ impl<'m> ContextCursor<'m> {
         // keywords), but it indicates that the user has typed
         // `import`. This is useful to know in some contexts. And this
         // applies also to the other keywords.
-        if !matches!(last.kind(), TokenKind::Name) && !last.kind().is_keyword() {
+        if !is_name_like_token(last) {
             return None;
         }
         // This one's weird, but if the cursor is beyond
@@ -1397,10 +1397,14 @@ fn add_argument_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
+    let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
         match node {
-            ast::AnyNodeRef::ExprCall(call) => {
-                if call.arguments.range().contains_range(cursor.range) {
+            ast::AnyNodeRef::Arguments(_) => {
+                in_arguments = true;
+            }
+            ast::AnyNodeRef::ExprCall(_) => {
+                if in_arguments {
                     add_function_arg_completions(db, model.file(), cursor, completions);
                 }
                 return;
@@ -1713,7 +1717,6 @@ impl<'t> CompletionTargetTokens<'t> {
     /// Look for the best matching token pattern at the given offset.
     fn find(cursor: &ContextCursor<'t>) -> Option<CompletionTargetTokens<'t>> {
         static OBJECT_DOT_EMPTY: [TokenKind; 1] = [TokenKind::Dot];
-        static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let before = cursor.tokens_before;
         Some(
@@ -1728,10 +1731,10 @@ impl<'t> CompletionTargetTokens<'t> {
                     object,
                     attribute: None,
                 }
-            } else if let Some([_dot, attribute]) =
-                token_suffix_by_kinds(before, OBJECT_DOT_NON_EMPTY)
+            } else if let [.., object, dot, attribute] = before
+                && dot.kind() == TokenKind::Dot
+                && is_name_like_token(attribute)
             {
-                let object = before[..before.len() - 2].last()?;
                 CompletionTargetTokens::PossibleObjectDot {
                     object,
                     attribute: Some(attribute),
@@ -2433,6 +2436,15 @@ fn token_suffix_by_kinds<const N: usize>(
     Some(std::array::from_fn(|i| {
         &tokens[tokens.len() - (kinds.len() - i)]
     }))
+}
+
+/// Returns `true` if the token is a `Name` or a keyword.
+///
+/// Keywords are included because the lexer will lex a partially-typed
+/// attribute name as a keyword token when it happens to match one
+/// (e.g., `{1}.is` lexes `is` as `TokenKind::Is` rather than `TokenKind::Name`).
+fn is_name_like_token(token: &Token) -> bool {
+    matches!(token.kind(), TokenKind::Name) || token.kind().is_keyword()
 }
 
 /// Returns the "kind" of a completion using just its type information.
@@ -4775,6 +4787,20 @@ Re<CURSOR>
     }
 
     #[test]
+    fn attribute_access_set_keyword_prefix() {
+        let builder = completion_test_builder(
+            "\
+{1}.is<CURSOR>
+",
+        );
+
+        builder
+            .build()
+            .contains("isdisjoint")
+            .not_contains("isinstance");
+    }
+
+    #[test]
     fn attribute_parens() {
         let builder = completion_test_builder(
             "\
@@ -5463,6 +5489,21 @@ def test_point(p2: Point):
 "#,
         );
         builder.build().contains("orthogonal_direction");
+    }
+
+    // https://github.com/astral-sh/ty/issues/3087
+    #[test]
+    fn no_panic_argument_completion_before_paren() {
+        let builder = completion_test_builder(
+            r#"
+list[int]<CURSOR>()
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"<No completions found after filtering out completions>",
+        );
     }
 
     #[test]

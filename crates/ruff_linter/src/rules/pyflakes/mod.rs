@@ -750,6 +750,19 @@ mod tests {
     }
 
     #[test]
+    fn f811_annotated_assignment_redefinition() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_34.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn extend_generics() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(

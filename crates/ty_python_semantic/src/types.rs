@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::iter;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -51,7 +52,7 @@ use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSetBuilder, Solutions};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -1058,6 +1059,15 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
+            Type::TypeVar(typevar) => {
+                let TypeVarBoundOrConstraints::UpperBound(bound) =
+                    typevar.typevar(db).bound_or_constraints(db)?
+                else {
+                    return None;
+                };
+                bound.nominal_class(db)
+            }
             _ => None,
         }
     }
@@ -1075,6 +1085,15 @@ impl<'db> Type<'db> {
         }
 
         specialization
+    }
+
+    /// Returns `true` if this type may contain preferred type mappings when provided as type context
+    /// during generic call inference.
+    ///
+    /// This is the case for any type which may contain types in non-covariant position within it,
+    /// e.g., nominal instances of a generic class, or callables.
+    pub(crate) fn may_prefer_declared_type(self, db: &'db dyn Db) -> bool {
+        self.class_specialization(db).is_some() || self.expand_eagerly(db).is_callable_type()
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -1823,22 +1842,16 @@ impl<'db> Type<'db> {
 
     /// Recursively visit the specialization of a generic class instance.
     ///
-    /// The provided closure will be called with each assignment of a type variable present in this
-    /// type, along with the variance of the outermost type with respect to the type variable.
-    ///
-    /// If a `TypeContext` is provided, it will be narrowed as nested types are visited, if the
-    /// type is a specialized instance of the same class.
-    pub(crate) fn visit_specialization<F>(self, db: &'db dyn Db, tcx: TypeContext<'db>, mut f: F)
+    /// The provided closure will be called on any nested types, along with their variance with
+    /// respect to the outermost type.
+    pub(crate) fn visit_specialization<F>(self, db: &'db dyn Db, mut f: F)
     where
-        F: FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
+        F: FnMut(Type<'db>, TypeVarVariance),
     {
-        let constraints = ConstraintSetBuilder::new();
         self.visit_specialization_impl(
             db,
-            tcx,
             TypeVarVariance::Covariant,
             &mut f,
-            &constraints,
             &SpecializationVisitor::default(),
         );
     }
@@ -1846,103 +1859,64 @@ impl<'db> Type<'db> {
     fn visit_specialization_impl(
         self,
         db: &'db dyn Db,
-        tcx: TypeContext<'db>,
         polarity: TypeVarVariance,
-        f: &mut dyn FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
-        constraints: &ConstraintSetBuilder<'db>,
+        f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Type::NominalInstance(instance) = self else {
+        let Some(specialization) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
-                        element.visit_specialization_impl(
-                            db,
-                            tcx,
-                            polarity,
-                            f,
-                            constraints,
-                            visitor,
-                        );
+                        element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
                 Type::Intersection(intersection) => {
                     for element in intersection.positive(db) {
-                        element.visit_specialization_impl(
-                            db,
-                            tcx,
-                            polarity,
-                            f,
-                            constraints,
-                            visitor,
-                        );
+                        element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
                 Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias.value_type(db).visit_specialization_impl(
-                        db,
-                        tcx,
-                        polarity,
-                        f,
-                        constraints,
-                        visitor,
-                    );
+                    alias
+                        .value_type(db)
+                        .visit_specialization_impl(db, polarity, f, visitor);
                 }),
+                Type::Callable(callable) => {
+                    for signature in callable.signatures(db) {
+                        for parameter in signature.parameters() {
+                            let variance = TypeVarVariance::Contravariant.compose(polarity);
+
+                            f(parameter.annotated_type(), variance);
+
+                            visitor.visit(parameter.annotated_type(), || {
+                                parameter
+                                    .annotated_type()
+                                    .visit_specialization_impl(db, variance, f, visitor);
+                            });
+                        }
+
+                        visitor.visit(signature.return_ty, || {
+                            signature
+                                .return_ty
+                                .visit_specialization_impl(db, polarity, f, visitor);
+                        });
+                    }
+                }
                 _ => {}
             }
 
             return;
         };
 
-        let Some((class_literal, Some(specialization))) =
-            instance.class(db).static_class_literal(db)
-        else {
-            return;
-        };
-        let generic_context = specialization.generic_context(db);
+        for (typevar, ty) in iter::zip(
+            specialization.generic_context(db).variables(db),
+            specialization.types(db),
+        ) {
+            let variance = typevar.variance_with_polarity(db, polarity);
 
-        // Collect the type mappings used to narrow the type context.
-        //
-        // We use a forward CSA check (`alias_instance ≤ tcx`) to infer what each typevar
-        // in the identity specialization maps to in the type context. For example, if
-        // `tcx = list[int]` and `alias_instance = list[T]`, the CSA produces `T = int`.
-        let tcx_mappings: FxHashMap<_, _> = tcx
-            .annotation
-            .and_then(|tcx| {
-                let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let set = alias_instance.when_constraint_set_assignable_to(db, tcx, constraints);
-                match set.solutions(db, constraints) {
-                    Solutions::Constrained(solutions) => {
-                        let mut mappings = FxHashMap::default();
-                        for solution in solutions.iter() {
-                            for binding in solution {
-                                mappings
-                                    .entry(binding.bound_typevar.identity(db))
-                                    .and_modify(|existing| {
-                                        *existing = UnionType::from_two_elements(
-                                            db,
-                                            *existing,
-                                            binding.solution,
-                                        );
-                                    })
-                                    .or_insert(binding.solution);
-                            }
-                        }
-                        Some(mappings)
-                    }
-                    _ => None,
-                }
-            })
-            .unwrap_or_default();
-
-        for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
-            let variance = type_var.variance_with_polarity(db, polarity);
-            let narrowed_tcx = TypeContext::new(tcx_mappings.get(&type_var.identity(db)).copied());
-
-            f(type_var, *ty, variance, narrowed_tcx);
+            f(*ty, variance);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, constraints, visitor);
+                ty.visit_specialization_impl(db, variance, f, visitor);
             });
         }
     }
@@ -2077,7 +2051,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(..)
@@ -2129,6 +2102,11 @@ impl<'db> Type<'db> {
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
+                false
+            }
+
+            Type::BoundMethod(_) => {
+                // Binding the same method to different instances yields different objects: `[].sort != [].sort`
                 false
             }
 
@@ -5029,6 +5007,12 @@ impl<'db> Type<'db> {
                 let ty = match class.known(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    Some(KnownClass::InitVar) => {
+                        return Err(InvalidTypeExpressionError {
+                            invalid_expressions: smallvec_inline![InvalidTypeExpression::InitVar],
+                            fallback_type: Type::unknown(),
+                        });
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
@@ -5590,9 +5574,17 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
-                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top => Type::object(),
-                    MaterializationKind::Bottom => Type::Never,
+                TypeMapping::Materialize(materialization_kind) => match self {
+                    // `Divergent` is an internal cycle marker rather than a gradual type like
+                    // `Any` or `Unknown`. Materializing it away would destroy the marker we rely
+                    // on for recursive alias convergence.
+                    // TODO: We elsewhere treat `Divergent` as a dynamic type, so failing to
+                    // materialize it away here could lead to odd behavior.
+                    Type::Dynamic(DynamicType::Divergent(_)) => self,
+                    _ => match materialization_kind {
+                        MaterializationKind::Top => Type::object(),
+                        MaterializationKind::Bottom => Type::Never,
+                    },
                 }
             }
 
@@ -6264,10 +6256,8 @@ fn self_typevar_owner_class_literal<'db>(
     bound_typevar
         .typevar(db)
         .upper_bound(db)
-        .and_then(|ty| match ty {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-            _ => None,
-        })
+        .and_then(|ty| ty.nominal_class(db))
+        .map(|class| class.class_literal(db))
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -6310,11 +6300,12 @@ impl<'db> SelfBinding<'db> {
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         let class_literal = match self_type {
-            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)
             }
-            _ => None,
+            _ => self_type
+                .nominal_class(db)
+                .map(|class| class.class_literal(db)),
         };
 
         Self {
@@ -6741,6 +6732,7 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
+    InitVar,
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
     /// `typing.Self` cannot be used in metaclass definitions.
@@ -6812,6 +6804,10 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
+                        (only in annotation expressions, and only with exactly one argument)",
+                    ),
+                    InvalidTypeExpression::InitVar => f.write_str(
+                        "Type qualifier `dataclasses.InitVar` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
                     InvalidTypeExpression::TypingSelfInStaticMethod => {

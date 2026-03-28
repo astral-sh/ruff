@@ -863,6 +863,15 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Function(_))
     }
 
+    pub(crate) const fn is_parameter_def(&self) -> bool {
+        matches!(
+            self,
+            DefinitionKind::VariadicPositionalParameter(_)
+                | DefinitionKind::VariadicKeywordParameter(_)
+                | DefinitionKind::Parameter(_)
+        )
+    }
+
     pub(crate) const fn is_loop_header(&self) -> bool {
         matches!(self, DefinitionKind::LoopHeader(_))
     }
@@ -908,7 +917,11 @@ impl DefinitionKind<'_> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
             }
-            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::ExceptHandler(handler) => handler
+                .node(module)
+                .name
+                .as_ref()
+                .map_or_else(|| handler.node(module).range(), Ranged::range),
             DefinitionKind::TypeVar(type_var) => type_var.node(module).name.range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name.range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => {

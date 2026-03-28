@@ -58,6 +58,20 @@ if bar.baz():
 if x and foo():
     pass
 
+# Multiline expression that needs outer parentheses
+if (
+    id(0)
+    + 0
+):
+    pass
+
+# Multiline call stays a single expression statement
+if foo(
+    1,
+    2,
+):
+    pass
+
 # Walrus operator with call
 if (x := foo()):
     pass

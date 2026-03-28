@@ -8,6 +8,7 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
+use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
@@ -1877,7 +1878,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (
                 // note `LiteralString` is not single-valued, but we handle the special case above
                 left @ (Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
@@ -1885,7 +1885,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
@@ -2195,6 +2194,58 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 KnownClass::FunctionType
                     .when_subclass_of(db, instance.class(db), self.constraints)
                     .negate(db, self.constraints)
+            }
+
+            // A `BoundMethod` type includes instances of the same method bound to a
+            // subtype/subclass of the self type.
+            (Type::BoundMethod(a), Type::BoundMethod(b)) => {
+                if a.function(db).name(db) != b.function(db).name(db) {
+                    // We typically ask about `BoundMethod` disjointness when we're looking at a
+                    // method call on an intersection type like `A & B`. In that case, the same
+                    // method name would show up on both sides of this check. However for
+                    // completeness, if we're ever comparing `BoundMethod` types with different
+                    // method names, then they're clearly disjoint.
+                    self.always()
+                } else if a.function(db) != b.function(db)
+                    && a.function(db)
+                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                    && b.function(db)
+                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                {
+                    // If *both* methods are `@final` (and they're not literally the same
+                    // definition), they must be disjoint.
+                    //
+                    // Note that we can't establish disjointness when only one side is `@final`,
+                    // because we have to worry about cases like this:
+                    //
+                    // ```
+                    // class A:
+                    //      def f(self): ...
+                    // class B:
+                    //      @final
+                    //      def f(self): ...
+                    // # Valid in this order, though `C(A, B)` would be invalid.
+                    // class C(B, A): ...
+                    // ```
+                    self.always()
+                } else {
+                    // The names match, so `BoundMethod` disjointness depends on whether the bound
+                    // self types are disjoint. Note that this can produce confusing results in the
+                    // face of Liskov violations. For example:
+                    // ```
+                    // class A:
+                    //     def f(self) -> int: ...
+                    // class B:
+                    //     def f(self) -> str: ...
+                    // def _(x: Intersection[A, B]):
+                    //     x.f()
+                    // ```
+                    // `class C(A, B)` could inhabit that intersection, but `int` and `str` are
+                    // disjoint, so the type of `x.f()` there is going to be inferred as `Never`.
+                    // That's probably not correct in practice, but the right way to address it is
+                    // to emit a diagnostic on the definition of `C.f`.
+                    self.check_type_pair(db, a.self_instance(db), b.self_instance(db))
+                }
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => {

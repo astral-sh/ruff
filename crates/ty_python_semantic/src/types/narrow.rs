@@ -3,7 +3,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
 use crate::subscript::PyIndex;
@@ -761,7 +762,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::IsNonTerminalCall(call_expr) => call_expr.scope(self.db),
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(self.db)
+            }
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }

@@ -52,3 +52,17 @@ k = {}
 # ok: ternary/binop where one branch could be a tuple → Unknown
 '%s %s' % (a if cond else b)
 '%s %s' % (a + b)
+
+# F507: zero placeholders with literal non-tuple RHS
+'hello' % 42  # F507
+'' % 42  # F507
+'hello' % (1,)  # F507
+# F507: zero placeholders with variable RHS (intentional use is very unlikely)
+banana = 42
+'hello' % banana  # F507
+'' % banana  # F507
+'hello' % unknown_var  # F507
+'hello' % get_value()  # F507
+'hello' % obj.attr  # F507
+# ok: zero placeholders with empty tuple
+'hello' % ()

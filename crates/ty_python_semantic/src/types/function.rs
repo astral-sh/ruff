@@ -1446,16 +1446,13 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty
-            && instance
+        ty.as_nominal_instance().is_some_and(|instance| {
+            instance
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| c.class_literal(db) == class)
-        {
-            return true;
-        }
-        false
+                .any(|mro_class| mro_class.class_literal(db) == class)
+        })
     };
 
     let always_true_if = |test: bool| {
@@ -1591,6 +1588,17 @@ fn last_definition_signature_cycle_initial<'db>(
     Signature::bottom()
 }
 
+/// Returns `true` if the function body is stub-like, ignoring a leading docstring.
+pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
+    let suite = ast::helpers::body_without_leading_docstring(&node.body);
+
+    suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    })
+}
+
 /// Classify the body of this function:
 /// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
 /// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
@@ -1605,19 +1613,9 @@ pub(super) fn function_body_kind<'db>(
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> FunctionBodyKind {
     // Allow docstrings, but only as the first statement.
-    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
-        && value.is_string_literal_expr()
-    {
-        &node.body[1..]
-    } else {
-        &node.body[..]
-    };
+    let suite = ast::helpers::body_without_leading_docstring(&node.body);
 
-    if suite.iter().all(|stmt| match stmt {
-        ast::Stmt::Pass(_) => true,
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
-        _ => false,
-    }) {
+    if function_has_stub_body(node) {
         return FunctionBodyKind::Stub;
     }
 

@@ -58,3 +58,32 @@ SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |         ^^^^^^^^
 55 |         h(x)
    |
+
+SIM113 Use `enumerate()` for index variable `i` in `for` loop
+   --> SIM113.py:204:9
+    |
+202 |     for val in [1, 2, 3]:
+203 |         print(f"{i}: {val}")
+204 |         i += 1
+    |         ^^^^^^
+205 |
+206 |     i = 0
+    |
+
+SIM113 Use `enumerate()` for index variable `i` in `for` loop
+   --> SIM113.py:209:9
+    |
+207 |     for val in [1, 2, 3]:
+208 |         print(f"{i}: {val}")
+209 |         i += 1
+    |         ^^^^^^
+    |
+
+SIM113 Use `enumerate()` for index variable `i` in `for` loop
+   --> SIM113.py:220:9
+    |
+218 |     for val in [1, 2, 3]:
+219 |         print(f"{i}: {val}")
+220 |         i += 1
+    |         ^^^^^^
+    |
