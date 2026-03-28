@@ -558,14 +558,14 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        <class 'MyClass'>
+        assert_snapshot!(test.hover(), @r"
+        class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
-        ```xml
-        <class 'MyClass'>
+        ```python
+        class MyClass(val)
         ```
         ---
         initializes MyClass (perfectly)
@@ -614,14 +614,14 @@ mod tests {
             )
             .build();
 
-        assert_snapshot!(test.hover(), @"
-        <class 'MyClass'>
+        assert_snapshot!(test.hover(), @r"
+        class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
-        ```xml
-        <class 'MyClass'>
+        ```python
+        class MyClass(val)
         ```
         ---
         initializes MyClass (perfectly)
@@ -670,7 +670,7 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        <class 'MyClass'>
+        class MyClass(val)
         ---------------------------------------------
         This is such a great class!!
 
@@ -679,8 +679,8 @@ mod tests {
         Everyone loves my class!!
 
         ---------------------------------------------
-        ```xml
-        <class 'MyClass'>
+        ```python
+        class MyClass(val)
         ```
         ---
         This is such a great class!!  
