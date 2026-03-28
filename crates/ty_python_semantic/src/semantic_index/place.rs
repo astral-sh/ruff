@@ -8,7 +8,6 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use smallvec::SmallVec;
-use std::hash::Hash;
 use std::iter::FusedIterator;
 
 /// A structural key for a place expression that ignores semantic-index flags.
@@ -253,13 +252,6 @@ impl PlaceTable {
             PlaceExprRef::Member(member) => {
                 self.members.member_id(member.expression()).map(Into::into)
             }
-        }
-    }
-
-    pub(crate) fn place_id_by_key(&self, place_key: &PlaceKey) -> Option<ScopedPlaceId> {
-        match place_key {
-            PlaceKey::Symbol(name) => self.symbols.symbol_id(name).map(Into::into),
-            PlaceKey::Member(member) => self.members.member_id(member).map(Into::into),
         }
     }
 

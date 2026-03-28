@@ -152,6 +152,10 @@ def _(x: int | None, cond: bool):
         x = 1
     if is_none:
         reveal_type(x)  # revealed: int | None
+
+    is_none = x is None
+    if is_none:
+        reveal_type(x)  # revealed: None
 ```
 
 ## Alias variable reassigned invalidates alias
@@ -164,6 +168,10 @@ def _(x: int | None):
     is_none = True
     if is_none:
         reveal_type(x)  # revealed: int | None
+
+    is_none = x is None
+    if is_none:
+        reveal_type(x)  # revealed: None
 ```
 
 ## Non-narrowing assignment is not treated as alias
@@ -210,6 +218,33 @@ def _(x: int | None):
         class Inner2:
             if is_none:
                 reveal_type(x)  # revealed: None
+
+class A:
+    x: int | None
+
+def _(a: A):
+    a = A()
+    a.x = None
+    is_none = a.x is None
+
+    if is_none:
+        reveal_type(a.x)  # revealed: None
+
+    class Inner:
+        if is_none:
+            reveal_type(a.x)  # revealed: None
+
+        def inner():
+            if is_none:
+                reveal_type(a.x)  # revealed: None
+
+    def inner2():
+        if is_none:
+            reveal_type(a.x)  # revealed: None
+
+        class Inner2:
+            if is_none:
+                reveal_type(a.x)  # revealed: None
 ```
 
 ## Cross-scope invalidation: narrowed variable reassigned

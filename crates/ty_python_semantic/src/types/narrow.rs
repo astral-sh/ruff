@@ -638,10 +638,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let index = semantic_index(self.db, file);
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 // Check for aliased conditional expressions (e.g. `is_none = x is None; if is_none: ...`)
-                if let Some(alias_predicate) = index.alias_predicate(expression_node) {
+                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
                     // We can also use aliases defined in the outer scope,
                     // but we need to check if the alias is still valid in this scope.
-                    if alias_predicate.is_guard_invalidated(self.db, index) {
+                    if alias_predicate.is_invalidated(self.db, index) {
                         return constraints;
                     }
                     let aliased_constraints =

@@ -20,8 +20,8 @@ use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
@@ -51,8 +51,9 @@ use crate::semantic_index::use_def::{
     ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::{
-    AliasGuard, AliasPredicate, ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex,
-    VisibleAncestorsIter, get_loop_header,
+    DescendantsIter, ExpressionsScopeMap, LoopHeader, LoopToken, NarrowingAliasGuard,
+    NarrowingAliasPredicate, ReassignmentGuard, SemanticIndex, VisibleAncestorsIter,
+    get_loop_header,
 };
 use crate::semantic_model::HasTrackedScope;
 use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
@@ -106,7 +107,7 @@ impl<'ast> ExprUseVisitor<'_, '_, 'ast> {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.builder.mark_symbol_used(symbol_id);
         }
-        let use_id = self.builder.current_ast_ids().record_use(expr);
+        let use_id = self.builder.current_ast_ids_mut().record_use(expr);
         self.builder
             .current_use_def_map_mut()
             .record_use(place_id, use_id);
@@ -154,14 +155,79 @@ impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
     }
 }
 
+struct NameUseCollector<'builder, 'db, 'ast> {
+    builder: &'builder SemanticIndexBuilder<'db, 'ast>,
+    guard_names: FxHashSet<Name>,
+    use_ids: FxHashMap<Name, ScopedUseId>,
+}
+
+impl<'ast> NameUseCollector<'_, '_, 'ast> {
+    fn record_guard_use(&mut self, name_expr: &'ast ast::ExprName) {
+        if !self.guard_names.contains(&name_expr.id) || self.use_ids.contains_key(&name_expr.id) {
+            return;
+        }
+
+        let key = ExpressionNodeKey::from(ast::ExprRef::from(name_expr));
+        let Some(use_id) = self.builder.current_ast_ids().use_id(key) else {
+            return;
+        };
+        self.use_ids.insert(name_expr.id.clone(), use_id);
+    }
+}
+
+impl<'ast> Visitor<'ast> for NameUseCollector<'_, '_, 'ast> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(name_expr) => {
+                self.record_guard_use(name_expr);
+                walk_expr(self, expr);
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                walk_expr(self, expr);
+            }
+            ast::Expr::Lambda(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+            | ast::Expr::StringLiteral(_) => {}
+            ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::DictComp(_) => {}
+            ast::Expr::Named(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::UnaryOp(_)
+            | ast::Expr::BoolOp(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::If(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Slice(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Await(_) => walk_expr(self, expr),
+        }
+    }
+}
+
 /// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
 struct NarrowingAlias<'ast> {
     /// The RHS expression (e.g., `x is None`).
     expression: &'ast ast::Expr,
-    /// The scope whose place table should be used to resolve narrowed places and their parents.
-    scope: FileScopeId,
+    /// The scope whose place table should be used to resolve the aliased expression.
+    expression_scope: FileScopeId,
+    guard: NarrowingAliasGuard,
 }
 
 struct ScopeInfo<'ast> {
@@ -227,7 +293,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 
     /// Alias metadata for predicate leaf names in the current file.
-    alias_predicates: FxHashMap<ExpressionNodeKey, AliasPredicate<'db>>,
+    alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -533,7 +599,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            if !enclosing_scope_kind.is_eager() {
+            if enclosing_scope_kind.is_lazy() {
                 break;
             }
         }
@@ -688,10 +754,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
 
                 let symbol = place_table.symbol(symbol_id);
-                self.scopes
-                    .iter_enumerated()
-                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
-                    .any(|(scope_id, _)| {
+                std::iter::once(key.enclosing_scope)
+                    .chain(
+                        DescendantsIter::new(&self.scopes, key.enclosing_scope)
+                            .map(|(scope_id, _)| scope_id),
+                    )
+                    .any(|scope_id| {
                         let other_scope_place_table = &self.place_tables[scope_id];
                         let Some(symbol_id) = other_scope_place_table.symbol_id(symbol.name())
                         else {
@@ -758,16 +826,69 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
+    fn current_ast_ids_mut(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
     }
 
+    fn current_ast_ids(&self) -> &AstIdsBuilder {
+        let scope_id = self.current_scope();
+        &self.ast_ids[scope_id]
+    }
+
     fn alias_guard_places(&self, alias: &NarrowingAlias<'ast>) -> Vec<PlaceKey> {
-        let place_table = &self.place_tables[alias.scope];
+        let place_table = &self.place_tables[alias.expression_scope];
         let narrowed_places =
             PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(alias.expression);
         collect_narrowed_place_keys(place_table, &narrowed_places)
+    }
+
+    fn alias_value_guards(&self, expression: &'ast ast::Expr) -> Box<[ReassignmentGuard]> {
+        let place_table = self.current_place_table();
+        let narrowed_places =
+            PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(expression);
+        let guard_names = collect_narrowed_place_keys(place_table, &narrowed_places)
+            .into_iter()
+            .filter_map(|place_key| match place_key {
+                PlaceKey::Symbol(name) => Some(name),
+                PlaceKey::Member(_) => None,
+            })
+            .collect();
+
+        let mut collector = NameUseCollector {
+            builder: self,
+            guard_names,
+            use_ids: FxHashMap::default(),
+        };
+        collector.visit_expr(expression);
+
+        collector
+            .use_ids
+            .into_iter()
+            .map(|(name, use_id)| ReassignmentGuard {
+                scope: self.current_scope(),
+                name,
+                use_id,
+            })
+            .collect()
+    }
+
+    fn alias_target_guard(&mut self, target: &ast::ExprName) -> ReassignmentGuard {
+        let symbol_id = self
+            .current_place_table()
+            .symbol_id(&target.id)
+            .expect("alias target symbol should exist");
+        let use_id = self
+            .current_ast_ids_mut()
+            .record_use(ast::ExprRef::from(target));
+        self.current_use_def_map_mut()
+            .record_use(symbol_id.into(), use_id);
+
+        ReassignmentGuard {
+            scope: self.current_scope(),
+            name: target.id.clone(),
+            use_id,
+        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -839,7 +960,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
-        let use_id = self.current_ast_ids().record_use(expr);
+        let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
     }
 
@@ -1355,17 +1476,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// If the RHS is a narrowing expression (would produce non-empty `PossiblyNarrowedPlaces`),
     /// and the target is not itself one of the narrowed places, record the alias.
     fn try_register_narrowing_alias(&mut self, target: &ast::Expr, value: Option<&'ast ast::Expr>) {
-        let Some(name) = target.as_name_expr() else {
+        let Some(target_name_expr) = target.as_name_expr() else {
             return;
         };
         let Some(value) = value else { return };
-        let target_name = &name.id;
+        let target_name = &target_name_expr.id;
 
         // If the RHS is a simple name that is itself an alias, propagate the
         // original narrowing expression (chained alias: `b = a` where `a` is an alias).
         if let Some(name) = value.as_name_expr() {
             if let Some(existing) = self.narrowing_aliases.get(&name.id).cloned() {
-                self.narrowing_aliases.insert(target_name.clone(), existing);
+                let guard = NarrowingAliasGuard {
+                    rhs_guards: existing.guard.rhs_guards,
+                    alias_guard: self.alias_target_guard(target_name_expr),
+                };
+                self.narrowing_aliases
+                    .insert(target_name.clone(), NarrowingAlias { guard, ..existing });
                 return;
             }
         }
@@ -1387,11 +1513,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
+            let guard = NarrowingAliasGuard {
+                rhs_guards: self.alias_value_guards(value),
+                alias_guard: self.alias_target_guard(target_name_expr),
+            };
             self.narrowing_aliases.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
-                    scope: self.current_scope(),
+                    expression_scope: self.current_scope(),
+                    guard,
                 },
             );
         } else {
@@ -1468,21 +1599,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ExpressionKind::Normal,
             );
 
-            let guard = if !self.scopes[self.current_scope()].is_eager() {
-                VisibleAncestorsIter::new(&self.scopes, self.current_scope())
-                    .nth(1)
-                    .map(|(enclosing_scope, _)| AliasGuard {
-                        enclosing_scope,
-                        guard_scope: alias.scope,
-                        alias_name: name.id.clone(),
-                    })
+            let guard = if self.current_scope() != alias.guard.alias_guard.scope
+                && self.scopes[self.current_scope()].is_lazy()
+            {
+                Some(alias.guard)
             } else {
                 None
             };
 
             self.alias_predicates.insert(
                 ExpressionNodeKey::from(leaf),
-                AliasPredicate {
+                NarrowingAliasPredicate {
                     expression: aliased_expression,
                     guard,
                 },
@@ -2065,7 +2192,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
-            alias_predicates: self.alias_predicates,
+            narrowing_alias_predicates: self.alias_predicates,
         }
     }
 
@@ -2151,7 +2278,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids().record_use(name);
+                let use_id = self.current_ast_ids_mut().record_use(name);
                 self.current_use_def_map_mut()
                     .record_use(symbol.into(), use_id);
 
