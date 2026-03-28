@@ -432,6 +432,26 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Never
 ```
 
+#### Unreachable bindings stay unresolved in lazy scopes
+
+```py
+if False:
+    ShouldBeUndefined = 1
+
+# error: [unresolved-reference]
+reveal_type(ShouldBeUndefined)  # revealed: Unknown
+
+# error: [unresolved-reference]
+type Alias = ShouldBeUndefined
+
+# error: [unresolved-reference]
+def f(x: ShouldBeUndefined):
+    pass
+
+# error: [unresolved-reference]
+x: ShouldBeUndefined
+```
+
 #### Type-param scopes are eager, but bounds/constraints are deferred
 
 ```py

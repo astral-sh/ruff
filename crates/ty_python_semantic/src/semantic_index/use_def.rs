@@ -1018,8 +1018,14 @@ impl<'db> UseDefMapBuilder<'db> {
                 let new_place = self
                     .reachable_symbol_definitions
                     .push(ReachableDefinitions {
-                        bindings: Bindings::unbound(self.reachability),
-                        declarations: Declarations::undeclared(self.reachability),
+                        // Reachable definitions model what can happen from scope entry, not just
+                        // from the current branch. A symbol first encountered in a statically
+                        // unreachable block still has an implicit unbound/undeclared path from
+                        // the start of the scope, which lazy/deferred lookups must preserve.
+                        bindings: Bindings::unbound(ScopedReachabilityConstraintId::ALWAYS_TRUE),
+                        declarations: Declarations::undeclared(
+                            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                        ),
                     });
                 debug_assert_eq!(symbol, new_place);
             }
@@ -1031,8 +1037,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 let new_place = self
                     .reachable_member_definitions
                     .push(ReachableDefinitions {
-                        bindings: Bindings::unbound(self.reachability),
-                        declarations: Declarations::undeclared(self.reachability),
+                        bindings: Bindings::unbound(ScopedReachabilityConstraintId::ALWAYS_TRUE),
+                        declarations: Declarations::undeclared(
+                            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                        ),
                     });
                 debug_assert_eq!(member, new_place);
             }
