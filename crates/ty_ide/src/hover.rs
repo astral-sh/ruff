@@ -43,9 +43,9 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     };
 
     let mut contents = Vec::new();
-    if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
+    if let Some(signature) = goto_target.constructor_signature(&model) {
         contents.push(HoverContent::Signature(signature));
-    } else if let Some(signature) = goto_target.constructor_signature(&model) {
+    } else if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
@@ -701,63 +701,6 @@ mod tests {
     }
 
     #[test]
-    fn hover_dataclass_class_init() {
-        let test = cursor_test(
-            r#"
-        from dataclasses import dataclass
-
-        @dataclass
-        class MyClass:
-            '''
-                This is such a great class!!
-
-                    Don't you know?
-
-                Everyone loves my class!!
-
-            '''
-            a: int
-            b: str
-
-        x = MyCla<CURSOR>ss(0, "")
-        "#,
-        );
-
-        assert_snapshot!(test.hover(), @r#"
-        class MyClass(a: int, b: str)
-        ---------------------------------------------
-        This is such a great class!!
-
-            Don't you know?
-
-        Everyone loves my class!!
-
-        ---------------------------------------------
-        ```python
-        class MyClass(a: int, b: str)
-        ```
-        ---
-        This is such a great class!!  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
-          
-        Everyone loves my class!!
-        ---------------------------------------------
-        info[hover]: Hovered content is
-          --> main.py:17:5
-           |
-        15 |     b: str
-        16 |
-        17 | x = MyClass(0, "")
-           |     ^^^^^-^
-           |     |    |
-           |     |    Cursor offset
-           |     source
-           |
-        "#);
-    }
-
-    #[test]
     fn hover_class_typed_init() {
         let test = cursor_test(
             r#"
@@ -792,39 +735,47 @@ mod tests {
     }
 
     #[test]
-    fn hover_dataclass_synthesized_init() {
+    fn hover_dataclass_class_init() {
         let test = cursor_test(
             r#"
         from dataclasses import dataclass
 
         @dataclass
-        class Test:
+        class MyClass:
+            '''
+                MyClass docs
+            '''
             a: int
-            b: int
+            b: str
 
-        x = Te<CURSOR>st(1, 2)
+        x = MyCla<CURSOR>ss(0, "")
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        class Test(a: int, b: int)
+        assert_snapshot!(test.hover(), @r#"
+        class MyClass(a: int, b: str)
+        ---------------------------------------------
+        MyClass docs
+
         ---------------------------------------------
         ```python
-        class Test(a: int, b: int)
+        class MyClass(a: int, b: str)
         ```
+        ---
+        MyClass docs
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:9:5
-          |
-        7 |     b: int
-        8 |
-        9 | x = Test(1, 2)
-          |     ^^-^
-          |     | |
-          |     | Cursor offset
-          |     source
-          |
-        ");
+          --> main.py:12:5
+           |
+        10 |     b: str
+        11 |
+        12 | x = MyClass(0, "")
+           |     ^^^^^-^
+           |     |    |
+           |     |    Cursor offset
+           |     source
+           |
+        "#);
     }
 
     #[test]
@@ -891,6 +842,233 @@ mod tests {
           |     source
           |
         "#);
+    }
+
+    #[test]
+    fn hover_class_init_overload_no_match() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class Shape:
+            """Shape docs"""
+
+            @overload
+            def __init__(self, val: str) -> None: ...
+
+            @overload
+            def __init__(self, val: int) -> None: ...
+
+            def __init__(self, val: int | str) -> None:
+                self.name = val
+
+        x = Sha<CURSOR>pe()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class Shape(val: str)
+        class Shape(val: int)
+        ---------------------------------------------
+        Shape docs
+
+        ---------------------------------------------
+        ```python
+        class Shape(val: str)
+        class Shape(val: int)
+        ```
+        ---
+        Shape docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:16:5
+           |
+        14 |         self.name = val
+        15 |
+        16 | x = Shape()
+           |     ^^^-^
+           |     |  |
+           |     |  Cursor offset
+           |     source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class_init_overload_match() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class Shape:
+            """Shape docs"""
+
+            @overload
+            def __init__(self, val: str) -> None: ...
+
+            @overload
+            def __init__(self, val: int) -> None: ...
+
+            def __init__(self, val: int | str) -> None:
+                self.name = val
+
+        x = Sha<CURSOR>pe("hello")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Shape(val: str)
+        ---------------------------------------------
+        Shape docs
+
+        ---------------------------------------------
+        ```python
+        class Shape(val: str)
+        ```
+        ---
+        Shape docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:16:5
+           |
+        14 |         self.name = val
+        15 |
+        16 | x = Shape("hello")
+           |     ^^^-^
+           |     |  |
+           |     |  Cursor offset
+           |     source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_class_init_and_new_invalid() {
+        let test = cursor_test(
+            r#"
+        class S:
+            def __init__(self, a: int):
+                """init docs"""
+                pass
+
+            def __new__(cls, a: int, b: str) -> "S":
+                """new docs"""
+                instance = super().__new__(cls)
+                return instance
+
+        x = <CURSOR>S(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class S(a: int, b: str)
+        class S(a: int)
+        ---------------------------------------------
+        new docs
+
+        ---------------------------------------------
+        ```python
+        class S(a: int, b: str)
+        class S(a: int)
+        ```
+        ---
+        new docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:5
+           |
+        10 |         return instance
+        11 |
+        12 | x = S(1)
+           |     -
+           |     |
+           |     source
+           |     Cursor offset
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class_init_and_new_valid() {
+        let test = cursor_test(
+            r#"
+        class S:
+            def __init__(self, a: int):
+                """init docs"""
+                pass
+
+            def __new__(cls, a: int) -> "S":
+                """new docs"""
+                instance = super().__new__(cls)
+                return instance
+
+        x = <CURSOR>S(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class S(a: int)
+        ---------------------------------------------
+        new docs
+
+        ---------------------------------------------
+        ```python
+        class S(a: int)
+        ```
+        ---
+        new docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:5
+           |
+        10 |         return instance
+        11 |
+        12 | x = S(1)
+           |     -
+           |     |
+           |     source
+           |     Cursor offset
+           |
+        ");
+    }
+    #[test]
+    fn hover_class_new_only() {
+        let test = cursor_test(
+            r#"
+        class S2:
+            def __new__(cls, a: int, b: str) -> "S2":
+                """new docs"""
+                instance = super().__new__(cls)
+                return instance
+
+        x = S<CURSOR>2(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class S2(a: int, b: str)
+        ---------------------------------------------
+        new docs
+
+        ---------------------------------------------
+        ```python
+        class S2(a: int, b: str)
+        ```
+        ---
+        new docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |         return instance
+        7 |
+        8 | x = S2(1)
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+          |
+        ");
     }
 
     #[test]

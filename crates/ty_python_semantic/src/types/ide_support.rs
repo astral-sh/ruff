@@ -1832,9 +1832,29 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     let db = model.db();
     let class_name = c.as_class_literal()?.name(db);
     let callable_type = c.try_upcast_to_callable(db)?.into_type(db);
-    let signature = resolve_single_overload(model, callable_type, call_expr)?;
-    let params = signature
-        .display_with(db, DisplaySettings::default().hide_return_type())
-        .to_string();
-    Some(format!("class {class_name}{params}"))
+
+    let display_sig = |signature: &Signature| {
+        let params = signature
+            .display_with(db, DisplaySettings::default().hide_return_type())
+            .to_string();
+
+        format!("class {class_name}{params}")
+    };
+
+    if let Some(signature) = resolve_single_overload(model, callable_type, call_expr) {
+        return Some(display_sig(&signature));
+    }
+
+    let all_sigs: Vec<String> = callable_type
+        .bindings(db)
+        .iter_flat()
+        .flatten()
+        .map(|binding| display_sig(&binding.signature))
+        .collect();
+
+    if all_sigs.is_empty() {
+        None
+    } else {
+        Some(all_sigs.join("\n"))
+    }
 }
