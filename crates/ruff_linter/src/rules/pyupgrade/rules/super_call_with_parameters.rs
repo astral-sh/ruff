@@ -2,7 +2,7 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -112,12 +112,19 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
+    let mut enclosing_classes = checker.semantic().current_scopes().filter_map(|scope| {
+        let ScopeKind::Class(class_def) = &scope.kind else {
+            return None;
+        };
+        Some(*class_def)
+    });
+
     // Find the enclosing class definition (if any).
-    let Some(Stmt::ClassDef(ast::StmtClassDef {
+    let Some(ast::StmtClassDef {
         name: parent_name,
         decorator_list,
         ..
-    })) = parents.find(|stmt| stmt.is_class_def_stmt())
+    }) = enclosing_classes.next()
     else {
         return;
     };
@@ -138,9 +145,15 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     // For `super(Outer.Inner, self)`, verify each segment matches the enclosing class nesting.
     match first_arg {
         Expr::Name(ast::ExprName { id, .. }) => {
-            if !((id == "__class__" || id == parent_name.as_str())
-                && !checker.semantic().current_scope().has(id))
-            {
+            if checker.semantic().current_scope().has(id) {
+                return;
+            }
+
+            if id != "__class__" && id == parent_name.as_str() {
+                if enclosing_classes.next().is_some() {
+                    return;
+                }
+            } else if id != "__class__" {
                 return;
             }
         }
@@ -152,16 +165,19 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
             }
             // Each preceding name must match the next enclosing class.
             for name in chain.iter().rev().skip(1) {
-                let Some(Stmt::ClassDef(ast::StmtClassDef {
+                let Some(ast::StmtClassDef {
                     name: enclosing_name,
                     ..
-                })) = parents.find(|stmt| stmt.is_class_def_stmt())
+                }) = enclosing_classes.next()
                 else {
                     return;
                 };
                 if *name != enclosing_name.as_str() {
                     return;
                 }
+            }
+            if enclosing_classes.next().is_some() {
+                return;
             }
         }
         _ => return,

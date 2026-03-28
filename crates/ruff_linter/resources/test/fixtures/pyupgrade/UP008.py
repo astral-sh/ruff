@@ -347,7 +347,6 @@ class Outer(Base):
 class CommonNesting:
     class C(Base):
         def __init__(self, foo):
-            # TODO(charlie): false positive until nested class matching is fixed.
             super(C, self).__init__(foo)  # Should NOT trigger UP008
 
 
@@ -355,7 +354,6 @@ class HigherLevelsOfNesting:
     class Inner:
         class C(Base):
             def __init__(self, foo):
-                # TODO(charlie): false positive until nested class matching is fixed.
                 super(Inner.C, self).__init__(foo)  # Should NOT trigger UP008
 
 
