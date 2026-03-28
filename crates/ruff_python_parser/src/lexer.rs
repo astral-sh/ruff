@@ -86,6 +86,10 @@ pub struct Lexer<'src> {
     /// The absolute byte offset where the current cell starts in the full source.
     cell_start_offset: TextSize,
 
+    /// Precomputed `cell_start_offset + cell_text_len`. Used by `offset()` to avoid
+    /// an extra addition per token compared to the original `source.len()` - `cursor.text_len()`.
+    cell_end_offset: TextSize,
+
     /// Whether cell offsets are set (non-empty). Used to skip cell logic for regular files.
     has_cells: bool,
 
@@ -134,6 +138,7 @@ impl<'src> Lexer<'src> {
             cell_offsets: &[],
             current_cell: 0,
             cell_start_offset: TextSize::new(0),
+            cell_end_offset: source.text_len(),
             has_cells: false,
             cell_text_len: source.text_len(),
             range_from_consume_end: None,
@@ -165,6 +170,7 @@ impl<'src> Lexer<'src> {
                 .unwrap_or_else(|| self.source.text_len());
             let first_cell_text = &self.source[..first_cell_end.to_usize()];
             self.cell_text_len = first_cell_text.text_len();
+            self.cell_end_offset = self.cell_text_len;
             self.cursor = Cursor::new(first_cell_text);
             self.current_cell = 0;
             self.cell_start_offset = TextSize::new(0);
@@ -183,6 +189,7 @@ impl<'src> Lexer<'src> {
         let cell_text = &self.source[cell_start.to_usize()..cell_end.to_usize()];
         self.cell_start_offset = cell_start;
         self.cell_text_len = cell_text.text_len();
+        self.cell_end_offset = cell_start + self.cell_text_len;
         self.cursor = Cursor::new(cell_text);
     }
 
@@ -1776,7 +1783,7 @@ impl<'src> Lexer<'src> {
     /// Retrieves the current offset of the cursor within the source code.
     #[inline]
     fn offset(&self) -> TextSize {
-        self.cell_start_offset + self.cell_text_len - self.cursor.text_len()
+        self.cell_end_offset - self.cursor.text_len()
     }
 
     #[inline]
@@ -1842,11 +1849,13 @@ impl<'src> Lexer<'src> {
             self.current_cell = cell_idx;
             self.cell_start_offset = cell_start;
             self.cell_text_len = cell_text.text_len();
+            self.cell_end_offset = cell_start + self.cell_text_len;
             self.cursor = cursor;
         } else {
             let mut cursor = Cursor::new(self.source);
             cursor.skip_bytes(cursor_offset.to_usize());
             self.cursor = cursor;
+            self.cell_end_offset = self.source.text_len();
         }
 
         self.current_value = value;
