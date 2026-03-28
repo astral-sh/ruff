@@ -102,6 +102,12 @@ impl Violation for MissingTodoAuthor {
 ///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
+/// 
+/// # TODO(charlie): this comment has a 3-digit issue code (matches the regex `\d+`)
+/// # 003 will resolve this todo comment
+/// 
+/// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
+/// # SIXCHR-003 will resolve this todo comment
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.269")]
