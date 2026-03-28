@@ -178,6 +178,8 @@ impl<'src> Lexer<'src> {
     }
 
     /// Advance to the next notebook cell by creating a new cursor for it.
+    #[cold]
+    #[inline(never)]
     fn advance_to_next_cell(&mut self) {
         self.current_cell += 1;
         let cell_start = self.cell_offsets[self.current_cell];
@@ -1488,6 +1490,8 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    #[cold]
+    #[inline(never)]
     fn consume_end(&mut self) -> TokenKind {
         let at_cell_boundary = self.has_cells && self.current_cell + 1 < self.cell_offsets.len();
 
