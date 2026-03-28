@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -169,14 +169,25 @@ fn convert_call_to_conversion_flag(
     })?;
 
     // Determine applicability: mark the fix as unsafe if there are comments in the
-    // call expression that fall outside the argument range (i.e., comments that would
-    // be deleted by replacing the call with a conversion flag).
+    // call expression that fall outside the effective argument range (i.e., comments
+    // that would be deleted by replacing the call with a conversion flag).
+    //
+    // Extra parentheses wrapping the argument are preserved by the libcst transformation
+    // (e.g., `ascii((arg))` → `(arg)!a`), so comments inside them are not deleted.
     let comment_ranges = checker.comment_ranges();
     let call_range = call.range();
-    let arg_range = arg.range();
+    // Use the parenthesized range of the arg (within call.arguments) to account for
+    // any extra parens that wrap the argument and whose content will be preserved.
+    let effective_arg_range = parenthesized_range(
+        arg.into(),
+        (&call.arguments).into(),
+        checker.tokens(),
+    )
+    .unwrap_or_else(|| arg.range());
     let has_deletable_comments = comment_ranges
-        .intersects(TextRange::new(call_range.start(), arg_range.start()))
-        || comment_ranges.intersects(TextRange::new(arg_range.end(), call_range.end()));
+        .intersects(TextRange::new(call_range.start(), effective_arg_range.start()))
+        || comment_ranges
+            .intersects(TextRange::new(effective_arg_range.end(), call_range.end()));
     let applicability = if has_deletable_comments {
         Applicability::Unsafe
     } else {
