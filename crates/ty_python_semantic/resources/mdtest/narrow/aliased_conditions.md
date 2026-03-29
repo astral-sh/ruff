@@ -534,4 +534,52 @@ def _(x: int | None):
                 reveal_type(x)  # revealed: None
             if is_none:
                 reveal_type(x)  # revealed: int | None
+
+def _(x: int | None):
+    is_none = x is None
+
+    class Inner:
+        is_none_alias = is_none
+        if is_none_alias:
+            reveal_type(x)  # revealed: None
+
+    def inner():
+        is_none_alias = is_none
+        if is_none_alias:
+            reveal_type(x)  # revealed: None
+
+is_none = True
+
+def _(x: int | None):
+    is_none = x is None
+
+    class Inner:
+        # This resolves to the global `is_none`!
+        is_none_alias = is_none
+        is_none = False
+        reveal_type(is_none_alias)  # revealed: Literal[True]
+        if is_none_alias:
+            reveal_type(x)  # revealed: int | None
+
+    def inner():
+        # error: [unresolved-reference] "Name `is_none` used when not defined"
+        is_none_alias = is_none
+        is_none = True
+        if is_none_alias:
+            reveal_type(x)  # revealed: int | None
+
+def _(x: int | None):
+    is_none = x is None
+
+    class Inner:
+        is_none_alias = is_none
+        x = 42
+        if is_none_alias:
+            reveal_type(x)  # revealed: Literal[42]
+
+    def inner():
+        is_none_alias = is_none
+        x = 42
+        if is_none_alias:
+            reveal_type(x)  # revealed: Literal[42]
 ```

@@ -1492,9 +1492,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // original narrowing expression (chained alias: `b = a` where `a` is an alias).
         if let Some(name) = value.as_name_expr() {
             if let Some(existing) = self.narrowing_aliases.get(&name.id).cloned() {
+                let chained_source_name = self
+                    .current_place_table()
+                    .symbol_id(&name.id)
+                    .map(|symbol_id| self.current_place_table().symbol(symbol_id))
+                    .filter(|symbol| symbol.is_free())
+                    .map(|_| name.id.clone());
                 let guard = NarrowingAliasGuard {
                     rhs_guards: existing.guard.rhs_guards,
                     alias_guard: self.alias_target_guard(target_name_expr),
+                    chained_source_name,
                 };
                 self.narrowing_aliases
                     .insert(target_name.clone(), NarrowingAlias { guard, ..existing });
@@ -1522,6 +1529,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let guard = NarrowingAliasGuard {
                 rhs_guards: self.alias_value_guards(value),
                 alias_guard: self.alias_target_guard(target_name_expr),
+                chained_source_name: None,
             };
             self.narrowing_aliases.insert(
                 target_name.clone(),
@@ -1540,27 +1548,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     ///
     /// This removes:
-    /// * Any alias for `place` itself (the alias variable was reassigned).
     /// * Any alias whose narrowed places include `place` (the narrowed variable was reassigned).
+    /// * Any alias for `place` itself (the alias variable was reassigned).
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
         let place_key = PlaceKey::from(self.current_place_table().place(place));
+        let local_shadowed_name = place
+            .as_symbol()
+            .map(|symbol_id| self.current_place_table().symbol(symbol_id))
+            .filter(|symbol| symbol.is_local())
+            .map(Symbol::name);
 
-        // Remove alias for `place` itself (the alias variable was reassigned).
-        if let PlaceKey::Symbol(name) = &place_key {
-            self.narrowing_aliases.remove(name);
-        }
         // Remove any alias whose guarded places include this place.
         let invalidated_aliases: Vec<_> = self
             .narrowing_aliases
             .iter()
             .filter_map(|(name, alias)| {
-                self.alias_guard_places(alias)
-                    .contains(&place_key)
-                    .then_some(name.clone())
+                (self.alias_guard_places(alias).contains(&place_key)
+                    || local_shadowed_name.as_ref().is_some_and(|shadowed_name| {
+                        alias.guard.chained_source_name.as_ref() == Some(shadowed_name)
+                    }))
+                .then_some(name.clone())
             })
             .collect();
         for name in invalidated_aliases {
             self.narrowing_aliases.remove(&name);
+        }
+        // Remove alias for `place` itself (the alias variable was reassigned).
+        if let PlaceKey::Symbol(name) = &place_key {
+            self.narrowing_aliases.remove(name);
         }
     }
 

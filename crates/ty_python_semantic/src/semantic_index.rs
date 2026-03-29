@@ -364,6 +364,11 @@ pub(crate) struct SemanticIndex<'db> {
 pub(crate) struct NarrowingAliasGuard {
     pub(crate) alias_guard: ReassignmentGuard,
     pub(crate) rhs_guards: Box<[ReassignmentGuard]>,
+    /// Source alias name for a chained alias created from a free-variable lookup.
+    ///
+    /// If that name is later bound locally in the same scope, the original lookup did not
+    /// resolve to the enclosing alias after all, so this chained alias must be invalidated.
+    pub(crate) chained_source_name: Option<Name>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -388,18 +393,18 @@ impl<'db> NarrowingAliasPredicate<'db> {
         };
         let nested_scope = self.expression.file_scope(db);
 
-        for guard_use in guard
+        for guard in guard
             .rhs_guards
             .iter()
             .chain(std::iter::once(&guard.alias_guard))
         {
-            let place_table = index.place_table(guard_use.scope);
-            let use_def = index.use_def_map(guard_use.scope);
-            let Some(place_id) = place_table.symbol_id(&guard_use.name) else {
+            let place_table = index.place_table(guard.scope);
+            let use_def = index.use_def_map(guard.scope);
+            let Some(place_id) = place_table.symbol_id(&guard.name) else {
                 return true;
             };
             let key = EnclosingSnapshotKey {
-                enclosing_scope: guard_use.scope,
+                enclosing_scope: guard.scope,
                 enclosing_place: place_id.into(),
                 nested_scope,
                 nested_laziness: ScopeLaziness::Lazy,
@@ -413,7 +418,7 @@ impl<'db> NarrowingAliasPredicate<'db> {
                 return true;
             };
 
-            let definition_bindings = use_def.bindings_at_use(guard_use.use_id);
+            let definition_bindings = use_def.bindings_at_use(guard.use_id);
             if !current_bindings.same_bindings_as(definition_bindings) {
                 return true;
             }
