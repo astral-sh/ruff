@@ -213,7 +213,7 @@ struct NarrowingAlias<'ast> {
     place_keys: FxHashSet<PlaceKey>,
 }
 
-/// All information collected by a single walk over a narrowing alias expression.
+/// Information necessary to safely and recursively apply a narrowing alias.
 struct NarrowingAliasInfo<'ast> {
     sub_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     place_keys: FxHashSet<PlaceKey>,
@@ -910,8 +910,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.ast_ids[scope_id]
     }
 
-    /// Analyze a narrowing alias expression in a single walk.
-    /// Collects sub-aliases, place keys, and value guards simultaneously.
+    /// Analyze a narrowing alias expression.
+    /// Collects sub-aliases, place keys, and value guards.
     fn analyze_narrowing_alias(&self, expression: &'ast ast::Expr) -> NarrowingAliasInfo<'ast> {
         let mut info = NarrowingAliasInfo {
             sub_aliases: FxHashMap::default(),
@@ -1013,28 +1013,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Expr::Call(call) => {
-                if Self::contains_sub_narrowing_alias(expression, available_aliases) {
-                    for arg in &call.arguments.args {
-                        if Self::contains_sub_narrowing_alias(arg, available_aliases) {
-                            self.collect_narrowing_alias_info(
-                                arg,
-                                expression_scope,
-                                available_aliases,
-                                info,
-                            );
-                        }
+                let mut has_alias = false;
+                for arg in &call.arguments.args {
+                    // Sub-alias found: e.g. `bool(is_none)`
+                    if Self::contains_sub_narrowing_alias(arg, available_aliases) {
+                        has_alias = true;
+                        self.collect_narrowing_alias_info(
+                            arg,
+                            expression_scope,
+                            available_aliases,
+                            info,
+                        );
                     }
-                    for keyword in &call.arguments.keywords {
-                        if Self::contains_sub_narrowing_alias(&keyword.value, available_aliases) {
-                            self.collect_narrowing_alias_info(
-                                &keyword.value,
-                                expression_scope,
-                                available_aliases,
-                                info,
-                            );
-                        }
+                }
+                for keyword in &call.arguments.keywords {
+                    if Self::contains_sub_narrowing_alias(&keyword.value, available_aliases) {
+                        has_alias = true;
+                        self.collect_narrowing_alias_info(
+                            &keyword.value,
+                            expression_scope,
+                            available_aliases,
+                            info,
+                        );
                     }
-                } else {
+                }
+                // Sub-alias not found: e.g. `isinstance(x, int)`
+                if !has_alias {
                     self.add_expr_value_guards(expression, expression_scope, info);
                 }
             }
