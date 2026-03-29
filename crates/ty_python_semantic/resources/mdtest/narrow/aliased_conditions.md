@@ -624,6 +624,24 @@ def _(x: int | None):
         x = 42
         if is_not_none:
             reveal_type(x)  # revealed: Literal[42]
+
+def _(x: int | None):
+    is_none = x is None
+    is_not_none = not is_none
+
+    is_none = True
+    if is_not_none:
+        reveal_type(x)  # revealed: int
+
+    class Inner:
+        is_none = True
+        if is_not_none:
+            reveal_type(x)  # revealed: int
+
+    def inner():
+        is_none = True
+        if is_not_none:
+            reveal_type(x)  # revealed: int
 ```
 
 ### Boolean-operated chained alias
