@@ -14,6 +14,7 @@ description = "WebAssembly bindings for Ruff"
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
+test = false
 
 [dependencies]
 ruff_formatter = { workspace = true }
@@ -49,3 +50,8 @@ default = ["console_error_panic_hook"]
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+ignored = [
+    "uuid",
+]
