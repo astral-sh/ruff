@@ -1213,7 +1213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
                     // fail to provide the "can only be subscripted with a string literal key" hint in that case.
 
-                    if slice_ty.is_dynamic() {
+                    if slice_ty.is_dynamic() || slice_ty.is_divergent() {
                         return true;
                     }
 

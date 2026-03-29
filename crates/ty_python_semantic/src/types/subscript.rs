@@ -440,7 +440,7 @@ fn typed_dict_subscript<'db>(
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
-    if slice_ty.is_dynamic() {
+    if slice_ty.is_dynamic() || slice_ty.is_divergent() {
         return Ok(Type::unknown());
     }
 
