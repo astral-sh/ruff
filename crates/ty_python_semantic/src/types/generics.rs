@@ -27,7 +27,9 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -1227,9 +1229,11 @@ impl<'db> Specialization<'db> {
                         vartype.materialize(db, materialization_kind.flip(), visitor)
                     }
                     TypeVarVariance::Invariant => {
-                        let top_materialization =
-                            vartype.materialize(db, MaterializationKind::Top, visitor);
-                        if !vartype.is_equivalent_to(db, top_materialization) {
+                        // We only need to know whether this invariant type argument contains any
+                        // dynamic pieces that would force the enclosing specialization to carry a
+                        // top/bottom materialization marker. Using equivalence here recurses back
+                        // through relation checking, which can overflow for recursive aliases.
+                        if any_over_type(db, *vartype, true, |ty| ty.is_dynamic()) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype
