@@ -35,12 +35,12 @@ def _(x: int | None):
 ## `isinstance` alias
 
 ```py
-def _(x: int | str):
+def _(x: int | None):
     is_int = isinstance(x, int)
     if is_int:
         reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: None
 ```
 
 ## Equality comparisons
@@ -61,23 +61,45 @@ def _(x: Literal[1, 2]):
 ```py
 from typing_extensions import TypeGuard, TypeIs
 
-def is_str(x: object) -> TypeGuard[str]:
-    return isinstance(x, str)
+def is_int(x: object) -> TypeGuard[int]:
+    return isinstance(x, int)
 
-def _(x: str | int):
-    is_s = is_str(x)
-    if is_s:
-        reveal_type(x)  # revealed: str
+def _(x: int | None):
+    is_i = is_int(x)
+    if is_i:
+        reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: str | int
+        reveal_type(x)  # revealed: int | None
 
-def is_str2(x: object) -> TypeIs[str]:
-    return isinstance(x, str)
+def is_int2(x: object) -> TypeIs[int]:
+    return isinstance(x, int)
 
-def _(x: str | int):
-    is_s = is_str2(x)
-    if is_s:
-        reveal_type(x)  # revealed: str
+def _(x: int | None):
+    is_i = is_int2(x)
+    if is_i:
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+## `if` expression alias
+
+```py
+def _(x: int | None):
+    is_none = x is None if True else False
+    if is_none:
+        reveal_type(x)  # revealed: None
+    else:
+        reveal_type(x)  # revealed: int
+```
+
+## `bool()` alias
+
+```py
+def _(x: int | None):
+    is_none = bool(x is None)
+    if is_none:
+        reveal_type(x)  # revealed: None
     else:
         reveal_type(x)  # revealed: int
 ```

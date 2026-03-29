@@ -905,7 +905,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::BoolOp(bool_op) => bool_op
                 .values
                 .iter()
-                .all(Self::can_register_narrowing_alias),
+                .any(Self::can_register_narrowing_alias),
+            ast::Expr::If(expr_if) => {
+                Self::can_register_narrowing_alias(&expr_if.test)
+                    || Self::can_register_narrowing_alias(&expr_if.body)
+                    || Self::can_register_narrowing_alias(&expr_if.orelse)
+            }
             _ => false,
         }
     }
