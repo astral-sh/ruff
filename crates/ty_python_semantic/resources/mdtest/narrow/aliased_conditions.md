@@ -144,6 +144,9 @@ class A:
     x: int | None
     b: bool
 
+    def negate_b(self):
+        self.b = not self.b
+
 def _(a: A):
     is_none = a.x is None
     if is_none:
@@ -163,7 +166,9 @@ def _(a: A):
 
 def _(a: A):
     # Attribute targets are not treated as aliases.
+    # It is difficult to track them accurately.
     a.b = a.x is None
+    a.negate_b()
     if a.b:
         reveal_type(a.x)  # revealed: int | None
     else:
@@ -185,7 +190,7 @@ def _(l: list[int | None]):
             reveal_type(l[0])  # revealed: None
 
 def _(l: list[int | None], lb: list[bool]):
-    # Same as above: subscript targets are not treated as aliases.
+    # Same as attributes: subscript targets are not treated as aliases.
     lb[0] = l[0] is None
     if lb[0]:
         reveal_type(l[0])  # revealed: int | None
