@@ -5432,6 +5432,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if let Some(standalone_expression) = self.index.try_expression(expression) {
+            let standalone_expression = if standalone_expression.file_scope(self.db())
+                == self.scope.file_scope_id(self.db())
+            {
+                standalone_expression
+            } else {
+                // Narrowing alias predicates can reuse AST nodes from an enclosing scope while
+                // evaluating them in the current scope. Re-home the standalone expression
+                // so nested inference uses the current scope's bindings and snapshots.
+                Expression::new(
+                    self.db(),
+                    self.file(),
+                    self.scope.file_scope_id(self.db()),
+                    standalone_expression.node_ref(self.db()).clone(),
+                    standalone_expression.assigned_to(self.db()),
+                    standalone_expression.kind(self.db()),
+                )
+            };
             self.infer_standalone_expression_impl(expression, standalone_expression, tcx)
         } else {
             self.infer_expression(expression, tcx)

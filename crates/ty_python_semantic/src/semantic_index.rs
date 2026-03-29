@@ -365,11 +365,11 @@ pub(crate) struct SemanticIndex<'db> {
 pub(crate) struct NarrowingAliasGuard {
     pub(crate) alias_guard: ReassignmentGuard,
     pub(crate) rhs_guards: Box<[ReassignmentGuard]>,
-    /// Source alias name for a chained alias created from a free-variable lookup.
+    /// Source alias names for chained aliases created from free-variable lookups.
     ///
-    /// If that name is later bound locally in the same scope, the original lookup did not
-    /// resolve to the enclosing alias after all, so this chained alias must be invalidated.
-    pub(crate) chained_source_name: Option<Name>,
+    /// If any of these names is later bound locally in the same scope, the original lookup did
+    /// not resolve to the enclosing alias after all, so this chained alias must be invalidated.
+    pub(crate) chained_source_names: Box<[Name]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]

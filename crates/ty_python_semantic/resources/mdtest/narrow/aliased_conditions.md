@@ -661,4 +661,19 @@ def _(x: int | None):
     def inner():
         if is_none_and_int:
             reveal_type(x)  # revealed: Never
+
+def _(x: str | int | None):
+    is_none = x is None
+    is_int = isinstance(x, int)
+    is_int_or_none = is_int or is_none
+    if is_int_or_none:
+        reveal_type(x)  # revealed: int | None
+
+    class Inner:
+        if is_int_or_none:
+            reveal_type(x)  # revealed: int | None
+
+    def inner():
+        if is_int_or_none:
+            reveal_type(x)  # revealed: int | None
 ```
