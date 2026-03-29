@@ -326,14 +326,15 @@ impl Project {
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        match check_file_impl(&db, file) {
+                        match compute_file_diagnostics(&db, file) {
                             Ok(diagnostics) => {
-                                reporter.report_checked_file(&db, file, diagnostics);
+                                reporter.report_checked_file(&db, file, &diagnostics);
 
-                                // This is outside `check_file_impl` to avoid that opening or closing
-                                // a file invalidates the `check_file_impl` query of every file!
+                                // This stays outside the tracked `check_file_impl` query so that
+                                // opening or closing a file doesn't invalidate cached single-file
+                                // results.
                                 if !open_files.contains(&file) {
-                                    // The module has already been parsed by `check_file_impl`.
+                                    // The module has already been parsed by `compute_file_diagnostics`.
                                     // We only retrieve it here so that we can call `clear` on it.
                                     let parsed = parsed_module(&db, file);
 
@@ -347,7 +348,7 @@ impl Project {
                                 reporter.report_checked_file(
                                     &db,
                                     file,
-                                    std::slice::from_ref(io_error),
+                                    std::slice::from_ref(&io_error),
                                 );
                             }
                         }
@@ -616,6 +617,10 @@ impl Project {
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    compute_file_diagnostics(db, file)
+}
+
+fn compute_file_diagnostics(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
