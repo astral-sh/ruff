@@ -362,15 +362,14 @@ pub(crate) struct SemanticIndex<'db> {
 /// all names used on the right-hand side of the alias have not been reassigned.
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingAliasGuard {
-    pub(crate) alias_guard: ReassignmentGuard,
-    pub(crate) rhs_guards: Box<[ReassignmentGuard]>,
+    pub(crate) target_guard: ReassignmentGuard,
+    pub(crate) value_guards: Box<[ReassignmentGuard]>,
     /// Source alias names for chained aliases created from free-variable lookups.
     ///
     /// If any of these names is later bound locally in the same scope, the original lookup did
     /// not resolve to the enclosing alias after all, so this chained alias must be invalidated.
-    pub(crate) chained_source_names: Box<[Name]>,
+    pub(crate) chained_source_names: FxHashSet<Name>,
     /// Cached set of place keys that, if reassigned, should invalidate this alias.
-    /// Computed once at registration time to avoid repeated tree walks.
     pub(crate) place_keys: FxHashSet<PlaceKey>,
 }
 
@@ -397,9 +396,9 @@ impl<'db> NarrowingAliasPredicate<'db> {
         let nested_scope = self.expression.file_scope(db);
 
         for guard in guard
-            .rhs_guards
+            .value_guards
             .iter()
-            .chain(std::iter::once(&guard.alias_guard))
+            .chain(std::iter::once(&guard.target_guard))
         {
             let place_table = index.place_table(guard.scope);
             let use_def = index.use_def_map(guard.scope);
