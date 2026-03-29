@@ -205,8 +205,9 @@ struct NarrowingAlias<'ast> {
     expression: &'ast ast::Expr,
     /// The scope whose place table should be used to resolve the aliased expression.
     expression_scope: FileScopeId,
-    /// Aliases referenced from `expression`, frozen at alias-definition time.
-    captured_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// Sub-aliases referenced from `expression`.
+    sub_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// Guards that need to be satisfied for this alias to be valid.
     guard: NarrowingAliasGuard,
     /// Cached set of place keys that, if reassigned, should invalidate this alias.
     place_keys: FxHashSet<PlaceKey>,
@@ -214,7 +215,7 @@ struct NarrowingAlias<'ast> {
 
 /// All information collected by a single walk over a narrowing alias expression.
 struct NarrowingAliasInfo<'ast> {
-    captured_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    sub_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     place_keys: FxHashSet<PlaceKey>,
     value_guards: Vec<ReassignmentGuard>,
 }
@@ -910,10 +911,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Analyze a narrowing alias expression in a single walk.
-    /// Collects captured aliases, place keys, and value guards simultaneously.
+    /// Collects sub-aliases, place keys, and value guards simultaneously.
     fn analyze_narrowing_alias(&self, expression: &'ast ast::Expr) -> NarrowingAliasInfo<'ast> {
         let mut info = NarrowingAliasInfo {
-            captured_aliases: FxHashMap::default(),
+            sub_aliases: FxHashMap::default(),
             place_keys: FxHashSet::default(),
             value_guards: Vec::new(),
         };
@@ -980,13 +981,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         match expression {
             ast::Expr::Name(name) => {
                 if let Some(alias) = available_aliases.get(&name.id) {
-                    info.captured_aliases
+                    info.sub_aliases
                         .entry(name.id.clone())
                         .or_insert_with(|| alias.clone());
                     self.collect_narrowing_alias_info(
                         alias.expression,
                         alias.expression_scope,
-                        &alias.captured_aliases,
+                        &alias.sub_aliases,
                         info,
                     );
                 } else {
@@ -1012,9 +1013,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Expr::Call(call) => {
-                if Self::contains_captured_narrowing_alias(expression, available_aliases) {
+                if Self::contains_sub_narrowing_alias(expression, available_aliases) {
                     for arg in &call.arguments.args {
-                        if Self::contains_captured_narrowing_alias(arg, available_aliases) {
+                        if Self::contains_sub_narrowing_alias(arg, available_aliases) {
                             self.collect_narrowing_alias_info(
                                 arg,
                                 expression_scope,
@@ -1024,10 +1025,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                     }
                     for keyword in &call.arguments.keywords {
-                        if Self::contains_captured_narrowing_alias(
-                            &keyword.value,
-                            available_aliases,
-                        ) {
+                        if Self::contains_sub_narrowing_alias(&keyword.value, available_aliases) {
                             self.collect_narrowing_alias_info(
                                 &keyword.value,
                                 expression_scope,
@@ -1064,29 +1062,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn contains_captured_narrowing_alias(
+    fn contains_sub_narrowing_alias(
         expression: &ast::Expr,
-        captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
+        sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> bool {
-        let mut contains_captured_alias = false;
+        let mut contains_sub_alias = false;
         Self::walk_narrowing_alias_predicate(expression, &mut |leaf| {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            if captured_aliases.contains_key(&name.id) {
-                contains_captured_alias = true;
+            if sub_aliases.contains_key(&name.id) {
+                contains_sub_alias = true;
             }
         });
-        contains_captured_alias
+        contains_sub_alias
     }
 
-    /// Compute chained source names from the captured aliases map.
+    /// Compute chained source names from the sub-aliases map.
     fn chained_source_names(
         &self,
-        captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
+        sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> FxHashSet<Name> {
         let mut result = FxHashSet::default();
-        for (name, alias) in captured_aliases {
+        for (name, alias) in sub_aliases {
             if self
                 .current_place_table()
                 .symbol_id(name)
@@ -1754,14 +1752,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let guard = NarrowingAliasGuard {
                 value_guards: info.value_guards.into_boxed_slice(),
                 target_guard: self.narrowing_alias_target_guard(target_name_expr),
-                chained_source_names: self.chained_source_names(&info.captured_aliases),
+                chained_source_names: self.chained_source_names(&info.sub_aliases),
             };
             self.narrowing_aliases.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
                     expression_scope: self.current_scope(),
-                    captured_aliases: info.captured_aliases,
+                    sub_aliases: info.sub_aliases,
                     guard,
                     place_keys: info.place_keys,
                 },
@@ -1827,16 +1825,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn register_captured_narrowing_aliases(
+    fn register_sub_narrowing_aliases(
         &mut self,
         expr: &'ast ast::Expr,
-        captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
+        sub_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) {
         Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = captured_aliases.get(&name.id).cloned() else {
+            let Some(alias) = sub_aliases.get(&name.id).cloned() else {
                 return;
             };
             self.register_narrowing_alias_predicate(leaf, &alias, None);
@@ -1867,7 +1865,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             },
         );
 
-        self.register_captured_narrowing_aliases(alias.expression, &alias.captured_aliases);
+        self.register_sub_narrowing_aliases(alias.expression, &alias.sub_aliases);
     }
 
     fn register_narrowing_aliases(&mut self, expr: &'ast ast::Expr) {
