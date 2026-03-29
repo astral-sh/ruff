@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::TypeChecker;
 use ruff_python_semantic::{BindingKind, ScopeKind, SemanticModel};
@@ -9,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_slf001_self_cls_mcs_enforcement_enabled;
 use crate::rules::pylint::helpers::is_dunder_operator_method;
 
 /// ## What it does
@@ -76,6 +78,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     let semantic = checker.semantic();
     let current_scope = semantic.current_scope();
+    let enforce_self_cls_mcs = is_slf001_self_cls_mcs_enforcement_enabled(checker.settings());
 
     if semantic.in_annotation() {
         return;
@@ -117,11 +120,11 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    if let Some(name) = UnqualifiedName::from_expr(value) {
-        // Ignore `self` and `cls` accesses.
-        if matches!(name.segments(), ["self" | "cls" | "mcs"]) {
-            return;
-        }
+    if !enforce_self_cls_mcs
+        && let Some(name) = UnqualifiedName::from_expr(value)
+        && matches!(name.segments(), ["self" | "cls" | "mcs"])
+    {
+        return;
     }
 
     if let Expr::Name(name) = value.as_ref() {
@@ -140,7 +143,12 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
             return;
         }
 
-        if is_same_class_instance(name, semantic) {
+        if is_same_class_instance(
+            name,
+            semantic,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
+        ) {
             return;
         }
     }
@@ -177,13 +185,81 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 ///
 /// This function is intentionally naive and does not handle more complex cases.
 /// It is expected to be expanded overtime, possibly when type-aware APIs are available.
-fn is_same_class_instance(name: &ast::ExprName, semantic: &SemanticModel) -> bool {
+fn is_same_class_instance(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+    staticmethod_decorators: &[String],
+) -> bool {
+    if is_method_receiver(
+        name,
+        semantic,
+        classmethod_decorators,
+        staticmethod_decorators,
+    ) {
+        return true;
+    }
+
     let Some(binding_id) = semantic.resolve_name(name) else {
         return false;
     };
 
     let binding = semantic.binding(binding_id);
     typing::check_type::<SameClassInstanceChecker>(binding, semantic)
+}
+
+/// Return `true` if `name` resolves to the first parameter of a syntactic
+/// method receiver, including class methods and `__new__`.
+fn is_method_receiver(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+    staticmethod_decorators: &[String],
+) -> bool {
+    let Some(binding_id) = semantic.resolve_name(name) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+
+    if !matches!(binding.kind, BindingKind::Argument) {
+        return false;
+    }
+
+    let Some(ast::Stmt::FunctionDef(function)) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Some(first_parameter) = function
+        .parameters
+        .posonlyargs
+        .first()
+        .or_else(|| function.parameters.args.first())
+    else {
+        return false;
+    };
+
+    if binding.range != first_parameter.parameter.name.range() {
+        return false;
+    }
+
+    let scope = &semantic.scopes[binding.scope];
+    let Some(parent_scope) = semantic.first_non_type_parent_scope(scope) else {
+        return false;
+    };
+
+    matches!(
+        function_type::classify(
+            &function.name,
+            &function.decorator_list,
+            parent_scope,
+            semantic,
+            classmethod_decorators,
+            staticmethod_decorators,
+        ),
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
+    )
 }
 
 struct SameClassInstanceChecker;

@@ -8,6 +8,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::flake8_self;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
     use anyhow::Result;
@@ -16,11 +17,26 @@ mod tests {
 
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_1.py"))]
+    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_self").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_2.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_self").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -33,6 +49,24 @@ mod tests {
             &settings::LinterSettings {
                 flake8_self: flake8_self::settings::Settings {
                     ignore_names: vec![Name::new_static("_meta")],
+                },
+                ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_method_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_self/SLF001_custom_decorators.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                pep8_naming: crate::rules::pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["custom_classmethod".to_string()],
+                    staticmethod_decorators: vec!["custom_staticmethod".to_string()],
+                    ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
             },

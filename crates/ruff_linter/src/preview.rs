@@ -218,6 +218,11 @@ pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/24275
+pub(crate) const fn is_slf001_self_cls_mcs_enforcement_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/20660
 pub(crate) const fn is_type_var_default_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
