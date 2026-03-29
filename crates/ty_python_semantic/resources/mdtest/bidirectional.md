@@ -542,6 +542,27 @@ def _(x: Intersection[X, Y]):
     x |= reveal_type({"bar": [1, None]})  # revealed: dict[str, list[int | None]]
 ```
 
+## `await` expressions
+
+Type context is also propagated through `await` expressions:
+
+```py
+from typing import Literal
+
+async def make_lst[T](x: T) -> list[T]:
+    return [x]
+
+async def _():
+    x1 = await make_lst(1)
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[Literal[1]] = await make_lst(1)
+    reveal_type(x2)  # revealed: list[Literal[1]]
+
+    x3: list[int | None] = await make_lst(1)
+    reveal_type(x3)  # revealed: list[int | None]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

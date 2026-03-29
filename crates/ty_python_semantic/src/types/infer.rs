@@ -984,6 +984,7 @@ bitflags::bitflags! {
 }
 
 impl InferenceFlags {
+    #[must_use = "Inference flags should always be restored to the original value after being temporarily modified"]
     fn replace(&mut self, other: Self, set_to: bool) -> bool {
         let previously_contained_flag = self.contains(other);
         self.set(other, set_to);

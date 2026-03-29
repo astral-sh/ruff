@@ -216,9 +216,6 @@ zip = { version = "0.6.6", default-features = false }
 [workspace.metadata.cargo-shear]
 ignored = [
     "getrandom",
-    "ruff_options_metadata",
-    "uuid",
-    "get-size2",
     "ty_completion_bench",
     "ty_completion_eval",
 ]

@@ -1757,6 +1757,66 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
+Synthesized `get()` on unions falls back to generic resolution when a key is missing from one arm:
+
+```py
+class HasX(TypedDict):
+    x: int
+
+class NoX(TypedDict):
+    y: str
+
+class OptX(TypedDict):
+    x: NotRequired[int]
+
+def _(u: HasX | NoX) -> None:
+    # Key "x" is missing from `NoX`, so specialization does not apply.
+    reveal_type(u.get("x"))  # revealed: int | Unknown | None
+
+def union_get(u: HasX | OptX) -> None:
+    # `HasX.x` is required (returns `int`), `OptX.x` is not (returns `int | None`).
+    reveal_type(u.get("x"))  # revealed: int | None
+```
+
+Synthesized `pop()` overloads on `TypedDict` unions correctly handle per-arm requiredness:
+
+```py
+class OptionalX(TypedDict):
+    x: NotRequired[int]
+
+class RequiredX(TypedDict):
+    x: int
+
+class OptStrX(TypedDict):
+    x: NotRequired[str]
+
+def _(v: OptionalX | RequiredX) -> None:
+    # TODO: it's correct that we emit an error,
+    # but this is a terrible error message:
+    #
+    # error: [call-non-callable] "Object of type `Overload[]` is not callable"
+    reveal_type(v.pop("x"))  # revealed: Unknown
+
+def union_pop_with_default(u: OptionalX | OptStrX) -> None:
+    # `Literal[0]` is assignable to `int`, so `OptionalX` arm returns `int`; `OptStrX` arm
+    # returns `str | Literal[0]`.
+    reveal_type(u.pop("x", 0))  # revealed: int | str
+```
+
+Synthesized `setdefault()` overloads on `TypedDict` unions:
+
+```py
+class IntX(TypedDict):
+    x: int
+
+class StrX(TypedDict):
+    x: str
+
+def _(u: IntX | StrX) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(u.setdefault("x", 1))  # revealed: int | str
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant

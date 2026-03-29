@@ -1242,8 +1242,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        let value_ty =
-            self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
+        let previous_check_unbound_typevars = self
+            .inference_flags
+            .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
+        let value_ty = self.infer_type_expression(&type_alias.value);
+        self.inference_flags.set(
+            InferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound_typevars,
+        );
 
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
         // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
@@ -1259,7 +1265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type IntOrStr = int | StrOrInt  # It's redundant, but OK
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
-        let expanded = value_ty.inner_type().expand_eagerly(self.db());
+        let expanded = value_ty.expand_eagerly(self.db());
         if expanded.is_divergent() {
             if let Some(builder) = self
                 .context
@@ -5125,13 +5131,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        // Prefer generic class instances when narrowing.
+        // Prefer the declared type of generic classes or callables when narrowing.
         //
         // Splitting up this loop is not necessary for correctness, but leads to a slight
         // performance improvement.
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_some())
+            .filter(|ty| ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
@@ -5139,7 +5145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         for narrowed_ty in narrow_targets
             .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
+            .filter(|ty| !ty.may_prefer_declared_type(db))
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
                 return result;
@@ -5539,7 +5545,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
-            ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
+            ast::Expr::Await(await_expression) => {
+                self.infer_await_expression(await_expression, tcx)
+            }
             ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::IpyEscapeCommand(_) => {
                 todo_type!("Ipy escape command support")
@@ -7637,13 +7645,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_else(Type::unknown)
     }
 
-    fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
+    fn infer_await_expression(
+        &mut self,
+        await_expression: &ast::ExprAwait,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprAwait {
             range: _,
             node_index: _,
             value,
         } = await_expression;
-        let expr_type = self.infer_expression(value, TypeContext::default());
+
+        let expr_type = self.infer_expression(
+            value,
+            tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(self.db(), &[tcx])),
+        );
+
         expr_type.try_await(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
             Type::unknown()
@@ -8347,6 +8364,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn union_elements_missing_attribute<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            attr_name: &str,
+            missing_types: &mut FxIndexSet<Type<'db>>,
+        ) {
+            if let Some(union) = ty.as_union_like(db) {
+                for element in union.elements(db) {
+                    union_elements_missing_attribute(db, *element, attr_name, missing_types);
+                }
+            } else if ty.member(db, attr_name).place.is_undefined() {
+                missing_types.insert(ty);
+            }
+        }
+
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let mut value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
@@ -8587,11 +8619,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // we want it to be an error. Use `as_union_like` here to handle type aliases
                     // of unions and `NewType`s of float/complex in addition to explicit unions.
                     if let Some(union) = value_type.as_union_like(db) {
-                        let elements_missing_the_attribute: Vec<_> = union
-                            .elements(db)
-                            .iter()
-                            .filter(|element| element.member(db, attr_name).place.is_undefined())
-                            .collect();
+                        let mut elements_missing_the_attribute = FxIndexSet::default();
+                        for element in union.elements(db) {
+                            union_elements_missing_attribute(
+                                db,
+                                *element,
+                                attr_name,
+                                &mut elements_missing_the_attribute,
+                            );
+                        }
+
                         if !elements_missing_the_attribute.is_empty() {
                             if let Some(builder) =
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)

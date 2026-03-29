@@ -57,6 +57,30 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
+fn publish_unused_binding_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    x = 1
+    return 0
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn diagnostic_end_of_file() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()
@@ -460,12 +484,14 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(2);
 
-    assert_json_snapshot!(diagnostics, @r#"
-    {
-      "vscode-notebook-cell://src/test.ipynb#0": [],
-      "vscode-notebook-cell://src/test.ipynb#1": []
-    }
-    "#);
+    // We still publish unused-bindings for both cells, even when syntax-error reporting is disabled.
+    assert_eq!(diagnostics.len(), 2);
+    assert!(
+        diagnostics
+            .values()
+            .flatten()
+            .all(|diagnostic| diagnostic.message != "unexpected EOF while parsing")
+    );
 
     Ok(())
 }
