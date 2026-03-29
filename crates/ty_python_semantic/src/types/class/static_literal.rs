@@ -37,7 +37,7 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
             MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
-            typed_dict::synthesize_typed_dict_method,
+            typed_dict::{synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -1012,25 +1012,9 @@ impl<'db> StaticClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-
-            ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
-                .to_class_literal(db)
-                .find_name_in_mro_with_policy(db, name, policy)
-                .expect("Will return Some() when called on class literal")
-                .map_type(|ty| {
-                    ty.apply_type_mapping(
-                        db,
-                        &TypeMapping::ReplaceSelf {
-                            new_upper_bound: determine_upper_bound(
-                                db,
-                                self,
-                                None,
-                                ClassBase::is_typed_dict,
-                            ),
-                        },
-                        TypeContext::default(),
-                    )
-                }),
+            ClassMemberResult::TypedDict => {
+                typed_dict_class_member(db, ClassLiteral::Static(self), policy, name)
+            }
         }
     }
 
@@ -1499,8 +1483,7 @@ impl<'db> StaticClassLiteral<'db> {
                             &TypeMapping::ReplaceSelf {
                                 new_upper_bound: determine_upper_bound(
                                     db,
-                                    self,
-                                    specialization,
+                                    ClassLiteral::Static(self),
                                     |base| {
                                         base.into_class()
                                             .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
@@ -1578,20 +1561,18 @@ impl<'db> StaticClassLiteral<'db> {
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
-                .map_type(|ty|
+                .map_type(|ty| {
+                    let new_upper_bound = determine_upper_bound(
+                        db,
+                        ClassLiteral::Static(self),
+                        ClassBase::is_typed_dict
+                    );
                     ty.apply_type_mapping(
                         db,
-                        &TypeMapping::ReplaceSelf {
-                            new_upper_bound: determine_upper_bound(
-                                db,
-                                self,
-                                specialization,
-                                ClassBase::is_typed_dict
-                            )
-                        },
-                                TypeContext::default(),
+                        &TypeMapping::ReplaceSelf { new_upper_bound },
+                        TypeContext::default(),
                     )
-                )
+                })
         }
     }
 

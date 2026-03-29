@@ -432,6 +432,20 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns the unknown specialization of this class.
+    ///
+    /// For non-generic classes, the class is returned unchanged.
+    /// For a non-specialized generic class, we return a generic alias that maps each of the class's
+    /// typevars to `Unknown`.
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::Static(class) => class.unknown_specialization(db),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
+                ClassType::NonGeneric(self)
+            }
+        }
+    }
+
     /// Returns the identity specialization for this class (same as default for non-generic).
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
@@ -662,7 +676,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.instance_member(db, specialization, name),
             Self::Dynamic(class) => class.instance_member(db, name),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
-            Self::DynamicTypedDict(typeddict) => typeddict.instance_member(db, name),
+            Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
         }
     }
 
@@ -1586,9 +1600,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 namedtuple.instance_member(db, name)
             }
-            Self::NonGeneric(ClassLiteral::DynamicTypedDict(typeddict)) => {
-                typeddict.instance_member(db, name)
-            }
+            Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => PlaceAndQualifiers::default(),
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();

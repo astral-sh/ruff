@@ -21,7 +21,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeVarVariance, UnionType,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, UnionType,
+    determine_upper_bound,
 };
 
 pub(super) fn synthesize_typed_dict_method<'db, I, N, F>(
@@ -645,20 +646,23 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
         // Fall back to TypedDictFallback for methods like __contains__, items, keys, etc.
         // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
-        KnownClass::TypedDictFallback
-            .to_class_literal(db)
-            .find_name_in_mro_with_policy(db, name, policy)
-            .expect(
-                "`find_name_in_mro_with_policy` will return `Some()` when called on class literal",
-            )
+        typed_dict_class_member(db, ClassLiteral::DynamicTypedDict(self), policy, name)
     }
+}
 
-    /// Look up an instance member by name (including superclasses).
-    #[expect(clippy::unused_self)]
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        // Fall back to TypedDictFallback for instance members.
-        KnownClass::TypedDictFallback
-            .to_instance(db)
-            .instance_member(db, name)
-    }
+pub(super) fn typed_dict_class_member<'db>(
+    db: &'db dyn Db,
+    self_class: ClassLiteral<'db>,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    KnownClass::TypedDictFallback
+        .to_class_literal(db)
+        .find_name_in_mro_with_policy(db, name, lookup_policy)
+        .expect("Will return Some() when called on class literal")
+        .map_type(|ty| {
+            let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
+            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+            ty.apply_type_mapping(db, &mapping, TypeContext::default())
+        })
 }

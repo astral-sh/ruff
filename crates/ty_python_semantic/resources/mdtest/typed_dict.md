@@ -2645,6 +2645,7 @@ def _(p: Partial) -> None:
     reveal_type(p.get("name", "default"))  # revealed: str
     reveal_type(p.pop("name"))  # revealed: str
     reveal_type(p.pop("name", "fallback"))  # revealed: str
+    reveal_type(p.copy())  # revealed: Partial
     del p["extra"]
 ```
 
