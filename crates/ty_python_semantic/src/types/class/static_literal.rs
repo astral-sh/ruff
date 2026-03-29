@@ -37,6 +37,7 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
             MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            typed_dict::synthesize_typed_dict_method,
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -58,12 +59,6 @@ use crate::{
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
-};
-
-use super::typed_dict::{
-    synthesize_typed_dict_delitem, synthesize_typed_dict_get, synthesize_typed_dict_getitem,
-    synthesize_typed_dict_merge, synthesize_typed_dict_pop, synthesize_typed_dict_setdefault,
-    synthesize_typed_dict_setitem, synthesize_typed_dict_update,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1348,12 +1343,6 @@ impl<'db> StaticClassLiteral<'db> {
             Some(Type::function_like_callable(db, signature))
         };
 
-        let td_fields = || {
-            self.fields(db, specialization, field_policy)
-                .iter()
-                .map(|(name, field)| (name, TypedDictField::from_field(field)))
-        };
-
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
@@ -1559,31 +1548,12 @@ impl<'db> StaticClassLiteral<'db> {
                         Type::heterogeneous_tuple(db, slots)
                     })
             }
-            (CodeGeneratorKind::TypedDict, "__getitem__") => {
-                Some(synthesize_typed_dict_getitem(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, "__setitem__") => {
-                Some(synthesize_typed_dict_setitem(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, "__delitem__") => {
-                Some(synthesize_typed_dict_delitem(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, "get") => {
-                Some(synthesize_typed_dict_get(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, "pop") => {
-                Some(synthesize_typed_dict_pop(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, "setdefault") => Some(synthesize_typed_dict_setdefault(
-                db,
-                instance_ty,
-                td_fields(),
-            )),
-            (CodeGeneratorKind::TypedDict, "update") => {
-                Some(synthesize_typed_dict_update(db, instance_ty, td_fields()))
-            }
-            (CodeGeneratorKind::TypedDict, name @ ("__or__" | "__ror__" | "__ior__")) => {
-                Some(synthesize_typed_dict_merge(db, instance_ty, name))
+            (CodeGeneratorKind::TypedDict, name) => {
+                synthesize_typed_dict_method(db, instance_ty, name, || {
+                    self.fields(db, specialization, field_policy)
+                        .iter()
+                        .map(|(name, field)| (name, TypedDictField::from_field(field)))
+                })
             }
             _ => None,
         }
@@ -1631,7 +1601,8 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
-        heap_size=get_size2::GetSize::get_heap_size)]
+        heap_size=get_size2::GetSize::get_heap_size
+    )]
     pub(crate) fn fields(
         self,
         db: &'db dyn Db,
@@ -1669,13 +1640,13 @@ impl<'db> StaticClassLiteral<'db> {
                 None
             })
             .flat_map(|source| match source {
-                FieldSource::Static(class, specialization) => {
-                    class.own_fields(db, specialization, field_policy)
-                }
-                FieldSource::DynamicTypedDict(typeddict) => typeddict
-                    .items(db)
-                    .iter()
-                    .map(|(name, td_field)| {
+                FieldSource::Static(class, specialization) => Either::Left(
+                    class
+                        .own_fields(db, specialization, field_policy)
+                        .into_iter(),
+                ),
+                FieldSource::DynamicTypedDict(typeddict) => {
+                    Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
                         (
                             name.clone(),
                             Field {
@@ -1687,8 +1658,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 first_declaration: td_field.first_declaration(),
                             },
                         )
-                    })
-                    .collect(),
+                    }))
+                }
             })
             // KW_ONLY sentinels are markers, not real fields. Exclude them so
             // they cannot shadow an inherited field with the same name.

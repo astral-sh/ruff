@@ -561,36 +561,13 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
                 return TypedDictSchema::default();
             };
 
-            let field_ty = deferred_inference
-                .try_expression_type(&item.value)
-                .unwrap_or(Type::unknown());
+            let field_ty = deferred_inference.expression_type(&item.value);
             let qualifiers = deferred_inference.qualifiers(&item.value);
 
             schema.insert(
                 Name::new(key_lit.value(db)),
                 functional_typed_dict_field(field_ty, qualifiers, total),
             );
-        }
-    }
-
-    for keyword in &node.arguments.keywords {
-        let Some(arg) = &keyword.arg else {
-            continue;
-        };
-
-        match arg.id.as_str() {
-            "total" | "closed" | "extra_items" => continue,
-            field_name => {
-                let field_ty = deferred_inference
-                    .try_expression_type(&keyword.value)
-                    .unwrap_or(Type::unknown());
-                let qualifiers = deferred_inference.qualifiers(&keyword.value);
-
-                schema.insert(
-                    Name::new(field_name),
-                    functional_typed_dict_field(field_ty, qualifiers, total),
-                );
-            }
         }
     }
 

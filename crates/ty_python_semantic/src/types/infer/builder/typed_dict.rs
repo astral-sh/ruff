@@ -84,24 +84,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(arg, TypeContext::default());
         }
 
-        if has_starred || has_double_starred {
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
-                if let Some(arg) = &kw.arg {
-                    if !matches!(arg.id.as_str(), "total" | "closed" | "extra_items")
-                        && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Argument `{}` does not match any known parameter of function `TypedDict`",
-                            arg.id
-                        ));
-                    }
-                }
-            }
-            return fallback();
-        }
-
         if args.len() > 2
+            && !has_starred
+            && !has_double_starred
             && let Some(builder) = self
                 .context
                 .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
@@ -159,6 +144,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
+        }
+
+        if has_double_starred || has_starred {
+            return fallback();
         }
 
         if fields_arg.is_none()
@@ -222,10 +211,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
-
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 
+    /// Infer the `TypedDictSchema` for an "inlined"/"dangling" functional `TypedDict` definition,
+    /// such as `class Foo(TypedDict("Bar", {"x": int})): ...`.
+    ///
+    /// Note that, as of 2026-03-29, support for these is not mandated by the spec, and they are not
+    /// supported by pyrefly or zuban. However, they are supported by pyright and mypy. We also
+    /// support inline schemas for `NamedTuple`s, so it makes sense to do the same for `TypedDict`s
+    /// out of consistency.
+    ///
+    /// This method uses `self.expression_type()` for all non-type expressions: it is assumed that
+    /// all non-type expressions have already been inferred by a call to `self.validate_fields_arg()`,
+    /// which is called before this method in the inference process.
     fn infer_dangling_typeddict_spec(
         &mut self,
         fields_arg: &ast::Expr,
@@ -263,7 +262,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         schema
     }
 
-    /// Infer field types for functional `TypedDict` in deferred phase.
+    /// Infer field types for functional `TypedDict` assignments in deferred phase, for example:
+    ///
+    /// ```python
+    /// TD = TypedDict("TD", {"x": "TD | None"}, total=False)
+    /// ```
     ///
     /// This is called during `infer_deferred_types` to infer field types after the `TypedDict`
     /// definition is complete. This enables support for recursive `TypedDict`s where field types
@@ -287,6 +290,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Infer all non-type expressions in the `fields` argument of a functional `TypedDict` definition,
+    /// and emit diagnostics for invalid field keys. Type expressions are not inferred during this pass,
+    /// because it must be deferred for` TypedDict` definitions that may hold recursive references to
+    /// themselves.
     fn validate_fields_arg(&mut self, fields_arg: &ast::Expr) {
         let db = self.db();
 

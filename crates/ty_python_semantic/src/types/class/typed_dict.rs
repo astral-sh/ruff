@@ -20,12 +20,38 @@ use crate::types::typed_dict::{
     TypedDictField, TypedDictSchema, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, ClassBase, ClassType, KnownClass, MemberLookupPolicy, Type,
-    TypeVarVariance, UnionBuilder, UnionType,
+    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
+    MemberLookupPolicy, Type, TypeVarVariance, UnionType,
 };
 
+pub(super) fn synthesize_typed_dict_method<'db, I, N, F>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    method_name: &str,
+    fields: impl Fn() -> I,
+) -> Option<Type<'db>>
+where
+    I: IntoIterator<Item = (N, F)>,
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
+{
+    match method_name {
+        "__getitem__" => Some(synthesize_typed_dict_getitem(db, instance_ty, fields())),
+        "__setitem__" => Some(synthesize_typed_dict_setitem(db, instance_ty, fields())),
+        "__delitem__" => Some(synthesize_typed_dict_delitem(db, instance_ty, fields())),
+        "get" => Some(synthesize_typed_dict_get(db, instance_ty, fields())),
+        "update" => Some(synthesize_typed_dict_update(db, instance_ty, fields())),
+        "pop" => Some(synthesize_typed_dict_pop(db, instance_ty, fields())),
+        "setdefault" => Some(synthesize_typed_dict_setdefault(db, instance_ty, fields())),
+        "__or__" | "__ror__" | "__ior__" => {
+            Some(synthesize_typed_dict_merge(db, instance_ty, method_name))
+        }
+        _ => None,
+    }
+}
+
 /// Synthesize the `__getitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_getitem<'db, N, F>(
+fn synthesize_typed_dict_getitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -38,18 +64,12 @@ where
         let field_name = field_name.borrow();
         let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
-        Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(key_type),
-                ],
-            ),
-            field.declared_ty,
-        )
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
+        ];
+        Signature::new(Parameters::new(db, parameters), field.declared_ty)
     });
 
     Type::Callable(CallableType::new(
@@ -60,7 +80,7 @@ where
 }
 
 /// Synthesize the `__setitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_setitem<'db, N, F>(
+fn synthesize_typed_dict_setitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -75,44 +95,30 @@ where
         .peekable();
 
     if writeable_fields.peek().is_none() {
-        return Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(Type::Never),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(Type::any()),
-                    ],
-                ),
-                Type::none(db),
-            )),
-            CallableTypeKind::FunctionLike,
-        ));
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key")))
+                .with_annotated_type(Type::Never),
+            Parameter::positional_only(Some(Name::new_static("value")))
+                .with_annotated_type(Type::any()),
+        ];
+        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+        return Type::function_like_callable(db, signature);
     }
 
     let overloads = writeable_fields.map(|(field_name, field)| {
         let field_name = field_name.borrow();
         let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
-        Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(key_type),
-                    Parameter::positional_only(Some(Name::new_static("value")))
-                        .with_annotated_type(field.declared_ty),
-                ],
-            ),
-            Type::none(db),
-        )
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
+            Parameter::positional_only(Some(Name::new_static("value")))
+                .with_annotated_type(field.declared_ty),
+        ];
+        Signature::new(Parameters::new(db, parameters), Type::none(db))
     });
 
     Type::Callable(CallableType::new(
@@ -123,7 +129,7 @@ where
 }
 
 /// Synthesize the `__delitem__` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_delitem<'db, N, F>(
+fn synthesize_typed_dict_delitem<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -138,39 +144,25 @@ where
         .peekable();
 
     if deletable_fields.peek().is_none() {
-        return Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(Type::Never),
-                    ],
-                ),
-                Type::none(db),
-            )),
-            CallableTypeKind::FunctionLike,
-        ));
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key")))
+                .with_annotated_type(Type::Never),
+        ];
+        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+        return Type::function_like_callable(db, signature);
     }
 
     let overloads = deletable_fields.map(|(field_name, _)| {
         let field_name = field_name.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
-        Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(key_type),
-                ],
-            ),
-            Type::none(db),
-        )
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
+        ];
+        Signature::new(Parameters::new(db, parameters), Type::none(db))
     });
 
     Type::Callable(CallableType::new(
@@ -181,7 +173,7 @@ where
 }
 
 /// Synthesize the `get` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_get<'db, N, F>(
+fn synthesize_typed_dict_get<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -197,16 +189,14 @@ where
             let field = field.borrow();
             let key_type = Type::string_literal(db, field_name.as_str());
 
+            let get_sig_params = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+            ];
             let get_sig = Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                    ],
-                ),
+                Parameters::new(db, get_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -220,19 +210,17 @@ where
                 TypeVarVariance::Covariant,
             );
 
+            let get_with_default_sig_params = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+                Parameter::positional_only(Some(Name::new_static("default")))
+                    .with_annotated_type(Type::TypeVar(t_default)),
+            ];
             let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(Type::TypeVar(t_default)),
-                    ],
-                ),
+                Parameters::new(db, get_with_default_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -262,19 +250,18 @@ where
                 TypeVarVariance::Covariant,
             );
 
+            let parameterss = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                Parameter::positional_only(Some(Name::new_static("default")))
+                    .with_annotated_type(Type::TypeVar(t_default)),
+            ];
+
             Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(KnownClass::Str.to_instance(db)),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(Type::TypeVar(t_default)),
-                    ],
-                ),
+                Parameters::new(db, parameterss),
                 UnionType::from_two_elements(db, Type::unknown(), Type::TypeVar(t_default)),
             )
         }));
@@ -287,7 +274,7 @@ where
 }
 
 /// Synthesize the `update` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_update<'db, N, F>(
+fn synthesize_typed_dict_update<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -296,21 +283,18 @@ where
     N: Borrow<Name>,
     F: Borrow<TypedDictField<'db>>,
 {
-    let keyword_parameters: Vec<_> = fields
-        .into_iter()
-        .map(|(field_name, field)| {
-            let field_name = field_name.borrow();
-            let field = field.borrow();
-            let ty = if field.is_read_only() {
-                Type::Never
-            } else {
-                field.declared_ty
-            };
-            Parameter::keyword_only(field_name.clone())
-                .with_annotated_type(ty)
-                .with_default_type(ty)
-        })
-        .collect();
+    let keyword_parameters = fields.into_iter().map(|(field_name, field)| {
+        let field_name = field_name.borrow();
+        let field = field.borrow();
+        let ty = if field.is_read_only() {
+            Type::Never
+        } else {
+            field.declared_ty
+        };
+        Parameter::keyword_only(field_name.clone())
+            .with_annotated_type(ty)
+            .with_default_type(ty)
+    });
 
     let update_patch_ty = if let Type::TypedDict(typed_dict) = instance_ty {
         Type::TypedDict(typed_dict.to_update_patch(db))
@@ -318,38 +302,30 @@ where
         instance_ty
     };
 
-    let value_ty = UnionBuilder::new(db)
-        .add(update_patch_ty)
-        .add(KnownClass::Iterable.to_specialized_instance(
-            db,
-            &[Type::heterogeneous_tuple(
-                db,
-                [KnownClass::Str.to_instance(db), Type::object()],
-            )],
-        ))
-        .build();
+    let str_object_tuple =
+        Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(db), Type::object()]);
 
-    let update_signature = Signature::new(
-        Parameters::new(
-            db,
-            [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("value")))
-                    .with_annotated_type(value_ty)
-                    .with_default_type(Type::none(db)),
-            ]
-            .into_iter()
-            .chain(keyword_parameters),
-        ),
-        Type::none(db),
+    let value_ty = UnionType::from_two_elements(
+        db,
+        update_patch_ty,
+        KnownClass::Iterable.to_specialized_instance(db, &[str_object_tuple]),
     );
 
+    let parameters = [
+        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
+        Parameter::positional_only(Some(Name::new_static("value")))
+            .with_annotated_type(value_ty)
+            .with_default_type(Type::none(db)),
+    ]
+    .into_iter()
+    .chain(keyword_parameters);
+
+    let update_signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
     Type::function_like_callable(db, update_signature)
 }
 
 /// Synthesize the `pop` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_pop<'db, N, F>(
+fn synthesize_typed_dict_pop<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -366,18 +342,13 @@ where
             let field = field.borrow();
             let key_type = Type::string_literal(db, field_name.as_str());
 
-            let pop_sig = Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                    ],
-                ),
-                field.declared_ty,
-            );
+            let pop_parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+            ];
+            let pop_sig = Signature::new(Parameters::new(db, pop_parameters), field.declared_ty);
 
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
@@ -385,19 +356,17 @@ where
                 TypeVarVariance::Covariant,
             );
 
+            let pop_with_default_parameters = [
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(key_type),
+                Parameter::positional_only(Some(Name::new_static("default")))
+                    .with_annotated_type(Type::TypeVar(t_default)),
+            ];
             let pop_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(key_type),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(Type::TypeVar(t_default)),
-                    ],
-                ),
+                Parameters::new(db, pop_with_default_parameters),
                 UnionType::from_two_elements(db, field.declared_ty, Type::TypeVar(t_default)),
             );
 
@@ -412,7 +381,7 @@ where
 }
 
 /// Synthesize the `setdefault` method for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_setdefault<'db, N, F>(
+fn synthesize_typed_dict_setdefault<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     fields: impl IntoIterator<Item = (N, F)>,
@@ -425,21 +394,15 @@ where
         let field_name = field_name.borrow();
         let field = field.borrow();
         let key_type = Type::string_literal(db, field_name.as_str());
+        let parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_type),
+            Parameter::positional_only(Some(Name::new_static("default")))
+                .with_annotated_type(field.declared_ty),
+        ];
 
-        Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(key_type),
-                    Parameter::positional_only(Some(Name::new_static("default")))
-                        .with_annotated_type(field.declared_ty),
-                ],
-            ),
-            field.declared_ty,
-        )
+        Signature::new(Parameters::new(db, parameters), field.declared_ty)
     });
 
     Type::Callable(CallableType::new(
@@ -450,21 +413,21 @@ where
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_merge<'db>(
+fn synthesize_typed_dict_merge<'db>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
-    let mut overloads = vec![Signature::new(
-        Parameters::new(
-            db,
-            [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("value")))
-                    .with_annotated_type(instance_ty),
-            ],
-        ),
+    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]>;
+
+    let first_overload_parameters = [
+        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
+        Parameter::positional_only(Some(Name::new_static("value")))
+            .with_annotated_type(instance_ty),
+    ];
+
+    overloads = smallvec::smallvec![Signature::new(
+        Parameters::new(db, first_overload_parameters,),
         instance_ty,
     )];
 
@@ -486,28 +449,25 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             ],
         );
 
+        let overload_two_parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("value")))
+                .with_annotated_type(partial_ty),
+        ];
         overloads.push(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("value")))
-                        .with_annotated_type(partial_ty),
-                ],
-            ),
+            Parameters::new(db, overload_two_parameters),
             instance_ty,
         ));
+
+        let overload_three_parameters = [
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("value")))
+                .with_annotated_type(dict_param_ty),
+        ];
         overloads.push(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("value")))
-                        .with_annotated_type(dict_param_ty),
-                ],
-            ),
+            Parameters::new(db, overload_three_parameters),
             dict_return_ty,
         ));
     }
@@ -552,7 +512,7 @@ pub enum DynamicTypedDictAnchor<'db> {
 pub struct DynamicTypedDictLiteral<'db> {
     /// The name of the TypedDict (from the first argument).
     #[returns(ref)]
-    pub name: Name,
+    pub(crate) name: Name,
 
     /// The anchor for this dynamic TypedDict, providing stable identity.
     ///
@@ -562,7 +522,7 @@ pub struct DynamicTypedDictLiteral<'db> {
     ///   is relative to the enclosing scope's anchor node index, and the
     ///   eagerly computed spec is stored on the anchor.
     #[returns(ref)]
-    pub anchor: DynamicTypedDictAnchor<'db>,
+    pub(crate) anchor: DynamicTypedDictAnchor<'db>,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -586,8 +546,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     /// Returns an instance type for this dynamic `TypedDict`.
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
-        Type::instance(db, ClassType::NonGeneric(self.into()))
+    pub(crate) fn to_instance(self) -> Type<'db> {
+        Type::typed_dict(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)))
     }
 
     /// Returns the range of the `TypedDict` call expression.
@@ -665,21 +625,9 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let instance_ty = self.to_instance(db);
-
-        let synthesized = match name {
-            "__getitem__" => synthesize_typed_dict_getitem(db, instance_ty, self.items(db)),
-            "__setitem__" => synthesize_typed_dict_setitem(db, instance_ty, self.items(db)),
-            "__delitem__" => synthesize_typed_dict_delitem(db, instance_ty, self.items(db)),
-            "get" => synthesize_typed_dict_get(db, instance_ty, self.items(db)),
-            "update" => synthesize_typed_dict_update(db, instance_ty, self.items(db)),
-            "pop" => synthesize_typed_dict_pop(db, instance_ty, self.items(db)),
-            "setdefault" => synthesize_typed_dict_setdefault(db, instance_ty, self.items(db)),
-            "__or__" | "__ror__" | "__ior__" => synthesize_typed_dict_merge(db, instance_ty, name),
-            _ => return Member::default(),
-        };
-
-        Member::definitely_declared(synthesized)
+        synthesize_typed_dict_method(db, self.to_instance(), name, || self.items(db))
+            .map(Member::definitely_declared)
+            .unwrap_or_default()
     }
 
     /// Look up a class-level member by name (including superclasses).
