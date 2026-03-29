@@ -552,52 +552,69 @@ help: Remove `super()` parameters
 398 | class LambdaMethod(BaseClass):
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:406:14
+   --> UP008.py:399:27
     |
-404 |     @classmethod
-405 |     def f(cls):
-406 |         super(ClassMethod, cls).f()  # can use super()
+398 | class LambdaMethod(BaseClass):
+399 |     f = lambda self: super(LambdaMethod, self).f()  # can use super()
+    |                           ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Remove `super()` parameters
+396 | 
+397 | 
+398 | class LambdaMethod(BaseClass):
+    -     f = lambda self: super(LambdaMethod, self).f()  # can use super()
+399 +     f = lambda self: super().f()  # can use super()
+400 | 
+401 | 
+402 | class ClassMethod(BaseClass):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:405:14
+    |
+403 |     @classmethod
+404 |     def f(cls):
+405 |         super(ClassMethod, cls).f()  # can use super()
     |              ^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-403 | class ClassMethod(BaseClass):
-404 |     @classmethod
-405 |     def f(cls):
+402 | class ClassMethod(BaseClass):
+403 |     @classmethod
+404 |     def f(cls):
     -         super(ClassMethod, cls).f()  # can use super()
-406 +         super().f()  # can use super()
+405 +         super().f()  # can use super()
+406 | 
 407 | 
-408 | 
-409 | class AsyncMethod(BaseClass):
+408 | class AsyncMethod(BaseClass):
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:411:14
+   --> UP008.py:410:14
     |
-409 | class AsyncMethod(BaseClass):
-410 |     async def f(self):
-411 |         super(AsyncMethod, self).f()  # can use super()
+408 | class AsyncMethod(BaseClass):
+409 |     async def f(self):
+410 |         super(AsyncMethod, self).f()  # can use super()
     |              ^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-408 | 
-409 | class AsyncMethod(BaseClass):
-410 |     async def f(self):
+407 | 
+408 | class AsyncMethod(BaseClass):
+409 |     async def f(self):
     -         super(AsyncMethod, self).f()  # can use super()
-411 +         super().f()  # can use super()
+410 +         super().f()  # can use super()
+411 | 
 412 | 
-413 | 
-414 | class OuterWithWhitespace:
+413 | class OuterWithWhitespace:
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:417:19
+   --> UP008.py:416:19
     |
-415 |     class Inner(BaseClass):
-416 |         def f(self):
-417 |             super (OuterWithWhitespace.Inner, self).f()  # can use super()
+414 |     class Inner(BaseClass):
+415 |         def f(self):
+416 |             super (OuterWithWhitespace.Inner, self).f()  # can use super()
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Remove `super()` parameters
-414 | class OuterWithWhitespace:
-415 |     class Inner(BaseClass):
-416 |         def f(self):
+413 | class OuterWithWhitespace:
+414 |     class Inner(BaseClass):
+415 |         def f(self):
     -             super (OuterWithWhitespace.Inner, self).f()  # can use super()
-417 +             super ().f()  # can use super()
+416 +             super ().f()  # can use super()

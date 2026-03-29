@@ -396,7 +396,6 @@ def function_local():
 
 
 class LambdaMethod(BaseClass):
-    # TODO(charlie): class-body lambda rewrite is still missed.
     f = lambda self: super(LambdaMethod, self).f()  # can use super()
 
 
