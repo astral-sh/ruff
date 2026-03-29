@@ -295,7 +295,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
 
     /// Alias metadata for predicate leaf names in the current file.
-    alias_predicates: FxHashMap<(ExpressionNodeKey, FileScopeId), NarrowingAliasPredicate<'db>>,
+    alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -1999,7 +1999,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         self.alias_predicates.insert(
-            (ExpressionNodeKey::from(leaf), self.current_scope()),
+            ExpressionNodeKey::from(leaf),
             NarrowingAliasPredicate {
                 expression: aliased_expression,
                 guard,
@@ -2045,7 +2045,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// narrowing constraints are recorded for them.
     fn add_alias_narrowed_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
         Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
-            let key = (ExpressionNodeKey::from(leaf), self.current_scope());
+            let key = ExpressionNodeKey::from(leaf);
             if let Some(alias_predicate) = self.alias_predicates.get(&key) {
                 let aliased_node = alias_predicate
                     .expression
