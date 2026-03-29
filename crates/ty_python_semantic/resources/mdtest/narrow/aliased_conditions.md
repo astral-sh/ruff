@@ -3,7 +3,7 @@
 Narrowing is supported when a narrowing expression is stored in an intermediate variable (an
 "aliased conditional expression") and that variable is later used as a condition.
 
-## Basic `is None` alias
+## `is None` alias
 
 ```py
 def _(x: int | None):
@@ -19,17 +19,6 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
     else:
         reveal_type(x)  # revealed: int
-```
-
-## Negated alias with `not`
-
-```py
-def _(x: int | None):
-    is_none = x is None
-    if not is_none:
-        reveal_type(x)  # revealed: int
-    else:
-        reveal_type(x)  # revealed: None
 ```
 
 ## `is not None` alias
@@ -51,27 +40,6 @@ def _(x: int | str):
     if is_int:
         reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: str
-```
-
-## Boolean-operated alias
-
-```py
-def _(x: str | int | None):
-    is_none = x is None
-    is_int = isinstance(x, int)
-    if is_none:
-        reveal_type(x)  # revealed: None
-    if is_int:
-        reveal_type(x)  # revealed: int
-    if is_none or is_int:
-        reveal_type(is_none)  # revealed: bool
-        reveal_type(x)  # revealed: None | int
-    if is_none and is_int:
-        reveal_type(is_none)  # revealed: Literal[True]
-        reveal_type(x)  # revealed: Never
-    if not (is_none or is_int):
-        reveal_type(is_none)  # revealed: Literal[False]
         reveal_type(x)  # revealed: str
 ```
 
@@ -112,6 +80,61 @@ def _(x: str | int):
         reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: int
+```
+
+## Negated alias with `not`
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    if not is_none:
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+## Boolean-operated alias
+
+```py
+def _(x: str | int | None):
+    is_none = x is None
+    is_int = isinstance(x, int)
+    if is_none:
+        reveal_type(x)  # revealed: None
+    if is_int:
+        reveal_type(x)  # revealed: int
+    if is_none or is_int:
+        reveal_type(is_none)  # revealed: bool
+        reveal_type(x)  # revealed: None | int
+    if is_none and is_int:
+        reveal_type(is_none)  # revealed: Literal[True]
+        reveal_type(x)  # revealed: Never
+    if not (is_none or is_int):
+        reveal_type(is_none)  # revealed: Literal[False]
+        reveal_type(x)  # revealed: str
+```
+
+## Aliases in complex predicates
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    if bool(is_none):
+        reveal_type(x)  # revealed: None
+    if is_none if True else False:
+        reveal_type(x)  # revealed: None
+    if is_none == True:
+        # TODO: it would be nice to support this case, but even direct narrowing doesn't work here
+        reveal_type(x)  # revealed: int | None
+    if (is_none,)[0]:
+        # TODO: same as above
+        reveal_type(x)  # revealed: int | None
+    if y := is_none:
+        # TODO: same as above
+        reveal_type(x)  # revealed: int | None
+    if (lambda: is_none)():
+        # TODO: same as above
+        reveal_type(x)  # revealed: int | None
 ```
 
 ## Attribute access alias

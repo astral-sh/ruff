@@ -1559,18 +1559,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn walk_alias_predicate_leaves(expr: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
+    fn walk_narrowing_alias_predicate(expr: &ast::Expr, f: &mut impl FnMut(&ast::Expr)) {
         match expr {
             ast::Expr::Name(_) => f(expr),
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
-                Self::walk_alias_predicate_leaves(&unary.operand, f);
+                Self::walk_narrowing_alias_predicate(&unary.operand, f);
             }
             ast::Expr::BoolOp(bool_op) => {
                 for value in &bool_op.values {
-                    Self::walk_alias_predicate_leaves(value, f);
+                    Self::walk_narrowing_alias_predicate(value, f);
                 }
             }
-            // Narrowing alias ​​expansion only applies to Name, UnaryOp, and BoolOp.
+            ast::Expr::Call(call) => {
+                for arg in &call.arguments.args {
+                    Self::walk_narrowing_alias_predicate(arg, f);
+                }
+                for keyword in &call.arguments.keywords {
+                    Self::walk_narrowing_alias_predicate(&keyword.value, f);
+                }
+            }
+            ast::Expr::If(expr_if) => {
+                Self::walk_narrowing_alias_predicate(&expr_if.test, f);
+                Self::walk_narrowing_alias_predicate(&expr_if.body, f);
+                Self::walk_narrowing_alias_predicate(&expr_if.orelse, f);
+            }
+            // TODO: Other expressions (such as Compare) should also be supported, but they are not yet supported even with direct narrowing.
             _ => {}
         }
     }
@@ -1583,7 +1596,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// * Records the resolved expression and any lazy-scope guard for the alias leaf
     ///
     fn register_predicate_aliases(&mut self, expr: &ast::Expr) {
-        Self::walk_alias_predicate_leaves(expr, &mut |leaf| {
+        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
@@ -1626,7 +1639,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// adds the places from the aliased expressions (e.g., `x` from `x is None`) so that
     /// narrowing constraints are recorded for them.
     fn add_alias_narrowed_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
-        Self::walk_alias_predicate_leaves(expr, &mut |leaf| {
+        Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let key = ExpressionNodeKey::from(leaf);
             if let Some(alias_predicate) = self.alias_predicates.get(&key) {
                 let aliased_node = alias_predicate
