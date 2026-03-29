@@ -104,6 +104,27 @@ def outer(flag: bool) -> None:
             y: int = x
 ```
 
+## Generator expression after nonlocal rebinding
+
+A nested eager scope such as a generator expression should see the rebound type of a `nonlocal`
+symbol:
+
+```py
+from typing import Optional
+
+class C:
+    value: int
+
+def check(x: Optional[C]) -> C:
+    return C()
+
+def outer(x: Optional[C]) -> None:
+    def inner() -> None:
+        nonlocal x
+        x = check(x)
+        all(reveal_type(x.value) == 1 for _ in [0])  # revealed: int
+```
+
 ## The types of `nonlocal` binding get unioned
 
 Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name

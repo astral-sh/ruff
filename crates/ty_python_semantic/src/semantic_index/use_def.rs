@@ -1470,15 +1470,20 @@ impl<'db> UseDefMapBuilder<'db> {
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
+        let stores_visible_bindings = !is_forwarding_symbol
+            || (enclosing_place_expr.is_bound()
+                && bindings.iter().any(|binding| !binding.binding.is_unbound()));
         // Names bound in class scopes are never visible to nested scopes (but
         // attributes/subscripts are visible), so we never need to save eager scope bindings in a
         // class scope. There is one exception to this rule: annotation scopes can see names
-        // defined in an immediately-enclosing class scope. Likewise, `global` and `nonlocal`
-        // symbols in the enclosing scope are forwarding declarations, so nested scopes should
-        // continue walking outward instead of treating any bindings here as owned by this scope.
+        // defined in an immediately-enclosing class scope. Likewise, unbound `global` and
+        // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
+        // should continue walking outward instead of treating any bindings here as owned by this
+        // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
+        // state needs to be snapshotted so nested scopes can see the rebound type.
         if (is_class_symbol && !is_parent_of_annotation_scope)
             || !enclosing_place_expr.is_bound()
-            || is_forwarding_symbol
+            || !stores_visible_bindings
         {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),

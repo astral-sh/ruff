@@ -298,6 +298,20 @@ def f():
     global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
 ```
 
+## Nested class after global rebinding
+
+Even if a `global` declaration is unresolved at module scope, nested eager scopes in the same
+function should still see a rebinding that already happened:
+
+```py
+def factory():
+    global x  # error: [unresolved-global] "Invalid global declaration of `x`: `x` has no declarations or bindings in the global scope"
+    x = 1
+
+    class C:
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ## References to variables before they are defined within a class scope are considered global
 
 If we try to access a variable in a class before it has been defined, the lookup will fall back to
