@@ -312,7 +312,9 @@ def _(a: A):
                 reveal_type(a.x)  # revealed: None
 ```
 
-## Cross-scope invalidation: narrowed variable reassigned
+## Cross-scope invalidation
+
+### Narrowed variable reassigned
 
 If the narrowed variable is reassigned inside an eager scope, the alias is invalidated within that
 scope.
@@ -377,7 +379,7 @@ def _(x: int | None):
     inner()
 ```
 
-## Cross-scope invalidation: alias variable reassigned
+### Alias variable reassigned
 
 If the alias variable itself is reassigned inside an eager scope, the alias is invalidated within
 that scope.
@@ -439,6 +441,8 @@ def _(x: int | None):
 ```
 
 ## Chained alias
+
+### Basic
 
 ```py
 def _(x: int | None):
@@ -534,7 +538,11 @@ def _(x: int | None):
                 reveal_type(x)  # revealed: None
             if is_none:
                 reveal_type(x)  # revealed: int | None
+```
 
+### Cross-scope chained alias
+
+```py
 def _(x: int | None):
     is_none = x is None
 
@@ -582,4 +590,57 @@ def _(x: int | None):
         x = 42
         if is_none_alias:
             reveal_type(x)  # revealed: Literal[42]
+```
+
+### Negated chained alias
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    is_not_none = not is_none
+    if is_not_none:
+        reveal_type(x)  # revealed: int
+
+    class Inner:
+        if is_not_none:
+            reveal_type(x)  # revealed: int
+
+    def inner():
+        if is_not_none:
+            reveal_type(x)  # revealed: int
+
+def _(x: int | None):
+    is_none = x is None
+    is_not_none = not is_none
+    if is_not_none:
+        reveal_type(x)  # revealed: int
+
+    class Inner:
+        x = 42
+        if is_not_none:
+            reveal_type(x)  # revealed: Literal[42]
+
+    def inner():
+        x = 42
+        if is_not_none:
+            reveal_type(x)  # revealed: Literal[42]
+```
+
+### Boolean-operated chained alias
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    is_int = isinstance(x, int)
+    is_none_and_int = is_none and is_int
+    if is_none_and_int:
+        reveal_type(x)  # revealed: Never
+
+    class Inner:
+        if is_none_and_int:
+            reveal_type(x)  # revealed: Never
+
+    def inner():
+        if is_none_and_int:
+            reveal_type(x)  # revealed: Never
 ```

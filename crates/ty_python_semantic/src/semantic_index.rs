@@ -354,7 +354,8 @@ pub(crate) struct SemanticIndex<'db> {
     /// When a predicate contains alias variables (e.g., `is_none`, `is_none or is_int`),
     /// each alias Name node is mapped to the aliased expression and any lazy-scope guard
     /// needed to validate it at constraint-generation time.
-    narrowing_alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+    narrowing_alias_predicates:
+        FxHashMap<(ExpressionNodeKey, FileScopeId), NarrowingAliasPredicate<'db>>,
 }
 
 /// A guard to determine if an alias is still usable for narrowing.
@@ -455,8 +456,9 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn narrowing_alias_predicate(
         &self,
         key: impl Into<ExpressionNodeKey>,
+        scope: FileScopeId,
     ) -> Option<&NarrowingAliasPredicate<'db>> {
-        self.narrowing_alias_predicates.get(&key.into())
+        self.narrowing_alias_predicates.get(&(key.into(), scope))
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
