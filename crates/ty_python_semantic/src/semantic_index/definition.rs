@@ -434,7 +434,6 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) module: &'ast ast::Identifier,
     pub(crate) module_index: usize,
 }
 
@@ -448,9 +447,6 @@ pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtAnnAssign,
-    pub(crate) annotation: &'ast ast::Expr,
-    pub(crate) value: Option<&'ast ast::Expr>,
-    pub(crate) target: &'ast ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -524,7 +520,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                alias_index,
+                alias_index: alias_index
+                    .try_into()
+                    .expect("import alias index should fit in u32"),
                 is_reexported,
             }),
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
@@ -533,17 +531,19 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                alias_index,
+                alias_index: alias_index
+                    .try_into()
+                    .expect("import-from alias index should fit in u32"),
                 is_reexported,
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
-                module,
                 module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                module: AstNodeRef::new(parsed, module),
-                module_index,
+                module_index: module_index
+                    .try_into()
+                    .expect("import-from submodule index should fit in u32"),
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -574,14 +574,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 target: AstNodeRef::new(parsed, target),
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
-                node: _,
-                annotation,
-                value,
-                target,
+                node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                target: AstNodeRef::new(parsed, target),
-                annotation: AstNodeRef::new(parsed, annotation),
-                value: value.map(|v| AstNodeRef::new(parsed, v)),
+                node: AstNodeRef::new(parsed, node),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -896,15 +891,15 @@ impl DefinitionKind<'_> {
             DefinitionKind::Class(class) => class.node(module).name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name.range(),
             DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::Assignment(assignment) => assignment.target(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target(module).range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
-                dict_key_assignment.key.node(module).range()
+                dict_key_assignment.key(module).range()
             }
-            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
                 parameter.node(module).name.range()
@@ -913,10 +908,8 @@ impl DefinitionKind<'_> {
                 parameter.node(module).name.range()
             }
             DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.name.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
-            DefinitionKind::MatchPattern(match_pattern) => {
-                match_pattern.identifier.node(module).range()
-            }
+            DefinitionKind::WithItem(with_item) => with_item.target(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier(module).range(),
             DefinitionKind::ExceptHandler(handler) => handler
                 .node(module)
                 .name
@@ -943,35 +936,33 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
             DefinitionKind::NamedExpression(named) => named.node(module).range(),
             DefinitionKind::Assignment(assign) => {
-                let target_range = assign.target.node(module).range();
-                let value_range = assign.value.node(module).range();
+                let target_range = assign.target(module).range();
+                let value_range = assign.value(module).range();
                 target_range.cover(value_range)
             }
             DefinitionKind::AnnotatedAssignment(assign) => {
-                let mut full_range = assign.target.node(module).range();
-                full_range = full_range.cover(assign.annotation.node(module).range());
+                let mut full_range = assign.target(module).range();
+                full_range = full_range.cover(assign.annotation(module).range());
 
-                if let Some(ref value) = assign.value {
-                    full_range = full_range.cover(value.node(module).range());
+                if let Some(value) = assign.value(module) {
+                    full_range = full_range.cover(value.range());
                 }
 
                 full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
-                dict_key_assignment.key.node(module).range()
+                dict_key_assignment.key(module).range()
             }
-            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
                 parameter.node(module).range()
             }
             DefinitionKind::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
             DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
-            DefinitionKind::MatchPattern(match_pattern) => {
-                match_pattern.identifier.node(module).range()
-            }
+            DefinitionKind::WithItem(with_item) => with_item.target(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier(module).range(),
             DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
@@ -1017,7 +1008,7 @@ impl DefinitionKind<'_> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value.is_some() {
+                if in_stub || ann_assign.value(module).is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -1109,6 +1100,10 @@ impl MatchPatternDefinitionKind {
         self.pattern.node(module)
     }
 
+    pub(crate) fn identifier<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.identifier.node(module)
+    }
+
     pub(crate) fn index(&self) -> u32 {
         self.index
     }
@@ -1153,7 +1148,7 @@ impl<'db> ComprehensionDefinitionKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportDefinitionKind {
     node: AstNodeRef<ast::StmtImport>,
-    alias_index: usize,
+    alias_index: u32,
     is_reexported: bool,
 }
 
@@ -1163,7 +1158,7 @@ impl ImportDefinitionKind {
     }
 
     pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index]
+        &self.import(module).names[self.alias_index as usize]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -1174,7 +1169,7 @@ impl ImportDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    alias_index: usize,
+    alias_index: u32,
     is_reexported: bool,
 }
 
@@ -1184,7 +1179,7 @@ impl ImportFromDefinitionKind {
     }
 
     pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index]
+        &self.import(module).names[self.alias_index as usize]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -1194,8 +1189,7 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    module: AstNodeRef<ast::Identifier>,
-    module_index: usize,
+    module_index: u32,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
@@ -1204,7 +1198,10 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 
     pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
-        self.module.node(module)
+        self.import(module)
+            .module
+            .as_ref()
+            .expect("import-from submodule definitions should always have a module identifier")
     }
 
     pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
@@ -1212,7 +1209,10 @@ impl ImportFromSubmoduleDefinitionKind {
         let module_str = module_ident.as_str();
 
         // Find the dot that terminates the target component.
-        let Some((end_offset, _)) = module_str.match_indices('.').nth(self.module_index) else {
+        let Some((end_offset, _)) = module_str
+            .match_indices('.')
+            .nth(self.module_index as usize)
+        else {
             // This shouldn't happen but just in case, provide a safe default
             return module_ident.range();
         };
@@ -1253,22 +1253,24 @@ impl<'db> AssignmentDefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
-    annotation: AstNodeRef<ast::Expr>,
-    value: Option<AstNodeRef<ast::Expr>>,
-    target: AstNodeRef<ast::Expr>,
+    node: AstNodeRef<ast::StmtAnnAssign>,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
+    fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtAnnAssign {
+        self.node.node(module)
+    }
+
     pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
-        self.value.as_ref().map(|value| value.node(module))
+        self.node(module).value.as_deref()
     }
 
     pub(crate) fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.annotation.node(module)
+        &self.node(module).annotation
     }
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.target.node(module)
+        &self.node(module).target
     }
 }
 
