@@ -212,8 +212,9 @@ struct NarrowingAlias<'ast> {
     place_keys: FxHashSet<PlaceKey>,
 }
 
-/// Accumulated guard information for a narrowing alias, computed in a single pass.
-struct NarrowingAliasValueGuards {
+/// All information collected by a single walk over a narrowing alias expression.
+struct NarrowingAliasInfo<'ast> {
+    captured_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     place_keys: FxHashSet<PlaceKey>,
     value_guards: Vec<ReassignmentGuard>,
 }
@@ -908,26 +909,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.ast_ids[scope_id]
     }
 
-    /// Compute value guards (+ place keys) for a narrowing alias
-    /// in a single pass over the expression tree.
-    #[must_use]
-    fn narrowing_alias_value_guards(
-        &self,
-        expression: &'ast ast::Expr,
-        expression_scope: FileScopeId,
-        captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
-    ) -> NarrowingAliasValueGuards {
-        let mut guards = NarrowingAliasValueGuards {
+    /// Analyze a narrowing alias expression in a single walk.
+    /// Collects captured aliases, place keys, and value guards simultaneously.
+    fn analyze_narrowing_alias(&self, expression: &'ast ast::Expr) -> NarrowingAliasInfo<'ast> {
+        let mut info = NarrowingAliasInfo {
+            captured_aliases: FxHashMap::default(),
             place_keys: FxHashSet::default(),
             value_guards: Vec::new(),
         };
-        self.collect_narrowing_alias_value_guards(
+        self.collect_narrowing_alias_info(
             expression,
-            expression_scope,
-            captured_aliases,
-            &mut guards,
+            self.current_scope(),
+            &self.narrowing_aliases,
+            &mut info,
         );
-        guards
+        info
     }
 
     /// Add guard info for a leaf expression (not an alias reference).
@@ -937,7 +933,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         expression: &'ast ast::Expr,
         expression_scope: FileScopeId,
-        guards: &mut NarrowingAliasValueGuards,
+        info: &mut NarrowingAliasInfo<'ast>,
     ) {
         let place_table = &self.place_tables[expression_scope];
         let narrowed_places =
@@ -952,7 +948,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
             .collect();
 
-        guards.place_keys.extend(all_place_keys);
+        info.place_keys.extend(all_place_keys);
 
         // Look up use IDs for the narrowed symbol names from the AST IDs.
         let mut collector = NameUseCollector {
@@ -968,117 +964,104 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 name,
                 use_id,
             };
-            if !guards.value_guards.contains(&guard) {
-                guards.value_guards.push(guard);
+            if !info.value_guards.contains(&guard) {
+                info.value_guards.push(guard);
             }
         }
     }
 
-    fn collect_narrowing_alias_value_guards(
+    fn collect_narrowing_alias_info(
         &self,
         expression: &'ast ast::Expr,
         expression_scope: FileScopeId,
-        captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
-        guards: &mut NarrowingAliasValueGuards,
+        available_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
+        info: &mut NarrowingAliasInfo<'ast>,
     ) {
         match expression {
             ast::Expr::Name(name) => {
-                if let Some(alias) = captured_aliases.get(&name.id) {
-                    self.collect_narrowing_alias_value_guards(
+                if let Some(alias) = available_aliases.get(&name.id) {
+                    info.captured_aliases
+                        .entry(name.id.clone())
+                        .or_insert_with(|| alias.clone());
+                    self.collect_narrowing_alias_info(
                         alias.expression,
                         alias.expression_scope,
                         &alias.captured_aliases,
-                        guards,
+                        info,
                     );
                 } else {
-                    self.add_expr_value_guards(expression, expression_scope, guards);
+                    self.add_expr_value_guards(expression, expression_scope, info);
                 }
             }
             ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
-                self.collect_narrowing_alias_value_guards(
+                self.collect_narrowing_alias_info(
                     &unary.operand,
                     expression_scope,
-                    captured_aliases,
-                    guards,
+                    available_aliases,
+                    info,
                 );
             }
             ast::Expr::BoolOp(bool_op) => {
                 for value in &bool_op.values {
-                    self.collect_narrowing_alias_value_guards(
+                    self.collect_narrowing_alias_info(
                         value,
                         expression_scope,
-                        captured_aliases,
-                        guards,
+                        available_aliases,
+                        info,
                     );
                 }
             }
             ast::Expr::Call(call) => {
-                if Self::contains_captured_narrowing_alias(expression, captured_aliases) {
+                if Self::contains_captured_narrowing_alias(expression, available_aliases) {
                     for arg in &call.arguments.args {
-                        if Self::contains_captured_narrowing_alias(arg, captured_aliases) {
-                            self.collect_narrowing_alias_value_guards(
+                        if Self::contains_captured_narrowing_alias(arg, available_aliases) {
+                            self.collect_narrowing_alias_info(
                                 arg,
                                 expression_scope,
-                                captured_aliases,
-                                guards,
+                                available_aliases,
+                                info,
                             );
                         }
                     }
                     for keyword in &call.arguments.keywords {
-                        if Self::contains_captured_narrowing_alias(&keyword.value, captured_aliases)
-                        {
-                            self.collect_narrowing_alias_value_guards(
+                        if Self::contains_captured_narrowing_alias(
+                            &keyword.value,
+                            available_aliases,
+                        ) {
+                            self.collect_narrowing_alias_info(
                                 &keyword.value,
                                 expression_scope,
-                                captured_aliases,
-                                guards,
+                                available_aliases,
+                                info,
                             );
                         }
                     }
                 } else {
-                    self.add_expr_value_guards(expression, expression_scope, guards);
+                    self.add_expr_value_guards(expression, expression_scope, info);
                 }
             }
             ast::Expr::If(expr_if) => {
-                self.collect_narrowing_alias_value_guards(
+                self.collect_narrowing_alias_info(
                     &expr_if.test,
                     expression_scope,
-                    captured_aliases,
-                    guards,
+                    available_aliases,
+                    info,
                 );
-                self.collect_narrowing_alias_value_guards(
+                self.collect_narrowing_alias_info(
                     &expr_if.body,
                     expression_scope,
-                    captured_aliases,
-                    guards,
+                    available_aliases,
+                    info,
                 );
-                self.collect_narrowing_alias_value_guards(
+                self.collect_narrowing_alias_info(
                     &expr_if.orelse,
                     expression_scope,
-                    captured_aliases,
-                    guards,
+                    available_aliases,
+                    info,
                 );
             }
-            _ => self.add_expr_value_guards(expression, expression_scope, guards),
+            _ => self.add_expr_value_guards(expression, expression_scope, info),
         }
-    }
-
-    fn captured_narrowing_aliases(
-        &self,
-        expression: &'ast ast::Expr,
-    ) -> FxHashMap<Name, NarrowingAlias<'ast>> {
-        let mut captured_aliases = FxHashMap::default();
-        Self::walk_narrowing_alias_predicate(expression, &mut |leaf| {
-            let Some(name) = leaf.as_name_expr() else {
-                return;
-            };
-            if let Some(alias) = self.narrowing_aliases.get(&name.id) {
-                captured_aliases
-                    .entry(name.id.clone())
-                    .or_insert_with(|| alias.clone());
-            }
-        });
-        captured_aliases
     }
 
     fn contains_captured_narrowing_alias(
@@ -1097,34 +1080,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         contains_captured_alias
     }
 
+    /// Compute chained source names from the captured aliases map.
     fn chained_source_names(
         &self,
-        expression: &'ast ast::Expr,
         captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
     ) -> FxHashSet<Name> {
-        let mut chained_source_names = FxHashSet::default();
-        Self::walk_narrowing_alias_predicate(expression, &mut |leaf| {
-            let Some(name) = leaf.as_name_expr() else {
-                return;
-            };
-            let Some(alias) = captured_aliases.get(&name.id) else {
-                return;
-            };
-
+        let mut result = FxHashSet::default();
+        for (name, alias) in captured_aliases {
             if self
                 .current_place_table()
-                .symbol_id(&name.id)
+                .symbol_id(name)
                 .map(|symbol_id| self.current_place_table().symbol(symbol_id))
                 .is_some_and(Symbol::is_free)
             {
-                chained_source_names.insert(name.id.clone());
+                result.insert(name.clone());
             }
-
-            for chained_source_name in &alias.guard.chained_source_names {
-                chained_source_names.insert(chained_source_name.clone());
-            }
-        });
-        chained_source_names
+            result.extend(alias.guard.chained_source_names.iter().cloned());
+        }
+        result
     }
 
     fn narrowing_alias_target_guard(&mut self, target: &ast::ExprName) -> ReassignmentGuard {
@@ -1772,27 +1745,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         }
 
-        let captured_aliases = self.captured_narrowing_aliases(value);
-        let guards =
-            self.narrowing_alias_value_guards(value, self.current_scope(), &captured_aliases);
-        let target_is_narrowed = guards
+        let info = self.analyze_narrowing_alias(value);
+        let target_is_narrowed = info
             .place_keys
             .contains(&PlaceKey::Symbol(target_name.clone()));
 
-        if !guards.place_keys.is_empty() && !target_is_narrowed {
+        if !info.place_keys.is_empty() && !target_is_narrowed {
             let guard = NarrowingAliasGuard {
-                value_guards: guards.value_guards.into_boxed_slice(),
+                value_guards: info.value_guards.into_boxed_slice(),
                 target_guard: self.narrowing_alias_target_guard(target_name_expr),
-                chained_source_names: self.chained_source_names(value, &captured_aliases),
+                chained_source_names: self.chained_source_names(&info.captured_aliases),
             };
             self.narrowing_aliases.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
                     expression_scope: self.current_scope(),
-                    captured_aliases,
+                    captured_aliases: info.captured_aliases,
                     guard,
-                    place_keys: guards.place_keys,
+                    place_keys: info.place_keys,
                 },
             );
         } else {
