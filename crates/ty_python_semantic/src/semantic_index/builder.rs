@@ -131,7 +131,7 @@ impl<'ast> Visitor<'ast> for ExprUseVisitor<'_, '_, 'ast> {
             ast::Expr::SetComp(_)
             | ast::Expr::ListComp(_)
             | ast::Expr::Generator(_)
-            | ast::Expr::DictComp(_) => {}
+            | ast::Expr::DictComp(_) => walk_expr(self, expr),
             ast::Expr::BoolOp(_)
             | ast::Expr::Named(_)
             | ast::Expr::BinOp(_)
