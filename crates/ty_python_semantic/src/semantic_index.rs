@@ -21,7 +21,7 @@ use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
-use crate::semantic_index::place::{PlaceExprRef, PlaceKey, PlaceTable, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExprRef, PlaceTable, ScopedPlaceId};
 pub use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::scope::{
     NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
@@ -369,8 +369,6 @@ pub(crate) struct NarrowingAliasGuard {
     /// If any of these names is later bound locally in the same scope, the original lookup did
     /// not resolve to the enclosing alias after all, so this chained alias must be invalidated.
     pub(crate) chained_source_names: FxHashSet<Name>,
-    /// Cached set of place keys that, if reassigned, should invalidate this alias.
-    pub(crate) place_keys: FxHashSet<PlaceKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]

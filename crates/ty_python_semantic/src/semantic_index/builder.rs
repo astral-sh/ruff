@@ -208,6 +208,8 @@ struct NarrowingAlias<'ast> {
     /// Aliases referenced from `expression`, frozen at alias-definition time.
     captured_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
     guard: NarrowingAliasGuard,
+    /// Cached set of place keys that, if reassigned, should invalidate this alias.
+    place_keys: FxHashSet<PlaceKey>,
 }
 
 /// Accumulated guard information for a narrowing alias, computed in a single pass.
@@ -822,7 +824,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.ast_ids[scope_id]
     }
 
-    /// Compute place keys + value guards for a narrowing alias
+    /// Compute value guards (+ place keys) for a narrowing alias
     /// in a single pass over the expression tree.
     #[must_use]
     fn alias_value_guards(
@@ -976,7 +978,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn collect_captured_aliases(
+    fn captured_aliases(
         &self,
         expression: &'ast ast::Expr,
     ) -> FxHashMap<Name, NarrowingAlias<'ast>> {
@@ -1010,7 +1012,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         contains_captured_alias
     }
 
-    fn collect_chained_source_names(
+    fn chained_source_names(
         &self,
         expression: &'ast ast::Expr,
         captured_aliases: &FxHashMap<Name, NarrowingAlias<'ast>>,
@@ -1673,7 +1675,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     value_guards: existing.guard.value_guards,
                     target_guard: self.alias_target_guard(target_name_expr),
                     chained_source_names,
-                    place_keys: existing.guard.place_keys,
                 };
                 self.narrowing_aliases
                     .insert(target_name.clone(), NarrowingAlias { guard, ..existing });
@@ -1686,7 +1687,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         }
 
-        let captured_aliases = self.collect_captured_aliases(value);
+        let captured_aliases = self.captured_aliases(value);
         let guards = self.alias_value_guards(value, self.current_scope(), &captured_aliases);
         let target_is_narrowed = guards
             .place_keys
@@ -1696,8 +1697,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let guard = NarrowingAliasGuard {
                 value_guards: guards.value_guards.into_boxed_slice(),
                 target_guard: self.alias_target_guard(target_name_expr),
-                chained_source_names: self.collect_chained_source_names(value, &captured_aliases),
-                place_keys: guards.place_keys,
+                chained_source_names: self.chained_source_names(value, &captured_aliases),
             };
             self.narrowing_aliases.insert(
                 target_name.clone(),
@@ -1706,6 +1706,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     expression_scope: self.current_scope(),
                     captured_aliases,
                     guard,
+                    place_keys: guards.place_keys,
                 },
             );
         } else {
@@ -1729,7 +1730,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.narrowing_aliases.retain(|name, alias| {
             // Keep the alias only if the reassigned place doesn't affect it.
-            !alias.guard.place_keys.contains(&place_key)
+            !alias.place_keys.contains(&place_key)
                 && !local_shadowed_name
                     .as_ref()
                     .is_some_and(|n| alias.guard.chained_source_names.contains(n))
