@@ -489,6 +489,20 @@ static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
+### Assignment through recursive aliases
+
+```py
+from __future__ import annotations
+
+type JSON = str | int | float | bool | list[JSON] | list[JSON_OBJECT] | dict[str, JSON] | None
+type JSON_OBJECT = dict[str, JSON]
+
+x: JSON_OBJECT = {"hello": 23}
+
+def f() -> JSON_OBJECT:
+    return {"hello": 23}
+```
+
 ### Cyclic defaults
 
 ```py
