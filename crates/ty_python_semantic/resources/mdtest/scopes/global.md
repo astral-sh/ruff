@@ -84,6 +84,41 @@ def f():
         y: int = x  # allowed, because x cannot be None in this branch
 ```
 
+## Nested function after conditional rebinding
+
+A nested function should still resolve a name in the module scope if the enclosing function marks it
+`global`, even if that function also has a conditional assignment to the name:
+
+```py
+PULL_SUMS: list[float] = []
+
+def bandit(foo: int) -> None:
+    global PULL_SUMS
+
+    if foo == 0:
+        PULL_SUMS = []
+        return
+
+    def bar(arm: int) -> None:
+        PULL_SUMS[arm]
+```
+
+A simpler scalar case should also keep falling back to the module global:
+
+```py
+x: int = 1
+
+def outer(flag: bool) -> None:
+    global x
+
+    if flag:
+        x = 2
+        return
+
+    def inner() -> None:
+        y: int = x
+```
+
 ## `nonlocal` and `global`
 
 A binding cannot be both `nonlocal` and `global`. This should emit a semantic syntax error. CPython

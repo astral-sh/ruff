@@ -84,6 +84,26 @@ def f():
         x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
 ```
 
+## Nested function after conditional nonlocal rebinding
+
+An inner function should still resolve a name through an enclosing `nonlocal` declaration, even if
+that enclosing scope also conditionally rebinds the name:
+
+```py
+def outer(flag: bool) -> None:
+    x: int = 1
+
+    def middle() -> None:
+        nonlocal x
+
+        if flag:
+            x = 2
+            return
+
+        def inner() -> None:
+            y: int = x
+```
+
 ## The types of `nonlocal` binding get unioned
 
 Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name
