@@ -401,6 +401,7 @@ fn determine_category(ty: &Type<'_>) -> TypeCategory {
         Type::TypedDict(_) => TypeCategory::TypedDict,
         Type::TypeAlias(_) => TypeCategory::TypeAlias,
         Type::NewTypeInstance(_) => TypeCategory::NewType,
+        Type::Divergent(_) => TypeCategory::Dynamic,
     }
 }
 
