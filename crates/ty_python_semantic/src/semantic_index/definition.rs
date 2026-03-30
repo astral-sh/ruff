@@ -463,7 +463,7 @@ pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) context_expr: &'ast ast::Expr,
+    pub(crate) item: &'ast ast::WithItem,
     pub(crate) target: &'ast ast::Expr,
     pub(crate) is_async: bool,
 }
@@ -471,9 +471,8 @@ pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) node: &'ast ast::StmtFor,
     pub(crate) target: &'ast ast::Expr,
-    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -498,10 +497,9 @@ pub(crate) enum LoopStmtRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) node: &'ast ast::Comprehension,
     pub(crate) target: &'ast ast::Expr,
     pub(crate) first: bool,
-    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -603,27 +601,27 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
-                iterable,
+                node,
                 target,
-                is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed, iterable),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                node: AstNodeRef::new(parsed, node),
                 target: AstNodeRef::new(parsed, target),
-                is_async,
+                is_async: node.is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 unpack,
-                iterable,
+                node,
                 target,
                 first,
-                is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed, iterable),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                node: AstNodeRef::new(parsed, node),
                 target: AstNodeRef::new(parsed, target),
                 first,
-                is_async,
+                is_async: node.is_async,
             }),
             DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
                 DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
@@ -636,12 +634,13 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 unpack,
-                context_expr,
+                item,
                 target,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                context_expr: AstNodeRef::new(parsed, context_expr),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                item: AstNodeRef::new(parsed, item),
                 target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
@@ -677,8 +676,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
                 loop_token,
                 loop_stmt: match loop_stmt {
-                    LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
-                    LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
+                    LoopStmtRef::While(stmt) => NodeKey::from_node(stmt),
+                    LoopStmtRef::For(stmt) => NodeKey::from_node(stmt),
                 },
                 place,
             }),
@@ -726,9 +725,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
-                iterable: _,
+                node: _,
                 unpack: _,
-                is_async: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => {
                 DefinitionNodeKey(NodeKey::from_node(target))
@@ -737,7 +735,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::VariadicKeywordParameter(node) => node.into(),
             Self::Parameter(node) => node.into(),
             Self::WithItem(WithItemDefinitionNodeRef {
-                context_expr: _,
+                item: _,
                 unpack: _,
                 is_async: _,
                 target,
@@ -1073,6 +1071,15 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
     }
 }
 
+impl<'db> TargetKind<'db> {
+    fn from_unpack(unpack: Option<Unpack<'db>>, unpack_position: UnpackPosition) -> Self {
+        match unpack {
+            Some(unpack) => TargetKind::Sequence(unpack_position, unpack),
+            None => TargetKind::Single,
+        }
+    }
+}
+
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
@@ -1127,20 +1134,21 @@ impl MatchPatternDefinitionKind {
 /// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ComprehensionDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    iterable: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    node: AstNodeRef<ast::Comprehension>,
     target: AstNodeRef<ast::Expr>,
     first: bool,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
     pub(crate) fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.iterable.node(module)
+        &self.node.node(module).iter
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1300,19 +1308,20 @@ impl DictKeyAssignmentKind<'_> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct WithItemDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    context_expr: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    item: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
     pub(crate) fn context_expr<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.context_expr.node(module)
+        &self.item.node(module).context_expr
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1326,19 +1335,20 @@ impl<'db> WithItemDefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ForStmtDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    iterable: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    node: AstNodeRef<ast::StmtFor>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
     pub(crate) fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.iterable.node(module)
+        &self.node.node(module).iter
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1382,14 +1392,8 @@ pub struct LoopHeaderDefinitionKind<'db> {
     /// The `LoopHeader` struct isn't ready when this type of definition is created. Instead we
     /// look it up later by passing this token to `get_loop_header`.
     loop_token: LoopToken<'db>,
-    loop_stmt: LoopStmtKind,
+    loop_stmt: NodeKey,
     place: ScopedPlaceId,
-}
-
-#[derive(Clone, Debug, get_size2::GetSize)]
-pub(crate) enum LoopStmtKind {
-    While(AstNodeRef<ast::StmtWhile>),
-    For(AstNodeRef<ast::StmtFor>),
 }
 
 impl<'db> LoopHeaderDefinitionKind<'db> {
@@ -1402,10 +1406,12 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
     }
 
     pub(crate) fn range(&self, module: &ParsedModuleRef) -> TextRange {
-        match &self.loop_stmt {
-            LoopStmtKind::While(stmt) => stmt.node(module).range(),
-            LoopStmtKind::For(stmt) => stmt.node(module).range(),
-        }
+        let stmt: &ast::Stmt = self
+            .loop_stmt
+            .node(module)
+            .try_into()
+            .expect("loop header definitions should always point to loop statements");
+        stmt.range()
     }
 }
 

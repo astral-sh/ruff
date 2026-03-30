@@ -1,3 +1,5 @@
+use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::AnyRootNodeRef;
 use ruff_python_ast::{HasNodeIndex, NodeIndex};
 
 use crate::ast_node_ref::AstNodeRef;
@@ -16,5 +18,9 @@ impl NodeKey {
 
     pub(super) fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
         NodeKey(node_ref.index())
+    }
+
+    pub(super) fn node<'ast>(self, module: &'ast ParsedModuleRef) -> AnyRootNodeRef<'ast> {
+        module.get_by_index(self.0)
     }
 }
