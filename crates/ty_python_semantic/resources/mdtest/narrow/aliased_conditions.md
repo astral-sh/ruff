@@ -177,12 +177,6 @@ def _(a: A):
         reveal_type(a.x)  # revealed: int
 
 def _(a: A):
-    is_none = a.x is None
-    a.x = 1
-    if is_none:
-        reveal_type(a.x)  # revealed: Literal[1]
-
-def _(a: A):
     # Attribute targets are not treated as aliases.
     # It is difficult to track them accurately.
     a.b = a.x is None
@@ -228,6 +222,21 @@ def _(x: int | None, cond: bool):
     is_none = x is None
     if is_none:
         reveal_type(x)  # revealed: None
+
+class A:
+    x: int | None
+
+def _(a: A):
+    is_none = a.x is None
+    a.x = 1
+    if is_none:
+        reveal_type(a.x)  # revealed: Literal[1]
+
+def _(a: A):
+    is_none = a.x is None
+    a = A()
+    if is_none:
+        reveal_type(a.x)  # revealed: int | None
 ```
 
 ## Alias variable reassigned invalidates alias

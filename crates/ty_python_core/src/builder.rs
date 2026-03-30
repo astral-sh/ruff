@@ -772,9 +772,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
-        // Remove aliases whose narrowed places include this place.
-        self.narrowing_aliases
-            .retain(|_, alias| !alias.narrowed_places.contains(&place));
+        // Also invalidate aliases that narrow any member of `place`.
+        let associated_members = self
+            .current_place_table()
+            .associated_place_ids(place)
+            .to_vec();
+        self.narrowing_aliases.retain(|_, alias| {
+            !alias.narrowed_places.contains(&place)
+                && !associated_members
+                    .iter()
+                    .any(|m| alias.narrowed_places.contains(&(*m).into()))
+        });
         // Remove alias for the place itself (alias variable reassigned).
         if let Some(symbol_id) = place.as_symbol() {
             let name = self.current_place_table().symbol(symbol_id).name().clone();
@@ -3279,6 +3287,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
 
                         let place_id = self.add_place(target);
+                        self.invalidate_narrowing_aliases_for(place_id);
                         self.delete_binding(place_id);
                     }
                 }
