@@ -1130,7 +1130,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime -m memory --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
+        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -1188,5 +1188,5 @@ jobs:
           # (see https://github.com/astral-sh/ruff/pull/20419)
           CODSPEED_PERF_ENABLED: false
         with:
-          mode: "walltime,memory"
+          mode: walltime
           run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
