@@ -48,6 +48,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.try_upcast_to_callable_with_policy(db, policy);
+        }
+
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
