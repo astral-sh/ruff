@@ -173,6 +173,9 @@ fn is_redundant_keyword(builtin: &str, keyword: &ast::Keyword) -> bool {
     };
     match builtin {
         "str" => arg == "object",
+        // Python 3.14 emits a `SyntaxWarning` for `complex(real=1j)`. While this
+        // does change the behavior, upgrading it to 1j is very much in the spirit of this rule
+        // and removing the `SyntaxWarning` is a nice side effect.
         "complex" => arg == "real",
         _ => false,
     }

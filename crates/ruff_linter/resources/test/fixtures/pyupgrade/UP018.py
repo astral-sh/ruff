@@ -97,6 +97,7 @@ str(t"hey")
 
 # UP018 - Extended detections
 str("A" "B")
+str("A" "B").lower()
 str(
     "A"
     "B"
