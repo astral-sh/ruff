@@ -7,6 +7,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -4258,20 +4259,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
-                let is_valid_special_form = |ty: Type<'db>| match ty {
-                    Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => false,
-                    Type::ClassLiteral(literal) => {
-                        !literal.is_known(self.db(), KnownClass::InitVar)
-                    }
-                    _ => true,
-                };
-
-                let is_invalid = match value {
-                    ast::Expr::Subscript(sub) => {
-                        !is_valid_special_form(self.expression_type(&sub.value))
-                    }
-                    _ => !is_valid_special_form(self.expression_type(value)),
-                };
+                let is_invalid = matches!(
+                    self.expression_type(map_subscript(value)),
+                    Type::SpecialForm(SpecialFormType::TypeQualifier(_))
+                );
 
                 if is_invalid
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)

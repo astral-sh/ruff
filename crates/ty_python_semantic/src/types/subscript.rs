@@ -7,6 +7,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
@@ -692,6 +693,13 @@ impl<'db> Type<'db> {
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
                 Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
+            }
+
+            (Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)), _) => {
+                // Subscripting `InitVar` gives you (bizarrely) an instance of `InitVar`,
+                // which isn't representable in our model because we don't recognise there as being
+                // an `InitVar` class at all. This doesn't really matter that much, so just infer `Any` here.
+                Some(Ok(Type::any()))
             }
 
             (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {

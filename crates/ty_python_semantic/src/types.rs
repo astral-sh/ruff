@@ -3736,6 +3736,13 @@ impl<'db> Type<'db> {
                 }
             },
 
+            Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)) => {
+                let parameter = Parameter::positional_or_keyword(Name::new_static("type"))
+                    .with_annotated_type(Type::any());
+                let signature = Signature::new(Parameters::new(db, [parameter]), Type::any());
+                Binding::single(self, signature).into()
+            }
+
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
                 // we will get the signature of the `__call__` attribute, but will pass in the type
@@ -4957,12 +4964,6 @@ impl<'db> Type<'db> {
                 let ty = match class.known(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
-                    Some(KnownClass::InitVar) => {
-                        return Err(InvalidTypeExpressionError {
-                            invalid_expressions: smallvec_inline![InvalidTypeExpression::InitVar],
-                            fallback_type: Type::unknown(),
-                        });
-                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
@@ -6678,7 +6679,6 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(TypeQualifier),
-    InitVar,
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
     /// `typing.Self` cannot be used in metaclass definitions.
@@ -6750,10 +6750,6 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
-                        (only in annotation expressions, and only with exactly one argument)",
-                    ),
-                    InvalidTypeExpression::InitVar => f.write_str(
-                        "Type qualifier `dataclasses.InitVar` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
