@@ -46,6 +46,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 16 |     f(c)  # error: [invalid-argument-type]
    |
 info: Element `Foo` of this union is not assignable to `Sized`
+info: protocol member `__len__` is not defined
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -71,6 +72,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 17 |     f(d)  # error: [invalid-argument-type]
    |
 info: Element `Foo` of this union is not assignable to `Sized`
+info: protocol member `__len__` is not defined
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -95,6 +97,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 17 |     f(d)  # error: [invalid-argument-type]
    |
 info: Union elements `Foo` and `Bar` are not assignable to `Sized`
+info: protocol member `__len__` is not defined
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -118,6 +121,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 7 union elements`
    |
 info: Union element `Foo`, and 2 more union elements, are not assignable to `Sized`
+info: protocol member `__len__` is not defined
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |

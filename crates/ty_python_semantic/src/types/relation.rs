@@ -606,10 +606,18 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct TypeRelationErrorContext {
     stack: RefCell<Vec<String>>,
 }
+
+impl PartialEq for TypeRelationErrorContext {
+    fn eq(&self, other: &Self) -> bool {
+        *self.stack.borrow() == *other.stack.borrow()
+    }
+}
+
+impl Eq for TypeRelationErrorContext {}
 
 impl TypeRelationErrorContext {
     fn new() -> Self {
