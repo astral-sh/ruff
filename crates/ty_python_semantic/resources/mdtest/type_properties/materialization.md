@@ -558,6 +558,27 @@ def f(
     reveal_type(unbounded)  # revealed: InvariantUnbounded[T_unbounded@f]
 ```
 
+This also applies when the invariant type argument contains `ParamSpec`-based callable forms:
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+
+class InvariantCallableShape(Generic[T]):
+    value: T
+
+def paramspec(top: Top[InvariantCallableShape[Callable[P, Callable[[A], B]]]]) -> None:
+    reveal_type(top)  # revealed: InvariantCallableShape[(**P@paramspec) -> ((A@paramspec, /) -> B@paramspec)]
+
+def concatenate(top: Top[InvariantCallableShape[Callable[Concatenate[A, P], B]]]) -> None:
+    # revealed: InvariantCallableShape[(A@concatenate, /, *args: P@concatenate.args, **kwargs: P@concatenate.kwargs) -> B@concatenate]
+    reveal_type(top)
+```
+
 Parameters in callable are contravariant, so the variance should be flipped:
 
 ```py
