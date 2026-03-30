@@ -9,6 +9,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -1563,21 +1564,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let arguments_slice = &*subscript.slice;
         match special_form {
-            SpecialFormType::Annotated => {
-                let ty = self
-                    .infer_subscript_load_impl(
-                        Type::SpecialForm(SpecialFormType::Annotated),
-                        subscript,
-                    )
-                    .in_type_expression(db, self.scope(), None, self.inference_flags)
-                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript));
-                // Only store on the tuple slice; non-tuple cases are handled by
-                // `infer_subscript_load_impl` via `infer_expression`.
-                if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, ty);
-                }
-                ty
-            }
+            SpecialFormType::Annotated => self
+                .parse_subscription_of_annotated_special_form(
+                    subscript,
+                    AnnotatedExprContext::TypeExpression,
+                )
+                .inner_type()
+                .in_type_expression(self.db(), self.scope(), None, self.inference_flags)
+                .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript)),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {

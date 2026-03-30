@@ -2,10 +2,9 @@ use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
-use crate::types::diagnostic::{
-    INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
-};
+use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
 use crate::types::infer::builder::InferenceFlags;
+use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
@@ -15,7 +14,7 @@ use crate::types::{
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum PEP613Policy {
+pub(super) enum PEP613Policy {
     Allowed,
     Disallowed,
 }
@@ -86,7 +85,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Implementation of [`infer_annotation_expression`].
     ///
     /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
-    fn infer_annotation_expression_impl(
+    pub(super) fn infer_annotation_expression_impl(
         &mut self,
         annotation: &ast::Expr,
         pep_613_policy: PEP613Policy,
@@ -222,50 +221,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match value_ty {
                     Type::SpecialForm(special_form) => match special_form {
                         SpecialFormType::Annotated => {
-                            // This branch is similar to the corresponding branch in
-                            // `infer_parameterized_special_form_type_expression`, but
-                            // `Annotated[…]` can appear both in annotation expressions and in
-                            // type expressions, and needs to be handled slightly
-                            // differently in each case (calling either `infer_type_expression_*`
-                            // or `infer_annotation_expression_*`).
-                            if let ast::Expr::Tuple(ast::ExprTuple {
-                                elts: arguments, ..
-                            }) = slice
-                            {
-                                if arguments.len() < 2 {
-                                    report_invalid_arguments_to_annotated(&self.context, subscript);
-                                }
-
-                                if let [inner_annotation, metadata @ ..] = &arguments[..] {
-                                    for element in metadata {
-                                        self.infer_expression(element, TypeContext::default());
-                                    }
-
-                                    let inner_annotation_ty = self
-                                        .infer_annotation_expression_impl(
-                                            inner_annotation,
-                                            PEP613Policy::Disallowed,
-                                        );
-
-                                    self.store_expression_type(
-                                        slice,
-                                        inner_annotation_ty.inner_type(),
-                                    );
-                                    inner_annotation_ty
-                                } else {
-                                    for argument in arguments {
-                                        self.infer_expression(argument, TypeContext::default());
-                                    }
-                                    self.store_expression_type(slice, Type::unknown());
-                                    TypeAndQualifiers::declared(Type::unknown())
-                                }
-                            } else {
-                                report_invalid_arguments_to_annotated(&self.context, subscript);
-                                self.infer_annotation_expression_impl(
-                                    slice,
-                                    PEP613Policy::Disallowed,
+                            let inferred = self.parse_subscription_of_annotated_special_form(
+                                subscript,
+                                AnnotatedExprContext::AnnotationExpression,
+                            );
+                            let in_type_expression = inferred
+                                .inner_type()
+                                .in_type_expression(
+                                    self.db(),
+                                    self.scope(),
+                                    None,
+                                    self.inference_flags,
                                 )
-                            }
+                                .unwrap_or_else(|err| {
+                                    err.into_fallback_type(&self.context, subscript)
+                                });
+                            TypeAndQualifiers::declared(in_type_expression)
+                                .with_qualifier(inferred.qualifiers())
                         }
                         SpecialFormType::TypeQualifier(qualifier) => {
                             let arguments = if let ast::Expr::Tuple(tuple) = slice {
