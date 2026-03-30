@@ -489,6 +489,23 @@ static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
+### Equivalence of top materializations of mutually recursive invariant aliases
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_equivalent_to, is_subtype_of, Top
+
+class Box[T]:
+    pass
+
+type A = Callable[[B], None]
+type B = Callable[[A], None]
+
+static_assert(is_equivalent_to(Top[Box[A]], Top[Box[B]]))
+static_assert(is_subtype_of(Top[Box[A]], Top[Box[B]]))
+static_assert(is_subtype_of(Top[Box[B]], Top[Box[A]]))
+```
+
 ### Assignment through recursive aliases
 
 ```py

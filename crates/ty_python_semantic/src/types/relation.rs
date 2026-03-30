@@ -455,42 +455,11 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub(crate) fn is_equivalent_to_with_materialization_visitor(
-        self,
-        db: &'db dyn Db,
-        other: Type<'db>,
-        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> bool {
-        self.when_equivalent_to_with_materialization_visitor(
-            db,
-            other,
-            &ConstraintSetBuilder::new(),
-            materialization_visitor,
-        )
-        .is_always_satisfied(db)
-    }
-
     pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        self.when_equivalent_to_with_materialization_visitor(
-            db,
-            other,
-            constraints,
-            &materialization_visitor,
-        )
-    }
-
-    pub(crate) fn when_equivalent_to_with_materialization_visitor<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Type<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -499,7 +468,6 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
@@ -1590,7 +1558,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1618,11 +1585,13 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
-    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
-    fn as_relation_checker(&self) -> TypeRelationChecker<'_, 'c, 'db> {
+    fn as_relation_checker<'a>(
+        &'a self,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    ) -> TypeRelationChecker<'a, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
@@ -1630,7 +1599,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            materialization_visitor: self.materialization_visitor,
+            materialization_visitor,
         }
     }
 
@@ -1648,11 +1617,15 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_checker = self.as_relation_checker();
-        relation_checker
+        // Recursive materialization fallbacks depend on the root being materialized, so the two
+        // directional equivalence passes must not share a cache.
+        let left_to_right_materialization_visitor = ApplyTypeMappingVisitor::default();
+        self.as_relation_checker(&left_to_right_materialization_visitor)
             .check_type_pair(db, left, right)
             .and(db, self.constraints, || {
-                relation_checker.check_type_pair(db, right, left)
+                let right_to_left_materialization_visitor = ApplyTypeMappingVisitor::default();
+                self.as_relation_checker(&right_to_left_materialization_visitor)
+                    .check_type_pair(db, right, left)
             })
     }
 }
@@ -1712,7 +1685,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
-            materialization_visitor: self.materialization_visitor,
         }
     }
 
