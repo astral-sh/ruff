@@ -2200,10 +2200,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     return Some(Parameters::paramspec(self.db(), tvar));
                 }
-                if parameters_type == Type::Dynamic(DynamicType::Unknown) {
-                    // This *probably* means we emitted an error during the
-                    // `self.infer_type_expression_no_store` call above, so we can avoid emitting a
-                    // follow-up error about invalid `Callable` parameters.
+                if parameters_type == Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
+                    // Avoid emitting a confusing error here saying that the first argument to
+                    // `Callable` must be "Concatenate, `...`, a parameter list or a ParamSpec"
+                    // if the first argument *was* in fact `Concatenate` -- it was just used
+                    // incorrectly. We'll have emitted an error elsewhere about the invalid use.
                     return Some(Parameters::unknown());
                 }
             }
@@ -2313,9 +2314,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     previously_allowed_paramspec,
                 );
                 let Type::TypeVar(typevar) = expr_type else {
-                    // `Unknown` signifies that we probably emitted a diagnostic elsewhere,
-                    // so avoid emitting another diagnostic here
-                    if !expr_type.is_unknown() {
+                    // `Concatenate` *is* allowed inside `Concatenate`, so avoid emitting here a diagnostic
+                    // saying that the argument is invalid if the inner type is an invalid use of the
+                    // `Concatenate` special form (we'll already have complained about the invalid use
+                    // elsewhere)
+                    if expr_type != Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
                         report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
                     }
                     return None;

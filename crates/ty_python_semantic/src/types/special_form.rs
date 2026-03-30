@@ -11,7 +11,6 @@ use crate::semantic_index::{
     scope::ScopeId,
     semantic_index, use_def_map,
 };
-use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
 use crate::types::{
     CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
@@ -19,6 +18,7 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
+use crate::types::{DynamicType, IntersectionType};
 use ruff_db::files::File;
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
@@ -781,13 +781,20 @@ impl SpecialFormType {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Concatenate
                     ],
-                    fallback_type: Type::unknown(),
+                    fallback_type: Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
                 })
             }
 
             // `Concatenate` can be valid in this context in a type expression,
             // but type arguments weren't provided here.
-            Self::Annotated | Self::Concatenate => Err(InvalidTypeExpressionError {
+            Self::Concatenate => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresTwoArguments(self)
+                ],
+                fallback_type: Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+            }),
+
+            Self::Annotated => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::RequiresTwoArguments(self)
                 ],

@@ -814,7 +814,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let param_type = self.infer_type_expression(single_elt);
                     match param_type {
                         Type::Dynamic(dynamic) if dynamic.is_todo() => Parameters::todo(),
-                        Type::Dynamic(DynamicType::Unknown) => Parameters::unknown(),
+                        Type::Dynamic(dynamic) if dynamic != DynamicType::Any => {
+                            Parameters::unknown()
+                        }
                         _ => Parameters::new(
                             self.db(),
                             [Parameter::positional_only(None).with_annotated_type(param_type)],
@@ -930,9 +932,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let parameters =
                             if param_type.is_todo() {
                                 Parameters::todo()
-                            } else if param_type.is_unknown() {
+                            } else if param_type.is_dynamic() && param_type != Type::any() {
                                 // If we ended up with an `Unknown` type here, it almost certainly means
-                                // that we already emitted an error elsewhere
+                                // that we already emitted an error elsewhere. Fallback to the more lenient
+                                // type.
                                 Parameters::unknown()
                             } else {
                                 Parameters::new(
@@ -964,7 +967,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // If we ended up with an `Unknown` type here, it almost certainly means
                     // that we already emitted an error elsewhere
-                    Type::Dynamic(DynamicType::Unknown) => {
+                    Type::Dynamic(_) => {
                         return Ok(Type::paramspec_value_callable(db, Parameters::unknown()));
                     }
 
