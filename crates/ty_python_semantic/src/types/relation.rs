@@ -727,15 +727,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn extend_error_context_from(&self, other: &Self) {
-        if let (Some(ctx), Some(other_ctx)) = (&self.error_context, &other.error_context) {
-            ctx.extend(other_ctx);
-        }
-    }
-
     pub(super) fn provide_error_hint(&self, get_message: impl FnOnce() -> String) {
         if let Some(error_context) = &self.error_context {
             error_context.push(get_message());
+        }
+    }
+
+    pub(super) fn extend_error_context_from(&self, other: &Self) {
+        if let (Some(ctx), Some(other_ctx)) = (&self.error_context, &other.error_context) {
+            ctx.extend(other_ctx);
         }
     }
 

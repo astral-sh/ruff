@@ -1238,6 +1238,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let mut result = self.always();
 
+        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
+        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
+        // if the return types are incompatible.
+        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_checks = !result
+            .intersect(db, self.constraints, return_type_constraints)
+            .is_never_satisfied(db);
+        if !return_type_checks {
+            self.provide_error_hint(|| {
+                format!(
+                    "incompatible return types `{}` and `{}`",
+                    source.return_ty.display(db),
+                    target.return_ty.display(db),
+                )
+            });
+        }
+
         let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
             match (type1, type2) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
@@ -1265,11 +1282,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
                 .is_never_satisfied(db)
         };
-
-        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
-        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
-        // if the return types are incompatible.
-        let return_type_checks = check_types(source.return_ty, target.return_ty);
 
         if self.relation.is_constraint_set_assignability() {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
