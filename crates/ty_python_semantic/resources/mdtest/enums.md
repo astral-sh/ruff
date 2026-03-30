@@ -1437,7 +1437,7 @@ reveal_type(enum_members(E3))  # revealed: Unknown
 from enum import Enum
 from ty_extensions import enum_members
 
-# this is invalid at runtime: TypeError
+# error: [too-many-positional-arguments]
 Color = Enum("Color", "RED", "GREEN", "BLUE")
 
 reveal_type(enum_members(Color))  # revealed: Unknown
@@ -1465,6 +1465,53 @@ def make_enum(name: str, labels: tuple[str, ...]) -> type[Enum]:
     result = Enum(name.title(), labels, module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result
+```
+
+### Non-string name
+
+```py
+from enum import Enum
+
+# error: [invalid-argument-type]
+Color = Enum(123, "RED GREEN BLUE")
+```
+
+### Unknown keyword arguments
+
+```py
+from enum import Enum
+
+# error: [unknown-argument]
+Color = Enum("Color", "RED GREEN BLUE", bad_kwarg=True)
+```
+
+### `boundary` keyword (Python 3.11+)
+
+#### Available on 3.11+
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Flag
+
+Perm = Flag("Perm", "READ WRITE EXECUTE", boundary=None)
+```
+
+#### Rejected before 3.11
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Flag
+
+# error: [unknown-argument]
+Perm = Flag("Perm", "READ WRITE EXECUTE", boundary=None)
 ```
 
 ### StrEnum function syntax
@@ -1553,6 +1600,24 @@ reveal_type(enum_members(Perm))
 reveal_type(Perm.READ.value)  # revealed: Literal[1]
 reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
 reveal_type(Perm.EXECUTE.value)  # revealed: Literal[4]
+```
+
+### Large start value (overflow guard)
+
+Values that would overflow `i64` should gracefully widen to `int`.
+
+```py
+from enum import Enum, Flag
+
+Big = Enum("Big", "A B", start=9223372036854775807)
+
+reveal_type(Big.A.value)  # revealed: Literal[9223372036854775807]
+reveal_type(Big.B.value)  # revealed: int
+
+BigFlag = Flag("BigFlag", "X Y", start=4611686018427387904)
+
+reveal_type(BigFlag.X.value)  # revealed: Literal[4611686018427387904]
+reveal_type(BigFlag.Y.value)  # revealed: int
 ```
 
 ## Exhaustiveness checking

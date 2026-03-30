@@ -1,12 +1,13 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 
 use crate::{
-    Db,
+    Db, Program,
     semantic_index::definition::Definition,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
+        diagnostic::{INVALID_ARGUMENT_TYPE, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT},
         infer::TypeInferenceBuilder,
         subclass_of::SubclassOfType,
     },
@@ -43,9 +44,24 @@ fn enum_auto_value<'db>(
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
         KnownClass::Flag | KnownClass::IntFlag => {
-            Type::int_literal(start << i64::try_from(index).unwrap_or(0))
+            let shift = i64::try_from(index).ok();
+            let headroom = if start >= 0 {
+                start.leading_zeros().saturating_sub(1)
+            } else {
+                start.leading_ones().saturating_sub(1)
+            };
+            shift
+                .and_then(|s| u32::try_from(s).ok())
+                .filter(|&s| s <= headroom)
+                .and_then(|s| start.checked_shl(s))
+                .map(Type::int_literal)
+                .unwrap_or_else(|| KnownClass::Int.to_instance(db))
         }
-        _ => Type::int_literal(start + i64::try_from(index).unwrap_or(0)),
+        _ => i64::try_from(index)
+            .ok()
+            .and_then(|i| start.checked_add(i))
+            .map(Type::int_literal)
+            .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
     }
 }
 
@@ -69,10 +85,17 @@ fn dict_auto_value<'db>(
             if last_int_value <= 0 {
                 Type::int_literal(1)
             } else {
-                Type::int_literal(1 << (i64::BITS - last_int_value.leading_zeros()))
+                let shift = i64::BITS - last_int_value.leading_zeros();
+                1_i64
+                    .checked_shl(shift)
+                    .map(Type::int_literal)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(db))
             }
         }
-        _ => Type::int_literal(last_int_value + 1),
+        _ => last_int_value
+            .checked_add(1)
+            .map(Type::int_literal)
+            .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
     }
 }
 
@@ -87,17 +110,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let args = &call_expr.arguments.args;
         let keywords = &call_expr.arguments.keywords;
 
-        // bail out on unknown keywords so normal overload resolution can diagnose them
-        let has_unknown_keyword = keywords.iter().any(|kw| {
-            kw.arg.as_ref().is_some_and(|name| {
-                !matches!(
+        let base_name = base_class.name(db);
+        let python_version = Program::get(db).python_version(db);
+
+        for kw in keywords {
+            if let Some(name) = &kw.arg {
+                let is_valid_keyword = matches!(
                     name.as_str(),
-                    "value" | "names" | "start" | "type" | "module" | "qualname" | "boundary"
-                )
-            })
-        });
-        if has_unknown_keyword {
-            return None;
+                    "value" | "names" | "start" | "type" | "module" | "qualname"
+                ) || (name.as_str() == "boundary"
+                    && python_version >= PythonVersion::PY311);
+                if !is_valid_keyword {
+                    if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
+                        builder.into_diagnostic(format_args!(
+                            "Argument `{name}` does not match any known parameter of function `{base_name}`",
+                        ));
+                    }
+                }
+            }
         }
 
         let value_kw = call_expr.arguments.find_keyword("value");
@@ -131,6 +161,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Non-literal name: return type[base_class] without creating a
         // DynamicEnumLiteral. This matches the typeshed overload return type.
         if !name_arg.is_string_literal_expr() {
+            let name_type = self.expression_type(name_arg);
+            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid argument to parameter `value` of `{base_name}()`"
+                ));
+                diagnostic.set_primary_message(format_args!(
+                    "Expected `str`, found `{}`",
+                    name_type.display(db)
+                ));
+            }
             return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
         }
 
@@ -151,6 +193,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
         let has_too_many_positional = args.len() > 2;
+        if has_too_many_positional {
+            if let Some(builder) = self
+                .context
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
+            {
+                builder.into_diagnostic(format_args!(
+                    "Too many positional arguments to function `{base_name}`: expected 2, got {}",
+                    args.len(),
+                ));
+            }
+        }
 
         // without `names`, this is a value-lookup call, not functional enum creation
         let names_arg = names_arg?;

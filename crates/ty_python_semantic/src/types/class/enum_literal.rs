@@ -102,8 +102,8 @@ impl<'db> DynamicEnumLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
+    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let _ = self;
         KnownClass::EnumType.to_class_literal(db)
     }
 
