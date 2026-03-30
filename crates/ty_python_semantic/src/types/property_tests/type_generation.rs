@@ -5,8 +5,9 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::known_instance::KnownInstanceType;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, EnumLiteralType, IntersectionBuilder, IntersectionType, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
+    IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
@@ -22,6 +23,9 @@ use ty_module_resolver::KnownModule;
 pub(crate) enum Ty {
     Never,
     Unknown,
+    Divergent,
+    TopDivergent,
+    BottomDivergent,
     None,
     Any,
     IntLiteral(i64),
@@ -147,6 +151,9 @@ impl Ty {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
+            Ty::Divergent => divergent(db, 1, None),
+            Ty::TopDivergent => divergent(db, 2, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, 3, Some(MaterializationKind::Bottom)),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
@@ -258,6 +265,19 @@ impl Ty {
     }
 }
 
+fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationKind>) -> Type<'_> {
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+
+    match materialization {
+        Some(materialization_kind) => divergent.materialize(
+            db,
+            materialization_kind,
+            &ApplyTypeMappingVisitor::default(),
+        ),
+        None => divergent,
+    }
+}
+
 fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
@@ -288,10 +308,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 5;
+    let fully_static_index = 8;
     let types = &[
         Ty::Any,
         Ty::Unknown,
+        Ty::Divergent,
+        Ty::TopDivergent,
+        Ty::BottomDivergent,
         Ty::SubclassOfAny,
         Ty::UnittestMockLiteral,
         Ty::UnittestMockInstance,
