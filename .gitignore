@@ -29,9 +29,6 @@ tracing.folded
 tracing-flamechart.svg
 tracing-flamegraph.svg
 
-# Personal notes
-/.notes
-
 # insta
 *.rs.pending-snap
 
