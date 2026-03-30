@@ -363,7 +363,7 @@ impl<'db> Type<'db> {
             constraints: &builder,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
-            error_context: Some(RefCell::new(TypeRelationErrorContext::new())),
+            error_context: Some(TypeRelationErrorContext::new()),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -374,7 +374,7 @@ impl<'db> Type<'db> {
             Ok(())
         } else {
             if let Some(error_context) = checker.error_context {
-                Err(std::mem::take(&mut error_context.borrow_mut()))
+                Err(error_context)
             } else {
                 unreachable!("TypeRelationChecker was constructed with an error context");
             }
@@ -608,24 +608,28 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 
 #[derive(Clone, Default)]
 pub struct TypeRelationErrorContext {
-    stack: Vec<String>,
+    stack: RefCell<Vec<String>>,
 }
 
 impl TypeRelationErrorContext {
     fn new() -> Self {
-        Self { stack: Vec::new() }
-    }
-
-    fn push(&mut self, message: String) {
-        self.stack.push(message);
-    }
-
-    pub fn info_messages(&self) -> impl IntoIterator<Item = String> + '_ {
-        let mut messages = Vec::new();
-        for (indent, message) in self.stack.iter().rev().enumerate() {
-            messages.push(format!("{}{}", "  ".repeat(indent), message));
+        Self {
+            stack: RefCell::new(Vec::new()),
         }
-        messages
+    }
+
+    fn push(&self, message: String) {
+        self.stack.borrow_mut().push(message);
+    }
+
+    pub fn info_messages(&self) -> Vec<String> {
+        let stack = self.stack.borrow();
+        stack
+            .iter()
+            .rev()
+            .enumerate()
+            .map(|(indent, message)| format!("{}{}", "  ".repeat(indent), message))
+            .collect()
     }
 }
 
@@ -634,7 +638,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    error_context: Option<RefCell<TypeRelationErrorContext>>,
+    error_context: Option<TypeRelationErrorContext>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -709,22 +713,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         get_message: impl FnOnce() -> String,
     ) {
         if let Some(error_context) = &self.error_context {
-            let mut ctx = error_context.borrow_mut();
-
-            ctx.push(format!(
+            error_context.push(format!(
                 "type `{source}` is not assignable to `{target}`",
                 source = source.display(db),
                 target = target.display(db)
             ));
 
-            ctx.push(format!("{message}:", message = get_message()));
+            error_context.push(format!("{message}:", message = get_message()));
         }
     }
 
     pub(super) fn provide_error_hint(&self, get_message: impl FnOnce() -> String) {
         if let Some(error_context) = &self.error_context {
-            let mut ctx = error_context.borrow_mut();
-            ctx.push(get_message());
+            error_context.push(get_message());
         }
     }
 
