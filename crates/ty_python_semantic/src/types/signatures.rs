@@ -1248,7 +1248,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if !return_type_checks {
             self.provide_error_hint(|| {
                 format!(
-                    "while comparing return types `{}` and `{}`",
+                    "incompatible return types `{}` and `{}`",
                     source.return_ty.display(db),
                     target.return_ty.display(db),
                 )
@@ -1281,7 +1281,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db) {
                 self.provide_error_context(db, target_ty, source_ty, || {
-                    "while comparing parameter types".to_string()
+                    "incompatible parameter types".to_string()
                 });
             }
             !result

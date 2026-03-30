@@ -83,7 +83,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
    |             Declared type
    |
 info: type `str` is not assignable to `bytes`
-info: ├── while comparing parameter types
+info: ├── incompatible parameter types
 info: └── while checking protocol member `check`
 info: rule `invalid-assignment` is enabled by default
 
