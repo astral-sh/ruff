@@ -119,14 +119,14 @@ impl Statistics {
             let input = InternedInput::new(black, ruff);
             let changes = Diff::compute(Algorithm::Histogram, &input);
             let removals = changes.count_removals();
-            let insertions = changes.count_additions();
+            let additions = changes.count_additions();
             assert_eq!(
                 input.before.len() - (removals as usize),
-                input.after.len() - (insertions as usize)
+                input.after.len() - (additions as usize)
             );
             Self {
                 black_input: removals,
-                ruff_output: insertions,
+                ruff_output: additions,
                 intersection: u32::try_from(input.before.len()).unwrap() - removals,
                 files_with_differences: 1,
             }
