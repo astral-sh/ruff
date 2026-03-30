@@ -197,6 +197,9 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 ///
 /// Lines that consist solely of whitespace are trimmed to a blank line.
 ///
+/// Lines that start with formfeeds have the indentation after the formfeeds
+/// removed and the formfeeds reinstated
+///
 /// # Panics
 /// If the first line is indented by less than the provided indent.
 pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
@@ -242,9 +245,14 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
             } else {
                 // Otherwise, reduce the indentation level.
                 if line.starts_with('\x0C') {
-                    result.push('\x0C');
-                    result.push_str(&line.trim_start_matches('\x0C')[dedent_len..]);
-                    result.push('\n');
+                    let formfeed_count = line.chars().take_while(|&c| c == '\x0C').count();
+                    let content = &line[formfeed_count..];
+
+                    for _ in 0..formfeed_count {
+                        result.push('\x0C');
+                    }
+                    result.push_str(&content[dedent_len..]);
+                    result.push_str(line.line_ending().unwrap_or_default().as_str());
                 } else {
                     result.push_str(&line.as_full_str()[dedent_len..]);
                 }
@@ -592,6 +600,48 @@ mod tests {
         let y = [
             "1",
             "2"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_preserves_crlf_for_lines_starting_with_form_feed() {
+        let x = [
+            "\x0C    1\r\n",
+            "    2\r\n",
+        ].join("");
+        let y = [
+            "\x0C1\r\n",
+            "2\r\n",
+        ].join("");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_preserves_multiple_leading_form_feeds() {
+        let x = [
+            "\x0C\x0C    1",
+            "    2",
+        ].join("\n");
+        let y = [
+            "\x0C\x0C1",
+            "2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_handles_when_multiple_leading_form_feeds_greater_than_dedent_len() {
+        let x = [
+            "\x0C\x0C\x0C\x0C  1",
+            "  2",
+        ].join("\n");
+        let y = [
+            "\x0C\x0C\x0C\x0C1",
+            "2",
         ].join("\n");
         assert_eq!(dedent_to(&x, ""), Some(y));
     }
