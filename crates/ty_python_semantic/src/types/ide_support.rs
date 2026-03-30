@@ -1828,7 +1828,7 @@ fn class_literal_to_hierarchy_info(
 }
 
 pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
-    let c = call_expr.func.inferred_type(model)?;
+    let function_ty = call_expr.func.inferred_type(model)?;
     let db = model.db();
     let class_name = c.as_class_literal()?.name(db);
     let display_sig = |signature: &Signature| {
