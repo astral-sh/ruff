@@ -46,7 +46,7 @@ error[invalid-assignment]: Object of type `def source(x: int, y: str) -> None` i
 7 | def _(source: Callable[[int, str], bool]):
 8 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
   |
-info: incompatible return types `None` and `bool`
+info: while comparing return types `None` and `bool`
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -64,6 +64,8 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
  9 | def _(source: Callable[[int, bytes], None]):
 10 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
    |
+info: type `bytes` is not assignable to `str`
+info: └── while comparing parameter types
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -81,7 +83,7 @@ error[invalid-assignment]: Object of type `(int, bytes, /) -> None` is not assig
 11 | def _(source: Callable[[int, str], bool]):
 12 |     target: Callable[[int], bool] = source  # error: [invalid-assignment]
    |
-info: incompatible return types `None` and `bool`
+info: while comparing return types `None` and `bool`
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -114,6 +116,8 @@ error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable t
    |         |
    |         Declared type
    |
+info: type `str` is not assignable to `int`
+info: └── while comparing parameter types
 info: rule `invalid-assignment` is enabled by default
 
 ```

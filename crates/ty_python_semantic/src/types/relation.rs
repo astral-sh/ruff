@@ -629,10 +629,19 @@ impl TypeRelationErrorContext {
 
     pub fn info_messages(&self) -> Vec<String> {
         let stack = self.stack.borrow();
+        let len = stack.len();
         stack
             .iter()
             .enumerate()
-            .map(|(indent, message)| format!("{}{}", "  ".repeat(indent), message))
+            .map(|(i, message)| {
+                if i == 0 {
+                    message.clone()
+                } else if i < len - 1 {
+                    format!("├── {message}")
+                } else {
+                    format!("└── {message}")
+                }
+            })
             .collect()
     }
 }

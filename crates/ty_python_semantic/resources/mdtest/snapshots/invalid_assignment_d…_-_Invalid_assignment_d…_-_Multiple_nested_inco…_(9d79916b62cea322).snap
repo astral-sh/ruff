@@ -39,5 +39,8 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |             |
    |             Declared type
    |
+info: type `str` is not assignable to `bytes`
+info: └── while comparing parameter types
+info: rule `invalid-assignment` is enabled by default
 
 ```

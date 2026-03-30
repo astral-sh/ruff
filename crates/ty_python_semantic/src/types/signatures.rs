@@ -1248,15 +1248,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if !return_type_checks {
             self.provide_error_hint(|| {
                 format!(
-                    "incompatible return types `{}` and `{}`",
+                    "while comparing return types `{}` and `{}`",
                     source.return_ty.display(db),
                     target.return_ty.display(db),
                 )
             });
         }
 
-        let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
-            match (type1, type2) {
+        let mut check_types = |target_ty: Type<'db>, source_ty: Type<'db>| {
+            match (target_ty, source_ty) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
                 // position.
@@ -1278,8 +1278,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 _ => {}
             }
 
+            let constraint_set = self.check_type_pair(db, target_ty, source_ty);
+            if constraint_set.is_never_satisfied(db) {
+                self.provide_error_context(db, target_ty, source_ty, || {
+                    "while comparing parameter types".to_string()
+                });
+            }
             !result
-                .intersect(db, self.constraints, self.check_type_pair(db, type1, type2))
+                .intersect(db, self.constraints, constraint_set)
                 .is_never_satisfied(db)
         };
 

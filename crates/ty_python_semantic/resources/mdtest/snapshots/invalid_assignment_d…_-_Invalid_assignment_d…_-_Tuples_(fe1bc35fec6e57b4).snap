@@ -34,7 +34,7 @@ error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assigna
 4 |     target: tuple[int, str, bool] = source  # error: [invalid-assignment]
   |
 info: type `str` is not assignable to `bytes`
-info:   in tuple element 2 of 3
+info: └── in tuple element 2 of 3
 info: rule `invalid-assignment` is enabled by default
 
 ```

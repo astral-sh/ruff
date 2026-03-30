@@ -40,7 +40,7 @@ error[invalid-assignment]: Object of type `HasName` is not assignable to `String
    |             |
    |             Declared type
    |
-info: incompatible return types `bytes` and `str`
+info: while comparing return types `bytes` and `str`
 info: rule `invalid-assignment` is enabled by default
 
 ```
