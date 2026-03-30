@@ -19,6 +19,16 @@ $ ruff check --watch          # Lint files in the current directory and re-lint 
 $ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
+`ruff check` also supports reading arguments from a file using `@`-prefixed argfiles. Each argument
+must be on its own line in the file:
+
+```console
+$ ruff check @/path/to/file_list.txt
+```
+
+This is useful when the list of files to lint is long, contains special characters, or is generated
+dynamically (e.g., by `git diff --name-only`).
+
 For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
