@@ -430,8 +430,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                // For the same reason, symbols declared as nonlocal or global are not recorded.
-                // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
+                // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
+                // forwarding declarations here; `snapshot_enclosing_state` stores only a
+                // constraint for those symbols. Also, if the enclosing scope allows its members to
+                // be modified from elsewhere, the snapshot will not be recorded.
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
                 if self.scopes[enclosing_scope_id].kind().is_module() {
