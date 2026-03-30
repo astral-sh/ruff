@@ -205,14 +205,16 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
     let existing_indent_len = text
         .universal_newlines()
         .find_map(|line| {
-            let trimmed = line.trim_whitespace_start();
+            let line_trimmed_formfeeds = line.trim_start_matches('\x0C');
+            let trimmed = line_trimmed_formfeeds.trim_whitespace_start();
+
             if trimmed.is_empty() {
                 None
             } else if trimmed.starts_with('#') && first_comment.is_none() {
-                first_comment = Some(line.len() - trimmed.len());
+                first_comment = Some(line_trimmed_formfeeds.len() - trimmed.len());
                 None
             } else {
-                Some(line.len() - trimmed.len())
+                Some(line_trimmed_formfeeds.len() - trimmed.len())
             }
         })
         .unwrap_or(first_comment.unwrap_or_default());
@@ -239,7 +241,13 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
                 result.push_str(line.as_full_str());
             } else {
                 // Otherwise, reduce the indentation level.
-                result.push_str(&line.as_full_str()[dedent_len..]);
+                if line.starts_with('\x0C') {
+                    result.push('\x0C');
+                    result.push_str(&line.trim_start_matches('\x0C')[dedent_len..]);
+                    result.push('\n');
+                } else {
+                    result.push_str(&line.as_full_str()[dedent_len..])
+                };
             }
         }
     }
@@ -576,5 +584,15 @@ mod tests {
             "    baz"
         ].join("\n");
         assert_eq!(dedent_to(&x, "  "), Some(y));
+
+        let x = [
+            "    1",
+            "    2"
+        ].join("\n");
+        let y = [
+            "1",
+            "2"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
     }
 }

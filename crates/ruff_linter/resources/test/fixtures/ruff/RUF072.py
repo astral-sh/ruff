@@ -71,6 +71,13 @@ finally:
     pass
     ...
 
+# Bare try finally with line starting with a formfeed
+try:
+    1
+    2
+finally:
+    pass
+
 # OK
 
 # finally with real code

@@ -197,7 +197,7 @@ RUF072 [*] Empty `finally` clause
 72 | |     ...
    | |_______^
 73 |
-74 |   # OK
+74 |   # Bare try finally with line starting with a formfeed
    |
 help: Remove the `finally` clause
 65 |     pass
@@ -210,119 +210,145 @@ help: Remove the `finally` clause
    -     ...
 68 + foo()
 69 |
-70 | # OK
-71 |
+70 | # Bare try finally with line starting with a formfeed
+71 | try:
+
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:78:1
+   |
+76 |       1
+77 |       2
+78 | / finally:
+79 | |     pass
+   | |________^
+80 |
+81 |   # OK
+   |
+help: Remove the `finally` clause
+72 |     ...
+73 |
+74 | # Bare try finally with line starting with a formfeed
+   - try:
+   -     1
+   -     2
+   - finally:
+   -     pass
+75 + 1
+76 + 2
+77 |
+78 | # OK
+79 |
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:102:1
+   --> RUF072.py:109:1
     |
-100 |   except Exception:
-101 |       bar()
-102 | / finally:  # comment
-103 | |     pass
+107 |   except Exception:
+108 |       bar()
+109 | / finally:  # comment
+110 | |     pass
     | |________^
-104 |
-105 |   # Comment on `pass` line
+111 |
+112 |   # Comment on `pass` line
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:110:1
+   --> RUF072.py:117:1
     |
-108 |   except Exception:
-109 |       bar()
-110 | / finally:
-111 | |     pass  # comment
+115 |   except Exception:
+116 |       bar()
+117 | / finally:
+118 | |     pass  # comment
     | |________^
-112 |
-113 |   # Preceding own-line comment
+119 |
+120 |   # Preceding own-line comment
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:119:1
+   --> RUF072.py:126:1
     |
-117 |       bar()
-118 |   # comment
-119 | / finally:
-120 | |     pass
+124 |       bar()
+125 |   # comment
+126 | / finally:
+127 | |     pass
     | |________^
-121 |
-122 |   # Trailing own-line comment
+128 |
+129 |   # Trailing own-line comment
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:127:1
+   --> RUF072.py:134:1
     |
-125 |   except Exception:
-126 |       bar()
-127 | / finally:
-128 | |     pass
+132 |   except Exception:
+133 |       bar()
+134 | / finally:
+135 | |     pass
     | |________^
-129 |       # comment
+136 |       # comment
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:136:1
+   --> RUF072.py:143:1
     |
-134 |   except Exception:
-135 |       bar()
-136 | / finally:
-137 | |     # comment
-138 | |     pass
+141 |   except Exception:
+142 |       bar()
+143 | / finally:
+144 | |     # comment
+145 | |     pass
     | |________^
-139 |
-140 |   # Own-line comment extra-indented before `pass`
+146 |
+147 |   # Own-line comment extra-indented before `pass`
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:145:1
+   --> RUF072.py:152:1
     |
-143 |   except Exception:
-144 |       bar()
-145 | / finally:
-146 | |         # comment
-147 | |     pass
+150 |   except Exception:
+151 |       bar()
+152 | / finally:
+153 | |         # comment
+154 | |     pass
     | |________^
-148 |
-149 |   # Trailing comment indented one level (belongs to finally body)
+155 |
+156 |   # Trailing comment indented one level (belongs to finally body)
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
-   --> RUF072.py:154:1
+   --> RUF072.py:161:1
     |
-152 |   except Exception:
-153 |       bar()
-154 | / finally:
-155 | |     pass
+159 |   except Exception:
+160 |       bar()
+161 | / finally:
+162 | |     pass
     | |________^
-156 |           # indented comment
-    |
-help: Remove the `finally` clause
-
-RUF072 Empty `finally` clause
-   --> RUF072.py:164:1
-    |
-162 |   except Exception:
-163 |       bar()
-164 | / finally:
-165 | |     pass
-    | |________^
-166 |   # dedented comment
+163 |           # indented comment
     |
 help: Remove the `finally` clause
 
 RUF072 Empty `finally` clause
    --> RUF072.py:171:1
     |
-169 |   try:
-170 |       foo()
-171 | / finally:  # comment
+169 |   except Exception:
+170 |       bar()
+171 | / finally:
 172 | |     pass
+    | |________^
+173 |   # dedented comment
+    |
+help: Remove the `finally` clause
+
+RUF072 Empty `finally` clause
+   --> RUF072.py:178:1
+    |
+176 |   try:
+177 |       foo()
+178 | / finally:  # comment
+179 | |     pass
     | |________^
     |
 help: Remove the `finally` clause
