@@ -23,6 +23,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
@@ -31,8 +32,8 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, DynamicType, InternedType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
-    StaticClassLiteral, Type, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -206,37 +207,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 SpecialFormType::Annotated => {
-                    let ast::Expr::Tuple(ast::ExprTuple {
-                        elts: ref arguments,
-                        ..
-                    }) = **slice
-                    else {
-                        report_invalid_arguments_to_annotated(&self.context, subscript);
-
-                        return self.infer_expression(slice, TypeContext::default());
-                    };
-
-                    if arguments.len() < 2 {
-                        report_invalid_arguments_to_annotated(&self.context, subscript);
-                    }
-
-                    let [type_expr, metadata @ ..] = &arguments[..] else {
-                        for argument in arguments {
-                            self.infer_expression(argument, TypeContext::default());
-                        }
-                        self.store_expression_type(slice, Type::unknown());
-                        return Type::unknown();
-                    };
-
-                    for element in metadata {
-                        self.infer_expression(element, TypeContext::default());
-                    }
-
-                    let ty = self.infer_type_expression(type_expr);
-
-                    return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                        db, ty,
-                    )));
+                    return self
+                        .parse_subscription_of_annotated_special_form(
+                            subscript,
+                            AnnotatedExprContext::TypeExpression,
+                        )
+                        .inner_type();
                 }
                 SpecialFormType::Optional => {
                     if matches!(**slice, ast::Expr::Tuple(_))
@@ -1693,6 +1669,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             .is_ok()
     }
+
+    pub(super) fn parse_subscription_of_annotated_special_form(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        subscript_context: AnnotatedExprContext,
+    ) -> TypeAndQualifiers<'db> {
+        let slice = &*subscript.slice;
+        let ast::Expr::Tuple(ast::ExprTuple {
+            elts: arguments, ..
+        }) = slice
+        else {
+            report_invalid_arguments_to_annotated(&self.context, subscript);
+            return subscript_context.infer(self, slice);
+        };
+
+        if arguments.len() < 2 {
+            report_invalid_arguments_to_annotated(&self.context, subscript);
+        }
+
+        let Some(first_argument) = arguments.first() else {
+            self.infer_expression(slice, TypeContext::default());
+            return TypeAndQualifiers::declared(Type::unknown());
+        };
+
+        for metadata_element in &arguments[1..] {
+            self.infer_expression(metadata_element, TypeContext::default());
+        }
+
+        subscript_context.infer(self, first_argument)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1815,4 +1821,38 @@ fn legacy_generic_class_context<'db>(
         db,
         validated_typevars,
     ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AnnotatedExprContext {
+    TypeExpression,
+    AnnotationExpression,
+}
+
+impl AnnotatedExprContext {
+    fn infer<'db>(
+        self,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+        argument: &ast::Expr,
+    ) -> TypeAndQualifiers<'db> {
+        match self {
+            AnnotatedExprContext::TypeExpression => {
+                let inner = builder.infer_type_expression(argument);
+                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                    builder.db(),
+                    inner,
+                )));
+                TypeAndQualifiers::declared(outer)
+            }
+            AnnotatedExprContext::AnnotationExpression => {
+                let inner =
+                    builder.infer_annotation_expression_impl(argument, PEP613Policy::Disallowed);
+                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                    builder.db(),
+                    inner.inner_type(),
+                )));
+                TypeAndQualifiers::declared(outer).with_qualifier(inner.qualifiers())
+            }
+        }
+    }
 }
