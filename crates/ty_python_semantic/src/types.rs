@@ -930,7 +930,6 @@ impl<'db> Type<'db> {
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
             | DynamicType::TodoUnpack
-            | DynamicType::TodoFunctionalTypedDict
             | DynamicType::TodoTypeVarTuple => true,
         })
     }
@@ -3737,32 +3736,6 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::SpecialForm(SpecialFormType::TypedDict) => {
-                Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("typename")))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                Parameter::positional_only(Some(Name::new_static("fields")))
-                                    .with_annotated_type(KnownClass::Dict.to_instance(db))
-                                    .with_default_type(Type::any()),
-                                Parameter::keyword_only(Name::new_static("total"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::bool_literal(true)),
-                                // Future compatibility, in case new keyword arguments will be added:
-                                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                    .with_annotated_type(Type::any()),
-                            ],
-                        ),
-                        Type::Dynamic(DynamicType::TodoFunctionalTypedDict),
-                    ),
-                )
-                .into()
-            }
-
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
                 // we will get the signature of the `__call__` attribute, but will pass in the type
@@ -6003,7 +5976,6 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple
                 | DynamicType::UnspecializedTypeVar
-                | DynamicType::TodoFunctionalTypedDict
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
@@ -6486,8 +6458,6 @@ pub enum DynamicType<'db> {
     TodoStarredExpression,
     /// A special Todo-variant for `TypeVarTuple` instances encountered in type expressions
     TodoTypeVarTuple,
-    /// A special Todo-variant for functional `TypedDict`s.
-    TodoFunctionalTypedDict,
     /// A type that is determined to be divergent during recursive type inference.
     Divergent(DivergentType),
 }
@@ -6514,7 +6484,6 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
             DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
             DynamicType::TodoTypeVarTuple => f.write_str("@Todo(TypeVarTuple)"),
-            DynamicType::TodoFunctionalTypedDict => f.write_str("@Todo(Functional TypedDicts)"),
             DynamicType::Divergent(_) => f.write_str("Divergent"),
         }
     }
@@ -7447,12 +7416,11 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 /// being added to the given class.
 pub(super) fn determine_upper_bound<'db>(
     db: &'db dyn Db,
-    class_literal: StaticClassLiteral<'db>,
-    specialization: Option<Specialization<'db>>,
+    class_literal: ClassLiteral<'db>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {
     let upper_bound = class_literal
-        .iter_mro(db, specialization)
+        .iter_mro(db)
         .take_while(|base| !is_known_base(*base))
         .filter_map(ClassBase::into_class)
         .last()

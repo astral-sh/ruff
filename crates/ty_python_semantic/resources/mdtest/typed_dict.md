@@ -108,6 +108,15 @@ bob.update(string_key_updates)
 
 # error: [invalid-argument-type]
 bob.update(bad_key_updates)
+
+Require = TypedDict(
+    "Require",
+    {"source-path": str, "compiled-module-path": str},
+    total=False,
+)
+
+requirement: Require = {}
+requirement.update({"source-path": "src", "compiled-module-path": "build"})
 ```
 
 `update()` treats the patch operand as partial even when the target `TypedDict` uses `Required` and
@@ -1733,8 +1742,7 @@ def _(p: Person) -> None:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
 
     # Even another typed dict:
-    # TODO: This should evaluate to `Inner`.
-    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner | dict[str, int]
+    reveal_type(p.get("inner", {"inner": 0}))  # revealed: Inner
 
     # We allow access to unknown keys (they could be set for a subtype of Person)
     reveal_type(p.get("unknown"))  # revealed: Unknown | None
@@ -1757,6 +1765,44 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
+Known-key `get()` calls also use the field type as bidirectional context when that produces a valid
+default:
+
+```py
+from typing import TypedDict
+
+class ResolvedData(TypedDict, total=False):
+    x: int
+
+class Payload(TypedDict, total=False):
+    resolved: ResolvedData
+
+class Payload2(TypedDict, total=False):
+    resolved: ResolvedData
+
+def takes_resolved(value: ResolvedData) -> None: ...
+def _(payload: Payload) -> None:
+    reveal_type(payload.get("resolved", {}))  # revealed: ResolvedData
+    takes_resolved(payload.get("resolved", {}))
+
+def _(payload: Payload | Payload2) -> None:
+    reveal_type(payload.get("resolved", {}))  # revealed: ResolvedData
+    takes_resolved(payload.get("resolved", {}))
+```
+
+With a gradual default, the specialized known-key overload and generic default overload both match,
+so we currently fall back to `Unknown`:
+
+```py
+from typing import Any, TypedDict
+
+class GradualDefault(TypedDict, total=False):
+    x: int
+
+def _(td: GradualDefault, default: Any) -> None:
+    reveal_type(td.get("x", default))  # revealed: Unknown
+```
+
 Synthesized `get()` on unions falls back to generic resolution when a key is missing from one arm:
 
 ```py
@@ -1776,6 +1822,16 @@ def _(u: HasX | NoX) -> None:
 def union_get(u: HasX | OptX) -> None:
     # `HasX.x` is required (returns `int`), `OptX.x` is not (returns `int | None`).
     reveal_type(u.get("x"))  # revealed: int | None
+```
+
+`pop()` also uses the field type as bidirectional context for the default argument:
+
+```py
+class Config(TypedDict, total=False):
+    data: dict[str, int]
+
+def _(c: Config) -> None:
+    reveal_type(c.pop("data", {}))  # revealed: dict[str, int]
 ```
 
 Synthesized `pop()` overloads on `TypedDict` unions correctly handle per-arm requiredness:
@@ -2000,6 +2056,33 @@ emp_invalid1 = Employee(department="HR")
 emp_invalid2 = Employee(id=3)
 ```
 
+## Class-based inheritance from functional `TypedDict`
+
+Class-based TypedDicts can inherit from functional TypedDicts:
+
+```py
+from typing import TypedDict
+
+Base = TypedDict("Base", {"a": int}, total=False)
+
+class Child(Base):
+    b: str
+    c: list[int]
+
+child1 = Child(b="hello", c=[1, 2, 3])
+child2 = Child(a=1, b="world", c=[])
+
+reveal_type(child1["a"])  # revealed: int
+reveal_type(child1["b"])  # revealed: str
+reveal_type(child1["c"])  # revealed: list[int]
+
+# error: [missing-typed-dict-key] "Missing required key 'b' in TypedDict `Child` constructor"
+bad_child1 = Child(c=[1])
+
+# error: [missing-typed-dict-key] "Missing required key 'c' in TypedDict `Child` constructor"
+bad_child2 = Child(b="test")
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
@@ -2123,23 +2206,507 @@ _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charl
 
 ## Function/assignment syntax
 
-This is not yet supported. Make sure that we do not emit false positives for this syntax:
+TypedDicts can be created using the functional syntax:
 
 ```py
-from typing_extensions import TypedDict, Required
+from typing_extensions import TypedDict
+from ty_extensions import reveal_mro
 
-# Alternative syntax
-Message = TypedDict("Message", {"id": Required[int], "content": str}, total=False)
+Movie = TypedDict("Movie", {"name": str, "year": int})
 
-msg = Message(id=1, content="Hello")
+reveal_type(Movie)  # revealed: <class 'Movie'>
+reveal_mro(Movie)  # revealed: (<class 'Movie'>, typing.TypedDict, <class 'object'>)
 
-# No errors for yet-unsupported features (`closed`):
+movie = Movie(name="The Matrix", year=1999)
+
+reveal_type(movie)  # revealed: Movie
+reveal_type(movie["name"])  # revealed: str
+reveal_type(movie["year"])  # revealed: int
+```
+
+An empty functional `TypedDict` should pass an empty dict for the `fields` argument:
+
+```py
+from typing_extensions import TypedDict
+
+Empty = TypedDict("Empty", {})
+empty = Empty()
+
+reveal_type(Empty)  # revealed: <class 'Empty'>
+reveal_type(empty)  # revealed: Empty
+
+EmptyPartial = TypedDict("EmptyPartial", {}, total=False)
+reveal_type(EmptyPartial())  # revealed: EmptyPartial
+```
+
+Omitting the `fields` argument entirely is an error:
+
+```py
+from typing_extensions import TypedDict
+
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
+Empty = TypedDict("Empty")
+reveal_type(Empty)  # revealed: <class 'Empty'>
+```
+
+Constructor validation also works with dict literals:
+
+```py
+from typing_extensions import TypedDict
+
+Film = TypedDict("Film", {"title": str, "year": int})
+
+# Valid usage
+film1 = Film({"title": "The Matrix", "year": 1999})
+film2 = Film(title="Inception", year=2010)
+
+reveal_type(film1)  # revealed: Film
+reveal_type(film2)  # revealed: Film
+
+# error: [invalid-argument-type] "Invalid argument to key "year" with declared type `int` on TypedDict `Film`: value of type `Literal["not a year"]`"
+invalid_type = Film({"title": "Bad", "year": "not a year"})
+
+# error: [missing-typed-dict-key] "Missing required key 'year' in TypedDict `Film` constructor"
+missing_key = Film({"title": "Incomplete"})
+
+# error: [invalid-key] "Unknown key "director" for TypedDict `Film`"
+extra_key = Film({"title": "Extra", "year": 2020, "director": "Someone"})
+```
+
+Inline functional `TypedDict`s preserve their field types too:
+
+```py
+from typing_extensions import TypedDict
+
+inline = TypedDict("Inline", {"x": int})(x=1)
+reveal_type(inline["x"])  # revealed: int
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `InlineBad`: value of type `Literal["bad"]`"
+inline_bad = TypedDict("InlineBad", {"x": int})(x="bad")
+```
+
+Inline functional `TypedDict`s preserve `ReadOnly` qualifiers:
+
+```py
+from typing_extensions import TypedDict, ReadOnly
+
+inline_readonly = TypedDict("InlineReadOnly", {"id": ReadOnly[int]})(id=1)
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `InlineReadOnly`: key is marked read-only"
+inline_readonly["id"] = 2
+```
+
+Inline functional `TypedDict`s resolve string forward references to existing names:
+
+```py
+from typing_extensions import TypedDict
+
+class Director:
+    pass
+
+inline_ref = TypedDict("InlineRef", {"director": "Director"})(director=Director())
+reveal_type(inline_ref["director"])  # revealed: Director
+```
+
+## Function syntax with `total=False`
+
+The `total=False` keyword makes all fields optional by default:
+
+```py
+from typing_extensions import TypedDict
+
+# With total=False, all fields are optional by default
+PartialMovie = TypedDict("PartialMovie", {"name": str, "year": int}, total=False)
+
+# All fields are optional
+partial = PartialMovie()
+partial_with_name = PartialMovie(name="The Matrix")
+
+# Non-bool arguments are rejected:
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+TotalNone = TypedDict("TotalNone", {"id": int}, total=None)
+
+# Non-literal bool arguments are also rejected per the spec:
+def f(total: bool) -> None:
+    # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+    TotalDynamic = TypedDict("TotalDynamic", {"id": int}, total=total)
+```
+
+## Function syntax with `Required` and `NotRequired`
+
+The `Required` and `NotRequired` wrappers can be used to override the default requiredness:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=True (default), all fields are required unless wrapped in NotRequired
+MovieWithOptional = TypedDict("MovieWithOptional", {"name": str, "year": NotRequired[int]})
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `MovieWithOptional` constructor"
+empty_movie = MovieWithOptional()
+movie_no_year = MovieWithOptional(name="The Matrix")
+reveal_type(movie_no_year)  # revealed: MovieWithOptional
+reveal_type(movie_no_year["name"])  # revealed: str
+reveal_type(movie_no_year["year"])  # revealed: int
+```
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=False, all fields are optional unless wrapped in Required
+PartialWithRequired = TypedDict("PartialWithRequired", {"name": Required[str], "year": int}, total=False)
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PartialWithRequired` constructor"
+empty_partial = PartialWithRequired()
+partial_no_year = PartialWithRequired(name="The Matrix")
+reveal_type(partial_no_year)  # revealed: PartialWithRequired
+```
+
+## Function syntax with `closed`
+
+The `closed` keyword is accepted but not yet fully supported:
+
+```py
+from typing_extensions import TypedDict
+
+# closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Functional TypedDicts)
+# Non-bool arguments are rejected:
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+ClosedNone = TypedDict("ClosedNone", {"id": int}, closed=None)
 
-# TODO: this should be an error
-msg.content
+# Non-literal bool arguments are also rejected per the spec:
+def f(closed: bool) -> None:
+    # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+    ClosedDynamic = TypedDict("ClosedDynamic", {"id": int}, closed=closed)
+```
+
+## Function syntax with `extra_items`
+
+The `extra_items` keyword is accepted and validated as an annotation expression:
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+# extra_items is accepted (no error)
+MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
+
+# Invalid type expressions are rejected:
+# error: [invalid-syntax-in-forward-annotation] "Syntax error in forward annotation: Unexpected token at the end of an expression"
+BadExtras = TypedDict("BadExtras", {"name": str}, extra_items="not a type expression")
+
+# Forward references in extra_items are supported:
+TD = TypedDict("TD", {}, extra_items="TD | None")
+reveal_type(TD)  # revealed: <class 'TD'>
+
+class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
+
+reveal_type(Foo)  # revealed: <class 'Foo'>
+
+# Type qualifiers like ReadOnly are valid in extra_items (annotation expression, not type expression):
+TD2 = TypedDict("TD2", {}, extra_items=ReadOnly[int])
+
+class Bar(TypedDict("TD3", {}, extra_items=ReadOnly[int])): ...
+```
+
+## Function syntax with forward references
+
+Functional TypedDict supports forward references (string annotations):
+
+```py
+from typing_extensions import TypedDict, NotRequired
+
+# Forward reference to a class defined below
+MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": "Director"})
+
+class Director:
+    name: str
+
+movie: MovieWithDirector = {"title": "The Matrix", "director": Director()}
+reveal_type(movie)  # revealed: MovieWithDirector
+
+# Forward reference to a class defined above
+MovieWithDirector2 = TypedDict("MovieWithDirector2", {"title": str, "director": NotRequired["Director"]})
+
+movie2: MovieWithDirector2 = {"title": "The Matrix"}
+reveal_type(movie2)  # revealed: MovieWithDirector2
+```
+
+String annotations can also wrap the entire `Required` or `NotRequired` qualifier:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# NotRequired as a string annotation
+TD = TypedDict("TD", {"required": str, "optional": "NotRequired[int]"})
+
+# 'required' is required, 'optional' is not required
+td1: TD = {"required": "hello"}  # Valid - optional is not required
+td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
+reveal_type(td1)  # revealed: TD
+reveal_type(td1["required"])  # revealed: Literal["hello"]
+reveal_type(td1["optional"])  # revealed: int
+
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
+bad_td: TD = {"optional": 42}
+
+# Also works with Required in total=False TypedDicts
+TD2 = TypedDict("TD2", {"required": "Required[str]", "optional": int}, total=False)
+
+# 'required' is required, 'optional' is not required
+td3: TD2 = {"required": "hello"}  # Valid
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD2` constructor"
+bad_td2: TD2 = {"optional": 42}
+```
+
+## Recursive functional `TypedDict` (unstringified forward reference)
+
+Forward references in functional `TypedDict` calls must be stringified, since the field types are
+evaluated at runtime. An unstringified self-reference is an error:
+
+```py
+from typing import TypedDict
+
+# error: [unresolved-reference] "Name `T` used when not defined"
+T = TypedDict("T", {"x": T | None})
+```
+
+## Recursive functional `TypedDict`
+
+Functional `TypedDict`s can also be recursive, referencing themselves in field types:
+
+```py
+from __future__ import annotations
+from typing_extensions import TypedDict
+
+# Self-referencing TypedDict using functional syntax
+TreeNode = TypedDict("TreeNode", {"value": int, "left": "TreeNode | None", "right": "TreeNode | None"})
+
+reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
+
+leaf: TreeNode = {"value": 1, "left": None, "right": None}
+reveal_type(leaf["value"])  # revealed: Literal[1]
+reveal_type(leaf["left"])  # revealed: None
+
+tree: TreeNode = {
+    "value": 10,
+    "left": {"value": 5, "left": None, "right": None},
+    "right": {"value": 15, "left": None, "right": None},
+}
+
+# error: [invalid-argument-type]
+bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
+```
+
+## Deprecated keyword-argument syntax
+
+The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is rejected.
+This syntax is deprecated since Python 3.11, and raises an exception on Python 3.13+:
+
+```py
+from typing_extensions import TypedDict
+
+# error: [unknown-argument] "Argument `name` does not match any known parameter of function `TypedDict`"
+# error: [unknown-argument] "Argument `year` does not match any known parameter of function `TypedDict`"
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
+Movie2 = TypedDict("Movie2", name=str, year=int)
+```
+
+## Function syntax with invalid arguments
+
+```py
+from typing_extensions import TypedDict
+
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
+Bad1 = TypedDict(123, {"name": str})
+
+# error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+Bad2 = TypedDict("Bad2", "not a dict")
+
+def get_fields() -> dict[str, object]:
+    return {"name": str}
+
+# error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+Bad2b = TypedDict("Bad2b", get_fields())
+
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
+
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
+
+tup = ("foo", "bar")
+kw = {"name": str}
+
+# error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
+Bad5 = TypedDict(*tup)
+
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+Bad6 = TypedDict("Bad6", {"name": str}, **kw)
+
+# error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
+Bad7 = TypedDict(*tup, **kw)
+
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+# error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
+Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
+
+kwargs = {"x": int}
+
+# error: [invalid-argument-type] "Expected a dict literal with string-literal keys for parameter `fields` of `TypedDict()`"
+# error: [invalid-type-form]
+Bad8 = TypedDict("Bad8", {**kwargs})
+
+def get_name() -> str:
+    return "x"
+
+name = get_name()
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+Bad9 = TypedDict("Bad9", {name: int})
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+# error: [invalid-type-form]
+Bad10 = TypedDict("Bad10", {name: 42})
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+class Bad11(TypedDict("Bad11", {name: 42})): ...
+```
+
+## Functional `TypedDict` with unknown fields
+
+When a functional `TypedDict` has unparseable fields (e.g., non-literal keys), the resulting type
+behaves like a `TypedDict` with no known fields. This is consistent with pyright and mypy:
+
+```py
+from typing import TypedDict
+
+def get_name() -> str:
+    return "x"
+
+key = get_name()
+
+# error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+Bad = TypedDict("Bad", {key: int})
+
+# No known fields, so keyword arguments are rejected
+# error: [invalid-key]
+b = Bad(x=1)
+reveal_type(b)  # revealed: Bad
+
+# Field access reports unknown keys
+# error: [invalid-key]
+reveal_type(b["x"])  # revealed: Unknown
+```
+
+## Equivalence between functional and class-based `TypedDict`
+
+Functional and class-based `TypedDict`s with the same fields are structurally equivalent:
+
+```py
+from typing import TypedDict
+from typing_extensions import assert_type
+from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+
+class ClassBased(TypedDict):
+    name: str
+    age: int
+
+Functional = TypedDict("Functional", {"name": str, "age": int})
+
+static_assert(is_equivalent_to(ClassBased, Functional))
+static_assert(is_assignable_to(ClassBased, Functional))
+static_assert(is_assignable_to(Functional, ClassBased))
+
+cb: ClassBased = {"name": "Alice", "age": 30}
+assert_type(cb, Functional)
+
+fn: Functional = {"name": "Bob", "age": 25}
+assert_type(fn, ClassBased)
+```
+
+## Subtyping between functional and class-based `TypedDict`
+
+A functional `TypedDict` is not a subtype of a class-based one when the field types differ:
+
+```py
+from typing import TypedDict
+from ty_extensions import is_assignable_to, static_assert
+
+class StrFields(TypedDict):
+    x: str
+
+IntFields = TypedDict("IntFields", {"x": int})
+
+static_assert(not is_assignable_to(IntFields, StrFields))
+static_assert(not is_assignable_to(StrFields, IntFields))
+```
+
+## Methods on functional `TypedDict`
+
+Functional `TypedDict`s support the same synthesized methods as class-based ones:
+
+```py
+from typing import TypedDict
+
+Person = TypedDict("Person", {"name": str, "age": int})
+
+def _(p: Person) -> None:
+    # __getitem__
+    reveal_type(p["name"])  # revealed: str
+    reveal_type(p["age"])  # revealed: int
+
+    # get()
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+
+    # setdefault()
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+
+    # __contains__
+    reveal_type("name" in p)  # revealed: bool
+
+    # __setitem__
+    p["name"] = "Alice"
+    # error: [invalid-assignment]
+    p["name"] = 42
+
+    # __delitem__ on required fields is an error
+    # error: [invalid-argument-type]
+    del p["name"]
+```
+
+Functional `TypedDict`s with `total=False` have optional fields that support `pop` and `del`:
+
+```py
+from typing import TypedDict
+
+Partial = TypedDict("Partial", {"name": str, "extra": int}, total=False)
+
+def _(p: Partial) -> None:
+    reveal_type(p.get("name"))  # revealed: str | None
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.pop("name"))  # revealed: str
+    reveal_type(p.pop("name", "fallback"))  # revealed: str
+    reveal_type(p.copy())  # revealed: Partial
+    del p["extra"]
+```
+
+## Merge operators on functional `TypedDict`
+
+```py
+from typing import TypedDict
+
+Foo = TypedDict("Foo", {"x": int, "y": str})
+
+def _(a: Foo, b: Foo) -> None:
+    reveal_type(a | b)  # revealed: Foo
+    reveal_type(a | {"x": 1})  # revealed: Foo
+    reveal_type(a | {"x": 1, "y": "a", "z": True})  # revealed: dict[str, object]
 ```
 
 ## Error cases
@@ -3236,15 +3803,14 @@ class Child(Base):
     y: str
 ```
 
-The functional `TypedDict` syntax is not yet fully supported, so we don't currently emit an error
-for it. Once functional `TypedDict` support is added, this should also emit an error:
+The functional `TypedDict` syntax also triggers this error:
 
 ```py
 from dataclasses import dataclass
 from typing import TypedDict
 
-# TODO: This should error once functional TypedDict is supported
 @dataclass
+# error: [invalid-dataclass]
 class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
 ```
@@ -3570,10 +4136,11 @@ The functional syntax also supports `extra_items`:
 ```py
 MovieFunctional = TypedDict("MovieFunctional", {"name": str}, extra_items=bool)
 
-d: MovieFunctional = {"name": "Blade Runner", "novel_adaptation": True}
+# TODO: should be OK (extra key with correct type), no errors
+d: MovieFunctional = {"name": "Blade Runner", "novel_adaptation": True}  # error: [invalid-key]
 
-# TODO: should be error: [invalid-argument-type]
-e: MovieFunctional = {"name": "Blade Runner", "year": 1982}
+# TODO: should be error: [invalid-argument-type] (wrong type for extra key), not [invalid-key]
+e: MovieFunctional = {"name": "Blade Runner", "year": 1982}  # error: [invalid-key]
 ```
 
 ### `extra_items` parameter must be a valid annotation expression; the only legal type qualifier is `ReadOnly`

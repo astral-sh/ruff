@@ -1808,6 +1808,10 @@ fn class_literal_to_hierarchy_info(
                 (header_range, header_range)
             }
         }
+        ClassLiteral::DynamicTypedDict(typeddict) => {
+            let header_range = typeddict.header_range(db);
+            (header_range, header_range)
+        }
     };
 
     TypeHierarchyClass {

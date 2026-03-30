@@ -10,13 +10,17 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
     report_missing_typed_dict_key,
 };
-use super::{ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, visitor};
+use super::infer::infer_deferred_types;
+use super::{
+    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers,
+    definition_expression_type, visitor,
+};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;
@@ -42,6 +46,25 @@ impl Default for TypedDictParams {
     fn default() -> Self {
         Self::TOTAL
     }
+}
+
+pub(super) fn functional_typed_dict_field(
+    declared_ty: Type<'_>,
+    qualifiers: TypeQualifiers,
+    total: bool,
+) -> TypedDictField<'_> {
+    let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+        true
+    } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+        false
+    } else {
+        total
+    };
+
+    TypedDictFieldBuilder::new(declared_ty)
+        .required(required)
+        .read_only(qualifiers.contains(TypeQualifiers::READ_ONLY))
+        .build()
 }
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
@@ -106,7 +129,13 @@ impl<'db> TypedDictType<'db> {
         }
 
         match self {
-            Self::Class(defining_class) => class_based_items(db, defining_class),
+            Self::Class(defining_class) => {
+                // Check if this is a dynamic TypedDict
+                if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
+                    return class.items(db);
+                }
+                class_based_items(db, defining_class)
+            }
             Self::Synthesized(synthesized) => synthesized.items(db),
         }
     }
@@ -489,6 +518,60 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             }
         }
     }
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial = |_, _, _|TypedDictSchema::default(),
+    heap_size = ruff_memory_usage::heap_size
+)]
+pub(super) fn deferred_functional_typed_dict_schema<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypedDictSchema<'db> {
+    let module = parsed_module(db, definition.file(db)).load(db);
+    let node = definition
+        .kind(db)
+        .value(&module)
+        .expect("Expected `TypedDict` definition to be an assignment")
+        .as_call_expr()
+        .expect("Expected `TypedDict` definition r.h.s. to be a call expression");
+
+    let deferred_inference = infer_deferred_types(db, definition);
+
+    let total = node.arguments.find_keyword("total").is_none_or(|total_kw| {
+        let total_ty = definition_expression_type(db, definition, &total_kw.value);
+        !total_ty.bool(db).is_always_false()
+    });
+
+    let mut schema = TypedDictSchema::default();
+
+    if let Some(fields_arg) = node.arguments.args.get(1) {
+        let ast::Expr::Dict(dict_expr) = fields_arg else {
+            return schema;
+        };
+
+        for item in &dict_expr.items {
+            let Some(key) = &item.key else {
+                return TypedDictSchema::default();
+            };
+
+            let key_ty = definition_expression_type(db, definition, key);
+            let Some(key_lit) = key_ty.as_string_literal() else {
+                return TypedDictSchema::default();
+            };
+
+            let field_ty = deferred_inference.expression_type(&item.value);
+            let qualifiers = deferred_inference.qualifiers(&item.value);
+
+            schema.insert(
+                Name::new(key_lit.value(db)),
+                functional_typed_dict_field(field_ty, qualifiers, total),
+            );
+        }
+    }
+
+    schema
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
@@ -1138,6 +1221,15 @@ impl<'db> TypedDictField<'db> {
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {
         self.first_declaration
+    }
+
+    /// Create a `TypedDictField` from a [`Field`] with `FieldKind::TypedDict`.
+    pub(crate) fn from_field(field: &super::class::Field<'db>) -> Self {
+        TypedDictFieldBuilder::new(field.declared_ty)
+            .required(field.is_required())
+            .read_only(field.is_read_only())
+            .first_declaration(field.first_declaration)
+            .build()
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
