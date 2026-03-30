@@ -376,6 +376,23 @@ where
             ];
             let pop_sig = Signature::new(Parameters::new(db, pop_parameters), field.declared_ty);
 
+            // Non-generic overload that accepts the field type as the default,
+            // providing bidirectional inference context for the default argument.
+            let pop_with_typed_default_sig = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(field.declared_ty),
+                    ],
+                ),
+                field.declared_ty,
+            );
+
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
                 Name::new_static("T"),
@@ -396,7 +413,7 @@ where
                 UnionType::from_two_elements(db, field.declared_ty, Type::TypeVar(t_default)),
             );
 
-            [pop_sig, pop_with_default_sig]
+            [pop_sig, pop_with_typed_default_sig, pop_with_default_sig]
         });
 
     Type::Callable(CallableType::new(
