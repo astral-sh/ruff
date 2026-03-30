@@ -96,7 +96,7 @@ impl<'db> ConstructorBinding<'db> {
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
-        // constructors.
+        // constructors; this may be needed for argument type contexts.
         if let Some(downstream) = self.downstream_constructor.as_mut() {
             downstream.bindings.match_parameters_in_place(db, arguments);
         }
