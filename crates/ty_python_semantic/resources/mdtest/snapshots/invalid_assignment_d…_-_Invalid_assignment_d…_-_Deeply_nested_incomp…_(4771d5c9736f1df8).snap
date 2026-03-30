@@ -34,5 +34,8 @@ error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> boo
   |         |
   |         Declared type
   |
+info: tuple element 2 of 2 is incompatible:
+info:   type `bytes` is not assignable to `str`
+info: rule `invalid-assignment` is enabled by default
 
 ```

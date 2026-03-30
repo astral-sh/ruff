@@ -622,6 +622,11 @@ impl TypeRelationErrorContext {
         self.stack.borrow_mut().push(message);
     }
 
+    fn extend(&self, other: &TypeRelationErrorContext) {
+        let other_stack = other.stack.borrow();
+        self.stack.borrow_mut().extend(other_stack.iter().cloned());
+    }
+
     pub fn info_messages(&self) -> Vec<String> {
         let stack = self.stack.borrow();
         stack
@@ -720,6 +725,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             ));
 
             error_context.push(format!("{message}:", message = get_message()));
+        }
+    }
+
+    pub(super) fn extend_error_context_from(&self, other: &Self) {
+        if let (Some(ctx), Some(other_ctx)) = (&self.error_context, &other.error_context) {
+            ctx.extend(other_ctx);
         }
     }
 

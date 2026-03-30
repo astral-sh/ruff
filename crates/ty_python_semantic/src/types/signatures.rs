@@ -1156,6 +1156,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let checker = self.with_inferable_typevars(inferable);
         let when = checker.check_signature_pair_inner(db, source, target);
 
+        self.extend_error_context_from(&checker);
+
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
@@ -1165,8 +1167,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
-
-        // TODO: Combine error context
     }
 
     fn check_signature_pair_inner(
