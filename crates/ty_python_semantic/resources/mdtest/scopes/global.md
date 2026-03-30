@@ -86,27 +86,12 @@ def f():
 
 ## Nested function after conditional rebinding
 
-A nested function should still resolve a name in the module scope if the enclosing function marks it
-`global`, even if that function also has a conditional assignment to the name:
+A nested function should resolve a `global` name through the enclosing scope, even if that scope
+conditionally rebinds it. Here, the early return means `inner` only sees the original module
+binding:
 
 ```py
-PULL_SUMS: list[float] = []
-
-def bandit(foo: int) -> None:
-    global PULL_SUMS
-
-    if foo == 0:
-        PULL_SUMS = []
-        return
-
-    def bar(arm: int) -> None:
-        PULL_SUMS[arm]
-```
-
-A simpler scalar case should also keep falling back to the module global:
-
-```py
-x: int = 1
+x = 1
 
 def outer(flag: bool) -> None:
     global x
@@ -116,7 +101,26 @@ def outer(flag: bool) -> None:
         return
 
     def inner() -> None:
-        y: int = x
+        reveal_type(x)  # revealed: Literal[1]
+```
+
+Without the early return, the nested function should see both possible bindings. This is a known
+limitation: we currently infer only the rebound value instead of the union of both:
+
+```py
+x = 1
+
+def outer(flag: bool) -> None:
+    global x
+
+    if flag:
+        x = 2
+
+    def inner() -> None:
+        # TODO: should be `Literal[1, 2]`
+        reveal_type(x)  # revealed: Literal[2]
+
+    inner()
 ```
 
 ## `nonlocal` and `global`
