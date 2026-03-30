@@ -5,11 +5,11 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    add_type_expression_reference_link, note_py_version_too_old_for_pep_604,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
 };
 use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -684,17 +684,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
-                Some(KnownClass::InitVar) => {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        let diagnostic = builder.into_diagnostic(
-                            "Type qualifier `dataclasses.InitVar` is not allowed in type \
-                            expressions (only in annotation expressions)",
-                        );
-                        add_type_expression_reference_link(diagnostic);
-                    }
-                    self.infer_expression(slice, TypeContext::default());
-                    Type::unknown()
-                }
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
             _ => self.infer_subscript_type_expression(subscript, value_ty),
@@ -1359,7 +1348,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::Dynamic(_) => {
+            Type::Dynamic(_) | Type::Divergent(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
                 // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
@@ -1575,21 +1564,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let arguments_slice = &*subscript.slice;
         match special_form {
-            SpecialFormType::Annotated => {
-                let ty = self
-                    .infer_subscript_load_impl(
-                        Type::SpecialForm(SpecialFormType::Annotated),
-                        subscript,
-                    )
-                    .in_type_expression(db, self.scope(), None, self.inference_flags)
-                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript));
-                // Only store on the tuple slice; non-tuple cases are handled by
-                // `infer_subscript_load_impl` via `infer_expression`.
-                if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, ty);
-                }
-                ty
-            }
+            SpecialFormType::Annotated => self
+                .parse_subscription_of_annotated_special_form(
+                    subscript,
+                    AnnotatedExprContext::TypeExpression,
+                )
+                .inner_type()
+                .in_type_expression(self.db(), self.scope(), None, self.inference_flags)
+                .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript)),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {

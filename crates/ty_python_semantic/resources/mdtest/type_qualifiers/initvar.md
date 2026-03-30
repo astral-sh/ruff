@@ -109,7 +109,7 @@ from dataclasses import InitVar, dataclass
 
 @dataclass
 class Wrong:
-    x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `InitVar` expected exactly 1 argument, got 2"
+    x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` expected exactly 1 argument, got 2"
 ```
 
 A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
@@ -163,6 +163,30 @@ class C:
 class D:
     def __init__(self) -> None:
         self.x: InitVar[int] = 1  # error: [invalid-type-form] "`InitVar` annotations are not allowed for non-name targets"
+```
+
+### Use as a class
+
+`InitVar` is a class at runtime. We do not recognise it as such, but we try to avoid emitting errors
+on runtime uses of the symbol.
+
+```py
+from dataclasses import InitVar
+
+x: type = InitVar
+
+reveal_type(InitVar[int])  # revealed: Any
+reveal_type(InitVar(int))  # revealed: Any
+reveal_type(InitVar(type=int))  # revealed: Any
+
+# error: [missing-argument] "No argument provided for required parameter `type`"
+reveal_type(InitVar())  # revealed: Any
+# error: [unknown-argument] "Argument `wut` does not match any known parameter"
+reveal_type(InitVar(str, wut=56))  # revealed: Any
+
+def test(x: object):
+    if isinstance(x, InitVar):
+        reveal_type(x)  # revealed: Any
 ```
 
 [type annotation grammar]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

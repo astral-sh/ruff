@@ -524,7 +524,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                alias_index,
+                alias_index: alias_index
+                    .try_into()
+                    .expect("import alias index should fit in u32"),
                 is_reexported,
             }),
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
@@ -533,7 +535,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                alias_index,
+                alias_index: alias_index
+                    .try_into()
+                    .expect("import-from alias index should fit in u32"),
                 is_reexported,
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
@@ -543,7 +547,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
                 module: AstNodeRef::new(parsed, module),
-                module_index,
+                module_index: module_index
+                    .try_into()
+                    .expect("import-from submodule index should fit in u32"),
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -1153,7 +1159,7 @@ impl<'db> ComprehensionDefinitionKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportDefinitionKind {
     node: AstNodeRef<ast::StmtImport>,
-    alias_index: usize,
+    alias_index: u32,
     is_reexported: bool,
 }
 
@@ -1163,7 +1169,7 @@ impl ImportDefinitionKind {
     }
 
     pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index]
+        &self.node.node(module).names[self.alias_index as usize]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -1174,7 +1180,7 @@ impl ImportDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    alias_index: usize,
+    alias_index: u32,
     is_reexported: bool,
 }
 
@@ -1184,7 +1190,7 @@ impl ImportFromDefinitionKind {
     }
 
     pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index]
+        &self.node.node(module).names[self.alias_index as usize]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -1195,7 +1201,7 @@ impl ImportFromDefinitionKind {
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     module: AstNodeRef<ast::Identifier>,
-    module_index: usize,
+    module_index: u32,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
@@ -1212,7 +1218,10 @@ impl ImportFromSubmoduleDefinitionKind {
         let module_str = module_ident.as_str();
 
         // Find the dot that terminates the target component.
-        let Some((end_offset, _)) = module_str.match_indices('.').nth(self.module_index) else {
+        let Some((end_offset, _)) = module_str
+            .match_indices('.')
+            .nth(self.module_index as usize)
+        else {
             // This shouldn't happen but just in case, provide a safe default
             return module_ident.range();
         };

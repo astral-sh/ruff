@@ -1684,3 +1684,20 @@ def _(
     reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
     reveal_type(nested_list_str)  # revealed: list[Divergent]
 ```
+
+### Materialization of self-referential generic implicit type aliases
+
+```py
+from typing import TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedList = list["NestedList[T] | None"]
+NestedDict = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
+```

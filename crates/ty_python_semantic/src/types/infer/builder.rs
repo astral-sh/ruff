@@ -7,6 +7,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -129,6 +130,7 @@ mod named_tuple;
 mod paramspec_validation;
 mod subscript;
 mod type_expression;
+mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
@@ -226,6 +228,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
+
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
@@ -341,6 +347,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferring_vararg_annotation: false,
             expressions: FxHashMap::default(),
             expression_cache: None,
+            qualifiers: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -391,6 +398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter());
         }
     }
 
@@ -555,6 +563,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .get(&expr.into())
             .copied()
             .or(self.fallback_type())
+    }
+
+    /// Store qualifiers for an annotation expression.
+    fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
+        if !qualifiers.is_empty() {
+            self.qualifiers.insert(expr.into(), qualifiers);
+        }
     }
 
     /// Get the type of an expression from any scope in the same file.
@@ -1348,7 +1363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // `@overload`ed functions without a body in unreachable code.
                         true
                     }
-                    Type::Dynamic(DynamicType::Divergent(_)) => true,
+                    Type::Divergent(_) => true,
                     _ => false,
                 }
             })
@@ -2154,7 +2169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -2726,6 +2741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
+                | Type::Divergent(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
                 | Type::BoundSuper(..) => return None,
@@ -2889,6 +2905,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
+                        self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3057,7 +3075,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_assignment_deferred(&mut self, target: &ast::Expr, value: &'ast ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType,
+        // and field types for functional TypedDict.
         let ast::Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) = value
@@ -3090,6 +3109,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
             _ => {}
+        }
+        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
+            self.infer_functional_typeddict_deferred(arguments);
+            return;
         }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
@@ -3810,7 +3833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
-                ClassBase::Dynamic(_) => {
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // Dynamic bases are allowed.
                 }
             }
@@ -4136,17 +4159,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeQualifiers::REQUIRED | TypeQualifiers::NOT_REQUIRED | TypeQualifiers::READ_ONLY,
             ) {
                 let in_typed_dict = current_scope.kind() == ScopeKind::Class
-                    && nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(
-                        |class| {
-                            class.iter_mro(self.db(), None).any(|base| {
-                                matches!(
-                                    base,
-                                    ClassBase::TypedDict
-                                        | ClassBase::Dynamic(DynamicType::TodoFunctionalTypedDict)
-                                )
-                            })
-                        },
-                    );
+                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                        .is_some_and(|class| class.is_typed_dict(self.db()));
                 if !in_typed_dict {
                     for qualifier in [
                         TypeQualifiers::REQUIRED,
@@ -4246,20 +4260,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
-                let is_valid_special_form = |ty: Type<'db>| match ty {
-                    Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => false,
-                    Type::ClassLiteral(literal) => {
-                        !literal.is_known(self.db(), KnownClass::InitVar)
-                    }
-                    _ => true,
-                };
-
-                let is_invalid = match value {
-                    ast::Expr::Subscript(sub) => {
-                        !is_valid_special_form(self.expression_type(&sub.value))
-                    }
-                    _ => !is_valid_special_form(self.expression_type(value)),
-                };
+                let is_invalid = matches!(
+                    self.expression_type(map_subscript(value)),
+                    Type::SpecialForm(SpecialFormType::TypeQualifier(_))
+                );
 
                 if is_invalid
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
@@ -4885,6 +4889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Intersection(_) => None,
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
+                | Type::Divergent(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -5969,13 +5974,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-        }
-
-        // Avoid false positives for the functional `TypedDict` form, which is currently
-        // unsupported.
-        if let Some(Type::Dynamic(DynamicType::TodoFunctionalTypedDict)) = tcx.annotation {
-            return KnownClass::Dict
-                .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
         let items = items
@@ -7108,6 +7106,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
+        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
+            return self.infer_typeddict_call_expression(call_expression, None);
+        }
+
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
@@ -7386,7 +7388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Validate `TypedDict` constructor calls after argument type inference.
         if let Some(class) = class
-            && class.class_literal(self.db()).is_typed_dict(self.db())
+            && class.is_typed_dict(self.db())
         {
             validate_typed_dict_constructor(
                 &self.context,
@@ -8732,7 +8734,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::Dynamic(_)) => operand_type,
+            (_, Type::Dynamic(_) | Type::Divergent(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
@@ -9069,6 +9071,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            qualifiers: _,
             string_annotations,
             scope,
             bindings,
@@ -9177,6 +9180,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
             cycle_recovery: _,
             all_definitely_bound: _,
+            qualifiers: _,
         } = self;
         let diagnostics = context.finish();
 
@@ -9198,6 +9202,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            mut qualifiers,
             string_annotations,
             scope,
             bindings,
@@ -9228,8 +9233,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty()
-            || !called_functions.is_empty())
+            || !called_functions.is_empty()
+            || !qualifiers.is_empty())
         .then(|| {
+            qualifiers.shrink_to_fit();
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
                 called_functions: called_functions
@@ -9240,6 +9247,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
+                qualifiers,
             })
         });
 
@@ -9285,6 +9293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+            qualifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -9351,6 +9360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: _,
             undecorated_type: _,
             all_definitely_bound: _,
+            qualifiers: _,
         } = *self;
 
         let mut builder = TypeInferenceBuilder::new(self.db(), region, index, self.module());
@@ -9402,6 +9412,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            qualifiers: _,
         } = other;
 
         let diagnostics = context.finish();
@@ -9929,7 +9940,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
     /// necessarily guarantee that the passed-in value for `__setitem__` is stored and
     /// can be retrieved unmodified via `__getitem__`. Therefore, we currently only
     /// perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
-    /// `bytesarray`, `TypedDict` and `collections` types) where we are confident that
+    /// `bytesarray`, `TypedDict`, and `collections` types) where we are confident that
     /// this kind of narrowing can be performed soundly. This is the same approach as
     /// pyright. TODO: Other standard library classes may also be considered safe. Also,
     /// subclasses of these safe classes that do not override `__getitem__/__setitem__`

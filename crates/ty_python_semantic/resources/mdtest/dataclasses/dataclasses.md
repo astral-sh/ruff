@@ -1959,16 +1959,16 @@ from typing import TypedDict
 
 TD = TypedDict("TD", {"x": int})
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass(TD)
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass()(TD)
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass(TypedDict("Inline1", {"a": str}))
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass()(TypedDict("Inline2", {"a": str}))
 ```
 

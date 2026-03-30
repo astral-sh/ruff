@@ -2310,12 +2310,6 @@ impl<'db> Bindings<'db> {
                         _ => {}
                     },
 
-                    Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(Type::Dynamic(
-                            crate::types::DynamicType::TodoFunctionalTypedDict,
-                        ));
-                    }
-
                     // Not a special case
                     _ => {}
                 }

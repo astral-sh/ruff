@@ -342,8 +342,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
-            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
+            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
@@ -356,9 +355,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
             | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
-
-            (todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::TodoFunctionalTypedDict), _) => Some(todo),
 
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.

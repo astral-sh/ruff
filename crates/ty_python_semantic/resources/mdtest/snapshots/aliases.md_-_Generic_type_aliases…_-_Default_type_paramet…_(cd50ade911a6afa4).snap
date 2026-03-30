@@ -1,6 +1,5 @@
 ---
 source: crates/ty_test/src/lib.rs
-assertion_line: 621
 expression: snapshot
 ---
 

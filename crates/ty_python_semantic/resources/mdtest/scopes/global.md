@@ -84,6 +84,45 @@ def f():
         y: int = x  # allowed, because x cannot be None in this branch
 ```
 
+## Nested function after conditional rebinding
+
+A nested function should resolve a `global` name through the enclosing scope, even if that scope
+conditionally rebinds it. Here, the early return means `inner` only sees the original module
+binding:
+
+```py
+x = 1
+
+def outer(flag: bool) -> None:
+    global x
+
+    if flag:
+        x = 2
+        return
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: Literal[1]
+```
+
+Without the early return, the nested function should see both possible bindings. This is a known
+limitation: we currently infer only the rebound value instead of the union of both:
+
+```py
+x = 1
+
+def outer(flag: bool) -> None:
+    global x
+
+    if flag:
+        x = 2
+
+    def inner() -> None:
+        # TODO: should be `Literal[1, 2]`
+        reveal_type(x)  # revealed: Literal[2]
+
+    inner()
+```
+
 ## `nonlocal` and `global`
 
 A binding cannot be both `nonlocal` and `global`. This should emit a semantic syntax error. CPython
@@ -261,6 +300,20 @@ You don't need a definition for implicit globals, but you do for built-ins:
 def f():
     global __file__  # allowed, implicit global
     global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
+```
+
+## Nested class after global rebinding
+
+Even if a `global` declaration is unresolved at module scope, nested eager scopes in the same
+function should still see a rebinding that already happened:
+
+```py
+def factory():
+    global x  # error: [unresolved-global] "Invalid global declaration of `x`: `x` has no declarations or bindings in the global scope"
+    x = 1
+
+    class C:
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## References to variables before they are defined within a class scope are considered global
