@@ -180,3 +180,24 @@ if a:  # branch 1
     b
 elif c:  # branch 2
     b
+
+# See: https://github.com/astral-sh/ruff/pull/22079#issuecomment-3690242578
+# Multi-line compound test with EOL comment on closing paren.
+# SIM114 should NOT fire — the comment on the `):` line is in the `if` branch's
+# body range but not the `elif` branch's, so the rule correctly skips
+# (branches have different comments, suggesting the duplication is intentional).
+def foo():
+    if isinstance(exc, HTTPError) and (
+        (500 <= exc.status <= 599)
+        or exc.status == 408  # server errors
+        or exc.status == 429  # request timeout
+    ):  # too many requests
+        return True
+
+    # Consider all SSL errors as temporary. There are a lot of bug
+    # reports from people where various SSL errors cause a crash
+    # but are actually just temporary. On the other hand, we have
+    # no information if this ever revealed a problem where retrying
+    # was not the right choice.
+    elif isinstance(exc, ssl.SSLError):
+        return True
