@@ -315,7 +315,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if constraint_set.is_never_satisfied(db) {
                                     self.provide_error_context(db, source, target, || {
                                         format!(
-                                            "tuple element {n} of {count} is incompatible",
+                                            "in tuple element {n} of {count}",
                                             count = source_tuple.0.len()
                                         )
                                     });
