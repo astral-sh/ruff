@@ -1571,6 +1571,7 @@ fn is_instance_truthiness<'db>(
         | Type::TypeGuard(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
+        | Type::Divergent(_)
         | Type::Never
         | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear
@@ -2042,8 +2043,9 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
-                let contains_unknown_or_todo =
-                    |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                let contains_unknown_or_todo = |ty: Type<'_>| {
+                    ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
+                };
                 if source_type.is_equivalent_to(db, *casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)

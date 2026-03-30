@@ -1508,6 +1508,8 @@ _ = cast(Bar2, foo)  # error: [redundant-cast]
 ```py
 from typing import TypedDict, Final, Literal, Any
 
+RecursiveKey = list["RecursiveKey | None"]
+
 class Person(TypedDict):
     name: str
     age: int | None
@@ -1515,10 +1517,15 @@ class Person(TypedDict):
 class Animal(TypedDict):
     name: str
 
+class Movie(TypedDict):
+    name: str
+
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
 
 def _(
+    recursive_key: RecursiveKey,
+    movie: Movie,
     person: Person,
     animal: Animal,
     being: Person | Animal,
@@ -1545,6 +1552,8 @@ def _(
 
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
+
+    reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
     # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
     reveal_type(animal["anything"])  # revealed: Unknown

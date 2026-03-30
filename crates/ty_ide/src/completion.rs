@@ -2497,6 +2497,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                 .iter_positive(db)
                 .find_map(|ty| imp(db, ty, visitor))?,
             Type::Dynamic(_)
+            | Type::Divergent(_)
             | Type::Never
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)

@@ -1348,7 +1348,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::Dynamic(_) => {
+            Type::Dynamic(_) | Type::Divergent(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
                 // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.

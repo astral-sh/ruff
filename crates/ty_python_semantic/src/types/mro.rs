@@ -292,7 +292,9 @@ impl<'db> Mro<'db> {
                                     later_indices: later_indices.iter().copied().collect(),
                                 });
                             }
-                            ClassBase::Dynamic(_) => duplicate_dynamic_bases = true,
+                            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                                duplicate_dynamic_bases = true;
+                            }
                         }
                     }
 

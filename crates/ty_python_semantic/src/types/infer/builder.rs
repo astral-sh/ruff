@@ -1363,7 +1363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // `@overload`ed functions without a body in unreachable code.
                         true
                     }
-                    Type::Dynamic(DynamicType::Divergent(_)) => true,
+                    Type::Divergent(_) => true,
                     _ => false,
                 }
             })
@@ -2169,7 +2169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -2741,6 +2741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
+                | Type::Divergent(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
                 | Type::BoundSuper(..) => return None,
@@ -3832,7 +3833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
-                ClassBase::Dynamic(_) => {
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // Dynamic bases are allowed.
                 }
             }
@@ -4888,6 +4889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Intersection(_) => None,
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
+                | Type::Divergent(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -8727,7 +8729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::Dynamic(_)) => operand_type,
+            (_, Type::Dynamic(_) | Type::Divergent(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {

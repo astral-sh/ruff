@@ -872,6 +872,7 @@ fn extract_typed_dict_keys<'db>(
         Type::TypeAlias(alias) => extract_typed_dict_keys(db, alias.value_type(db)),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
+        | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)

@@ -11,8 +11,8 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    CallableType, ClassBase, ClassType, CycleDetector, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
     ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
@@ -268,6 +268,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
              => true,
             Type::Dynamic(_)
+            | Type::Divergent(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -669,8 +670,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
@@ -728,27 +728,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(dynamic), _) => {
-                // If a `Divergent` type is involved, it must not be eliminated.
-                debug_assert!(
-                    !matches!(dynamic, DynamicType::Divergent(_)),
-                    "DynamicType::Divergent should have been handled in an earlier branch"
-                );
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    match self.relation {
-                        TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            true
-                        }
-                        TypeRelation::Redundancy { .. } => match target {
-                            Type::Dynamic(_) => true,
-                            Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                            _ => false,
-                        },
+            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
+                self.constraints,
+                match self.relation {
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Redundancy { .. } => match target {
+                        Type::Dynamic(_) => true,
+                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        _ => false,
                     },
-                )
-            }
+                },
+            ),
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
@@ -1702,6 +1693,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);
