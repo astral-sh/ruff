@@ -3093,7 +3093,6 @@ dependencies = [
  "etcetera",
  "filetime",
  "get-size2",
- "glob",
  "ignore",
  "insta",
  "matchit",

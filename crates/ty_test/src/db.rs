@@ -344,17 +344,6 @@ impl System for MdtestSystem {
         self.as_system().walk_directory(&self.normalize_path(path))
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
-        ruff_db::system::PatternError,
-    > {
-        self.as_system()
-            .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
-    }
-
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
         Some(self)
     }
