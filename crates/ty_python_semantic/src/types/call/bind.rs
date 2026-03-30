@@ -630,18 +630,14 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
-    fn collect_type_context_callables<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        out: &mut Vec<&'a CallableBinding<'db>>,
-    ) {
+    fn collect_type_context_callables<'a>(&'a self, out: &mut Vec<&'a CallableBinding<'db>>) {
         for item in self.iter_callable_items() {
             out.push(item.callable());
 
             if let Some(constructor) = item.as_constructor()
-                && let Some(bindings) = constructor.checked_downstream_constructor_bindings(db)
+                && let Some(downstream) = &constructor.downstream_constructor
             {
-                bindings.collect_type_context_callables(db, out);
+                downstream.bindings.collect_type_context_callables(out);
             }
         }
     }
@@ -650,10 +646,9 @@ impl<'db> Bindings<'db> {
     /// constructor callables that are relevant to the matched upstream constructor path.
     pub(crate) fn iter_type_context_callables(
         &self,
-        db: &'db dyn Db,
     ) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
         let mut callables = Vec::new();
-        self.collect_type_context_callables(db, &mut callables);
+        self.collect_type_context_callables(&mut callables);
         callables.into_iter()
     }
 
