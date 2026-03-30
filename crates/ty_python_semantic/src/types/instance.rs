@@ -495,12 +495,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let missing = missing_protocol_members(db, ty, protocol);
         if !missing.is_empty() {
+            let ty_display = ty.display(db).to_string();
             self.provide_error_hint(|| {
                 if missing.len() == 1 {
-                    format!("protocol member `{}` is not defined", missing[0])
+                    format!(
+                        "protocol member `{}` is not defined on type `{ty_display}`",
+                        missing[0]
+                    )
                 } else {
                     let members: Vec<_> = missing.iter().map(|n| format!("`{n}`")).collect();
-                    format!("protocol members {} are not defined", members.join(", "))
+                    format!(
+                        "protocol members {} are not defined on type `{ty_display}`",
+                        members.join(", ")
+                    )
                 }
             });
             return result;

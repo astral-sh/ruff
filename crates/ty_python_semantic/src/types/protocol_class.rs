@@ -698,8 +698,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .place
                     else {
                         let member_name = member.name;
+                        let ty_display = ty.display(db).to_string();
                         self.provide_error_hint(|| {
-                            format!("protocol member `{member_name}` is not defined")
+                            format!("protocol member `{member_name}` is not defined on type `{ty_display}`")
                         });
                         return self.never();
                     };
@@ -739,8 +740,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 );
                 if !is_defined {
                     let member_name = member.name;
+                    let ty_display = ty.display(db).to_string();
                     self.provide_error_hint(|| {
-                        format!("protocol member `{member_name}` is not defined")
+                        format!(
+                            "protocol member `{member_name}` is not defined on type `{ty_display}`"
+                        )
                     });
                 }
                 ConstraintSet::from_bool(self.constraints, is_defined)
@@ -753,8 +757,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }) = ty.member(db, member.name).place
                 else {
                     let member_name = member.name;
+                    let ty_display = ty.display(db).to_string();
                     self.provide_error_hint(|| {
-                        format!("protocol member `{member_name}` is not defined")
+                        format!(
+                            "protocol member `{member_name}` is not defined on type `{ty_display}`"
+                        )
                     });
                     return self.never();
                 };
