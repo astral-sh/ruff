@@ -159,7 +159,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
+            let name = literal.value(db).to_string();
+
+            if let Some(assigned_name) = definition.and_then(|definition| definition.name(db))
+                && name != assigned_name
+                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+            {
+                builder.into_diagnostic(format_args!(
+                    "The name of a `TypedDict` (`{name}`) must match \
+                    the name of the variable it is assigned to (`{assigned_name}`)"
+                ));
+            }
+
+            Name::new(name)
         } else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)

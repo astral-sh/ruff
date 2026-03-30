@@ -2513,6 +2513,9 @@ from typing_extensions import TypedDict
 # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
 Bad1 = TypedDict(123, {"name": str})
 
+# error: [invalid-argument-type] "The name of a `TypedDict` (`WrongName`) must match the name of the variable it is assigned to (`BadTypedDict3`)"
+BadTypedDict3 = TypedDict("WrongName", {"name": str})
+
 # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
 Bad2 = TypedDict("Bad2", "not a dict")
 
