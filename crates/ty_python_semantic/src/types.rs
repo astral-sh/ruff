@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::iter;
 use std::time::Duration;
 
@@ -233,8 +234,73 @@ fn definition_expression_type<'db>(
     }
 }
 
+struct ApplyDefaultTypeMapping;
+struct ApplyTopMaterialization;
+struct ApplyBottomMaterialization;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActiveTypeMapping {
+    Default,
+    TopMaterialization,
+    BottomMaterialization,
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
+///
+/// Materialization is the only mapping mode that needs to visit the same type under two different
+/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
+/// for those modes so invariant checks can safely reuse one visitor.
+#[derive(Default)]
+pub(crate) struct ApplyTypeMappingVisitor<'db> {
+    default: TypeTransformer<'db, ApplyDefaultTypeMapping>,
+    top_materialization: TypeTransformer<'db, ApplyTopMaterialization>,
+    bottom_materialization: TypeTransformer<'db, ApplyBottomMaterialization>,
+    active_type_mappings: RefCell<Vec<ActiveTypeMapping>>,
+}
+
+impl<'db> ApplyTypeMappingVisitor<'db> {
+    fn visit(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        let active_type_mapping = self
+            .active_type_mappings
+            .borrow()
+            .last()
+            .copied()
+            .unwrap_or(ActiveTypeMapping::Default);
+
+        match active_type_mapping {
+            ActiveTypeMapping::Default => self.default.visit(ty, func),
+            ActiveTypeMapping::TopMaterialization => self.top_materialization.visit(ty, func),
+            ActiveTypeMapping::BottomMaterialization => self.bottom_materialization.visit(ty, func),
+        }
+    }
+
+    fn with_type_mapping<T>(
+        &self,
+        type_mapping: &TypeMapping<'_, 'db>,
+        func: impl FnOnce() -> T,
+    ) -> T {
+        let active_type_mapping = match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => {
+                ActiveTypeMapping::TopMaterialization
+            }
+            TypeMapping::Materialize(MaterializationKind::Bottom) => {
+                ActiveTypeMapping::BottomMaterialization
+            }
+            _ => ActiveTypeMapping::Default,
+        };
+
+        self.active_type_mappings
+            .borrow_mut()
+            .push(active_type_mapping);
+
+        let result = func();
+
+        let previous = self.active_type_mappings.borrow_mut().pop();
+        debug_assert_eq!(previous, Some(active_type_mapping));
+
+        result
+    }
+}
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
@@ -5314,30 +5380,32 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        match self {
-            Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
-            Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        visitor.with_type_mapping(type_mapping, || match self {
+            Type::TypeVar(bound_typevar) => {
+                bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
+            }
+            Type::KnownInstance(known_instance) => {
+                known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
-                match type_mapping {
-                    // Promote the types within the signature before promoting the signature to its
-                    // callable form.
-                    TypeMapping::Promote(PromotionMode::On, _) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ))
-                        .promote_impl(db)
-                    }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+            Type::FunctionLiteral(function) => visitor.visit(self, || match type_mapping {
+                // Promote the types within the signature before promoting the signature to its
+                // callable form.
+                TypeMapping::Promote(PromotionMode::On, _) => {
+                    Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
                         type_mapping,
                         tcx,
                         visitor,
-                    )),
+                    ))
+                    .promote_impl(db)
                 }
+                _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
             }),
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
@@ -5346,7 +5414,12 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)) => {
+            Type::NominalInstance(instance)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) =>
+            {
                 match instance.known_class(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
@@ -5354,7 +5427,12 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
+            Type::NominalInstance(instance)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)
+                ) =>
+            {
                 if instance.is_singleton(db) {
                     UnionType::from_two_elements(db, self, Type::unknown())
                 } else {
@@ -5364,7 +5442,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            },
+            }
 
             Type::NewTypeInstance(newtype) => visitor.visit(self, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
@@ -5380,7 +5458,12 @@ impl<'db> Type<'db> {
                 // > read-only property members, and method members, on protocols act covariantly;
                 // > write-only property members act contravariantly; and read/write attribute
                 // > members on protocols act invariantly
-                Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                Type::ProtocolInstance(instance.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
@@ -5419,7 +5502,9 @@ impl<'db> Type<'db> {
                 Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            Type::SubclassOf(subclass_of) => {
+                subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
 
             Type::PropertyInstance(property) => {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -5431,16 +5516,20 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
-                    builder =
-                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                    builder = builder.add_positive(
+                        positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    );
                 }
                 // Promotion should remove negative contributions from intersections,
                 // so we don't preserve them here when promotion is enabled.
                 if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
                     for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
-                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
-                        );
+                        builder = builder.add_negative(negative.apply_type_mapping_impl(
+                            db,
+                            &type_mapping.flip(),
+                            tcx,
+                            visitor,
+                        ));
                     }
                 }
                 builder.build()
@@ -5470,38 +5559,42 @@ impl<'db> Type<'db> {
                 // detection rather than the visitor's cycle detection, because the visitor tracks
                 // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                 if TypeMapping::EagerExpansion == *type_mapping {
-                    return alias.raw_value_type(db).expand_eagerly(db);
-                }
-
-                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
-                // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
-                // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                //
-                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, || {
-                    match type_mapping {
+                    alias.raw_value_type(db).expand_eagerly(db)
+                } else {
+                    // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
+                    // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
+                    // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
+                    //
+                    // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
+                    // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
+                    // will detect the cycle and return the fallback value.
+                    let mapped = visitor.visit(self, || match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
                         _ => {
-                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            let value_type = alias
+                                .raw_value_type(db)
+                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                            alias.apply_function_specialization(db, value_type)
+                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         }
+                    });
+
+                    let is_recursive =
+                        any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| {
+                            ty.is_divergent()
+                        });
+
+                    // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
+                    //
+                    // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
+                    // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
+                    // incomplete.
+                    if !is_recursive && alias.value_type(db) == mapped {
+                        self
+                    } else {
+                        mapped
                     }
-                });
-
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
-
-                // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
-                //
-                // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
-                // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
-                // incomplete.
-                if !is_recursive && alias.value_type(db) == mapped {
-                    self
-                } else {
-                    mapped
                 }
             }
 
@@ -5562,7 +5655,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
-        }
+        })
     }
 
     /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build

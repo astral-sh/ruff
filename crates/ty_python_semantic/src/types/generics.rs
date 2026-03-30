@@ -27,9 +27,7 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
-};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -1229,11 +1227,13 @@ impl<'db> Specialization<'db> {
                         vartype.materialize(db, materialization_kind.flip(), visitor)
                     }
                     TypeVarVariance::Invariant => {
-                        // We only need to know whether this invariant type argument contains any
-                        // dynamic pieces that would force the enclosing specialization to carry a
-                        // top/bottom materialization marker. Using equivalence here recurses back
-                        // through relation checking, which can overflow for recursive aliases.
-                        if any_over_type(db, *vartype, true, |ty| ty.is_dynamic()) {
+                        let top_materialization =
+                            vartype.materialize(db, MaterializationKind::Top, visitor);
+                        if !vartype.is_equivalent_to_with_materialization_visitor(
+                            db,
+                            top_materialization,
+                            visitor,
+                        ) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype
@@ -1273,11 +1273,13 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
+            &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
     }
@@ -1458,10 +1460,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        let source_top = source_type.top_materialization(db);
-        let source_bottom = source_type.bottom_materialization(db);
-        let target_top = target_type.top_materialization(db);
-        let target_bottom = target_type.bottom_materialization(db);
+        let source_top =
+            source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let source_bottom = source_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
+        let target_top =
+            target_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let target_bottom = target_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
 
         let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
             // TODO:
