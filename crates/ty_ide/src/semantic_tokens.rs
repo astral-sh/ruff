@@ -527,43 +527,71 @@ impl<'db> SemanticTokenVisitor<'db> {
         (SemanticTokenType::Variable, modifiers)
     }
 
-    /// Returns the `PropertyInstanceType` for an attribute access if the attribute
-    /// is a property, by examining the attribute's definition. This is needed because
-    /// instance-level property access (e.g., `obj.prop`) resolves through the descriptor
-    /// protocol, so the inferred type is the property's return type rather than a
-    /// `PropertyInstance`.
+    /// Checks if an attribute access resolves to a property by examining definitions.
+    /// Returns `Some((property, has_setter))` if it's a property. The `has_setter` flag
+    /// is determined by checking for `@name.setter` decorators in the AST, since individual
+    /// function definitions' `PropertyInstanceType` may not reflect the full property
+    /// (the getter's type has `setter=None` even when a setter exists separately).
     fn property_from_definition<'a>(
         &self,
         attr: &ast::ExprAttribute,
-    ) -> Option<PropertyInstanceType<'a>>
+    ) -> Option<(PropertyInstanceType<'a>, bool)>
     where
         'db: 'a,
     {
         let db = self.model.db();
         let definitions = definitions_for_attribute(self.model, attr);
-        // Collect all PropertyInstanceType definitions and prefer the one with a setter,
-        // since the getter's definition has setter=None even when a setter exists.
-        definitions.iter().fold(None, |best, resolved| {
+
+        if definitions.is_empty() {
+            return None;
+        }
+
+        let mut found_property = None;
+        let mut has_setter_def = false;
+        let mut has_non_property_def = false;
+
+        for resolved in &definitions {
             let Some(definition) = resolved.definition() else {
-                return best;
+                continue;
             };
             if let DefinitionKind::Function(func_ref) = definition.kind(db) {
-                let def_model = SemanticModel::new(db, definition.file(db));
                 let parsed = parsed_module(db, definition.file(db)).load(db);
                 let func_node = func_ref.node(&parsed);
-                if let Some(Type::PropertyInstance(property)) = func_node.inferred_type(&def_model)
+
+                // Check if this definition has a .setter decorator
+                for decorator in &func_node.decorator_list {
+                    if let ast::Expr::Attribute(deco_attr) = &decorator.expression {
+                        if deco_attr.attr.as_str() == "setter" {
+                            has_setter_def = true;
+                        }
+                    }
+                }
+
+                // Check if this definition's type is a PropertyInstance
+                let def_model = SemanticModel::new(db, definition.file(db));
+                if let Some(Type::PropertyInstance(property)) =
+                    func_node.inferred_type(&def_model)
                 {
-                    match best {
-                        Some(existing) if existing.setter(db).is_some() => Some(existing),
-                        _ => Some(property),
+                    if found_property.is_none() {
+                        found_property = Some(property);
                     }
                 } else {
-                    best
+                    // Function definition that is NOT a property (e.g., regular method)
+                    has_non_property_def = true;
                 }
             } else {
-                best
+                // Non-function definition (e.g., regular variable assignment)
+                has_non_property_def = true;
             }
-        })
+        }
+
+        // For union types, if some members define the attribute as a property and others
+        // don't, fall back to Variable classification (return None).
+        if has_non_property_def {
+            return None;
+        }
+
+        found_property.map(|p| (p, has_setter_def))
     }
 
     fn classify_parameter(
@@ -940,9 +968,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
                 let (token_type, modifiers) =
-                    if let Some(property) = self.property_from_definition(attr) {
+                    if let Some((_property, has_setter)) = self.property_from_definition(attr) {
                         let mut modifiers = SemanticTokenModifier::empty();
-                        if property.setter(self.model.db()).is_none() {
+                        if !has_setter {
                             modifiers |= SemanticTokenModifier::READONLY;
                         }
                         (SemanticTokenType::Property, modifiers)
@@ -2085,12 +2113,14 @@ def f(obj: WithProperty | WithAttribute):
         "value" @ 43..48: Method [definition]
         "self" @ 49..53: SelfParameter [definition]
         "int" @ 58..61: Class
-        "WithAttribute" @ 79..92: Class [definition]
-        "value" @ 98..103: Variable [definition]
-        "f" @ 112..113: Function [definition]
-        "obj" @ 114..117: Parameter [definition]
-        "WithProperty" @ 119..131: Class
-        "WithAttribute" @ 134..147: Class
+        "1" @ 78..79: Number
+        "WithAttribute" @ 87..100: Class [definition]
+        "value" @ 106..111: Variable [definition]
+        "2" @ 114..115: Number
+        "f" @ 121..122: Function [definition]
+        "obj" @ 123..126: Parameter [definition]
+        "WithProperty" @ 128..140: Class
+        "WithAttribute" @ 143..156: Class
         "obj" @ 162..165: Parameter
         "value" @ 166..171: Variable
         "#);
