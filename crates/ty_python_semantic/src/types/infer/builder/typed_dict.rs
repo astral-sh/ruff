@@ -159,7 +159,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name = if let Some(literal) = name_type.as_string_literal() {
-            let name = literal.value(db).to_string();
+            let name = literal.value(db);
 
             if let Some(assigned_name) = definition.and_then(|definition| definition.name(db))
                 && name != assigned_name
