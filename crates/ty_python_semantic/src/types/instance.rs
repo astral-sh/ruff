@@ -528,6 +528,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
+        if structurally_satisfied.is_never_satisfied(db) {
+            let ty_display = ty.display(db).to_string();
+            let protocol_display = Type::ProtocolInstance(protocol).display(db).to_string();
+            self.provide_error_hint(|| {
+                format!("type `{ty_display}` is not compatible with protocol `{protocol_display}`")
+            });
+        }
         result.or(db, self.constraints, || structurally_satisfied)
     }
 
