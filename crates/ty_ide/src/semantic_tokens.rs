@@ -541,20 +541,27 @@ impl<'db> SemanticTokenVisitor<'db> {
     {
         let db = self.model.db();
         let definitions = definitions_for_attribute(self.model, attr);
-        definitions.iter().find_map(|resolved| {
-            let definition = resolved.definition()?;
+        // Collect all PropertyInstanceType definitions and prefer the one with a setter,
+        // since the getter's definition has setter=None even when a setter exists.
+        definitions.iter().fold(None, |best, resolved| {
+            let Some(definition) = resolved.definition() else {
+                return best;
+            };
             if let DefinitionKind::Function(func_ref) = definition.kind(db) {
                 let def_model = SemanticModel::new(db, definition.file(db));
                 let parsed = parsed_module(db, definition.file(db)).load(db);
                 let func_node = func_ref.node(&parsed);
                 if let Some(Type::PropertyInstance(property)) = func_node.inferred_type(&def_model)
                 {
-                    Some(property)
+                    match best {
+                        Some(existing) if existing.setter(db).is_some() => Some(existing),
+                        _ => Some(property),
+                    }
                 } else {
-                    None
+                    best
                 }
             } else {
-                None
+                best
             }
         })
     }
@@ -2049,7 +2056,43 @@ b = cfg.read_write
         "read_only" @ 273..282: Property [readonly]
         "b" @ 283..284: Variable [definition]
         "cfg" @ 287..290: Variable
-        "read_write" @ 291..301: Property [readonly]
+        "read_write" @ 291..301: Property
+        "#);
+    }
+
+    #[test]
+    fn property_union_with_non_property_falls_back() {
+        let test = SemanticTokenTest::new(
+            "
+class WithProperty:
+    @property
+    def value(self) -> int:
+        return 1
+
+class WithAttribute:
+    value = 2
+
+def f(obj: WithProperty | WithAttribute):
+    return obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "WithProperty" @ 7..19: Class [definition]
+        "property" @ 26..34: Decorator
+        "value" @ 43..48: Method [definition]
+        "self" @ 49..53: SelfParameter [definition]
+        "int" @ 58..61: Class
+        "WithAttribute" @ 79..92: Class [definition]
+        "value" @ 98..103: Variable [definition]
+        "f" @ 112..113: Function [definition]
+        "obj" @ 114..117: Parameter [definition]
+        "WithProperty" @ 119..131: Class
+        "WithAttribute" @ 134..147: Class
+        "obj" @ 162..165: Parameter
+        "value" @ 166..171: Variable
         "#);
     }
 
