@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+```python
+# Nested string literals inside f-string expressions follow either alternating
+# or preferred quote normalization depending on nested-string-quote-style.
+f'{ "nested" }'
+f'{ "nested" = }'
+f'{ ["1", "2"] }'
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.12
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+# Nested string literals inside f-string expressions follow either alternating
+# or preferred quote normalization depending on nested-string-quote-style.
+f"{'nested'}"
+f"{ "nested" = }"
+f"{['1', '2']}"
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.12
+source_type                = Python
+nested-string-quote-style  = preferred
+```
+
+```python
+# Nested string literals inside f-string expressions follow either alternating
+# or preferred quote normalization depending on nested-string-quote-style.
+f"{"nested"}"
+f"{ "nested" = }"
+f"{["1", "2"]}"
+```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+# Nested string literals inside f-string expressions follow either alternating
+# or preferred quote normalization depending on nested-string-quote-style.
+f"{'nested'}"
+f'{ "nested" = }'
+f"{['1', '2']}"
+```
+
+
+### Output 4
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = preferred
+```
+
+```python
+# Nested string literals inside f-string expressions follow either alternating
+# or preferred quote normalization depending on nested-string-quote-style.
+f"{'nested'}"
+f'{ "nested" = }'
+f"{['1', '2']}"
+```

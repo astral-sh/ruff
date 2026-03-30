@@ -1,0 +1,12 @@
+[
+  {
+    "quote_style": "double",
+    "target_version": "3.14",
+    "nested_string_quote_style": "alternating"
+  },
+  {
+    "quote_style": "double",
+    "target_version": "3.14",
+    "nested_string_quote_style": "preferred"
+  }
+]
