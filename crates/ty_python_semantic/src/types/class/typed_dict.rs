@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 
+use itertools::Either;
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -229,7 +230,31 @@ where
                 },
             );
 
-            [get_sig, get_with_default_sig]
+            // For non-required fields, add a non-generic overload that accepts the
+            // field type as the default. This is ordered before the generic TypeVar
+            // overload so that `td.get("key", {})` can use the field type as
+            // bidirectional inference context for the default argument.
+            if field.is_required() {
+                Either::Left([get_sig, get_with_default_sig].into_iter())
+            } else {
+                let get_with_typed_default_sig = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("default")))
+                                .with_annotated_type(field.declared_ty),
+                        ],
+                    ),
+                    field.declared_ty,
+                );
+                Either::Right(
+                    [get_sig, get_with_typed_default_sig, get_with_default_sig].into_iter(),
+                )
+            }
         })
         // Fallback overloads for unknown keys
         .chain(std::iter::once(Signature::new(
