@@ -90,7 +90,6 @@ use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::newtype::NewType;
-use crate::types::relation::TypeRelationErrorContext;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::CallableSignature;
 use crate::types::special_form::TypeQualifier;
@@ -9338,14 +9337,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, declared_ty) {
+        if let Err(error_context) = bound_ty.check_assignability_to(db, declared_ty) {
             report_invalid_assignment(
                 &builder.context,
                 self.node,
                 self.binding,
                 declared_ty,
                 bound_ty,
-                &TypeRelationErrorContext::default(), // TODO
+                &error_context,
             );
 
             // Allow declarations to override inference in case of invalid assignment.
