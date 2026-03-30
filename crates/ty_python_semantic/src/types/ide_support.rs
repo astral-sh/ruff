@@ -1873,9 +1873,8 @@ mod resolve_definition {
             | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
-            | DefinitionKind::VariadicPositionalParameter(_)
-            | DefinitionKind::VariadicKeywordParameter(_)
             | DefinitionKind::Parameter(_)
+            | DefinitionKind::LambdaParameter { .. }
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_)
