@@ -246,8 +246,8 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
                     result.push_str(&line.trim_start_matches('\x0C')[dedent_len..]);
                     result.push('\n');
                 } else {
-                    result.push_str(&line.as_full_str()[dedent_len..])
-                };
+                    result.push_str(&line.as_full_str()[dedent_len..]);
+                }
             }
         }
     }
