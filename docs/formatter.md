@@ -14,6 +14,13 @@ ruff format path/to/code/     # Format all files in `path/to/code` (and any subd
 ruff format path/to/file.py   # Format a single file.
 ```
 
+`ruff format` also supports reading arguments from a file using `@`-prefixed argfiles. Each argument
+must be on its own line in the file:
+
+```shell
+ruff format @/path/to/file_list.txt
+```
+
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
 in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
 and instead exit with a non-zero status code upon detecting any unformatted files.
