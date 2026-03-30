@@ -2262,8 +2262,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Special form `typing.Concatenate` expected at least 2 parameters \
-                            but got {}",
+                        "`typing.Concatenate` requires at least 2 arguments when used in a \
+                        type expression (got {})",
                         arguments.len()
                     ));
                 }
