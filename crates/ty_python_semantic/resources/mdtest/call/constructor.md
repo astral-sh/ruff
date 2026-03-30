@@ -1022,6 +1022,48 @@ class D(C): ...
 reveal_type(C())  # revealed: D
 ```
 
+### Generic `__new__` returning a strict subclass preserves that return type
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls, x: T) -> "D":
+        raise NotImplementedError
+
+    def __init__(self, x: object) -> None: ...
+
+    x: T
+
+class D(C[int]): ...
+
+reveal_type(C("foo"))  # revealed: D
+```
+
+### Generic `__new__` subtype return should inherit specialization from `__init__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls, x: object) -> "D[T]":
+        raise NotImplementedError
+
+    def __init__(self, x: T) -> None: ...
+
+    x: T
+
+class D[T](C[T]): ...
+
+reveal_type(C("foo"))  # revealed: D[str]
+```
+
 ### Mixed overloaded `__new__` preserving strict-subclass return
 
 ```py
