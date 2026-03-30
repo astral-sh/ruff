@@ -413,13 +413,11 @@ impl GotoTarget<'_> {
         }
     }
 
-    /// Try to get a simplified display of this callable type by resolving overloads
-    pub(crate) fn call_type_simplified_by_overloads(
-        &self,
-        model: &SemanticModel,
-    ) -> Option<String> {
+    /// Try to get a call signature for this target.
+    pub(crate) fn call_signature(&self, model: &SemanticModel) -> Option<String> {
         if let GotoTarget::Call { call, .. } = self {
-            call_type_simplified_by_overloads(model, call)
+            constructor_signature(model, call)
+                .or_else(|| call_type_simplified_by_overloads(model, call))
         } else {
             None
         }
@@ -687,15 +685,6 @@ impl GotoTarget<'_> {
                 .map(|definition| vec![definition]),
         };
         definitions.map(Definitions)
-    }
-
-    /// Get signature for class constructor
-    pub(crate) fn constructor_signature(&self, model: &SemanticModel) -> Option<String> {
-        if let GotoTarget::Call { call, .. } = self {
-            constructor_signature(model, call)
-        } else {
-            None
-        }
     }
 
     /// Returns the text representation of this goto target.

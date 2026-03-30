@@ -43,9 +43,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     };
 
     let mut contents = Vec::new();
-    if let Some(signature) = goto_target.constructor_signature(&model) {
-        contents.push(HoverContent::Signature(signature));
-    } else if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
+    if let Some(signature) = goto_target.call_signature(&model) {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
@@ -714,10 +712,16 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ---------------------------------------------
         ```python
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -753,13 +757,19 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ---------------------------------------------
         MyClass docs
 
         ---------------------------------------------
         ```python
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ```
         ---
         MyClass docs
@@ -824,10 +834,16 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ---------------------------------------------
         ```python
-        class MyClass(a: int, b: str)
+        class MyClass(
+            a: int,
+            b: str
+        )
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -961,14 +977,20 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        class S(a: int, b: str)
+        class S(
+            a: int,
+            b: str
+        )
         class S(a: int)
         ---------------------------------------------
         new docs
 
         ---------------------------------------------
         ```python
-        class S(a: int, b: str)
+        class S(
+            a: int,
+            b: str
+        )
         class S(a: int)
         ```
         ---

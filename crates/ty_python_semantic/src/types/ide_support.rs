@@ -1830,15 +1830,21 @@ fn class_literal_to_hierarchy_info(
 pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
     let function_ty = call_expr.func.inferred_type(model)?;
     let db = model.db();
-    let class_name = c.as_class_literal()?.name(db);
+    let class_name = function_ty.as_class_literal()?.name(db);
     let display_sig = |signature: &Signature| {
         let params = signature
-            .display_with(db, DisplaySettings::default().hide_return_type())
+            .display_with(
+                db,
+                DisplaySettings::default()
+                    .multiline()
+                    .disallow_signature_name()
+                    .hide_return_type(),
+            )
             .to_string();
 
         format!("class {class_name}{params}")
     };
-    let callable_type = c.try_upcast_to_callable(db)?.into_type(db);
+    let callable_type = function_ty.try_upcast_to_callable(db)?.into_type(db);
     let bindings = callable_type.bindings(db);
 
     if let Some(binding) = bindings.single_element()
