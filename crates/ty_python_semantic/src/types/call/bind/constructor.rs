@@ -94,13 +94,11 @@ impl<'db> ConstructorBinding<'db> {
     ) {
         self.entry.match_parameters(db, arguments, argument_forms);
 
+        // We don't know at this point whether we'll need to check downstream constructors or not
+        // (since we can't resolve return types yet), so we match parameters for all downstream
+        // constructors.
         if let Some(downstream) = self.downstream_constructor.as_mut() {
-            // `init_binding.match_parameters` handles its own bound-`self` insertion, so pass the
-            // original call arguments here.
-            let mut init_forms = ArgumentForms::new(arguments.len());
-            for init_binding in downstream.bindings.iter_callable_items_mut() {
-                init_binding.match_parameters(db, arguments, &mut init_forms);
-            }
+            downstream.bindings.match_parameters_in_place(db, arguments);
         }
     }
 

@@ -732,13 +732,17 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
+        self.match_parameters_in_place(db, arguments);
+        self
+    }
+
+    fn match_parameters_in_place(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         let mut argument_forms = ArgumentForms::new(arguments.len());
         for item in self.iter_callable_items_mut() {
             item.match_parameters(db, arguments, &mut argument_forms);
         }
         argument_forms.shrink_to_fit();
         self.argument_forms = argument_forms;
-        self
     }
 
     /// Verify that the type of each argument is assignable to type of the parameter that it was
