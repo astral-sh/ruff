@@ -520,6 +520,23 @@ def f() -> JSON_OBJECT:
     return {"hello": 23}
 ```
 
+### Recursive aliases through recursive returns
+
+```py
+from __future__ import annotations
+from dataclasses import dataclass
+
+type NodeDict = dict[str, str | list[NodeDict]]
+
+@dataclass
+class Node:
+    label: str
+    children: list[Node]
+
+    def to_dict(self) -> NodeDict:
+        return {"label": self.label, "children": [child.to_dict() for child in self.children]}
+```
+
 ### Cyclic defaults
 
 ```py

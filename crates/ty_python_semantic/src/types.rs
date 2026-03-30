@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter;
+use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -237,6 +238,7 @@ fn definition_expression_type<'db>(
 struct ApplyDefaultTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
+struct ApplyMaterializationEquivalence;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ActiveTypeMapping {
@@ -250,11 +252,12 @@ enum ActiveTypeMapping {
 /// Materialization is the only mapping mode that needs to visit the same type under two different
 /// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
 /// for those modes so invariant checks can safely reuse one visitor.
-#[derive(Default)]
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: TypeTransformer<'db, ApplyDefaultTypeMapping>,
     top_materialization: TypeTransformer<'db, ApplyTopMaterialization>,
     bottom_materialization: TypeTransformer<'db, ApplyBottomMaterialization>,
+    materialization_equivalence:
+        Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>,
     active_type_mappings: RefCell<Vec<ActiveTypeMapping>>,
 }
 
@@ -299,6 +302,39 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         debug_assert_eq!(previous, Some(active_type_mapping));
 
         result
+    }
+
+    fn is_equivalent_to_materialization(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> bool {
+        self.materialization_equivalence.visit((left, right), || {
+            left.is_equivalent_to_with_materialization_visitor(db, right, self)
+        })
+    }
+
+    fn for_new_materialization_root(&self) -> Self {
+        Self {
+            default: TypeTransformer::default(),
+            top_materialization: TypeTransformer::default(),
+            bottom_materialization: TypeTransformer::default(),
+            materialization_equivalence: Rc::clone(&self.materialization_equivalence),
+            active_type_mappings: RefCell::default(),
+        }
+    }
+}
+
+impl<'db> Default for ApplyTypeMappingVisitor<'db> {
+    fn default() -> Self {
+        Self {
+            default: TypeTransformer::default(),
+            top_materialization: TypeTransformer::default(),
+            bottom_materialization: TypeTransformer::default(),
+            materialization_equivalence: Rc::new(CycleDetector::new(true)),
+            active_type_mappings: RefCell::default(),
+        }
     }
 }
 
@@ -5580,10 +5616,12 @@ impl<'db> Type<'db> {
                         }
                     });
 
-                    let is_recursive =
-                        any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| {
-                            ty.is_divergent()
-                        });
+                    let is_recursive = any_over_type(
+                        db,
+                        alias.raw_value_type(db).expand_eagerly(db),
+                        false,
+                        |ty| ty.is_divergent(),
+                    );
 
                     // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                     //
