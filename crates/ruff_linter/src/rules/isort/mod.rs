@@ -648,6 +648,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("lexicographical.py"))]
+    fn lexicographical(path: &Path) -> Result<()> {
+        let snapshot = format!("lexicographical_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    lexicographical: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("propagate_inline_comments.py"))]
     fn propagate_inline_comments(path: &Path) -> Result<()> {
         let snapshot = format!("propagate_inline_comments_{}", path.to_string_lossy());

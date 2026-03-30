@@ -70,6 +70,7 @@ pub struct Settings {
     pub from_first: bool,
     pub length_sort: bool,
     pub length_sort_straight: bool,
+    pub lexicographical: bool,
 }
 
 impl Settings {
@@ -125,6 +126,7 @@ impl Default for Settings {
             from_first: false,
             length_sort: false,
             length_sort_straight: false,
+            lexicographical: false,
         }
     }
 }
@@ -161,7 +163,8 @@ impl Display for Settings {
                 self.no_sections,
                 self.from_first,
                 self.length_sort,
-                self.length_sort_straight
+                self.length_sort_straight,
+                self.lexicographical
             ]
         }
         Ok(())

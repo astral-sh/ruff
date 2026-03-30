@@ -39,29 +39,33 @@ fn member_type(name: &str, settings: &Settings) -> MemberType {
 }
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct NatOrdStr<'a>(Cow<'a, str>);
+pub(crate) struct CmpStr<'a> {
+    s: Cow<'a, str>,
+    lexicographical: bool,
+}
 
-impl Ord for NatOrdStr<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        natord::compare(&self.0, &other.0)
+impl<'a> CmpStr<'a> {
+    fn new(s: impl Into<Cow<'a, str>>, lexicographical: bool) -> Self {
+        Self {
+            s: s.into(),
+            lexicographical,
+        }
     }
 }
 
-impl PartialOrd for NatOrdStr<'_> {
+impl Ord for CmpStr<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.lexicographical {
+            self.s.cmp(&other.s)
+        } else {
+            natord::compare(&self.s, &other.s)
+        }
+    }
+}
+
+impl PartialOrd for CmpStr<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl<'a> From<&'a str> for NatOrdStr<'a> {
-    fn from(s: &'a str) -> Self {
-        NatOrdStr(Cow::Borrowed(s))
-    }
-}
-
-impl From<String> for NatOrdStr<'_> {
-    fn from(s: String) -> Self {
-        NatOrdStr(Cow::Owned(s))
     }
 }
 
@@ -87,10 +91,10 @@ pub(crate) struct ModuleKey<'a> {
     force_to_top: bool,
     maybe_length: Option<usize>,
     distance: Distance,
-    maybe_lowercase_name: Option<NatOrdStr<'a>>,
-    module_name: Option<NatOrdStr<'a>>,
+    maybe_lowercase_name: Option<CmpStr<'a>>,
+    module_name: Option<CmpStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
-    asname: Option<NatOrdStr<'a>>,
+    asname: Option<CmpStr<'a>>,
 }
 
 impl<'a> ModuleKey<'a> {
@@ -121,12 +125,15 @@ impl<'a> ModuleKey<'a> {
         };
 
         let maybe_lowercase_name = name.and_then(|name| {
-            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
+            (!settings.case_sensitive).then_some(CmpStr::new(
+                maybe_lowercase(name),
+                settings.lexicographical,
+            ))
         });
 
-        let module_name = name.map(NatOrdStr::from);
+        let module_name = name.map(|n| CmpStr::new(n, settings.lexicographical));
 
-        let asname = asname.map(NatOrdStr::from);
+        let asname = asname.map(|n| CmpStr::new(n, settings.lexicographical));
 
         let first_alias =
             first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
@@ -150,9 +157,9 @@ pub(crate) struct MemberKey<'a> {
     not_star_import: bool,
     member_type: Option<MemberType>,
     maybe_length: Option<usize>,
-    maybe_lowercase_name: Option<NatOrdStr<'a>>,
-    module_name: NatOrdStr<'a>,
-    asname: Option<NatOrdStr<'a>>,
+    maybe_lowercase_name: Option<CmpStr<'a>>,
+    module_name: CmpStr<'a>,
+    asname: Option<CmpStr<'a>>,
 }
 
 impl<'a> MemberKey<'a> {
@@ -164,10 +171,10 @@ impl<'a> MemberKey<'a> {
         let maybe_length = settings
             .length_sort
             .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
-        let maybe_lowercase_name =
-            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
-        let module_name = NatOrdStr::from(name);
-        let asname = asname.map(NatOrdStr::from);
+        let maybe_lowercase_name = (!settings.case_sensitive)
+            .then_some(CmpStr::new(maybe_lowercase(name), settings.lexicographical));
+        let module_name = CmpStr::new(name, settings.lexicographical);
+        let asname = asname.map(|n| CmpStr::new(n, settings.lexicographical));
 
         Self {
             not_star_import,

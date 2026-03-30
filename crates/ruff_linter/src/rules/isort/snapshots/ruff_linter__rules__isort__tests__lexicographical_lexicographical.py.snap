@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> lexicographical.py:1:1
+  |
+1 | / import a_2
+2 | | import a_1
+3 | | import a_10
+4 | | import B_a
+5 | | import b_A
+6 | | from foo import a_2, a_1, a_10, B_a, b_A
+  | |________________________________________^
+  |
+help: Organize imports
+  - import a_2
+1 | import a_1
+2 | import a_10
+3 + import a_2
+4 | import B_a
+5 | import b_A
+  - from foo import a_2, a_1, a_10, B_a, b_A
+6 + from foo import B_a, a_1, a_10, a_2, b_A

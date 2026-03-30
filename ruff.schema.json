@@ -1909,6 +1909,13 @@
             "null"
           ]
         },
+        "lexicographical": {
+          "description": "Tells isort to sort imports lexicographically (alphabetical but with uppercase letters before lowercase).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports.\nUse `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to\nthe typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because\nit enforces at least one empty and at most two empty lines after imports.",
           "type": [

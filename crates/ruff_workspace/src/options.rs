@@ -2836,6 +2836,16 @@ pub struct IsortOptions {
     )]
     pub length_sort_straight: Option<bool>,
 
+    /// Tells isort to sort imports lexicographically (alphabetical but with uppercase letters before lowercase).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            lexicographical = true
+        "#
+    )]
+    pub lexicographical: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     ///
@@ -3080,6 +3090,7 @@ impl IsortOptions {
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
             length_sort_straight: self.length_sort_straight.unwrap_or(false),
+            lexicographical: self.lexicographical.unwrap_or(false),
         })
     }
 }
