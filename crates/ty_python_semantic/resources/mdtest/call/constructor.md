@@ -261,6 +261,25 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Generic constructor inference stays coherent with helper typevars
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def __new__(cls, x: T, extra: U) -> "Box[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T, extra: U) -> None:
+        self.x = x
+        self.extra = extra
+
+reveal_type(Box(1, "a"))  # revealed: Box[int]
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py
