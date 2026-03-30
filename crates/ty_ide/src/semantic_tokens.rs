@@ -1944,7 +1944,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "CONSTANT" @ 413..421: Variable [readonly]
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
-        "prop" @ 491..495: Property
+        "prop" @ 491..495: Property [readonly]
         "v" @ 534..535: Variable [definition]
         "MyClass" @ 538..545: Class
         "method" @ 546..552: Method
@@ -1953,7 +1953,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "__name__" @ 605..613: Variable
         "t" @ 651..652: Variable [definition]
         "MyClass" @ 655..662: Class
-        "prop" @ 663..667: Property
+        "prop" @ 663..667: Property [readonly]
         "#);
     }
 
@@ -1985,10 +1985,71 @@ x = Foo.prop
         "Foo" @ 77..80: Class
         "w" @ 83..84: Variable [definition]
         "foo" @ 87..90: Variable
-        "prop" @ 91..95: Property
+        "prop" @ 91..95: Property [readonly]
         "x" @ 96..97: Variable [definition]
         "Foo" @ 100..103: Class
-        "prop" @ 104..108: Property
+        "prop" @ 104..108: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn property_readonly_modifier() {
+        // Verify that the readonly modifier is set for getter-only properties
+        // and NOT set for properties that also have a setter.
+        let test = SemanticTokenTest::new(
+            "
+class Config:
+    @property
+    def read_only(self) -> str:
+        return 'value'
+
+    @property
+    def read_write(self) -> int:
+        return self._x
+
+    @read_write.setter
+    def read_write(self, value: int) -> None:
+        self._x = value
+
+cfg = Config()
+a = cfg.read_only
+b = cfg.read_write
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Config" @ 7..13: Class [definition]
+        "property" @ 20..28: Decorator
+        "read_only" @ 37..46: Method [definition]
+        "self" @ 47..51: SelfParameter [definition]
+        "str" @ 56..59: Class
+        "'value'" @ 76..83: String
+        "property" @ 90..98: Decorator
+        "read_write" @ 107..117: Method [definition]
+        "self" @ 118..122: SelfParameter [definition]
+        "int" @ 127..130: Class
+        "self" @ 147..151: SelfParameter
+        "_x" @ 152..154: Variable
+        "read_write" @ 161..171: Decorator
+        "setter" @ 172..178: Decorator
+        "read_write" @ 187..197: Method [definition]
+        "self" @ 198..202: SelfParameter [definition]
+        "value" @ 204..209: Parameter [definition]
+        "int" @ 211..214: Class
+        "None" @ 219..223: Class
+        "self" @ 233..237: SelfParameter
+        "_x" @ 238..240: Variable
+        "value" @ 243..248: Parameter
+        "cfg" @ 250..253: Variable [definition]
+        "Config" @ 256..262: Class
+        "a" @ 265..266: Variable [definition]
+        "cfg" @ 269..272: Variable
+        "read_only" @ 273..282: Property [readonly]
+        "b" @ 283..284: Variable [definition]
+        "cfg" @ 287..290: Variable
+        "read_write" @ 291..301: Property
         "#);
     }
 
@@ -2104,7 +2165,7 @@ x = foobar_cls.prop                              # prop should be property
         "CONSTANT" @ 470..478: Variable [readonly]
         "w" @ 561..562: Variable [definition]
         "foobar" @ 565..571: Variable
-        "prop" @ 572..576: Property
+        "prop" @ 572..576: Property [readonly]
         "foobar_cls" @ 636..646: Variable [definition]
         "Foo" @ 649..652: Class
         "random" @ 656..662: Variable
@@ -2114,7 +2175,7 @@ x = foobar_cls.prop                              # prop should be property
         "method" @ 689..695: Method
         "x" @ 760..761: Variable [definition]
         "foobar_cls" @ 764..774: Variable
-        "prop" @ 775..779: Property
+        "prop" @ 775..779: Property [readonly]
         "#);
     }
 
@@ -2192,10 +2253,10 @@ q = Baz.prop        # prop should be property on the class as well
         "CONSTANT" @ 502..510: Variable [readonly]
         "r" @ 558..559: Variable [definition]
         "baz" @ 562..565: Variable
-        "prop" @ 566..570: Property
+        "prop" @ 566..570: Property [readonly]
         "q" @ 604..605: Variable [definition]
         "Baz" @ 608..611: Class
-        "prop" @ 612..616: Property
+        "prop" @ 612..616: Property [readonly]
         "#);
     }
 
@@ -2274,10 +2335,10 @@ q = Baz.prop
         "CONSTANT" @ 416..424: Variable [readonly]
         "r" @ 425..426: Variable [definition]
         "baz" @ 429..432: Variable
-        "prop" @ 433..437: Property
+        "prop" @ 433..437: Property [readonly]
         "q" @ 438..439: Variable [definition]
         "Baz" @ 442..445: Class
-        "prop" @ 446..450: Property
+        "prop" @ 446..450: Property [readonly]
         "#);
     }
 
@@ -3130,10 +3191,10 @@ class BoundedContainer[T: int, U = str]:
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
         "P" @ 354..355: Variable
-        "args" @ 356..360: Property
+        "args" @ 356..360: Property [readonly]
         "kwargs" @ 364..370: Parameter [definition]
         "P" @ 372..373: Variable
-        "kwargs" @ 374..380: Property
+        "kwargs" @ 374..380: Property [readonly]
         "str" @ 385..388: Class
         "str" @ 405..408: Class
         "func" @ 409..413: Parameter
