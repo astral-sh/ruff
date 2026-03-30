@@ -1229,11 +1229,7 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Invariant => {
                         let top_materialization =
                             vartype.materialize(db, MaterializationKind::Top, visitor);
-                        if !vartype.is_equivalent_to_with_materialization_visitor(
-                            db,
-                            top_materialization,
-                            visitor,
-                        ) {
+                        if !vartype.is_equivalent_to(db, top_materialization) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype
