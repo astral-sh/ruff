@@ -5,6 +5,7 @@ use crate::server::Result;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
+use crate::tsp::handlers::send_snapshot_changed_if_needed;
 
 pub(crate) struct DidChangeWorkspaceFoldersHandler;
 
@@ -18,6 +19,8 @@ impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {
         client: &Client,
         params: types::DidChangeWorkspaceFoldersParams,
     ) -> Result<()> {
+        let old_revision = session.revision();
+
         let format_workspace_folders = |folders: &[lsp_types::WorkspaceFolder]| -> String {
             if folders.is_empty() {
                 "<empty>".to_string()
@@ -77,6 +80,9 @@ impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {
         if added_workspace_folder {
             session.request_uninitialized_workspace_folder_configurations(client);
         }
+
+        send_snapshot_changed_if_needed(old_revision, session, client);
+
         Ok(())
     }
 }

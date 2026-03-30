@@ -245,6 +245,10 @@ impl Session {
         self.revision += 1;
     }
 
+    pub(crate) fn revision(&self) -> u64 {
+        self.revision
+    }
+
     /// The LSP specification doesn't allow configuration requests during initialization,
     /// but we need access to the configuration to resolve the settings in turn to create the
     /// project databases. This will become more important in the future when we support

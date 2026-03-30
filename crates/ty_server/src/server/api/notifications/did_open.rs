@@ -7,6 +7,7 @@ use crate::server::api::diagnostics::publish_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
+use crate::tsp::handlers::send_snapshot_changed_if_needed;
 
 pub(crate) struct DidOpenTextDocumentHandler;
 
@@ -30,9 +31,12 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 },
         } = params;
 
+        let old_revision = session.revision();
+
         let text_doc = TextDocument::new(uri, text, version, &language_id);
         let document = session.open_text_document(text_doc);
         publish_diagnostics_if_needed(&document, session, client);
+        send_snapshot_changed_if_needed(old_revision, session, client);
 
         Ok(())
     }
