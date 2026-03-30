@@ -168,11 +168,10 @@ impl<'a> Assignment<'a> {
     /// Returns `true` when every assignment target is a simple name and each name is a dunder
     /// (`__` prefix and suffix), matching [`is_dunder`].
     fn all_targets_are_dunder(&self) -> bool {
-        !self.targets.is_empty()
-            && self.targets.iter().all(|target| {
-                target
-                    .as_name_expr()
-                    .is_some_and(|name| is_dunder(name.id.as_str()))
-            })
+        self.targets.iter().all(|target| {
+            target
+                .as_name_expr()
+                .is_some_and(|name| is_dunder(name.id.as_str()))
+        })
     }
 }
