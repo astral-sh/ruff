@@ -146,3 +146,19 @@ help: Replace with comprehension
 18 | # Okay.
 19 | dict.fromkeys(pierogi_fillings)
 note: This is an unsafe fix and may change runtime behavior
+
+RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+  --> RUF024.py:39:1
+   |
+37 | key = "xy"
+38 | key_0 = "z"
+39 | dict.fromkeys("ABC", list(key))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with comprehension
+36 | 
+37 | key = "xy"
+38 | key_0 = "z"
+   - dict.fromkeys("ABC", list(key))
+39 + {key_1: list(key) for key_1 in "ABC"}
+note: This is an unsafe fix and may change runtime behavior
