@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
@@ -608,7 +609,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 
 #[derive(Clone, Default, Debug)]
 pub struct TypeRelationErrorContext {
-    stack: RefCell<Vec<String>>,
+    stack: Rc<RefCell<Vec<String>>>,
 }
 
 impl PartialEq for TypeRelationErrorContext {
@@ -622,17 +623,12 @@ impl Eq for TypeRelationErrorContext {}
 impl TypeRelationErrorContext {
     fn new() -> Self {
         Self {
-            stack: RefCell::new(Vec::new()),
+            stack: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
     fn push(&self, message: String) {
         self.stack.borrow_mut().push(message);
-    }
-
-    fn extend(&self, other: &TypeRelationErrorContext) {
-        let other_stack = other.stack.borrow();
-        self.stack.borrow_mut().extend(other_stack.iter().cloned());
     }
 
     pub fn info_messages(&self) -> Vec<String> {
@@ -747,12 +743,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn provide_error_hint(&self, get_message: impl FnOnce() -> String) {
         if let Some(error_context) = &self.error_context {
             error_context.push(get_message());
-        }
-    }
-
-    pub(super) fn extend_error_context_from(&self, other: &Self) {
-        if let (Some(ctx), Some(other_ctx)) = (&self.error_context, &other.error_context) {
-            ctx.extend(other_ctx);
         }
     }
 
