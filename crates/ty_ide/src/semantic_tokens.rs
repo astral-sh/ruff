@@ -547,8 +547,8 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         let mut found_property = None;
-        let mut has_setter_def = false;
         let mut has_non_property_def = false;
+        let attr_name = attr.attr.as_str();
 
         for resolved in &definitions {
             let Some(definition) = resolved.definition() else {
@@ -558,29 +558,18 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let parsed = parsed_module(db, definition.file(db)).load(db);
                 let func_node = func_ref.node(&parsed);
 
-                // Check if this definition has a .setter decorator
-                for decorator in &func_node.decorator_list {
-                    if let ast::Expr::Attribute(deco_attr) = &decorator.expression {
-                        if deco_attr.attr.as_str() == "setter" {
-                            has_setter_def = true;
-                        }
-                    }
-                }
-
                 // Check if this definition's type is a PropertyInstance
                 let def_model = SemanticModel::new(db, definition.file(db));
                 if let Some(Type::PropertyInstance(property)) =
                     func_node.inferred_type(&def_model)
                 {
                     if found_property.is_none() {
-                        found_property = Some(property);
+                        found_property = Some((property, func_node.range(), parsed.clone()));
                     }
                 } else {
-                    // Function definition that is NOT a property (e.g., regular method)
                     has_non_property_def = true;
                 }
             } else {
-                // Non-function definition (e.g., regular variable assignment)
                 has_non_property_def = true;
             }
         }
@@ -591,7 +580,43 @@ impl<'db> SemanticTokenVisitor<'db> {
             return None;
         }
 
-        found_property.map(|p| (p, has_setter_def))
+        found_property.map(|(property, getter_range, parsed)| {
+            // definitions_for_attribute only returns one binding, so it may miss the
+            // setter definition. Search the enclosing class body in the AST for a
+            // sibling function with a @name.setter decorator.
+            let has_setter = Self::has_setter_in_class(parsed.suite(), getter_range, attr_name);
+            (property, has_setter)
+        })
+    }
+
+    /// Search for a `@name.setter` decorated function in the class containing `getter_range`.
+    fn has_setter_in_class(stmts: &[ast::Stmt], getter_range: ruff_text_size::TextRange, name: &str) -> bool {
+        for stmt in stmts {
+            if let ast::Stmt::ClassDef(class) = stmt {
+                if class.range().contains_range(getter_range) {
+                    // Found the class containing the getter — check its body
+                    for class_stmt in &class.body {
+                        if let ast::Stmt::FunctionDef(func) = class_stmt {
+                            if func.name.as_str() == name {
+                                for decorator in &func.decorator_list {
+                                    if let ast::Expr::Attribute(deco_attr) = &decorator.expression {
+                                        if deco_attr.attr.as_str() == "setter" {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }
+                // Check nested classes
+                if Self::has_setter_in_class(&class.body, getter_range, name) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn classify_parameter(
