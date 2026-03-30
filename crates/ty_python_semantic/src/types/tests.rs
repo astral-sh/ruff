@@ -84,8 +84,8 @@ fn todo_types() {
 fn divergent_type() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    assert!(!div.is_dynamic());
-    assert!(!div.has_dynamic(&db));
+    assert!(div.is_dynamic());
+    assert!(div.has_dynamic(&db));
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.

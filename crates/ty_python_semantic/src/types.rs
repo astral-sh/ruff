@@ -977,7 +977,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_dynamic(&self) -> bool {
-        matches!(self, Type::Dynamic(_))
+        matches!(self, Type::Dynamic(_) | Type::Divergent(_))
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
