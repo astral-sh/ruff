@@ -1111,7 +1111,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .elements(db)
                     .iter()
                     .when_all(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, elem_ty, target)
+                        let constraint_set = self.check_type_pair(db, elem_ty, target);
+                        if constraint_set.is_never_satisfied(db) {
+                            self.provide_error_context(db, elem_ty, target, || {
+                                format!("union element `{}` is not assignable", elem_ty.display(db))
+                            });
+                        }
+                        constraint_set
                     })
             }
 
