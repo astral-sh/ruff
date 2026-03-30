@@ -6,8 +6,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.ruff.strictly_empty_init_modules = true
 
 --- Summary ---
-Removed: 5
-Added: 24
+Removed: 6
+Added: 30
 
 --- Removed ---
 RUF067 `__init__` module should only contain docstrings and re-exports
@@ -56,13 +56,24 @@ RUF067 `__init__` module should only contain docstrings and re-exports
 
 
 RUF067 `__init__` module should only contain docstrings and re-exports
-  --> __init__.py:48:1
+  --> __init__.py:54:1
    |
-47 | # non-`extend_path` assignments are not allowed
-48 | __path__ = 5  # RUF067
-   | ^^^^^^^^^^^^
-49 |
-50 | # also allow `__author__`
+52 | __submodules__ += ["extra"]  # ok
+53 |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:55:1
+   |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |
+57 | # also allow `__author__`
    |
 
 
@@ -320,25 +331,94 @@ RUF067 `__init__` module should not contain any code
 45 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 46 |
-47 | # non-`extend_path` assignments are not allowed
+47 | # any dunder-named assignment is allowed in non-strict mode
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:48:1
    |
-47 | # non-`extend_path` assignments are not allowed
-48 | __path__ = 5  # RUF067
+47 | # any dunder-named assignment is allowed in non-strict mode
+48 | __path__ = 5  # ok
    | ^^^^^^^^^^^^
-49 |
-50 | # also allow `__author__`
+49 | __submodules__ = []  # ok (e.g. mkinit)
+50 | __protected__ = []  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:49:1
+   |
+47 | # any dunder-named assignment is allowed in non-strict mode
+48 | __path__ = 5  # ok
+49 | __submodules__ = []  # ok (e.g. mkinit)
+   | ^^^^^^^^^^^^^^^^^^^
+50 | __protected__ = []  # ok
+51 | __custom__: list[str] = []  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:50:1
+   |
+48 | __path__ = 5  # ok
+49 | __submodules__ = []  # ok (e.g. mkinit)
+50 | __protected__ = []  # ok
+   | ^^^^^^^^^^^^^^^^^^
+51 | __custom__: list[str] = []  # ok
+52 | __submodules__ += ["extra"]  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:51:1
    |
-50 | # also allow `__author__`
-51 | __author__ = "The Author"  # ok
+49 | __submodules__ = []  # ok (e.g. mkinit)
+50 | __protected__ = []  # ok
+51 | __custom__: list[str] = []  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 | __submodules__ += ["extra"]  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:52:1
+   |
+50 | __protected__ = []  # ok
+51 | __custom__: list[str] = []  # ok
+52 | __submodules__ += ["extra"]  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:54:1
+   |
+52 | __submodules__ += ["extra"]  # ok
+53 |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:55:1
+   |
+54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |
+57 | # also allow `__author__`
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:58:1
+   |
+57 | # also allow `__author__`
+58 | __author__ = "The Author"  # ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
