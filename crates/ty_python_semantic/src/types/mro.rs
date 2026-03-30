@@ -539,6 +539,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicTypedDict(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicEnum(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
         }
     }
 
@@ -569,6 +572,11 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicTypedDict(literal) => {
+                    let mut full_mro_iter = literal.mro(self.db).iter();
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicEnum(literal) => {
                     let mut full_mro_iter = literal.mro(self.db).iter();
                     full_mro_iter.next();
                     full_mro_iter

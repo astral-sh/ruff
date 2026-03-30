@@ -158,6 +158,27 @@ pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
+    if let ClassLiteral::DynamicEnum(enum_lit) = class {
+        let spec = enum_lit.spec(db);
+        if !spec.has_known_members(db) {
+            return None;
+        }
+        let members: FxIndexMap<Name, Type<'db>> = spec
+            .members(db)
+            .iter()
+            .map(|(name, ty)| (name.clone(), *ty))
+            .collect();
+        if members.is_empty() {
+            return None;
+        }
+        return Some(EnumMetadata {
+            members,
+            aliases: FxHashMap::default(),
+            auto_members: FxHashSet::default(),
+            value_annotation: None,
+            init_function: None,
+        });
+    }
     let class = match class {
         ClassLiteral::Static(class) => class,
         ClassLiteral::Dynamic(..) => {
@@ -173,6 +194,7 @@ pub(crate) fn enum_metadata<'db>(
             return None;
         }
         ClassLiteral::DynamicNamedTuple(..) | ClassLiteral::DynamicTypedDict(..) => return None,
+        ClassLiteral::DynamicEnum(..) => unreachable!("handled above"),
     };
 
     // This is a fast path to avoid traversing the MRO of known classes
@@ -389,8 +411,9 @@ pub(crate) fn enum_metadata<'db>(
     })
 }
 
-/// Iterates over parent enum classes in the MRO, skipping known classes
-/// (like `Enum`, `StrEnum`, etc.) that we handle specially.
+/// Iterates over parent enum classes in the MRO, skipping known enum
+/// infrastructure classes but including `IntEnum`, `Flag`, and `IntFlag`
+/// which declare `_value_` annotations that should be inherited.
 fn iter_parent_enum_classes<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -401,7 +424,13 @@ fn iter_parent_enum_classes<'db>(
         .filter_map(ClassBase::into_class)
         .filter_map(move |class_type| {
             let base = class_type.class_literal(db).as_static()?;
-            (base.known(db).is_none() && is_enum_class_by_inheritance(db, base)).then_some(base)
+            let is_traversable = base.known(db).is_none_or(|k| {
+                matches!(
+                    k,
+                    KnownClass::IntEnum | KnownClass::Flag | KnownClass::IntFlag
+                )
+            });
+            (is_traversable && is_enum_class_by_inheritance(db, base)).then_some(base)
         })
 }
 

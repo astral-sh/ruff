@@ -52,7 +52,9 @@ impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match class.class_literal(db) {
             // Dynamic classes created via `type()` don't have special instance types.
-            ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_) => {
+            ClassLiteral::Dynamic(_)
+            | ClassLiteral::DynamicNamedTuple(_)
+            | ClassLiteral::DynamicEnum(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
             // Functional TypedDicts return a TypedDict instance type.

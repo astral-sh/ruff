@@ -116,6 +116,7 @@ mod binary_expressions;
 mod class;
 mod dict;
 mod dynamic_class;
+mod enum_call;
 mod final_attribute;
 mod function;
 mod imports;
@@ -3115,6 +3116,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
                         self.infer_new_class_call(call_expr, Some(definition))
+                    } else if let Some(base_class) =
+                        enum_call::enum_functional_call_base(self.db(), callable_type)
+                        && let Some(ty) =
+                            self.infer_enum_call_expression(call_expr, Some(definition), base_class)
+                    {
+                        ty
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -6800,6 +6807,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
             return self.infer_typeddict_call_expression(call_expression, None);
+        }
+
+        if let Some(base_class) = enum_call::enum_functional_call_base(self.db(), callable_type)
+            && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
+        {
+            return ty;
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the

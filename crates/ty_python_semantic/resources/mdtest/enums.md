@@ -1303,7 +1303,257 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
 
 ## Function syntax
 
-To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
+### String names (positional)
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", "RED, GREEN, BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### String names (keyword)
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", names="RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### List/tuple of tuples
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", [("RED", 1), ("GREEN", 2), ("BLUE", 3)])
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", (("RED", 1), ("GREEN", 2), ("BLUE", 3)))
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### List of strings
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", ["RED", "GREEN", "BLUE"])
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### Dict mapping
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.BLUE.value)  # revealed: Literal[3]
+```
+
+### Dict mapping with `auto()`
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+Color = Enum("Color", {"RED": auto(), "GREEN": auto(), "BLUE": auto()})
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.BLUE.value)  # revealed: Literal[3]
+```
+
+When mixing explicit values with `auto()` in a dict, the auto value is derived from the previous
+member's value, not from `start + index`:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+Mixed = Enum("Mixed", {"A": 10, "B": auto(), "C": auto()})
+
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"]]
+reveal_type(enum_members(Mixed))
+
+reveal_type(Mixed.A.value)  # revealed: Literal[10]
+reveal_type(Mixed.B.value)  # revealed: Literal[11]
+reveal_type(Mixed.C.value)  # revealed: Literal[12]
+```
+
+### Duplicate member names
+
+Duplicate member names raise `TypeError` at runtime. We degrade to unknown members rather than
+synthesizing a broken enum.
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+E1 = Enum("E1", "A A")
+reveal_type(enum_members(E1))  # revealed: Unknown
+
+E2 = Enum("E2", ["A", "A"])
+reveal_type(enum_members(E2))  # revealed: Unknown
+
+E3 = Enum("E3", [("A", 1), ("A", 2)])
+reveal_type(enum_members(E3))  # revealed: Unknown
+```
+
+### Too many positional args
+
+`Enum(value, names, *, ...)` only accepts two positional args at runtime.
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# this is invalid at runtime: TypeError
+Color = Enum("Color", "RED", "GREEN", "BLUE")
+
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
+
+### No positional args
+
+```py
+from enum import Enum
+
+# this is invalid at runtime but should not panic
+Color = Enum()
+
+reveal_type(Color)  # revealed: @Todo(functional `Enum` syntax)
+```
+
+### Non-literal name
+
+Non-literal names should still be recognized as creating an enum class.
+
+```py
+from enum import Enum
+
+def make_enum(name: str, labels: tuple[str, ...]) -> type[Enum]:
+    result = Enum(name.title(), labels, module=__name__)
+    reveal_type(result)  # revealed: type[Enum]
+    return result
+```
+
+### StrEnum function syntax
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+from ty_extensions import enum_members
+
+Color = StrEnum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal["red"]
+reveal_type(Color.GREEN.value)  # revealed: Literal["green"]
+reveal_type(Color.BLUE.value)  # revealed: Literal["blue"]
+```
+
+### Custom start value
+
+```py
+from enum import Enum
+
+Color = Enum("Color", "RED GREEN BLUE", start=0)
+
+reveal_type(Color.RED.value)  # revealed: Literal[0]
+reveal_type(Color.GREEN.value)  # revealed: Literal[1]
+reveal_type(Color.BLUE.value)  # revealed: Literal[2]
+```
+
+### Type mixin
+
+```py
+from enum import Enum
+
+Http = Enum("Http", "OK NOT_FOUND", type=int)
+
+reveal_type(Http.OK.value)  # revealed: Literal[1]
+reveal_type(Http.NOT_FOUND.value)  # revealed: Literal[2]
+```
+
+### IntEnum function syntax
+
+```py
+from enum import IntEnum
+from ty_extensions import enum_members
+
+Color = IntEnum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### Flag function syntax
+
+```py
+from enum import Flag
+from ty_extensions import enum_members
+
+Perm = Flag("Perm", "READ WRITE EXECUTE")
+
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Perm))
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[4]
+```
+
+### IntFlag function syntax
+
+```py
+from enum import IntFlag
+from ty_extensions import enum_members
+
+Perm = IntFlag("Perm", "READ WRITE EXECUTE")
+
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Perm))
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[4]
+```
 
 ## Exhaustiveness checking
 
