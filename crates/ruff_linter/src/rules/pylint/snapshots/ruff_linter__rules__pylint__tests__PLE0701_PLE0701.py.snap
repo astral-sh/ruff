@@ -1,0 +1,266 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE0701 `Exception` is an ancestor class of `ValueError`
+ --> PLE0701.py:6:1
+  |
+4 |   except Exception:
+5 |       pass
+6 | / except ValueError:  # PLE0701
+7 | |     pass
+  | |________^
+8 |
+9 |   # Multi-level hierarchy
+  |
+
+PLE0701 `LookupError` is an ancestor class of `KeyError`
+  --> PLE0701.py:14:1
+   |
+12 |   except LookupError:
+13 |       pass
+14 | / except KeyError:  # PLE0701
+15 | |     pass
+   | |________^
+16 |
+17 |   # Deep hierarchy: BaseException -> Exception -> RuntimeError -> NotImplementedError
+   |
+
+PLE0701 `BaseException` is an ancestor class of `NotImplementedError`
+  --> PLE0701.py:22:1
+   |
+20 |   except BaseException:
+21 |       pass
+22 | / except NotImplementedError:  # PLE0701
+23 | |     pass
+   | |________^
+24 |
+25 |   # Tuple handler: general exception in tuple
+   |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+  --> PLE0701.py:30:1
+   |
+28 |   except (Exception, TypeError):
+29 |       pass
+30 | / except ValueError:  # PLE0701
+31 | |     pass
+   | |________^
+32 |
+33 |   # Multiple specific after general
+   |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+  --> PLE0701.py:38:1
+   |
+36 |   except Exception:
+37 |       pass
+38 | / except ValueError:  # PLE0701
+39 | |     pass
+   | |________^
+40 |   except TypeError:  # PLE0701
+41 |       pass
+   |
+
+PLE0701 `Exception` is an ancestor class of `TypeError`
+  --> PLE0701.py:40:1
+   |
+38 |   except ValueError:  # PLE0701
+39 |       pass
+40 | / except TypeError:  # PLE0701
+41 | |     pass
+   | |________^
+42 |
+43 |   # OSError hierarchy
+   |
+
+PLE0701 `OSError` is an ancestor class of `ConnectionError`
+  --> PLE0701.py:48:1
+   |
+46 |   except OSError:
+47 |       pass
+48 | / except ConnectionError:  # PLE0701
+49 | |     pass
+   | |________^
+50 |
+51 |   # ConnectionError -> BrokenPipeError
+   |
+
+PLE0701 `ConnectionError` is an ancestor class of `BrokenPipeError`
+  --> PLE0701.py:56:1
+   |
+54 |   except ConnectionError:
+55 |       pass
+56 | / except BrokenPipeError:  # PLE0701
+57 | |     pass
+   | |________^
+58 |
+59 |   # SyntaxError -> IndentationError -> TabError
+   |
+
+PLE0701 `SyntaxError` is an ancestor class of `TabError`
+  --> PLE0701.py:64:1
+   |
+62 |   except SyntaxError:
+63 |       pass
+64 | / except TabError:  # PLE0701
+65 | |     pass
+   | |________^
+66 |
+67 |   # ValueError -> UnicodeError -> UnicodeDecodeError
+   |
+
+PLE0701 `ValueError` is an ancestor class of `UnicodeDecodeError`
+  --> PLE0701.py:72:1
+   |
+70 |   except ValueError:
+71 |       pass
+72 | / except UnicodeDecodeError:  # PLE0701
+73 | |     pass
+   | |________^
+74 |
+75 |   # Warning hierarchy
+   |
+
+PLE0701 `Warning` is an ancestor class of `DeprecationWarning`
+  --> PLE0701.py:80:1
+   |
+78 |   except Warning:
+79 |       pass
+80 | / except DeprecationWarning:  # PLE0701
+81 | |     pass
+   | |________^
+82 |
+83 |   # Exception aliases: IOError is an alias for OSError
+   |
+
+PLE0701 `IOError` is an ancestor class of `ConnectionError`
+  --> PLE0701.py:88:1
+   |
+86 |   except IOError:
+87 |       pass
+88 | / except ConnectionError:  # PLE0701
+89 | |     pass
+   | |________^
+90 |
+91 |   # Exception aliases: EnvironmentError is an alias for OSError
+   |
+
+PLE0701 `EnvironmentError` is an ancestor class of `FileNotFoundError`
+  --> PLE0701.py:96:1
+   |
+94 |   except EnvironmentError:
+95 |       pass
+96 | / except FileNotFoundError:  # PLE0701
+97 | |     pass
+   | |________^
+98 |
+99 |   # Specific caught in tuple of later handler
+   |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+   --> PLE0701.py:104:1
+    |
+102 |   except Exception:
+103 |       pass
+104 | / except (ValueError, KeyError):  # PLE0701 (for each)
+105 | |     pass
+    | |________^
+106 |
+107 |   # OK: correct order (specific before general)
+    |
+
+PLE0701 `Exception` is an ancestor class of `KeyError`
+   --> PLE0701.py:104:1
+    |
+102 |   except Exception:
+103 |       pass
+104 | / except (ValueError, KeyError):  # PLE0701 (for each)
+105 | |     pass
+    | |________^
+106 |
+107 |   # OK: correct order (specific before general)
+    |
+
+PLE0701 `BaseException` is an ancestor class of `ValueError`
+   --> PLE0701.py:168:1
+    |
+166 |   except:
+167 |       pass
+168 | / except ValueError:  # PLE0701
+169 | |     pass
+    | |________^
+170 |
+171 |   # OK: single handler
+    |
+
+PLE0701 `OSError` is an ancestor class of `IOError`
+   --> PLE0701.py:182:1
+    |
+180 |   except OSError:
+181 |       pass
+182 | / except IOError:  # PLE0701
+183 | |     pass
+    | |________^
+184 |
+185 |   # Alias of same class: EnvironmentError and IOError
+    |
+
+PLE0701 `EnvironmentError` is an ancestor class of `IOError`
+   --> PLE0701.py:190:1
+    |
+188 |   except EnvironmentError:
+189 |       pass
+190 | / except IOError:  # PLE0701
+191 | |     pass
+    | |________^
+192 |
+193 |   # OK: builtins access (resolve_builtin_symbol handles this)
+    |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+   --> PLE0701.py:200:1
+    |
+198 |   except builtins.Exception:
+199 |       pass
+200 | / except builtins.ValueError:  # PLE0701
+201 | |     pass
+    | |________^
+202 |
+203 |   # ExceptionGroup diamond: BaseExceptionGroup -> ExceptionGroup
+    |
+
+PLE0701 `BaseExceptionGroup` is an ancestor class of `ExceptionGroup`
+   --> PLE0701.py:208:1
+    |
+206 |   except BaseExceptionGroup:
+207 |       pass
+208 | / except ExceptionGroup:  # PLE0701
+209 | |     pass
+    | |________^
+210 |
+211 |   # except* support
+    |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+   --> PLE0701.py:216:1
+    |
+214 |   except* Exception:
+215 |       pass
+216 | / except* ValueError:  # PLE0701
+217 | |     pass
+    | |________^
+218 |
+219 |   # OK: except* with user-defined exceptions (can't determine hierarchy)
+    |
+
+PLE0701 `Exception` is an ancestor class of `ValueError`
+   --> PLE0701.py:240:1
+    |
+238 |   except Exception as e:
+239 |       pass
+240 | / except ValueError as e:  # PLE0701
+241 | |     pass
+    | |________^
+242 |
+243 |   # OK: exception assigned to a variable (no longer a builtin reference)
+    |

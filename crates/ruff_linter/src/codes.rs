@@ -248,6 +248,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0604") => rules::pylint::rules::InvalidAllObject,
         (Pylint, "E0605") => rules::pylint::rules::InvalidAllFormat,
         (Pylint, "E0643") => rules::pylint::rules::PotentialIndexError,
+        (Pylint, "E0701") => rules::pylint::rules::BadExceptOrder,
         (Pylint, "E0704") => rules::pylint::rules::MisplacedBareRaise,
         (Pylint, "E1132") => rules::pylint::rules::RepeatedKeywordArgument,
         (Pylint, "E1141") => rules::pylint::rules::DictIterMissingItems,

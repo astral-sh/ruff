@@ -200,6 +200,7 @@ mod tests {
     #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
     #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::BadExceptOrder, Path::new("PLE0701.py"))]
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
     #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]

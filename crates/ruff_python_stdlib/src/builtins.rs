@@ -525,3 +525,188 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
             | (13.., "PythonFinalizationError")
     )
 }
+
+/// Returns the direct superclass of a builtin exception in the Python exception hierarchy,
+/// or `None` if the name is not a known builtin exception (or is `BaseException`, the root)
+///
+/// Also handles legacy aliases: `IOError` and `EnvironmentError` are aliases for `OSError`
+///
+/// See: <https://docs.python.org/3/library/exceptions.html#exception-hierarchy>
+///
+/// ```
+/// use ruff_python_stdlib::builtins::builtin_exception_superclass;
+///
+/// assert_eq!(builtin_exception_superclass("ValueError"), Some("Exception"));
+/// assert_eq!(builtin_exception_superclass("KeyError"), Some("LookupError"));
+/// assert_eq!(builtin_exception_superclass("Exception"), Some("BaseException"));
+/// assert_eq!(builtin_exception_superclass("BaseException"), None);
+/// assert_eq!(builtin_exception_superclass("MyCustomError"), None);
+///
+/// // Aliases map to OSError
+/// assert_eq!(builtin_exception_superclass("IOError"), Some("OSError"));
+/// assert_eq!(builtin_exception_superclass("EnvironmentError"), Some("OSError"));
+/// ```
+pub fn builtin_exception_superclass(name: &str) -> Option<&'static str> {
+    match name {
+        // Direct children of BaseException
+        "GeneratorExit" | "KeyboardInterrupt" | "SystemExit" | "Exception" => Some("BaseException"),
+        // 3.11+: BaseExceptionGroup inherits from BaseException
+        "BaseExceptionGroup" => Some("BaseException"),
+
+        // Direct children of Exception
+        "ArithmeticError" | "AssertionError" | "AttributeError" | "BufferError" | "EOFError"
+        | "ImportError" | "LookupError" | "MemoryError" | "NameError" | "OSError"
+        | "ReferenceError" | "RuntimeError" | "StopAsyncIteration" | "StopIteration"
+        | "SyntaxError" | "SystemError" | "TypeError" | "ValueError" | "Warning" => {
+            Some("Exception")
+        }
+        // 3.11+: ExceptionGroup inherits from Exception (and BaseExceptionGroup)
+        "ExceptionGroup" => Some("Exception"),
+        // 3.13+
+        "PythonFinalizationError" => Some("Exception"),
+
+        // ArithmeticError subclasses
+        "FloatingPointError" | "OverflowError" | "ZeroDivisionError" => Some("ArithmeticError"),
+
+        // ImportError subclasses
+        "ModuleNotFoundError" => Some("ImportError"),
+
+        // LookupError subclasses
+        "IndexError" | "KeyError" => Some("LookupError"),
+
+        // NameError subclasses
+        "UnboundLocalError" => Some("NameError"),
+
+        // OSError subclasses
+        "BlockingIOError" | "ChildProcessError" | "ConnectionError" | "FileExistsError"
+        | "FileNotFoundError" | "InterruptedError" | "IsADirectoryError" | "NotADirectoryError"
+        | "PermissionError" | "ProcessLookupError" | "TimeoutError" => Some("OSError"),
+
+        // OSError aliases
+        "IOError" | "EnvironmentError" => Some("OSError"),
+
+        // ConnectionError subclasses
+        "BrokenPipeError"
+        | "ConnectionAbortedError"
+        | "ConnectionRefusedError"
+        | "ConnectionResetError" => Some("ConnectionError"),
+
+        // RuntimeError subclasses
+        "NotImplementedError" | "RecursionError" => Some("RuntimeError"),
+
+        // SyntaxError subclasses
+        "IndentationError" => Some("SyntaxError"),
+
+        // IndentationError subclasses
+        "TabError" => Some("IndentationError"),
+
+        // ValueError subclasses
+        "UnicodeError" => Some("ValueError"),
+
+        // UnicodeError subclasses
+        "UnicodeDecodeError" | "UnicodeEncodeError" | "UnicodeTranslateError" => {
+            Some("UnicodeError")
+        }
+
+        // Warning subclasses
+        "BytesWarning"
+        | "DeprecationWarning"
+        | "FutureWarning"
+        | "ImportWarning"
+        | "PendingDeprecationWarning"
+        | "ResourceWarning"
+        | "RuntimeWarning"
+        | "SyntaxWarning"
+        | "UnicodeWarning"
+        | "UserWarning" => Some("Warning"),
+        // 3.10+
+        "EncodingWarning" => Some("Warning"),
+
+        // BaseException itself has no superclass, and unknown names return None
+        _ => None,
+    }
+}
+
+/// Normalizes exception aliases to their canonical name
+///
+/// `IOError` and `EnvironmentError` are aliases for `OSError`
+///
+/// Keep in sync with the alias arms in [`builtin_exception_superclass`]
+fn normalize_exception_alias(name: &str) -> &str {
+    match name {
+        "IOError" | "EnvironmentError" => "OSError",
+        _ => name,
+    }
+}
+
+/// Returns `true` if `ancestor` is an ancestor of `descendant` in the builtin
+/// exception hierarchy
+///
+/// Returns `false` if either name is not a known builtin exception, or if
+/// `ancestor` is not actually an ancestor of `descendant`
+///
+/// Handles exception aliases (`IOError`/`EnvironmentError` -> `OSError`) and
+/// `ExceptionGroup`'s diamond inheritance (`Exception` + `BaseExceptionGroup`)
+///
+/// ```
+/// use ruff_python_stdlib::builtins::is_builtin_exception_ancestor;
+///
+/// // Direct and multi-level ancestry
+/// assert!(is_builtin_exception_ancestor("Exception", "ValueError"));
+/// assert!(is_builtin_exception_ancestor("LookupError", "KeyError"));
+/// assert!(is_builtin_exception_ancestor("BaseException", "ValueError"));
+/// assert!(is_builtin_exception_ancestor("SyntaxError", "TabError"));
+/// assert!(is_builtin_exception_ancestor("ValueError", "UnicodeDecodeError"));
+/// assert!(is_builtin_exception_ancestor("OSError", "BrokenPipeError"));
+///
+/// // Not ancestors
+/// assert!(!is_builtin_exception_ancestor("ValueError", "TypeError"));
+/// assert!(!is_builtin_exception_ancestor("KeyError", "IndexError"));
+/// assert!(!is_builtin_exception_ancestor("ValueError", "Exception"));
+///
+/// // Same class is not its own ancestor
+/// assert!(!is_builtin_exception_ancestor("ValueError", "ValueError"));
+///
+/// // Aliases of the same class ARE treated as ancestor relationships
+/// assert!(is_builtin_exception_ancestor("OSError", "IOError"));
+/// assert!(is_builtin_exception_ancestor("IOError", "OSError"));
+/// assert!(is_builtin_exception_ancestor("EnvironmentError", "IOError"));
+///
+/// // Aliases also work as ancestors of subclasses
+/// assert!(is_builtin_exception_ancestor("IOError", "ConnectionError"));
+/// assert!(is_builtin_exception_ancestor("EnvironmentError", "FileNotFoundError"));
+///
+/// // Unknown names
+/// assert!(!is_builtin_exception_ancestor("MyError", "ValueError"));
+/// assert!(!is_builtin_exception_ancestor("Exception", "MyError"));
+///
+/// // ExceptionGroup diamond inheritance
+/// assert!(is_builtin_exception_ancestor("BaseExceptionGroup", "ExceptionGroup"));
+/// assert!(is_builtin_exception_ancestor("Exception", "ExceptionGroup"));
+/// assert!(is_builtin_exception_ancestor("BaseException", "ExceptionGroup"));
+/// ```
+pub fn is_builtin_exception_ancestor(ancestor: &str, descendant: &str) -> bool {
+    let ancestor_normalized = normalize_exception_alias(ancestor);
+    let descendant_normalized = normalize_exception_alias(descendant);
+
+    // Aliases of the same class (e.g., OSError and IOError) are treated as
+    // the ancestor catching the descendant
+    if ancestor_normalized == descendant_normalized {
+        return ancestor != descendant;
+    }
+
+    // ExceptionGroup has diamond inheritance: it extends both Exception and
+    // BaseExceptionGroup. Walk both branches
+    if descendant_normalized == "ExceptionGroup" && ancestor_normalized == "BaseExceptionGroup" {
+        return true;
+    }
+
+    let mut current = descendant_normalized;
+    loop {
+        match builtin_exception_superclass(current) {
+            Some(parent) if parent == ancestor_normalized => return true,
+            Some(parent) => current = parent,
+            None => return false,
+        }
+    }
+}

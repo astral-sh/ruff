@@ -1334,6 +1334,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }
+            if checker.is_rule_enabled(Rule::BadExceptOrder) {
+                pylint::rules::bad_except_order(checker, handlers);
+            }
             if checker.is_rule_enabled(Rule::DefaultExceptNotLast) {
                 pyflakes::rules::default_except_not_last(checker, handlers, checker.locator);
             }
