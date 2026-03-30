@@ -2032,13 +2032,13 @@ b = cfg.read_write
         "int" @ 127..130: Class
         "self" @ 147..151: SelfParameter
         "_x" @ 152..154: Variable
-        "read_write" @ 161..171: Decorator
-        "setter" @ 172..178: Decorator
+        "read_write" @ 161..171: Method
+        "setter" @ 172..178: Method
         "read_write" @ 187..197: Method [definition]
         "self" @ 198..202: SelfParameter [definition]
         "value" @ 204..209: Parameter [definition]
         "int" @ 211..214: Class
-        "None" @ 219..223: Class
+        "None" @ 219..223: BuiltinConstant
         "self" @ 233..237: SelfParameter
         "_x" @ 238..240: Variable
         "value" @ 243..248: Parameter
@@ -2049,7 +2049,7 @@ b = cfg.read_write
         "read_only" @ 273..282: Property [readonly]
         "b" @ 283..284: Variable [definition]
         "cfg" @ 287..290: Variable
-        "read_write" @ 291..301: Property
+        "read_write" @ 291..301: Property [readonly]
         "#);
     }
 
