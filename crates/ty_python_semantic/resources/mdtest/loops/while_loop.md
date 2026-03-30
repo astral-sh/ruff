@@ -152,6 +152,28 @@ while random():
 reveal_type(i)  # revealed: int
 ```
 
+### Non-integer overloaded updates are not promoted
+
+```py
+from typing import Literal
+
+def keep_going(x: object) -> bool:
+    return True
+
+class Weird:
+    def __add__(self, other: int) -> Literal["foo"]:
+        return "foo"
+
+x = Weird()
+while keep_going(x):
+    reveal_type(x)  # revealed: Weird | Literal["foo"]
+    if isinstance(x, Weird):
+        x = x + 1
+    else:
+        x = Weird()
+reveal_type(x)  # revealed: Weird | Literal["foo"]
+```
+
 ### A binding that didn't exist before the loop started
 
 ```py
