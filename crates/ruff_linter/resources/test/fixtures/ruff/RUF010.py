@@ -23,11 +23,11 @@ f"{bla!s} {[]!r} {'bar'!a}"  # OK
 "Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"  # OK
 
 
-def ascii(arg):
-    pass
+def ascii_shadowing():
+    def ascii(arg):
+        pass
 
-
-f"{ascii(bla)}"  # OK
+    f"{ascii(bla)}"  # OK
 
 (
     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
