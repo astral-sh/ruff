@@ -669,7 +669,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        match &member.kind {
+        let result = match &member.kind {
             ProtocolMemberKind::Method(method) => {
                 // `__call__` members must be special cased for several reasons:
                 //
@@ -697,6 +697,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                         .place
                     else {
+                        let member_name = member.name;
+                        self.provide_error_hint(|| {
+                            format!("protocol member `{member_name}` is not defined")
+                        });
                         return self.never();
                     };
                     attribute_type
@@ -725,16 +729,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             }
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => ConstraintSet::from_bool(
-                self.constraints,
-                matches!(
+            ProtocolMemberKind::Property(_) => {
+                let is_defined = matches!(
                     ty.member(db, member.name).place,
                     Place::Defined(DefinedPlace {
                         definedness: Definedness::AlwaysDefined,
                         ..
                     })
-                ),
-            ),
+                );
+                if !is_defined {
+                    let member_name = member.name;
+                    self.provide_error_hint(|| {
+                        format!("protocol member `{member_name}` is not defined")
+                    });
+                }
+                ConstraintSet::from_bool(self.constraints, is_defined)
+            }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
                     ty: attribute_type,
@@ -742,6 +752,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ..
                 }) = ty.member(db, member.name).place
                 else {
+                    let member_name = member.name;
+                    self.provide_error_hint(|| {
+                        format!("protocol member `{member_name}` is not defined")
+                    });
                     return self.never();
                 };
                 self.check_type_pair(db, *member_type, attribute_type).and(
@@ -750,7 +764,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     || self.check_type_pair(db, attribute_type, *member_type),
                 )
             }
+        };
+        if result.is_never_satisfied(db) {
+            let member_name = member.name;
+            self.provide_error_hint(|| format!("while checking protocol member `{member_name}`"));
         }
+        result
     }
 
     pub(super) fn check_protocol_interface_pair(
@@ -1065,27 +1084,35 @@ fn protocol_bind_self<'db>(
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
 /// comparisons and generic protocol solving when the actual type is plainly missing a member.
-pub(super) fn has_all_protocol_members_defined<'db>(
+pub(super) fn missing_protocol_members<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
-) -> bool {
+) -> Vec<String> {
     let target_interface = protocol.interface(db);
 
     match ty {
-        Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
-            source_protocol
-                .interface(db)
-                .includes_member(db, member.name())
-        }),
-        _ => target_interface.members(db).all(|member| {
-            matches!(
-                ty.member(db, member.name()).place,
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                })
-            )
-        }),
+        Type::ProtocolInstance(source_protocol) => target_interface
+            .members(db)
+            .filter(|member| {
+                !source_protocol
+                    .interface(db)
+                    .includes_member(db, member.name())
+            })
+            .map(|member| member.name().to_string())
+            .collect(),
+        _ => target_interface
+            .members(db)
+            .filter(|member| {
+                !matches!(
+                    ty.member(db, member.name()).place,
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    })
+                )
+            })
+            .map(|member| member.name().to_string())
+            .collect(),
     }
 }

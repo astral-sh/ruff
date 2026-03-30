@@ -20,7 +20,7 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+    ProtocolClass, missing_protocol_members, walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
@@ -493,7 +493,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        if !has_all_protocol_members_defined(db, ty, protocol) {
+        let missing = missing_protocol_members(db, ty, protocol);
+        if !missing.is_empty() {
+            self.provide_error_hint(|| {
+                if missing.len() == 1 {
+                    format!("protocol member `{}` is not defined", missing[0])
+                } else {
+                    let members: Vec<_> = missing.iter().map(|n| format!("`{n}`")).collect();
+                    format!("protocol members {} are not defined", members.join(", "))
+                }
+            });
             return result;
         }
 

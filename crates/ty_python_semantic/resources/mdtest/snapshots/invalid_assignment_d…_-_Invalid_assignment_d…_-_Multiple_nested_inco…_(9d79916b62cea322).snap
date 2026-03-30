@@ -40,7 +40,8 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |             Declared type
    |
 info: type `str` is not assignable to `bytes`
-info: └── while comparing parameter types
+info: ├── while comparing parameter types
+info: └── while checking protocol member `check1`
 info: rule `invalid-assignment` is enabled by default
 
 ```

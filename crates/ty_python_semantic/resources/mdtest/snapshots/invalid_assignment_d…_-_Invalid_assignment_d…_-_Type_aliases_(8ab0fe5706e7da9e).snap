@@ -41,6 +41,7 @@ error[invalid-assignment]: Object of type `HasName` is not assignable to `String
    |             Declared type
    |
 info: while comparing return types `bytes` and `str`
+info: └── while checking protocol member `name`
 info: rule `invalid-assignment` is enabled by default
 
 ```
