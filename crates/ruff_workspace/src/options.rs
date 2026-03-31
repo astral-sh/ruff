@@ -3827,23 +3827,14 @@ pub struct FormatOptions {
     )]
     pub quote_style: Option<QuoteStyle>,
 
-    /// Controls the quote style for nested strings inside interpolated string expressions in
-    /// Python 3.12+.
+    /// Controls the quote style for nested strings inside interpolated string expressions.
     ///
     /// - `alternating` (default): Use alternating quotes.
     /// - `preferred`: Use the configured [`quote-style`](#format_quote-style).
     ///
-    /// With `nested-string-quote-style = "preferred"` and `quote-style = "double"` in Python 3.12+:
-    ///
     /// ```python
-    /// f"Result: {data["key"]}"  # Same quotes for outer f-string and nested string
-    /// ```
-    ///
-    /// With `nested-string-quote-style = "alternating"` (default) or in Python versions before
-    /// 3.12:
-    ///
-    /// ```python
-    /// f"Result: {data['key']}"  # Alternating quotes for compatibility
+    /// f"{data['key']}"  # alternating (default)
+    /// f"{data["key"]}"  # preferred
     /// ```
     ///
     /// Note: This setting has no effect when targeting Python versions below 3.12.

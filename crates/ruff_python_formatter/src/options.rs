@@ -65,9 +65,9 @@ pub struct PyFormatOptions {
 
     /// Controls the quote style for nested strings in Python 3.12+.
     ///
-    /// When set to `preferred`, Ruff will use the configured `quote-style` even for nested
-    /// strings inside interpolated string expressions. When set to `alternating` (default), Ruff
-    /// alternates quote styles for nested strings for compatibility with older Python versions.
+    /// When set to `alternating` (default), Ruff will alternate quote styles for nested strings
+    /// inside interpolated string expressions. When set to `preferred`, Ruff will use
+    /// the configured `quote-style`.
     nested_string_quote_style: NestedStringQuoteStyle,
 }
 
