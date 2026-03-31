@@ -13,7 +13,8 @@ impl RequestHandler for GetSupportedProtocolVersionHandler {
 }
 
 impl SyncRequestHandler for GetSupportedProtocolVersionHandler {
-    fn run(_session: &mut Session, _client: &Client, _params: ()) -> crate::server::Result<String> {
+    fn run(session: &mut Session, _client: &Client, _params: ()) -> crate::server::Result<String> {
+        session.register_tsp_consumer();
         Ok(PROTOCOL_VERSION.to_string())
     }
 }

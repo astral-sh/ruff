@@ -108,6 +108,11 @@ pub(crate) struct Session {
 
     /// The name of the client (editor) that connected to this server.
     client_name: ClientName,
+
+    /// Whether the client has registered as a TSP consumer by calling
+    /// `typeServer/getSupportedProtocolVersion`. When `true`, the server sends
+    /// `typeServer/snapshotChanged` notifications after state mutations.
+    tsp_consumer_registered: bool,
 }
 
 /// LSP State for a Project
@@ -172,6 +177,7 @@ impl Session {
             revision: 0,
             registrations: HashSet::new(),
             client_name,
+            tsp_consumer_registered: false,
         })
     }
 
@@ -247,6 +253,17 @@ impl Session {
 
     pub(crate) fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Marks the client as a TSP consumer. Called when the client sends
+    /// `typeServer/getSupportedProtocolVersion`.
+    pub(crate) fn register_tsp_consumer(&mut self) {
+        self.tsp_consumer_registered = true;
+    }
+
+    /// Returns `true` if the client has registered as a TSP consumer.
+    pub(crate) fn is_tsp_consumer(&self) -> bool {
+        self.tsp_consumer_registered
     }
 
     /// The LSP specification doesn't allow configuration requests during initialization,
