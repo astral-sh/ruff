@@ -139,7 +139,8 @@ impl<'db> ConstructorBinding<'db> {
         dataclass_field_specifiers: &[Type<'db>],
     ) {
         if let Some(downstream) = self.checked_downstream_constructor_mut() {
-            // TODO
+            // We discard the result here, but that's fine; it's `report_diagnostics` and
+            // `as_result` that ultimately matter.
             let _ = downstream.check_types_impl(
                 db,
                 constraints,
