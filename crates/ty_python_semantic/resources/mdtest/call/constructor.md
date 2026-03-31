@@ -1257,29 +1257,6 @@ def _(flag: bool) -> None:
 
 ## `__new__` and `__init__` both present
 
-### Identical signatures
-
-A common case is to have `__new__` and `__init__` with identical signatures (except for the first
-argument). We report errors for both `__new__` and `__init__` if the arguments are incorrect.
-
-At runtime `__new__` is called first and will fail without executing `__init__` if the arguments are
-incorrect. However, we decided that it is better to report errors for both methods, since after
-fixing the `__new__` method, the user may forget to fix the `__init__` method.
-
-```py
-class Foo:
-    def __new__(cls, x: int) -> "Foo":
-        return object.__new__(cls)
-
-    def __init__(self, x: int): ...
-
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
-reveal_type(Foo())  # revealed: Foo
-
-reveal_type(Foo(1))  # revealed: Foo
-```
-
 ### Compatible signatures
 
 But they can also be compatible, but not identical. We should correctly report errors only for the

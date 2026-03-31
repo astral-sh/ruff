@@ -190,83 +190,35 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
-    /// analyze their overloads to determine how to handle downstream constructors.
+    /// analyze their overloads to determine whether to check downstream constructors.
     ///
-    /// We have to analyze overloads individually rather than just relying on the resolved return
-    /// type of the overall callable, because in no-matching-overload or multiple-matching-overload
-    /// cases where the overload resolution algorithm might just collapse to `Unknown`, we want to
-    /// make more informed decisions based on whether all overloads return instance or non-instance
-    /// types.
+    /// We analyze overloads individually rather than just relying on the resolved return type of
+    /// the overall callable, because in multiple-matching-overload cases where the overload
+    /// resolution algorithm might just collapse to `Unknown`, we want to make a more informed
+    /// decision based on whether all overloads return instance types, or not.
+    ///
+    /// This must be called after we've checked types on `self.entry` (in `self.check_types()`), so
+    /// we know which overloads matched.
     fn determine_should_check_downstream(&self, db: &'db dyn Db) -> bool {
         let constructor_kind = self.constructor_kind();
         if constructor_kind.is_init() || self.downstream_constructor().is_none() {
             return false;
         }
+
+        let callable = self.callable();
+
+        if callable.as_result().is_err() {
+            return false;
+        }
+
         let Some(constructor_class_literal) = self.constructed_class_literal(db) else {
             return false;
         };
-        let callable = self.callable();
-        let matching_overloads: Vec<_> = callable
-            .matching_overloads()
-            .map(|(_, overload)| overload)
-            .collect();
-        let analyze_selected =
-            |first_overload: &Binding<'db>,
-             overloads: &[&Binding<'db>],
-             check_downstream_override: Option<bool>| {
-                let first_return_is_instance = classify_constructor_return(
-                    db,
-                    constructor_class_literal,
-                    first_overload.return_ty,
-                )
-                .is_instance();
-                let mut saw_instance_return = first_return_is_instance;
-                let mut saw_non_instance_return = !first_return_is_instance;
 
-                for overload in overloads {
-                    if classify_constructor_return(
-                        db,
-                        constructor_class_literal,
-                        overload.return_ty,
-                    )
-                    .is_instance()
-                    {
-                        saw_instance_return = true;
-                    } else {
-                        saw_non_instance_return = true;
-                    }
-                }
-
-                if saw_instance_return {
-                    return check_downstream_override.unwrap_or(!saw_non_instance_return);
-                }
-
-                false
-            };
-
-        if let Some((first_overload, overloads)) = matching_overloads.split_first() {
-            return analyze_selected(first_overload, overloads, None);
-        }
-
-        match callable.overloads() {
-            [overload] => {
-                analyze_selected(overload, &[], Some(!constructor_kind.is_metaclass_call()))
-            }
-            overloads
-                if !overloads.is_empty()
-                    && overloads.iter().all(|overload| {
-                        classify_constructor_return(
-                            db,
-                            constructor_class_literal,
-                            overload.return_ty,
-                        )
-                        .is_instance()
-                    }) =>
-            {
-                !constructor_kind.is_metaclass_call()
-            }
-            _ => false,
-        }
+        callable.matching_overloads().all(|(_, overload)| {
+            classify_constructor_return(db, constructor_class_literal, overload.return_ty)
+                .is_instance()
+        })
     }
 
     /// Compute the constructor return that is determined directly by overload return analysis.
@@ -692,10 +644,6 @@ pub(crate) enum ConstructorCallableKind {
 impl ConstructorCallableKind {
     fn is_init(self) -> bool {
         matches!(self, ConstructorCallableKind::Init)
-    }
-
-    fn is_metaclass_call(self) -> bool {
-        matches!(self, ConstructorCallableKind::MetaclassCall)
     }
 }
 
