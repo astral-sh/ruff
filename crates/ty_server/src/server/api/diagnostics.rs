@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
 use lsp_types::notification::PublishDiagnostics;
@@ -496,6 +497,36 @@ pub(super) fn to_lsp_diagnostic(
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
+    let mut message = if supports_related_information {
+        // Show both the primary and annotation messages if available,
+        // because we don't create a related information for the primary message.
+        if let Some(annotation_message) = diagnostic
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+        {
+            format!("{}: {annotation_message}", diagnostic.primary_message())
+        } else {
+            diagnostic.primary_message().to_string()
+        }
+    } else {
+        diagnostic.concise_message().to_string()
+    };
+
+    // Append info sub-diagnostics that have no location (and thus
+    // can't be shown as "related information") to the message.
+    let mut first = true;
+    for sub_diagnostic in diagnostic.sub_diagnostics() {
+        if sub_diagnostic.primary_annotation().is_none() {
+            if first {
+                message.push('\n');
+                first = false;
+            }
+            let prefix = sub_diagnostic.severity().to_string();
+            let hint = sub_diagnostic.concise_message();
+            write!(message, "\n{prefix}: {hint}").ok();
+        }
+    }
+
     Some((
         url,
         Diagnostic {
@@ -505,20 +536,7 @@ pub(super) fn to_lsp_diagnostic(
             code: Some(NumberOrString::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: if supports_related_information {
-                // Show both the primary and annotation messages if available,
-                // because we don't create a related information for the primary message.
-                if let Some(annotation_message) = diagnostic
-                    .primary_annotation()
-                    .and_then(|annotation| annotation.get_message())
-                {
-                    format!("{}: {annotation_message}", diagnostic.primary_message())
-                } else {
-                    diagnostic.primary_message().to_string()
-                }
-            } else {
-                diagnostic.concise_message().to_string()
-            },
+            message,
             related_information,
             data: serde_json::to_value(data).ok(),
         },

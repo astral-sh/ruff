@@ -705,7 +705,7 @@ impl SubDiagnostic {
         }
     }
 
-    pub(crate) fn severity(&self) -> SubDiagnosticSeverity {
+    pub fn severity(&self) -> SubDiagnosticSeverity {
         self.inner.severity
     }
 }
@@ -1332,6 +1332,16 @@ impl SubDiagnosticSeverity {
             SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
             SubDiagnosticSeverity::Error => AnnotateLevel::Error,
             SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+        }
+    }
+
+    pub fn to_string(self) -> &'static str {
+        match self {
+            SubDiagnosticSeverity::Help => "help",
+            SubDiagnosticSeverity::Info => "info",
+            SubDiagnosticSeverity::Warning => "warning",
+            SubDiagnosticSeverity::Error => "error",
+            SubDiagnosticSeverity::Fatal => "fatal",
         }
     }
 }
