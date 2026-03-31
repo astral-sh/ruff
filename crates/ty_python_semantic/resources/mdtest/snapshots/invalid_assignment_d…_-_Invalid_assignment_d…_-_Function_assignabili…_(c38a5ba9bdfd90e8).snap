@@ -51,6 +51,7 @@ error[invalid-method-override]: Invalid override of method `method`
   |         ---------------------------- `Parent.method` defined here
 3 |         raise NotImplementedError
   |
+info: incompatible parameter types `bytes` and `str`
 info: This violates the Liskov Substitution Principle
 
 ```
@@ -73,6 +74,7 @@ error[invalid-method-override]: Invalid override of method `method`
    |         ---------------------------- `Parent.method` defined here
  3 |         raise NotImplementedError
    |
+info: incompatible return types `None` and `bool`
 info: This violates the Liskov Substitution Principle
 
 ```

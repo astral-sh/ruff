@@ -5380,6 +5380,7 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
+    error_context: &TypeRelationErrorContext,
 ) {
     let db = context.db();
 
@@ -5448,6 +5449,10 @@ pub(super) fn report_invalid_method_override<'db>(
             superclass_function_kind = superclass_function_kind.description(),
             subclass_function_kind = subclass_function_kind.description(),
         ));
+    }
+
+    for message in error_context.info_messages() {
+        diagnostic.info(message);
     }
 
     diagnostic.info("This violates the Liskov Substitution Principle");

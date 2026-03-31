@@ -186,6 +186,7 @@ error[invalid-method-override]: Invalid override of method `class_method`
  5 |     @staticmethod
  6 |     def static_method(x: int) -> int: ...
    |
+info: incompatible return types `object` and `int`
 info: This violates the Liskov Substitution Principle
 
 ```
@@ -210,6 +211,7 @@ error[invalid-method-override]: Invalid override of method `static_method`
  7 |
  8 | class BadChild1(Parent):
    |
+info: incompatible return types `object` and `int`
 info: This violates the Liskov Substitution Principle
 
 ```

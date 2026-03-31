@@ -40,6 +40,7 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 143 |     def __ne__(self, value: object, /) -> bool: ...
 144 |     def __str__(self) -> str: ...  # noqa: Y029
     |
+info: incompatible parameter types `Bad` and `object`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:
 help

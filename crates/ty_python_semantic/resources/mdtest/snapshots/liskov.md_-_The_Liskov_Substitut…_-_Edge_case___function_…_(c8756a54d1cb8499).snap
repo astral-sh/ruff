@@ -55,6 +55,7 @@ error[invalid-method-override]: Invalid override of method `x`
 1 | def x(self, y: str): ...
   |     --------------- Signature of `B.x`
   |
+info: incompatible parameter types `str` and `int`
 info: This violates the Liskov Substitution Principle
 
 ```
@@ -76,6 +77,7 @@ error[invalid-method-override]: Invalid override of method `x`
  1 | def x(self, y: str): ...
    |     --------------- Signature of `C.x`
    |
+info: incompatible parameter types `int` and `str`
 info: This violates the Liskov Substitution Principle
 
 ```

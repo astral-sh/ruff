@@ -81,6 +81,7 @@ error[invalid-method-override]: Invalid override of method `__lt__`
 10 |
 11 | # TODO: specifying `order=True` on the subclass means that a `__lt__` method is
    |
+info: incompatible parameter types `Bar` and `Foo`
 info: This violates the Liskov Substitution Principle
 info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
  --> src/mdtest_snippet.pyi:5:7
@@ -101,6 +102,7 @@ error[invalid-method-override]: Invalid override of method `_asdict`
 54 |     def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
    |
+info: incompatible return types `tuple[int, ...]` and `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
 info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
   --> src/mdtest_snippet.pyi:50:7
