@@ -7,6 +7,7 @@ use crate::semantic_index::predicate::{
     PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::semantic_index;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
@@ -780,6 +781,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         self.places()
             .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
+    }
+
+    fn is_current_method_receiver(&self, expr: &ast::Expr) -> bool {
+        let Some(name_expr) = expr.as_name_expr() else {
+            return false;
+        };
+
+        let scope = self.scope();
+        let index = semantic_index(self.db, scope.file(self.db));
+        let file_scope_id = scope.file_scope_id(self.db);
+
+        if index.class_definition_of_method(file_scope_id).is_none() {
+            return false;
+        }
+
+        let Some(function) = scope.node(self.db).as_function() else {
+            return false;
+        };
+
+        function
+            .node(self.module)
+            .parameters
+            .iter_non_variadic_params()
+            .next()
+            .is_some_and(|parameter| parameter.parameter.name.id == name_expr.id)
     }
 
     /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
@@ -1557,10 +1583,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg_expr, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg_expr)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1571,6 +1597,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .value(self.db);
 
                     if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    if self.is_current_method_receiver(first_arg_expr) {
                         return None;
                     }
 

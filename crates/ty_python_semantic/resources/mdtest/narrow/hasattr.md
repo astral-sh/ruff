@@ -98,3 +98,21 @@ def f(x: object):
         # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
 ```
+
+Using `hasattr()` to guard initialization of an implicit instance attribute should not recurse
+through the same attribute lookup:
+
+```py
+class Dist:
+    metadata: object
+
+class Req:
+    def get_dist(self):
+        return Dist()
+
+    @property
+    def metadata(self):
+        if not hasattr(self, "_metadata"):
+            self._metadata = self.get_dist().metadata
+        return self._metadata
+```
