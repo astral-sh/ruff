@@ -53,7 +53,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
 11 |     def check(self, x: int, y: bytes) -> bool:
    |
 info: type `DoesNotHaveCheck` is not compatible with protocol `SupportsCheck`
-info: └── protocol member `check` is not defined on type `DoesNotHaveCheck`
+      └── protocol member `check` is not defined on type `DoesNotHaveCheck`
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -84,8 +84,8 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
    |             Declared type
    |
 info: type `CheckWithWrongSignature` is not compatible with protocol `SupportsCheck`
-info: ├── protocol member `check` is incompatible
-info: └── incompatible parameter types `bytes` and `str`
+      ├── protocol member `check` is incompatible
+      └── incompatible parameter types `bytes` and `str`
 info: rule `invalid-assignment` is enabled by default
 
 ```

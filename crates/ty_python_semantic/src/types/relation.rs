@@ -631,23 +631,27 @@ impl TypeRelationErrorContext {
         self.stack.borrow_mut().push(message);
     }
 
-    pub fn info_messages(&self) -> Vec<String> {
+    pub fn info_message(&self) -> Option<String> {
         let stack = self.stack.borrow();
         let len = stack.len();
-        stack
-            .iter()
-            .rev()
-            .enumerate()
-            .map(|(i, message)| {
-                if i == 0 {
-                    message.clone()
-                } else if i < len - 1 {
-                    format!("├── {message}")
+        if len == 0 {
+            return None;
+        }
+        let mut result = String::new();
+        for (i, message) in stack.iter().rev().enumerate() {
+            if i > 0 {
+                // add six spaces of indentation to match the "info: " prefix of the first message
+                // TODO: fix this in `ruff_annotate_snippets`?
+                result.push_str("\n      ");
+                if i < len - 1 {
+                    result.push_str("├── ");
                 } else {
-                    format!("└── {message}")
+                    result.push_str("└── ");
                 }
-            })
-            .collect()
+            }
+            result.push_str(message);
+        }
+        Some(result)
     }
 }
 
@@ -1385,7 +1389,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::TypedDict(_), _) => self.with_recursion_guard(source, target, || {
                 let spec = &[KnownClass::Str.to_instance(db), Type::object()];
                 let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-                self.check_type_pair(db, str_object_map, target)
+                let result = self.check_type_pair(db, str_object_map, target);
+                if result.is_never_satisfied(db) {
+                    if let Type::NominalInstance(instance) = target
+                        && instance.class(db).is_known(db, KnownClass::Dict)
+                    {
+                        self.provide_error_hint(|| {
+                            "`TypedDict` types are not assignable to `dict` \
+                             (consider using `Mapping` instead)"
+                                .to_string()
+                        });
+                    }
+                }
+                result
             }),
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
