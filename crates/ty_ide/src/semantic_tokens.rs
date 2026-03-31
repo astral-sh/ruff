@@ -560,8 +560,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 // Check if this definition's type is a PropertyInstance
                 let def_model = SemanticModel::new(db, definition.file(db));
-                if let Some(Type::PropertyInstance(property)) =
-                    func_node.inferred_type(&def_model)
+                if let Some(Type::PropertyInstance(property)) = func_node.inferred_type(&def_model)
                 {
                     if found_property.is_none() {
                         found_property = Some((property, func_node.range(), parsed.clone()));
@@ -590,7 +589,11 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     /// Search for a `@name.setter` decorated function in the class containing `getter_range`.
-    fn has_setter_in_class(stmts: &[ast::Stmt], getter_range: ruff_text_size::TextRange, name: &str) -> bool {
+    fn has_setter_in_class(
+        stmts: &[ast::Stmt],
+        getter_range: ruff_text_size::TextRange,
+        name: &str,
+    ) -> bool {
         for stmt in stmts {
             if let ast::Stmt::ClassDef(class) = stmt {
                 if class.range().contains_range(getter_range) {
@@ -2146,8 +2149,8 @@ def f(obj: WithProperty | WithAttribute):
         "obj" @ 123..126: Parameter [definition]
         "WithProperty" @ 128..140: Class
         "WithAttribute" @ 143..156: Class
-        "obj" @ 162..165: Parameter
-        "value" @ 166..171: Variable
+        "obj" @ 170..173: Parameter
+        "value" @ 174..179: Variable
         "#);
     }
 
