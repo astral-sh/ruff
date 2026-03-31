@@ -31,6 +31,17 @@ use crate::{Edit, Fix, FixAvailability, Locator, Violation};
 /// ]
 /// ```
 ///
+/// ## Formatter compatibility
+/// This rule is incompatible with the [formatter] when using
+/// [`format.skip-magic-trailing-comma`]. The formatter uses the trailing
+/// comma as a signal to keep sequences multiline. With
+/// `skip-magic-trailing-comma` enabled, the formatter will collapse the
+/// expanded `__all__` back onto a single line (if it fits within the line
+/// width), causing the rule to trigger again on the next lint pass.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
+/// [`format.skip-magic-trailing-comma`]: https://docs.astral.sh/ruff/settings/#format-skip-magic-trailing-comma
+///
 /// ## Fix safety
 /// This rule's fix is always safe, as it only changes whitespace formatting
 /// without altering the runtime value of `__all__`.
