@@ -230,6 +230,7 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
     let dedent_len = existing_indent_len - indent.len();
 
     let mut result = String::with_capacity(text.len() + indent.len());
+
     for line in text.universal_newlines() {
         let trimmed = line.trim_whitespace_start();
         if trimmed.is_empty() {
@@ -237,22 +238,27 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
                 result.push_str(&line_ending);
             }
         } else {
+            let formfeed_count = line.chars().take_while(|&c| c == '\x0C').count();
+            let content = if line.starts_with('\x0C') {
+                &line[formfeed_count..]
+            } else {
+                line.as_full_str()
+            };
             // Determine the current indentation level.
-            let current_indent_len = line.len() - trimmed.len();
+            let current_indent_len = content.len() - trimmed.len();
             if current_indent_len < existing_indent_len {
                 // If the current indentation level is less than the baseline, keep it as is.
                 result.push_str(line.as_full_str());
             } else {
                 // Otherwise, reduce the indentation level.
                 if line.starts_with('\x0C') {
-                    let formfeed_count = line.chars().take_while(|&c| c == '\x0C').count();
-                    let content = &line[formfeed_count..];
-
                     for _ in 0..formfeed_count {
                         result.push('\x0C');
                     }
                     result.push_str(&content[dedent_len..]);
-                    result.push_str(line.line_ending().unwrap_or_default().as_str());
+                    if let Some(line_ending) = line.line_ending() {
+                        result.push_str(&line_ending);
+                    }
                 } else {
                     result.push_str(&line.as_full_str()[dedent_len..]);
                 }
@@ -594,13 +600,35 @@ mod tests {
         assert_eq!(dedent_to(&x, "  "), Some(y));
 
         let x = [
-            "    1",
+            "\x0C    1",
             "    2"
         ].join("\n");
         let y = [
-            "1",
+            "\x0C1",
             "2"
         ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_returns_none_if_indent_too_large() {
+        let x = [
+            "    foo", 
+            "    bar"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "      "), None);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_only_whitespace_lines() {
+        let x = [
+            "   ", 
+            "\t", 
+            "  "
+        ].join("\n");
+        let y = "\n\n".to_string();
         assert_eq!(dedent_to(&x, ""), Some(y));
     }
 
@@ -620,7 +648,7 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
-    fn dedent_to_preserves_multiple_leading_form_feeds() {
+    fn dedent_to_preserves_multiple_leading_form_feeds_on_first_line() {
         let x = [
             "\x0C\x0C    1",
             "    2",
@@ -628,6 +656,20 @@ mod tests {
         let y = [
             "\x0C\x0C1",
             "2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_preserves_multiple_leading_form_feeds_on_second_line() {
+        let x = [
+            "    1",
+            "\x0C\x0C    2",
+        ].join("\n");
+        let y = [
+            "1",
+            "\x0C\x0C2",
         ].join("\n");
         assert_eq!(dedent_to(&x, ""), Some(y));
     }
@@ -644,5 +686,38 @@ mod tests {
             "2",
         ].join("\n");
         assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_ignores_leading_form_feeds_when_checking_indentation() {
+        let x = [
+            "    1",
+            "\x0C\x0C  2",
+        ].join("\n");
+        let y = [
+            "1",
+            "\x0C\x0C  2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_is_idempotent() {
+        let x = [
+            "    foo",
+            "  bar",
+            "   ",
+            "    baz"
+        ].join("\n");
+        let y = [
+            "  foo",
+            "  bar",
+            "",
+            "  baz"
+        ].join("\n");
+        let first_result = dedent_to(&x, "  ").unwrap();
+        assert_eq!(dedent_to(&first_result, "  "), Some(y));
     }
 }
