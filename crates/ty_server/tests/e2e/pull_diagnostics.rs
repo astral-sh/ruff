@@ -97,6 +97,37 @@ def foo():
 }
 
 #[test]
+fn loop_carried_rebinding_is_not_reported_unused() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def buy_sell_once(prices: list[float]) -> float:
+    assert len(prices) > 1
+    best_buy, best_so_far = prices[0], 0.0
+    for i in range(1, len(prices)):
+        best_so_far = max(best_so_far, prices[i] - best_buy)
+        best_buy = min(best_buy, prices[i])
+    return best_so_far
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+
+    Ok(())
+}
+
+#[test]
 fn on_did_open_diagnostics_off() -> Result<()> {
     let _filter = filter_result_id();
 
