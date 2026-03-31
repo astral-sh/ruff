@@ -102,7 +102,6 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         # error: [unsupported-operator]
         # error: [invalid-type-form] "F-strings are not allowed in type expressions"
         p: int | f"foo",
-        # error: [invalid-type-form] "Slices are not allowed in type expressions"
         # error: [invalid-type-form] "Invalid subscript"
         q: [1, 2, 3][1:2],
     ):
@@ -246,7 +245,6 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        # error: [invalid-type-form] "Slices are not allowed in type expressions"
         # error: [invalid-type-form] "Invalid subscript"
         o: "[1, 2, 3][1:2]",
     ):
@@ -282,7 +280,7 @@ def _(
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
     f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
-    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
+    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
     g: [int, str],
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
     h: (int, str),
@@ -303,7 +301,6 @@ class name_0[name_2: [int]]:
     pass
 
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Dict literals are not allowed in type expressions"
 class name_4[name_1: [{}]]:
     pass
 ```
@@ -340,16 +337,15 @@ from PIL import Image
 def g(x: Image): ...  # error: [invalid-type-form]
 ```
 
-### List-literal used when you meant to use a list or tuple
+### List-literal used when you meant to use a list
 
 ```py
 def _(
     x: [int],  # error: [invalid-type-form]
 ) -> [int]:  # error: [invalid-type-form]
     return x
-```
 
-```py
+# No special hints for these: it's unclear what the user meant:
 def _(
     x: [int, str],  # error: [invalid-type-form]
 ) -> [int, str]:  # error: [invalid-type-form]

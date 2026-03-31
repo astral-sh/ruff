@@ -9330,7 +9330,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// The inference results can be merged into the current inference region using
     /// [`TypeInferenceBuilder::extend`].
-    fn speculate(&mut self) -> Self {
+    fn speculate(&self) -> Self {
         let Self {
             region,
             index,
