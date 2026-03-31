@@ -28,8 +28,8 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-reveal_type(p.x)  # revealed: Unknown | int
-reveal_type(p.y)  # revealed: Unknown | int
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
 ```
 
 ## Self-referential bare type alias
@@ -113,7 +113,7 @@ We do, however, still check assignability of the default value to the parameter 
 ```py
 class D:
     def f(self: "D"):
-        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = ...) -> Unknown)` is not assignable to annotated parameter type `int`"
+        # error: [invalid-parameter-default] "Default value of type `(a: int = ...) -> Unknown` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
         self.a = inner_a
 ```
@@ -128,16 +128,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Unknown) | ((positional=...) -> Divergent)
+        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Unknown) | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 
@@ -152,7 +152,7 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: Unknown | str | dict[Unknown, Unknown] | dict[str, str]
+# revealed: str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
 ```
 

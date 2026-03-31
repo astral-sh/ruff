@@ -290,7 +290,7 @@ class RecursiveAttr:
     def update(self):
         self.i = self.i + 1
 
-reveal_type(RecursiveAttr().i)  # revealed: Unknown | int
+reveal_type(RecursiveAttr().i)  # revealed: int
 
 # Here are some recursive but saturating examples. Because it's difficult to statically determine whether literal unions saturate or diverge,
 # we widen them early, even though they may actually be convergent.
@@ -301,7 +301,7 @@ class RecursiveAttr2:
     def update(self):
         self.i = (self.i + 1) % 4
 
-reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3]
+reveal_type(RecursiveAttr2().i)  # revealed: int
 
 class RecursiveAttr3:
     def __init__(self):
@@ -311,7 +311,7 @@ class RecursiveAttr3:
         self.i = (self.i + 1) % 5
 
 # Going beyond the MAX_RECURSIVE_UNION_LITERALS limit:
-reveal_type(RecursiveAttr3().i)  # revealed: Unknown | int
+reveal_type(RecursiveAttr3().i)  # revealed: int
 ```
 
 We set a much higher limit for non-recursive unions of enum literals, because huge enums are common

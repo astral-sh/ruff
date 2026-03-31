@@ -101,7 +101,7 @@ use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::CallableSignature;
 use crate::types::subclass_of::SubclassOfInner;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, TupleUnpacker};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_dict_dict_literal};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
@@ -2781,12 +2781,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
                 {
-                    let assigned_tys = tuple_spec.all_elements().to_vec();
+                    let target_len = match elts.iter().position(ast::Expr::is_starred_expr) {
+                        Some(starred_index) => {
+                            TupleLength::Variable(starred_index, elts.len() - (starred_index + 1))
+                        }
+                        None => TupleLength::Fixed(elts.len()),
+                    };
+                    let mut unpacker = TupleUnpacker::new(self.db(), target_len);
 
-                    for (i, element) in elts.iter().enumerate() {
-                        match assigned_tys.get(i).copied() {
-                            None => self.infer_target_impl(element, value, None),
-                            Some(ty) => self.infer_target_impl(element, value, Some(&|_, _| ty)),
+                    if unpacker.unpack_tuple(tuple_spec.as_ref()).is_ok() {
+                        for (element, ty) in elts.iter().zip(unpacker.into_types()) {
+                            self.infer_target_impl(element, value, Some(&|_, _| ty));
+                        }
+                    } else {
+                        for element in elts {
+                            self.infer_target_impl(element, value, None);
                         }
                     }
                 } else {

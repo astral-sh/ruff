@@ -127,7 +127,7 @@ c = C()
 
 reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
+reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data"] | int
 
 reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
 
@@ -173,9 +173,10 @@ def f1(flag: bool):
             # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
-    reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+    reveal_type(C1().attr)  # revealed: Unknown | str
 
     # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `str`"
     C1().attr = 1
 ```
 
@@ -188,7 +189,7 @@ class C2:
         self.attr = "normal"
     attr = NonDataDescriptor()
 
-reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+reveal_type(C2().attr)  # revealed: Unknown | str
 
 # Assignments always go to the instance attribute in this case
 C2().attr = 1

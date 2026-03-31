@@ -1935,11 +1935,24 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of `Unknown` with the inferred types of all bindings of
-        // that attribute. We include `Unknown` in that union to account for the fact that the
-        // attribute might be externally modified.
+        // any method, we build a union of the inferred types of all bindings of that attribute.
+        //
+        // For implicit instance attributes, we trust those inferred types and promote literals so
+        // that `self.x = 1` behaves like a mutable attribute of type `int`, not `Literal[1]`.
+        // Bare `Final` instance attributes are the exception: they preserve literal types because
+        // they are immutable. For class attributes inferred from `@classmethod`s, we still include
+        // `Unknown` to account for external mutation.
         let mut union_of_inferred_types = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+        let is_implicit_instance_attribute =
+            matches!(target_method_decorator, MethodDecorator::None);
+        let inferred_attribute_ty = |ty: Type<'db>, qualifiers: TypeQualifiers| {
+            if is_implicit_instance_attribute && !qualifiers.contains(TypeQualifiers::FINAL) {
+                ty.promote(db)
+            } else {
+                ty
+            }
+        };
 
         let mut is_attribute_bound = false;
 
@@ -2045,7 +2058,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if !qualifiers.contains(TypeQualifiers::FINAL) {
+        if !qualifiers.contains(TypeQualifiers::FINAL) && !is_implicit_instance_attribute {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
@@ -2126,7 +2139,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                                 let inferred_ty = unpacked.expression_type(assign.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                             TargetKind::Single => {
                                 // We found an un-annotated attribute assignment of the form:
@@ -2139,7 +2153,8 @@ impl<'db> StaticClassLiteral<'db> {
                                     TypeContext::default(),
                                 );
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                         }
                     }
@@ -2154,7 +2169,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(for_stmt.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2170,7 +2186,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                         }
                     }
@@ -2185,7 +2202,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(with_item.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2203,7 +2221,8 @@ impl<'db> StaticClassLiteral<'db> {
                                     context_ty.enter(db)
                                 };
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                         }
                     }
@@ -2219,7 +2238,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(comprehension.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2235,7 +2255,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_attribute_ty(inferred_ty, qualifiers));
                             }
                         }
                     }

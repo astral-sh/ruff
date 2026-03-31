@@ -15,11 +15,12 @@ class A:
 a = A()
 a.x = 0
 a.y = 0
+# error: [invalid-assignment] "Object of type `Literal[0]` is not assignable to attribute `z` of type `None`"
 a.z = 0
 
 reveal_type(a.x)  # revealed: Literal[0]
 reveal_type(a.y)  # revealed: Literal[0]
-reveal_type(a.z)  # revealed: Literal[0]
+reveal_type(a.z)  # revealed: None
 
 # Make sure that we infer the narrowed type for eager
 # scopes (class, comprehension) and the non-narrowed
@@ -27,41 +28,42 @@ reveal_type(a.z)  # revealed: Literal[0]
 class _:
     reveal_type(a.x)  # revealed: Literal[0]
     reveal_type(a.y)  # revealed: Literal[0]
-    reveal_type(a.z)  # revealed: Literal[0]
+    reveal_type(a.z)  # revealed: None
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(a.y) for _ in range(1)]  # revealed: Literal[0]
-[reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
+[reveal_type(a.z) for _ in range(1)]  # revealed: None
 
 def _():
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.z)  # revealed: None
 
 if False:
     a = A()
 reveal_type(a.x)  # revealed: Literal[0]
 reveal_type(a.y)  # revealed: Literal[0]
-reveal_type(a.z)  # revealed: Literal[0]
+reveal_type(a.z)  # revealed: None
 
 if True:
     a = A()
 reveal_type(a.x)  # revealed: int | None
 reveal_type(a.y)  # revealed: Unknown | None
-reveal_type(a.z)  # revealed: Unknown | None
+reveal_type(a.z)  # revealed: None
 
 a.x = 0
 a.y = 0
+# error: [invalid-assignment] "Object of type `Literal[0]` is not assignable to attribute `z` of type `None`"
 a.z = 0
 reveal_type(a.x)  # revealed: Literal[0]
 reveal_type(a.y)  # revealed: Literal[0]
-reveal_type(a.z)  # revealed: Literal[0]
+reveal_type(a.z)  # revealed: None
 
 class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.z)  # revealed: None
 
 def cond() -> bool:
     return True
@@ -71,13 +73,13 @@ class _:
         a = A()
     reveal_type(a.x)  # revealed: Literal[0]
     reveal_type(a.y)  # revealed: Literal[0]
-    reveal_type(a.z)  # revealed: Literal[0]
+    reveal_type(a.z)  # revealed: None
 
     if cond():
         a = A()
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
-    reveal_type(a.z)  # revealed: Unknown | None
+    reveal_type(a.z)  # revealed: None
 
 class _:
     a = A()
@@ -85,7 +87,7 @@ class _:
     class Inner:
         reveal_type(a.x)  # revealed: int | None
         reveal_type(a.y)  # revealed: Unknown | None
-        reveal_type(a.z)  # revealed: Unknown | None
+        reveal_type(a.z)  # revealed: None
 
 a = A()
 # error: [unresolved-attribute]
@@ -313,16 +315,16 @@ class F:
 class Mock: ...
 
 f = F()
-reveal_type(f.e)  # revealed: Unknown | E
+reveal_type(f.e)  # revealed: E
+# error: [invalid-assignment] "Object of type `Mock` is not assignable to attribute `e` of type `E`"
 f.e = Mock()
-reveal_type(f.e)  # revealed: Mock
+reveal_type(f.e)  # revealed: E
 
 f2 = F()
-reveal_type(f2.e.d)  # revealed: Unknown | D
+reveal_type(f2.e.d)  # revealed: D
+# error: [invalid-assignment] "Object of type `Mock` is not assignable to attribute `d` of type `D`"
 f2.e.d = Mock()
-# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown`,
-# and `Unknown` could be a data descriptor type. But we enable it for practical convenience.
-reveal_type(f2.e.d)  # revealed: Mock
+reveal_type(f2.e.d)  # revealed: D
 ```
 
 ## Invalid assignments are not used for narrowing
