@@ -81,22 +81,20 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             .comment_ranges()
             .comments_in_range(body_range(following_branch, checker.locator()));
 
-        let first_comments: Vec<_> = first_comment_ranges
-            .iter()
-            .map(|range| checker.locator().slice(*range))
-            .collect();
-        let second_comments: Vec<_> = second_comment_ranges
-            .iter()
-            .map(|range| checker.locator().slice(*range))
-            .collect();
+        // Compare comments without allocating Vecs — compare ranges directly.
+        let comments_match = first_comment_ranges.len() == second_comment_ranges.len()
+            && first_comment_ranges
+                .iter()
+                .zip(second_comment_ranges.iter())
+                .all(|(a, b)| checker.locator().slice(*a) == checker.locator().slice(*b));
 
-        if first_comments != second_comments {
+        if !comments_match {
             // If any comment is a pragma comment (e.g., `# noqa: SIM114`), skip the
             // diagnostic entirely so the pragma isn't flagged as unused (RUF100).
-            let has_pragma = first_comments
+            let has_pragma = first_comment_ranges
                 .iter()
-                .chain(second_comments.iter())
-                .any(|comment| is_pragma_comment(comment));
+                .chain(second_comment_ranges.iter())
+                .any(|range| is_pragma_comment(checker.locator().slice(*range)));
             if has_pragma {
                 continue;
             }
