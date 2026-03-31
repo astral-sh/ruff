@@ -28,9 +28,24 @@ pub(super) struct ConstructorBinding<'db> {
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<DownstreamConstructor<'db>>>,
+    /// Should we check downstream constructors? This starts out `None`, and is populated to a
+    /// `bool` by `check_types`, once we've type-checked our own overloads.
+    cached_should_check_downstream: Option<bool>,
 }
 
 impl<'db> ConstructorBinding<'db> {
+    pub(super) fn new(
+        entry: CallableBinding<'db>,
+        constructor_context: ConstructorContext<'db>,
+    ) -> Self {
+        Self {
+            entry,
+            constructor_context,
+            downstream_constructor: None,
+            cached_should_check_downstream: None,
+        }
+    }
+
     pub(super) fn context(&self) -> ConstructorContext<'db> {
         self.constructor_context
     }
@@ -49,13 +64,11 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
-        let overload_analysis = self.constructor_overload_analysis(db);
 
         // For layered mixed-constructor handling (metaclass `__call__` mixed with
         // downstream constructor logic), if the downstream constructor resolves to a
         // non-instance return, that becomes the effective constructor return.
-        if overload_analysis.check_downstream
-            && let Some(downstream) = self.downstream_constructor()
+        if let Some(downstream) = self.checked_downstream_constructor()
             && let Some(constructor_class_literal) = self.constructed_class_literal(db)
         {
             let downstream_return = downstream.bindings.return_type(db);
@@ -68,14 +81,12 @@ impl<'db> ConstructorBinding<'db> {
 
         // If `__new__` or metaclass `__call__` produced an explicit return type, use it
         // directly rather than building an instance of the constructed class.
-        if let Some(return_ty) = overload_analysis.return_type {
+        if let Some(return_ty) = self.constructor_overload_return_type(db) {
             return return_ty;
         }
 
-        constructed_instance_type.apply_optional_specialization(
-            db,
-            self.instance_return_specialization(db, overload_analysis.check_downstream),
-        )
+        constructed_instance_type
+            .apply_optional_specialization(db, self.instance_return_specialization(db))
     }
 
     pub(super) fn set_constructed_instance_type(&mut self, instance_type: Type<'db>) {
@@ -109,44 +120,56 @@ impl<'db> ConstructorBinding<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
-        self.entry
-            .check_types(db, constraints, argument_types, call_expression_tcx)
+        let forms = self
+            .entry
+            .check_types(db, constraints, argument_types, call_expression_tcx);
+
+        // Now that we've fully checked our own callable, we can determine whether downstream
+        // constructors should be checked or not.
+        debug_assert!(self.cached_should_check_downstream.is_none());
+        self.cached_should_check_downstream = Some(self.determine_should_check_downstream(db));
+
+        forms
     }
 
-    pub(super) fn check_downstream_constructor(
+    pub(super) fn maybe_check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
-    ) -> bool {
-        if !self.constructor_overload_analysis(db).check_downstream {
-            return false;
+    ) {
+        if let Some(downstream) = self.checked_downstream_constructor_mut() {
+            // TODO
+            let _ = downstream.bindings.check_types_impl(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+            );
         }
-
-        self.downstream_constructor_mut().is_some_and(|downstream| {
-            downstream
-                .bindings
-                .check_types_impl(
-                    db,
-                    constraints,
-                    argument_types,
-                    call_expression_tcx,
-                    dataclass_field_specifiers,
-                )
-                .is_err()
-        })
     }
 
-    pub(super) fn checked_downstream_constructor_bindings(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<&Bindings<'db>> {
-        self.constructor_overload_analysis(db)
-            .check_downstream
-            .then_some(self.downstream_constructor()?)
+    pub(super) fn checked_downstream_constructor_bindings(&self) -> Option<&Bindings<'db>> {
+        self.checked_downstream_constructor()
             .map(|downstream| &downstream.bindings)
+    }
+
+    fn checked_downstream_constructor(&self) -> Option<&DownstreamConstructor<'db>> {
+        self.should_check_downstream()
+            .then_some(self.downstream_constructor.as_deref()?)
+    }
+
+    fn checked_downstream_constructor_mut(&mut self) -> Option<&mut DownstreamConstructor<'db>> {
+        self.should_check_downstream()
+            .then_some(self.downstream_constructor.as_deref_mut()?)
+    }
+
+    fn should_check_downstream(&self) -> bool {
+        self.cached_should_check_downstream
+            .expect("cached_should_check_downstream should have been set by check_types")
     }
 
     /// When inferring a specialization for a constructor return, we may have multiple matched
@@ -172,31 +195,25 @@ impl<'db> ConstructorBinding<'db> {
     /// We have to analyze overloads individually rather than just relying on the resolved return
     /// type of the overall callable, because in no-matching-overload or multiple-matching-overload
     /// cases where the overload resolution algorithm might just collapse to `Unknown`, we want to
-    /// make decisions based on whether all overloads return instance or non-instance types.
-    fn constructor_overload_analysis(&self, db: &'db dyn Db) -> ConstructorOverloadAnalysis<'db> {
+    /// make more informed decisions based on whether all overloads return instance or non-instance
+    /// types.
+    fn determine_should_check_downstream(&self, db: &'db dyn Db) -> bool {
         let constructor_kind = self.constructor_kind();
-        if constructor_kind.is_init() {
-            return ConstructorOverloadAnalysis::default();
+        if constructor_kind.is_init() || self.downstream_constructor().is_none() {
+            return false;
         }
         let Some(constructor_class_literal) = self.constructed_class_literal(db) else {
-            return ConstructorOverloadAnalysis::default();
+            return false;
         };
         let callable = self.callable();
         let matching_overloads: Vec<_> = callable
             .matching_overloads()
             .map(|(_, overload)| overload)
             .collect();
-        let selected_return_type = |check_downstream| {
-            self.selected_instance_return_type(
-                db,
-                self.instance_return_specialization(db, check_downstream),
-            )
-        };
         let analyze_selected =
             |first_overload: &Binding<'db>,
              overloads: &[&Binding<'db>],
              check_downstream_override: Option<bool>| {
-                let mut selected_return = true;
                 let first_return_is_instance = classify_constructor_return(
                     db,
                     constructor_class_literal,
@@ -205,13 +222,8 @@ impl<'db> ConstructorBinding<'db> {
                 .is_instance();
                 let mut saw_instance_return = first_return_is_instance;
                 let mut saw_non_instance_return = !first_return_is_instance;
-                let mut first_non_instance_return =
-                    (!first_return_is_instance).then_some(first_overload.return_ty);
-                let mut saw_distinct_non_instance_return = false;
 
                 for overload in overloads {
-                    selected_return = false;
-
                     if classify_constructor_return(
                         db,
                         constructor_class_literal,
@@ -220,48 +232,16 @@ impl<'db> ConstructorBinding<'db> {
                     .is_instance()
                     {
                         saw_instance_return = true;
-                    } else if let Some(first_non_instance_return) = first_non_instance_return {
-                        saw_non_instance_return = true;
-                        saw_distinct_non_instance_return |=
-                            overload.return_ty != first_non_instance_return;
                     } else {
                         saw_non_instance_return = true;
-                        first_non_instance_return = Some(overload.return_ty);
                     }
                 }
 
                 if saw_instance_return {
-                    let check_downstream =
-                        check_downstream_override.unwrap_or(!saw_non_instance_return);
-                    let return_type = selected_return
-                        .then(|| selected_return_type(check_downstream))
-                        .flatten();
-                    return ConstructorOverloadAnalysis {
-                        return_type,
-                        check_downstream,
-                    };
+                    return check_downstream_override.unwrap_or(!saw_non_instance_return);
                 }
 
-                match first_non_instance_return {
-                    Some(_) if saw_distinct_non_instance_return => ConstructorOverloadAnalysis {
-                        return_type: Some(Type::unknown()),
-                        check_downstream: false,
-                    },
-                    Some(first_non_instance_return) => ConstructorOverloadAnalysis {
-                        return_type: Some(first_non_instance_return),
-                        check_downstream: false,
-                    },
-                    None => {
-                        let check_downstream = check_downstream_override.unwrap_or(true);
-                        let return_type = selected_return
-                            .then(|| selected_return_type(check_downstream))
-                            .flatten();
-                        ConstructorOverloadAnalysis {
-                            return_type,
-                            check_downstream,
-                        }
-                    }
-                }
+                false
             };
 
         if let Some((first_overload, overloads)) = matching_overloads.split_first() {
@@ -283,15 +263,90 @@ impl<'db> ConstructorBinding<'db> {
                         .is_instance()
                     }) =>
             {
-                ConstructorOverloadAnalysis {
-                    return_type: None,
-                    check_downstream: !constructor_kind.is_metaclass_call(),
+                !constructor_kind.is_metaclass_call()
+            }
+            _ => false,
+        }
+    }
+
+    /// Compute the constructor return that is determined directly by overload return analysis.
+    ///
+    /// This must be evaluated after downstream constructor bindings have been type-checked,
+    /// because instance-returning constructor paths may incorporate downstream specializations.
+    fn constructor_overload_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let constructor_kind = self.constructor_kind();
+        if constructor_kind.is_init() {
+            return None;
+        }
+
+        let constructor_class_literal = self.constructed_class_literal(db)?;
+
+        let callable = self.callable();
+        let matching_overloads: Vec<_> = callable
+            .matching_overloads()
+            .map(|(_, overload)| overload)
+            .collect();
+        let selected_return_type =
+            || self.selected_instance_return_type(db, self.instance_return_specialization(db));
+        let analyze_selected = |first_overload: &Binding<'db>, overloads: &[&Binding<'db>]| {
+            let mut selected_return = true;
+            let first_return_is_instance = classify_constructor_return(
+                db,
+                constructor_class_literal,
+                first_overload.return_ty,
+            )
+            .is_instance();
+            let mut saw_instance_return = first_return_is_instance;
+            let mut first_non_instance_return =
+                (!first_return_is_instance).then_some(first_overload.return_ty);
+            let mut saw_distinct_non_instance_return = false;
+
+            for overload in overloads {
+                selected_return = false;
+
+                if classify_constructor_return(db, constructor_class_literal, overload.return_ty)
+                    .is_instance()
+                {
+                    saw_instance_return = true;
+                } else if let Some(first_non_instance_return) = first_non_instance_return {
+                    saw_distinct_non_instance_return |=
+                        overload.return_ty != first_non_instance_return;
+                } else {
+                    first_non_instance_return = Some(overload.return_ty);
                 }
             }
-            _ => ConstructorOverloadAnalysis {
-                return_type: Some(callable.return_type()),
-                check_downstream: false,
-            },
+
+            if saw_instance_return {
+                return selected_return.then(selected_return_type).flatten();
+            }
+
+            match first_non_instance_return {
+                Some(_) if saw_distinct_non_instance_return => Some(Type::unknown()),
+                Some(first_non_instance_return) => Some(first_non_instance_return),
+                None => selected_return.then(selected_return_type).flatten(),
+            }
+        };
+
+        if let Some((first_overload, overloads)) = matching_overloads.split_first() {
+            return analyze_selected(first_overload, overloads);
+        }
+
+        match callable.overloads() {
+            [overload] => analyze_selected(overload, &[]),
+            overloads
+                if !overloads.is_empty()
+                    && overloads.iter().all(|overload| {
+                        classify_constructor_return(
+                            db,
+                            constructor_class_literal,
+                            overload.return_ty,
+                        )
+                        .is_instance()
+                    }) =>
+            {
+                None
+            }
+            _ => Some(callable.return_type()),
         }
     }
 
@@ -299,14 +354,20 @@ impl<'db> ConstructorBinding<'db> {
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
     {
+        // We only map constructor bindings before we even set their downstream constructor.
+        debug_assert!(
+            self.downstream_constructor.is_none(),
+            "map should not be used on a ConstructorBinding with downstream constructor"
+        );
+        debug_assert!(
+            self.cached_should_check_downstream.is_none(),
+            "map should not be used on a ConstructorBinding that has cached check_downstream"
+        );
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
-            downstream_constructor: self.downstream_constructor.map(|downstream| {
-                Box::new(DownstreamConstructor {
-                    bindings: downstream.bindings.map_with(f),
-                })
-            }),
+            downstream_constructor: None,
+            cached_should_check_downstream: None,
         }
     }
 
@@ -314,11 +375,8 @@ impl<'db> ConstructorBinding<'db> {
     /// resulting specialization can be applied either to the constructed instance type or to an
     /// explicit `__new__` / `__call__` return annotation that is an instance of the constructed
     /// type or a subclass.
-    fn instance_return_specialization(
-        &self,
-        db: &'db dyn Db,
-        include_downstream: bool,
-    ) -> Option<Specialization<'db>> {
+    fn instance_return_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        let include_downstream = self.should_check_downstream();
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
@@ -655,17 +713,6 @@ impl ConstructorReturnKind {
     fn is_instance(self) -> bool {
         matches!(self, ConstructorReturnKind::Instance)
     }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-struct ConstructorOverloadAnalysis<'db> {
-    /// The effective constructor return, if overload resolution determined one directly. When this
-    /// is `None`, callers should fall back to the constructed instance type specialized from the
-    /// matched constructor bindings.
-    return_type: Option<Type<'db>>,
-    /// Whether downstream constructors should still be checked before the final return is
-    /// determined.
-    check_downstream: bool,
 }
 
 /// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
