@@ -156,6 +156,27 @@ impl<'db> ConstructorBinding<'db> {
             .then_some(self.downstream_constructor.as_deref()?)
     }
 
+    pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
+    where
+        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
+    {
+        // We only map constructor bindings before we even set their downstream constructor.
+        debug_assert!(
+            self.downstream_constructor.is_none(),
+            "map should not be used on a ConstructorBinding with downstream constructor"
+        );
+        debug_assert!(
+            self.cached_should_check_downstream.is_none(),
+            "map should not be used on a ConstructorBinding that has cached check_downstream"
+        );
+        ConstructorBinding {
+            entry: f(self.entry),
+            constructor_context: self.constructor_context,
+            downstream_constructor: None,
+            cached_should_check_downstream: None,
+        }
+    }
+
     fn checked_downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
         self.should_check_downstream()
             .then_some(self.downstream_constructor.as_deref_mut()?)
@@ -288,27 +309,6 @@ impl<'db> ConstructorBinding<'db> {
                 None
             }
             _ => Some(callable.return_type()),
-        }
-    }
-
-    pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
-    where
-        F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
-    {
-        // We only map constructor bindings before we even set their downstream constructor.
-        debug_assert!(
-            self.downstream_constructor.is_none(),
-            "map should not be used on a ConstructorBinding with downstream constructor"
-        );
-        debug_assert!(
-            self.cached_should_check_downstream.is_none(),
-            "map should not be used on a ConstructorBinding that has cached check_downstream"
-        );
-        ConstructorBinding {
-            entry: f(self.entry),
-            constructor_context: self.constructor_context,
-            downstream_constructor: None,
-            cached_should_check_downstream: None,
         }
     }
 
