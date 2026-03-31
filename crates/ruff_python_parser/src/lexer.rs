@@ -1526,6 +1526,26 @@ impl<'src> Lexer<'src> {
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
+        // At a cell boundary with open indent levels, clear the stack silently and
+        // advance to the next cell. Do NOT emit Dedent tokens — they would tell the
+        // parser the block is properly closed when it isn't. The parser should see
+        // the compound statement as having no body (it will recover when it encounters
+        // the next token from the new cell).
+        if at_cell_boundary && *self.indentations.current() != Indentation::root() {
+            while self.indentations.dedent().is_some() {
+                // Silently discard all dedents.
+            }
+            // Also discard the pending newline if we haven't flushed it yet.
+            if self.state.is_after_newline() {
+                // Already at a logical line start, no newline to discard.
+            } else {
+                self.state = State::AfterNewline;
+            }
+            self.range_from_consume_end = Some(self.token_range());
+            self.advance_to_next_cell();
+            return self.lex_token();
+        }
+
         let end_token = if at_cell_boundary {
             TokenKind::Dedent
         } else {
