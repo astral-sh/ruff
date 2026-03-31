@@ -514,6 +514,10 @@ impl<'db> ConstructorBinding<'db> {
     /// constructor-wide specialization can refine them. To avoid that, this helper preserves any
     /// type variables belonging to the constructed class, while still applying substitutions for
     /// non-class variables such as method-level type parameters.
+    ///
+    /// TODO: This is a bit of a hack to undo over-eager default specialization from the normal
+    /// specialization builder. It should be removable if we more clearly mark unsolved typevars in
+    /// a specialization.
     fn return_annotation_specialization(
         &self,
         db: &'db dyn Db,
