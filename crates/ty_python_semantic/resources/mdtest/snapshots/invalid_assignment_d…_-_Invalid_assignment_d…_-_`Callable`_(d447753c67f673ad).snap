@@ -64,8 +64,7 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
  9 | def _(source: Callable[[int, bytes], None]):
 10 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
    |
-info: incompatible parameter types
-info: └── type `bytes` is not assignable to `str`
+info: incompatible parameter types `str` and `bytes`
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -116,8 +115,7 @@ error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable t
    |         |
    |         Declared type
    |
-info: incompatible parameter types
-info: └── type `str` is not assignable to `int`
+info: incompatible parameter types `int` and `str`
 info: rule `invalid-assignment` is enabled by default
 
 ```

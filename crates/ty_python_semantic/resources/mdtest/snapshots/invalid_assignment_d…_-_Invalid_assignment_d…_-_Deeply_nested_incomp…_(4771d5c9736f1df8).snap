@@ -34,9 +34,8 @@ error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> boo
   |         |
   |         Declared type
   |
-info: incompatible parameter types
-info: ├── type `tuple[int, bytes]` is not assignable to `tuple[int, str]`
-info: ├── in tuple element 2 of 2
+info: incompatible parameter types `tuple[int, str]` and `tuple[int, bytes]`
+info: ├── the second tuple element is not compatible
 info: └── type `bytes` is not assignable to `str`
 info: rule `invalid-assignment` is enabled by default
 

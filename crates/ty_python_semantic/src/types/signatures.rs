@@ -1278,8 +1278,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db) {
-                self.provide_error_context(db, target_ty, source_ty, || {
-                    "incompatible parameter types".to_string()
+                self.provide_error_hint(|| {
+                    format!(
+                        "incompatible parameter types `{}` and `{}`",
+                        source_ty.display(db),
+                        target_ty.display(db),
+                    )
                 });
             }
             !result

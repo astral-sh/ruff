@@ -314,10 +314,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if constraint_set.is_never_satisfied(db) {
                                     self.provide_error_context(db, source, target, || {
-                                        format!(
-                                            "in tuple element {n} of {count}",
-                                            count = source_tuple.0.len()
-                                        )
+                                        let count = source_tuple.0.len();
+
+                                        let which = match (n, count) {
+                                            (1, _) => "the first tuple element".to_string(),
+                                            (2, _) => "the second tuple element".to_string(),
+                                            (n, c) if n == c => {
+                                                "the last tuple element".to_string()
+                                            }
+                                            (3, _) => "the third tuple element".to_string(),
+                                            _ => format!("tuple element {n} of {count}"),
+                                        };
+
+                                        format!("{which} is not compatible")
                                     });
                                 }
 
