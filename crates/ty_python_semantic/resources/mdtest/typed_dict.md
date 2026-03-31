@@ -2596,6 +2596,9 @@ Bad10 = TypedDict("Bad10", {name: 42})
 
 # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
 class Bad11(TypedDict("Bad11", {name: 42})): ...
+
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+class Bad12(TypedDict(123, {"field": int})): ...
 ```
 
 ## Functional `TypedDict` with unknown fields
