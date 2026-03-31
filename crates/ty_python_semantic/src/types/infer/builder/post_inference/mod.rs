@@ -7,4 +7,5 @@ pub(super) mod function;
 pub(super) mod overloaded_function;
 pub(super) mod static_class;
 pub(super) mod type_param_validation;
+pub(super) mod typed_dict;
 pub(super) mod typeguard;

@@ -29,7 +29,7 @@ use crate::{
             DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
             INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
             INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
-            INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
+            INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
             report_conflicting_metaclass_from_bases, report_duplicate_bases,
             report_instance_layout_conflict, report_invalid_or_unsupported_base,
@@ -50,6 +50,8 @@ use crate::{
         visitor::find_over_type,
     },
 };
+
+use super::typed_dict::validate_typed_dict_class;
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done
@@ -1003,54 +1005,8 @@ pub(crate) fn check_static_class_definitions<'db>(
         protocol.validate_members(context);
     }
 
-    // (16) If it's a `TypedDict` class, check that it doesn't include any invalid
-    // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
-    //
-    //     The body of the class definition defines the items of the `TypedDict` type. It
-    //     may also contain a docstring or pass statements (primarily to allow the creation
-    //     of an empty `TypedDict`). No other statements are allowed, and type checkers
-    //     should report an error if any are present.
     if class.is_typed_dict(db) {
-        for stmt in &class_node.body {
-            match stmt {
-                // Annotated assignments are allowed (that's the whole point), but they're
-                // not allowed to have a value.
-                ast::Stmt::AnnAssign(ann_assign) => {
-                    if let Some(value) = &ann_assign.value
-                        && let Some(builder) =
-                            context.report_lint(&INVALID_TYPED_DICT_STATEMENT, &**value)
-                    {
-                        builder.into_diagnostic("TypedDict item cannot have a value");
-                    }
-
-                    continue;
-                }
-                // Pass statements are allowed.
-                ast::Stmt::Pass(_) => continue,
-                ast::Stmt::Expr(expr) => {
-                    // Docstrings are allowed.
-                    if matches!(*expr.value, ast::Expr::StringLiteral(_)) {
-                        continue;
-                    }
-                    // As a non-standard but common extension, we also interpret `...` as
-                    // equivalent to `pass`.
-                    if matches!(*expr.value, ast::Expr::EllipsisLiteral(_)) {
-                        continue;
-                    }
-                }
-                // Everything else is forbidden.
-                _ => {}
-            }
-            if let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_STATEMENT, stmt) {
-                if matches!(stmt, ast::Stmt::FunctionDef(_)) {
-                    builder.into_diagnostic(format_args!("TypedDict class cannot have methods"));
-                } else {
-                    let mut diagnostic = builder
-                        .into_diagnostic(format_args!("invalid statement in TypedDict class body"));
-                    diagnostic.info("Only annotated declarations (`<name>: <type>`) are allowed.");
-                }
-            }
-        }
+        validate_typed_dict_class(context, class_node);
     }
 
     class.validate_members(context);
