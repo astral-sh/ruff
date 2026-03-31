@@ -7,7 +7,7 @@ use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, is_pragma_comment};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -210,13 +210,4 @@ fn merge_branches(
 /// the body).
 fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
     TextRange::new(branch.test.end(), locator.line_end(branch.end()))
-}
-
-/// Check if a comment is a pragma comment (e.g., `# noqa`, `# type: ignore`, `# pragma: no cover`).
-fn is_pragma_comment(comment: &str) -> bool {
-    let comment = comment.trim_start_matches('#').trim();
-    comment.starts_with("noqa")
-        || comment.starts_with("type:")
-        || comment.starts_with("pragma:")
-        || comment.starts_with("pyright:")
 }
