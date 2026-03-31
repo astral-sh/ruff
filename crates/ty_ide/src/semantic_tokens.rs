@@ -47,7 +47,7 @@ use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
     HasType, SemanticModel, definitions_for_attribute, semantic_index::definition::DefinitionKind,
-    types::PropertyInstanceType, types::Type, types::ide_support::definition_for_name,
+    types::Type, types::ide_support::definition_for_name,
 };
 
 /// Semantic token types supported by the language server.
@@ -535,7 +535,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     fn property_from_definition<'a>(
         &self,
         attr: &ast::ExprAttribute,
-    ) -> Option<(PropertyInstanceType<'a>, bool)>
+    ) -> Option<SemanticTokenModifier>
     where
         'db: 'a,
     {
@@ -546,80 +546,35 @@ impl<'db> SemanticTokenVisitor<'db> {
             return None;
         }
 
-        let mut found_property = None;
-        let mut has_non_property_def = false;
-        let attr_name = attr.attr.as_str();
+        let mut read_only = true;
 
         for resolved in &definitions {
-            let Some(definition) = resolved.definition() else {
-                continue;
-            };
+            let definition = resolved.definition()?;
+
             if let DefinitionKind::Function(func_ref) = definition.kind(db) {
                 let parsed = parsed_module(db, definition.file(db)).load(db);
                 let func_node = func_ref.node(&parsed);
 
                 // Check if this definition's type is a PropertyInstance
                 let def_model = SemanticModel::new(db, definition.file(db));
-                if let Some(Type::PropertyInstance(property)) = func_node.inferred_type(&def_model)
-                {
-                    if found_property.is_none() {
-                        found_property = Some((property, func_node.range(), parsed.clone()));
-                    }
-                } else {
-                    has_non_property_def = true;
-                }
+                let property = func_node
+                    .inferred_type(&def_model)?
+                    .as_property_instance()?;
+
+                read_only &= property.setter(db).is_none();
             } else {
-                has_non_property_def = true;
+                return None;
             }
         }
 
-        // For union types, if some members define the attribute as a property and others
-        // don't, fall back to Variable classification (return None).
-        if has_non_property_def {
-            return None;
+        // definitions_for_attribute only returns one binding, so it may miss the
+        // setter definition. Search the enclosing class body in the AST for a
+        // sibling function with a @name.setter decorator.
+        if read_only {
+            Some(SemanticTokenModifier::READONLY)
+        } else {
+            Some(SemanticTokenModifier::empty())
         }
-
-        found_property.map(|(property, getter_range, parsed)| {
-            // definitions_for_attribute only returns one binding, so it may miss the
-            // setter definition. Search the enclosing class body in the AST for a
-            // sibling function with a @name.setter decorator.
-            let has_setter = Self::has_setter_in_class(parsed.suite(), getter_range, attr_name);
-            (property, has_setter)
-        })
-    }
-
-    /// Search for a `@name.setter` decorated function in the class containing `getter_range`.
-    fn has_setter_in_class(
-        stmts: &[ast::Stmt],
-        getter_range: ruff_text_size::TextRange,
-        name: &str,
-    ) -> bool {
-        for stmt in stmts {
-            if let ast::Stmt::ClassDef(class) = stmt {
-                if class.range().contains_range(getter_range) {
-                    // Found the class containing the getter — check its body
-                    for class_stmt in &class.body {
-                        if let ast::Stmt::FunctionDef(func) = class_stmt {
-                            if func.name.as_str() == name {
-                                for decorator in &func.decorator_list {
-                                    if let ast::Expr::Attribute(deco_attr) = &decorator.expression {
-                                        if deco_attr.attr.as_str() == "setter" {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return false;
-                }
-                // Check nested classes
-                if Self::has_setter_in_class(&class.body, getter_range, name) {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     fn classify_parameter(
@@ -996,11 +951,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
                 let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
                 let (token_type, modifiers) =
-                    if let Some((_property, has_setter)) = self.property_from_definition(attr) {
-                        let mut modifiers = SemanticTokenModifier::empty();
-                        if !has_setter {
-                            modifiers |= SemanticTokenModifier::READONLY;
-                        }
+                    if let Some(modifiers) = self.property_from_definition(attr) {
                         (SemanticTokenType::Property, modifiers)
                     } else {
                         self.classify_from_type_for_attribute(ty, &attr.attr)
@@ -1895,7 +1846,7 @@ b: list["int | str"] | None
 c: "list[int | str] | None"
 d: "list[int | str]" | "None"
 e: 'list["int | str"] | "None"'
-f: """'list["int | str"]' | 'None'""" 
+f: """'list["int | str"]' | 'None'"""
 "#,
         );
 
@@ -2112,7 +2063,7 @@ b = cfg.read_write
         "read_only" @ 273..282: Property [readonly]
         "b" @ 283..284: Variable [definition]
         "cfg" @ 287..290: Variable
-        "read_write" @ 291..301: Property
+        "read_write" @ 291..301: Property [readonly]
         "#);
     }
 
@@ -2390,7 +2341,7 @@ class Baz:
         prop: str = \"hello\"
 
 baz = Baz()
-s = baz.method 
+s = baz.method
 t = baz.CONSTANT
 r = baz.prop
 q = Baz.prop
@@ -2431,15 +2382,15 @@ q = Baz.prop
         "s" @ 392..393: Variable [definition]
         "baz" @ 396..399: Variable
         "method" @ 400..406: Variable
-        "t" @ 408..409: Variable [definition]
-        "baz" @ 412..415: Variable
-        "CONSTANT" @ 416..424: Variable [readonly]
-        "r" @ 425..426: Variable [definition]
-        "baz" @ 429..432: Variable
-        "prop" @ 433..437: Property [readonly]
-        "q" @ 438..439: Variable [definition]
-        "Baz" @ 442..445: Class
-        "prop" @ 446..450: Property [readonly]
+        "t" @ 407..408: Variable [definition]
+        "baz" @ 411..414: Variable
+        "CONSTANT" @ 415..423: Variable [readonly]
+        "r" @ 424..425: Variable [definition]
+        "baz" @ 428..431: Variable
+        "prop" @ 432..436: Property [readonly]
+        "q" @ 437..438: Variable [definition]
+        "Baz" @ 441..444: Class
+        "prop" @ 445..449: Property [readonly]
         "#);
     }
 
@@ -2625,7 +2576,7 @@ class MyClass:
     def __init__(self): pass
 
     """unrelated string"""
-    
+
     x: str = "hello"
 "#,
         );
@@ -2656,7 +2607,7 @@ What a good module wooo
 def my_func(): pass
 
 """unrelated string"""
-    
+
 x: str = "hello"
 "#,
         );

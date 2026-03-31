@@ -1170,6 +1170,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
+        match self {
+            Type::PropertyInstance(property) => Some(property),
+            _ => None,
+        }
+    }
+
     pub const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
