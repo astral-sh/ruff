@@ -347,31 +347,38 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
+            let mut ancestor_resolved = Vec::new();
 
-            // Check declarations first
+            // Declarations take precedence over bindings, but attribute go-to-definition
+            // should return all co-definitions for the chosen class scope.
             for decl in use_def.reachable_symbol_declarations(place_id) {
                 if let Some(def) = decl.declaration.definition() {
-                    resolved.extend(resolve_definition(
+                    ancestor_resolved.extend(resolve_definition(
                         db,
                         def,
                         Some(attribute_name),
                         ImportAliasResolution::ResolveAliases,
                     ));
-                    break 'scopes;
                 }
             }
 
             // If no declarations found, check bindings
-            for binding in use_def.reachable_symbol_bindings(place_id) {
-                if let Some(def) = binding.binding.definition() {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                    break 'scopes;
+            if ancestor_resolved.is_empty() {
+                for binding in use_def.reachable_symbol_bindings(place_id) {
+                    if let Some(def) = binding.binding.definition() {
+                        ancestor_resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(attribute_name),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
+                    }
                 }
+            }
+
+            if !ancestor_resolved.is_empty() {
+                resolved.extend(ancestor_resolved);
+                break 'scopes;
             }
         }
 
@@ -385,31 +392,38 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
+                let mut scope_resolved = Vec::new();
 
-                // Check declarations first
+                // Declarations take precedence over bindings, but return all
+                // co-definitions from the chosen method scope.
                 for decl in use_def.reachable_member_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(
+                        scope_resolved.extend(resolve_definition(
                             db,
                             def,
                             Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
-                        break 'scopes;
                     }
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.reachable_member_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                        break 'scopes;
+                if scope_resolved.is_empty() {
+                    for binding in use_def.reachable_member_bindings(place_id) {
+                        if let Some(def) = binding.binding.definition() {
+                            scope_resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(attribute_name),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
+                        }
                     }
+                }
+
+                if !scope_resolved.is_empty() {
+                    resolved.extend(scope_resolved);
+                    break 'scopes;
                 }
             }
         }
