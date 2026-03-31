@@ -2092,6 +2092,73 @@ bad_child1 = Child(c=[1])
 bad_child2 = Child(b="test")
 ```
 
+## Incompatible field overrides
+
+Overriding an inherited `TypedDict` field must preserve the compatibility rules from the typing
+spec. ty should reject both direct overwrites and incompatible merges from multiple bases.
+
+```py
+from typing import Collection, TypedDict
+from typing_extensions import NotRequired, ReadOnly, Required
+
+class Movie(TypedDict):
+    name: str
+
+class BadMovie(Movie):
+    # error: [invalid-typed-dict-header]
+    name: int
+
+FunctionalMovie = TypedDict("FunctionalMovie", {"name": str})
+
+class BadFunctionalMovie(FunctionalMovie):
+    # error: [invalid-typed-dict-header]
+    name: int
+
+class L(TypedDict):
+    value: int
+
+class R(TypedDict):
+    value: str
+
+class BadMerge(L, R):  # error: [invalid-typed-dict-header]
+    pass
+
+class NamedDict(TypedDict):
+    name: ReadOnly[str]
+
+class Album(NamedDict):
+    name: str
+    year: int
+
+album: Album = {"name": "Flood", "year": 1990}
+album["name"] = "Dark Side Of The Moon"
+
+class AlbumCollection(TypedDict):
+    albums: ReadOnly[Collection[Album]]
+
+class RecordShop(AlbumCollection):
+    albums: ReadOnly[list[Album]]
+
+class OptionalName(TypedDict):
+    name: ReadOnly[NotRequired[str]]
+
+class RequiredName(OptionalName):
+    name: ReadOnly[Required[str]]
+
+required_name: RequiredName = {"name": "Flood"}
+
+class MutableBase(TypedDict):
+    value: Required[int]
+
+class BadReadOnly(MutableBase):
+    # error: [invalid-typed-dict-header]
+    value: ReadOnly[int]
+
+class BadOptional(MutableBase):
+    # error: [invalid-typed-dict-header]
+    value: NotRequired[int]
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.

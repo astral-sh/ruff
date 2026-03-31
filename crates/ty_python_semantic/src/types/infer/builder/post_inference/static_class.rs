@@ -29,8 +29,8 @@ use crate::{
             DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
             INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
             INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
-            INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
+            INVALID_TYPED_DICT_HEADER, IncompatibleBases, SUBCLASS_OF_FINAL_CLASS,
+            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
             report_conflicting_metaclass_from_bases, report_duplicate_bases,
             report_instance_layout_conflict, report_invalid_or_unsupported_base,
             report_invalid_total_ordering, report_invalid_type_param_order,
@@ -184,6 +184,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let mut disjoint_bases = IncompatibleBases::default();
     let mut protocol_base_with_generic_context = None;
+    let mut direct_typed_dict_bases = vec![];
 
     // Iterate through the class's explicit bases to check for various possible errors:
     //     - Check for inheritance from plain `Generic`,
@@ -310,6 +311,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                     Annotation::secondary(base_class.class_literal(db).header_span(db))
                         .message(format_args!("`{}` defined here", base_class.name(db))),
                 );
+            }
+            if base_class.class_literal(db).is_typed_dict(db) {
+                direct_typed_dict_bases.push(base_class);
             }
         }
 
@@ -1006,7 +1010,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if class.is_typed_dict(db) {
-        validate_typed_dict_class(context, class_node);
+        validate_typed_dict_class(context, class, class_node, &direct_typed_dict_bases);
     }
 
     class.validate_members(context);

@@ -1,11 +1,34 @@
+use ruff_db::{
+    diagnostic::{Annotation, Diagnostic, Span},
+    parsed::parsed_module,
+};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 
-use crate::types::{context::InferContext, diagnostic::INVALID_TYPED_DICT_STATEMENT};
+use crate::{
+    Db,
+    semantic_index::definition::Definition,
+    types::{
+        ClassType, StaticClassLiteral, Type, TypedDictType,
+        class::CodeGeneratorKind,
+        context::InferContext,
+        diagnostic::{INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT},
+        typed_dict::TypedDictField,
+    },
+};
 
-pub(super) fn validate_typed_dict_class(
-    context: &InferContext<'_, '_>,
+pub(super) fn validate_typed_dict_class<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
     class_node: &ast::StmtClassDef,
+    direct_bases: &[ClassType<'db>],
 ) {
+    validate_typed_dict_class_body(context, class_node);
+    validate_typed_dict_field_overrides(context, class, class_node, direct_bases);
+}
+
+fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &ast::StmtClassDef) {
     // Check that a class-based `TypedDict` doesn't include any invalid statements:
     // https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
     //
@@ -53,4 +76,261 @@ pub(super) fn validate_typed_dict_class(
             }
         }
     }
+}
+
+fn validate_typed_dict_field_overrides<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    direct_bases: &[ClassType<'db>],
+) {
+    let db = context.db();
+    let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
+    let own_fields = class.own_fields(db, None, CodeGeneratorKind::TypedDict);
+    let mut reported_fields = FxHashSet::default();
+
+    for base in direct_bases {
+        for (field_name, base_field) in TypedDictType::new(*base).items(db) {
+            let Some(child_field) = child_fields.get(field_name.as_str()) else {
+                continue;
+            };
+
+            let Some(reason) =
+                TypedDictFieldOverrideReason::from_fields(db, child_field, base_field)
+            else {
+                continue;
+            };
+
+            if !reported_fields.insert(field_name.clone()) {
+                continue;
+            }
+
+            let own_field_definition = own_fields
+                .get(field_name.as_str())
+                .and_then(|field| field.first_declaration);
+            let inherited_field_definition = own_field_definition
+                .is_none()
+                .then(|| child_field.first_declaration())
+                .flatten();
+
+            report_typed_dict_field_override(
+                context,
+                class,
+                class_node,
+                field_name.as_str(),
+                reason,
+                base.name(db),
+                base_field.first_declaration(),
+                own_field_definition,
+                inherited_field_definition,
+            );
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TypedDictFieldOverrideReason<'db> {
+    /// A required inherited field was relaxed to `NotRequired`.
+    RequiredFieldMadeNotRequired,
+    /// A mutable inherited field was redeclared as read-only.
+    MutableFieldMadeReadOnly,
+    /// A mutable inherited `NotRequired` field was made required.
+    MutableNotRequiredFieldMadeRequired,
+    /// A read-only inherited field's new type is not assignable to the base type.
+    ReadOnlyTypeNotAssignable {
+        db: &'db dyn Db,
+        child_ty: Type<'db>,
+        base_ty: Type<'db>,
+    },
+    /// A mutable inherited field's new type is not mutually assignable with the base type.
+    MutableTypeIncompatible {
+        db: &'db dyn Db,
+        child_ty: Type<'db>,
+        base_ty: Type<'db>,
+    },
+}
+
+impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RequiredFieldMadeNotRequired => {
+                write!(
+                    f,
+                    "Required inherited fields cannot be redeclared as `NotRequired`"
+                )
+            }
+            Self::MutableFieldMadeReadOnly => {
+                write!(
+                    f,
+                    "Mutable inherited fields cannot be redeclared as read-only"
+                )
+            }
+            Self::MutableNotRequiredFieldMadeRequired => {
+                write!(
+                    f,
+                    "Mutable inherited `NotRequired` fields cannot be redeclared as required"
+                )
+            }
+            Self::ReadOnlyTypeNotAssignable {
+                db,
+                child_ty,
+                base_ty,
+            } => write!(
+                f,
+                "Inherited read-only field type `{}` is not assignable from `{}`",
+                base_ty.display(*db),
+                child_ty.display(*db),
+            ),
+            Self::MutableTypeIncompatible {
+                db,
+                child_ty,
+                base_ty,
+            } => write!(
+                f,
+                "Inherited mutable field type `{}` is incompatible with `{}`",
+                base_ty.display(*db),
+                child_ty.display(*db),
+            ),
+        }
+    }
+}
+
+impl<'db> TypedDictFieldOverrideReason<'db> {
+    fn from_fields(
+        db: &'db dyn Db,
+        child_field: &TypedDictField<'db>,
+        base_field: &TypedDictField<'db>,
+    ) -> Option<Self> {
+        if base_field.is_required() && !child_field.is_required() {
+            return Some(Self::RequiredFieldMadeNotRequired);
+        }
+
+        if !base_field.is_read_only() {
+            if child_field.is_read_only() {
+                return Some(Self::MutableFieldMadeReadOnly);
+            }
+
+            if !base_field.is_required() && child_field.is_required() {
+                return Some(Self::MutableNotRequiredFieldMadeRequired);
+            }
+        }
+
+        let types_are_compatible = if base_field.is_read_only() {
+            child_field
+                .declared_ty
+                .is_assignable_to(db, base_field.declared_ty)
+        } else {
+            child_field
+                .declared_ty
+                .is_assignable_to(db, base_field.declared_ty)
+                && base_field
+                    .declared_ty
+                    .is_assignable_to(db, child_field.declared_ty)
+        };
+
+        if types_are_compatible {
+            return None;
+        }
+
+        Some(if base_field.is_read_only() {
+            Self::ReadOnlyTypeNotAssignable {
+                db,
+                child_ty: child_field.declared_ty,
+                base_ty: base_field.declared_ty,
+            }
+        } else {
+            Self::MutableTypeIncompatible {
+                db,
+                child_ty: child_field.declared_ty,
+                base_ty: base_field.declared_ty,
+            }
+        })
+    }
+}
+
+#[expect(clippy::too_many_arguments)]
+fn report_typed_dict_field_override<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    field_name: &str,
+    reason: TypedDictFieldOverrideReason<'db>,
+    base_name: &str,
+    base_definition: Option<Definition<'db>>,
+    own_field_definition: Option<Definition<'db>>,
+    inherited_field_definition: Option<Definition<'db>>,
+) {
+    let db = context.db();
+    let Some(builder) = own_field_definition
+        .and_then(|definition| {
+            context.report_lint(
+                &INVALID_TYPED_DICT_HEADER,
+                definition.full_range(db, context.module()),
+            )
+        })
+        .or_else(|| context.report_lint(&INVALID_TYPED_DICT_HEADER, class.header_range(db)))
+    else {
+        return;
+    };
+
+    let mut diagnostic = if own_field_definition.is_some() {
+        builder.into_diagnostic(format_args!(
+            "Cannot overwrite TypedDict field `{field_name}`"
+        ))
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot overwrite TypedDict field `{field_name}` while merging base classes"
+        ))
+    };
+
+    diagnostic.set_primary_message(format_args!("{reason}"));
+
+    if own_field_definition.is_some() {
+        annotate_definition(
+            db,
+            &mut diagnostic,
+            own_field_definition,
+            format_args!("Field `{field_name}` redeclared here"),
+        );
+    } else {
+        annotate_definition(
+            db,
+            &mut diagnostic,
+            inherited_field_definition,
+            format_args!("Field `{field_name}` already inherited from another base here"),
+        );
+    }
+
+    annotate_definition(
+        db,
+        &mut diagnostic,
+        base_definition,
+        format_args!("Inherited field `{field_name}` declared here on base `{base_name}`"),
+    );
+
+    diagnostic.annotate(
+        context
+            .secondary(class_node)
+            .message(format_args!("In TypedDict class `{}`", class.name(db))),
+    );
+}
+
+fn annotate_definition<'db>(
+    db: &'db dyn Db,
+    diagnostic: &mut Diagnostic,
+    definition: Option<Definition<'db>>,
+    message: impl std::fmt::Display,
+) {
+    let Some(definition) = definition else {
+        return;
+    };
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    diagnostic.annotate(
+        Annotation::secondary(
+            Span::from(file).with_range(definition.focus_range(db, &module).range()),
+        )
+        .message(message),
+    );
 }
