@@ -46,8 +46,10 @@ use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, definitions_for_attribute, semantic_index::definition::DefinitionKind,
-    types::Type, types::ide_support::definition_for_name,
+    HasType, SemanticModel,
+    semantic_index::definition::DefinitionKind,
+    types::Type,
+    types::ide_support::{definition_for_name, static_member_type_for_attribute},
 };
 
 /// Semantic token types supported by the language server.
@@ -482,6 +484,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         };
 
         let mut token_type = UnifiedTokenType::None;
+        let mut all_properties_are_readonly = true;
 
         for element in elements {
             // Classify based on the inferred type of the attribute
@@ -503,9 +506,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 }
                 Type::PropertyInstance(property) => {
                     token_type.add(SemanticTokenType::Property);
-                    if property.setter(db).is_none() {
-                        modifiers |= SemanticTokenModifier::READONLY;
-                    }
+                    all_properties_are_readonly &= property.setter(db).is_none();
                 }
                 _ => {
                     token_type = UnifiedTokenType::Fallback;
@@ -514,6 +515,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         if let Some(uniform) = token_type.into_semantic_token_type() {
+            if uniform == SemanticTokenType::Property && all_properties_are_readonly {
+                modifiers |= SemanticTokenModifier::READONLY;
+            }
             return (uniform, modifiers);
         }
 
@@ -525,56 +529,6 @@ impl<'db> SemanticTokenVisitor<'db> {
         // For other types (variables, constants, etc.), classify as variable
         // Should this always be property?
         (SemanticTokenType::Variable, modifiers)
-    }
-
-    /// Checks if an attribute access resolves to a property by examining definitions.
-    /// Returns `Some((property, has_setter))` if it's a property. The `has_setter` flag
-    /// is determined by checking for `@name.setter` decorators in the AST, since individual
-    /// function definitions' `PropertyInstanceType` may not reflect the full property
-    /// (the getter's type has `setter=None` even when a setter exists separately).
-    fn property_from_definition<'a>(
-        &self,
-        attr: &ast::ExprAttribute,
-    ) -> Option<SemanticTokenModifier>
-    where
-        'db: 'a,
-    {
-        let db = self.model.db();
-        let definitions = definitions_for_attribute(self.model, attr);
-
-        if definitions.is_empty() {
-            return None;
-        }
-
-        let mut read_only = true;
-
-        for resolved in &definitions {
-            let definition = resolved.definition()?;
-
-            if let DefinitionKind::Function(func_ref) = definition.kind(db) {
-                let parsed = parsed_module(db, definition.file(db)).load(db);
-                let func_node = func_ref.node(&parsed);
-
-                // Check if this definition's type is a PropertyInstance
-                let def_model = SemanticModel::new(db, definition.file(db));
-                let property = func_node
-                    .inferred_type(&def_model)?
-                    .as_property_instance()?;
-
-                read_only &= property.setter(db).is_none();
-            } else {
-                return None;
-            }
-        }
-
-        // definitions_for_attribute only returns one binding, so it may miss the
-        // setter definition. Search the enclosing class body in the AST for a
-        // sibling function with a @name.setter decorator.
-        if read_only {
-            Some(SemanticTokenModifier::READONLY)
-        } else {
-            Some(SemanticTokenModifier::empty())
-        }
     }
 
     fn classify_parameter(
@@ -949,13 +903,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
-                let (token_type, modifiers) =
-                    if let Some(modifiers) = self.property_from_definition(attr) {
-                        (SemanticTokenType::Property, modifiers)
-                    } else {
-                        self.classify_from_type_for_attribute(ty, &attr.attr)
-                    };
+                let ty = static_member_type_for_attribute(self.model, attr)
+                    .unwrap_or_else(|| expr.inferred_type(self.model).unwrap_or(Type::unknown()));
+                let (token_type, modifiers) = self.classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
             }
             ast::Expr::NumberLiteral(_) => {
@@ -2063,7 +2013,7 @@ b = cfg.read_write
         "read_only" @ 273..282: Property [readonly]
         "b" @ 283..284: Variable [definition]
         "cfg" @ 287..290: Variable
-        "read_write" @ 291..301: Property [readonly]
+        "read_write" @ 291..301: Property
         "#);
     }
 
@@ -2102,6 +2052,69 @@ def f(obj: WithProperty | WithAttribute):
         "WithAttribute" @ 143..156: Class
         "obj" @ 170..173: Parameter
         "value" @ 174..179: Variable
+        "#);
+    }
+
+    #[test]
+    fn property_union_readonly_only_if_all_variants_are_readonly() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ReadWrite:
+    @property
+    def value(self) -> int:
+        return self._value
+
+    @value.setter
+    def value(self, new_value: int) -> None:
+        self._value = new_value
+
+obj = ReadOnly() if random() else ReadWrite()
+x = obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "ReadOnly" @ 34..42: Class [definition]
+        "property" @ 49..57: Decorator
+        "value" @ 66..71: Method [definition]
+        "self" @ 72..76: SelfParameter [definition]
+        "int" @ 81..84: Class
+        "1" @ 101..102: Number
+        "ReadWrite" @ 110..119: Class [definition]
+        "property" @ 126..134: Decorator
+        "value" @ 143..148: Method [definition]
+        "self" @ 149..153: SelfParameter [definition]
+        "int" @ 158..161: Class
+        "self" @ 178..182: SelfParameter
+        "_value" @ 183..189: Variable
+        "value" @ 196..201: Method
+        "setter" @ 202..208: Method
+        "value" @ 217..222: Method [definition]
+        "self" @ 223..227: SelfParameter [definition]
+        "new_value" @ 229..238: Parameter [definition]
+        "int" @ 240..243: Class
+        "None" @ 248..252: BuiltinConstant
+        "self" @ 262..266: SelfParameter
+        "_value" @ 267..273: Variable
+        "new_value" @ 276..285: Parameter
+        "obj" @ 287..290: Variable [definition]
+        "ReadOnly" @ 293..301: Class
+        "random" @ 307..313: Variable
+        "ReadWrite" @ 321..330: Class
+        "x" @ 333..334: Variable [definition]
+        "obj" @ 337..340: Variable
+        "value" @ 341..346: Property
         "#);
     }
 
@@ -2387,10 +2400,10 @@ q = Baz.prop
         "CONSTANT" @ 415..423: Variable [readonly]
         "r" @ 424..425: Variable [definition]
         "baz" @ 428..431: Variable
-        "prop" @ 432..436: Property [readonly]
+        "prop" @ 432..436: Variable
         "q" @ 437..438: Variable [definition]
         "Baz" @ 441..444: Class
-        "prop" @ 445..449: Property [readonly]
+        "prop" @ 445..449: Variable
         "#);
     }
 

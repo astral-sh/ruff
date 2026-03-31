@@ -327,6 +327,18 @@ pub fn definitions_for_attribute<'db>(
     resolved
 }
 
+/// Returns the descriptor object type for an attribute expression `x.y`, without invoking the
+/// descriptor protocol. This corresponds to `inspect.getattr_static(x, "y")` at the type level.
+pub fn static_member_type_for_attribute<'db>(
+    model: &SemanticModel<'db>,
+    attribute: &ast::ExprAttribute,
+) -> Option<Type<'db>> {
+    let lhs_ty = attribute.value.inferred_type(model)?;
+    lhs_ty
+        .static_member(model.db(), attribute.attr.as_str())
+        .ignore_possibly_undefined()
+}
+
 fn definitions_for_attribute_in_class_hierarchy<'db>(
     class_literal: &ClassLiteral<'db>,
     model: &SemanticModel<'db>,
