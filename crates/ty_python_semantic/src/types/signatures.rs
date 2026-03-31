@@ -1443,7 +1443,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 if self_name != other_name {
                                     self.provide_error_hint(|| {
                                         format!(
-                                            "parameter `{self_name}` does not match `{other_name}`",
+                                            "parameter `{self_name}` does not match `{other_name}` (and can be used as a keyword parameter)",
                                         )
                                     });
                                     return self.never();
@@ -2133,7 +2133,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if source_name != target_name {
                                 self.provide_error_hint(|| {
                                     format!(
-                                        "parameter `{source_name}` does not match `{target_name}`",
+                                        "parameter `{source_name}` does not match `{target_name}` (and can be used as a keyword parameter)",
                                     )
                                 });
                                 return self.never();
