@@ -460,7 +460,7 @@ RUF010 [*] Use explicit conversion flag
 82 | | )}"
    | |_^
 83 |
-84 |   # Fix should be safe when the comment is preserved inside extra parentheses
+84 |   # Fix should be unsafe when it deletes comments after the argument
    |
 help: Replace with conversion flag
 76 |     1
@@ -472,84 +472,221 @@ help: Replace with conversion flag
    - )}"
 79 + f"{1!s}"
 80 | 
-81 | # Fix should be safe when the comment is preserved inside extra parentheses
-82 | f"{ascii((
+81 | # Fix should be unsafe when it deletes comments after the argument
+82 | f"{ascii(1  # comment
 note: This is an unsafe fix and may change runtime behavior
 
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:85:4
    |
-84 |   # Fix should be safe when the comment is preserved inside extra parentheses
-85 |   f"{ascii((
+84 |   # Fix should be unsafe when it deletes comments after the argument
+85 |   f"{ascii(1  # comment
    |  ____^
-86 | |     # comment
-87 | |     1
-88 | | ))}"
-   | |__^
-89 |
-90 |   f"{repr((
+86 | | )}"
+   | |_^
+87 |
+88 |   f"{repr((
    |
 help: Replace with conversion flag
 82 | )}"
 83 | 
-84 | # Fix should be safe when the comment is preserved inside extra parentheses
-   - f"{ascii((
-85 + f"{(
-86 |     # comment
-87 |     1
-   - ))}"
-88 + )!a}"
-89 | 
-90 | f"{repr((
-91 |     # comment
+84 | # Fix should be unsafe when it deletes comments after the argument
+   - f"{ascii(1  # comment
+   - )}"
+85 + f"{1!a}"
+86 | 
+87 | f"{repr((
+88 |     1
+note: This is an unsafe fix and may change runtime behavior
 
 RUF010 [*] Use explicit conversion flag
-  --> RUF010.py:90:4
+  --> RUF010.py:88:4
    |
-88 |   ))}"
-89 |
-90 |   f"{repr((
+86 |   )}"
+87 |
+88 |   f"{repr((
    |  ____^
-91 | |     # comment
-92 | |     1
-93 | | ))}"
-   | |__^
-94 |
-95 |   f"{str((
+89 | |     1
+90 | | )  # comment
+91 | | )}"
+   | |_^
+92 |
+93 |   f"{str((
    |
 help: Replace with conversion flag
-87 |     1
-88 | ))}"
-89 | 
+85 | f"{ascii(1  # comment
+86 | )}"
+87 | 
    - f"{repr((
-90 + f"{(
-91 |     # comment
-92 |     1
-   - ))}"
-93 + )!r}"
-94 | 
-95 | f"{str((
-96 |     # comment
+88 + f"{(
+89 |     1
+   - )  # comment
+   - )}"
+90 + )!r}"
+91 | 
+92 | f"{str((
+93 |     1
+note: This is an unsafe fix and may change runtime behavior
 
 RUF010 [*] Use explicit conversion flag
-  --> RUF010.py:95:4
+  --> RUF010.py:93:4
    |
-93 |   ))}"
-94 |
-95 |   f"{str((
+91 |   )}"
+92 |
+93 |   f"{str((
    |  ____^
+94 | |     1
+95 | | )
 96 | |     # comment
-97 | |     1
-98 | | ))}"
-   | |__^
+97 | | )}"
+   | |_^
+98 |
+99 |   # Fix should be safe when the comment is preserved inside extra parentheses
    |
 help: Replace with conversion flag
-92 |     1
-93 | ))}"
-94 | 
+90 | )  # comment
+91 | )}"
+92 | 
    - f"{str((
-95 + f"{(
-96 |     # comment
-97 |     1
-   - ))}"
-98 + )!s}"
+93 + f"{(
+94 |     1
+   - )
+   -     # comment
+   - )}"
+95 + )!s}"
+96 | 
+97 | # Fix should be safe when the comment is preserved inside extra parentheses
+98 | f"{ascii((
+note: This is an unsafe fix and may change runtime behavior
+
+RUF010 [*] Use explicit conversion flag
+   --> RUF010.py:100:4
+    |
+ 99 |   # Fix should be safe when the comment is preserved inside extra parentheses
+100 |   f"{ascii((
+    |  ____^
+101 | |     # comment
+102 | |     1
+103 | | ))}"
+    | |__^
+104 |
+105 |   f"{repr((
+    |
+help: Replace with conversion flag
+97  | )}"
+98  | 
+99  | # Fix should be safe when the comment is preserved inside extra parentheses
+    - f"{ascii((
+100 + f"{(
+101 |     # comment
+102 |     1
+    - ))}"
+103 + )!a}"
+104 | 
+105 | f"{repr((
+106 |     1  # comment
+
+RUF010 [*] Use explicit conversion flag
+   --> RUF010.py:105:4
+    |
+103 |   ))}"
+104 |
+105 |   f"{repr((
+    |  ____^
+106 | |     1  # comment
+107 | | ))}"
+    | |__^
+108 |
+109 |   f"{repr((
+    |
+help: Replace with conversion flag
+102 |     1
+103 | ))}"
+104 | 
+    - f"{repr((
+105 + f"{(
+106 |     1  # comment
+    - ))}"
+107 + )!r}"
+108 | 
+109 | f"{repr((
+110 |     1
+
+RUF010 [*] Use explicit conversion flag
+   --> RUF010.py:109:4
+    |
+107 |   ))}"
+108 |
+109 |   f"{repr((
+    |  ____^
+110 | |     1
+111 | |     # comment
+112 | | ))}"
+    | |__^
+113 |
+114 |   f"{repr((
+    |
+help: Replace with conversion flag
+106 |     1  # comment
+107 | ))}"
+108 | 
+    - f"{repr((
+109 + f"{(
+110 |     1
+111 |     # comment
+    - ))}"
+112 + )!r}"
+113 | 
+114 | f"{repr((
+115 |     # comment
+
+RUF010 [*] Use explicit conversion flag
+   --> RUF010.py:114:4
+    |
+112 |   ))}"
+113 |
+114 |   f"{repr((
+    |  ____^
+115 | |     # comment
+116 | |     1
+117 | | ))}"
+    | |__^
+118 |
+119 |   f"{str((
+    |
+help: Replace with conversion flag
+111 |     # comment
+112 | ))}"
+113 | 
+    - f"{repr((
+114 + f"{(
+115 |     # comment
+116 |     1
+    - ))}"
+117 + )!r}"
+118 | 
+119 | f"{str((
+120 |     # comment
+
+RUF010 [*] Use explicit conversion flag
+   --> RUF010.py:119:4
+    |
+117 |   ))}"
+118 |
+119 |   f"{str((
+    |  ____^
+120 | |     # comment
+121 | |     1
+122 | | ))}"
+    | |__^
+    |
+help: Replace with conversion flag
+116 |     1
+117 | ))}"
+118 | 
+    - f"{str((
+119 + f"{(
+120 |     # comment
+121 |     1
+    - ))}"
+122 + )!s}"

@@ -178,16 +178,14 @@ fn convert_call_to_conversion_flag(
     let call_range = call.range();
     // Use the parenthesized range of the arg (within call.arguments) to account for
     // any extra parens that wrap the argument and whose content will be preserved.
-    let effective_arg_range = parenthesized_range(
-        arg.into(),
-        (&call.arguments).into(),
-        checker.tokens(),
-    )
-    .unwrap_or_else(|| arg.range());
-    let has_deletable_comments = comment_ranges
-        .intersects(TextRange::new(call_range.start(), effective_arg_range.start()))
-        || comment_ranges
-            .intersects(TextRange::new(effective_arg_range.end(), call_range.end()));
+    let effective_arg_range =
+        parenthesized_range(arg.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or_else(|| arg.range());
+    let has_deletable_comments = comment_ranges.intersects(TextRange::new(
+        call_range.start(),
+        effective_arg_range.start(),
+    )) || comment_ranges
+        .intersects(TextRange::new(effective_arg_range.end(), call_range.end()));
     let applicability = if has_deletable_comments {
         Applicability::Unsafe
     } else {

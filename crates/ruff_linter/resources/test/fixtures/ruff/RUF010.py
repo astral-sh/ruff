@@ -81,10 +81,34 @@ f"{str(
     1
 )}"
 
+# Fix should be unsafe when it deletes comments after the argument
+f"{ascii(1  # comment
+)}"
+
+f"{repr((
+    1
+)  # comment
+)}"
+
+f"{str((
+    1
+)
+    # comment
+)}"
+
 # Fix should be safe when the comment is preserved inside extra parentheses
 f"{ascii((
     # comment
     1
+))}"
+
+f"{repr((
+    1  # comment
+))}"
+
+f"{repr((
+    1
+    # comment
 ))}"
 
 f"{repr((
