@@ -2529,19 +2529,18 @@ Movie2 = TypedDict("Movie2", name=str, year=int)
 ```py
 from typing_extensions import TypedDict
 
-# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
+# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "The name of a `TypedDict` (`WrongName`) must match the name of the variable it is assigned to (`BadTypedDict3`)"
+# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
 
 def f(x: str) -> None:
-    # error: [invalid-argument-type] "The first argument to `TypedDict` must be the string literal `Y`"
+    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:
-    # error: [invalid-argument-type] "The first argument to `TypedDict` must be a string literal"
-    TypedDict(x, {})
+    TypedDict(x, {})  # fine
 
 name = "GoodTypedDict"
 GoodTypedDict = TypedDict(name, {"name": str})
