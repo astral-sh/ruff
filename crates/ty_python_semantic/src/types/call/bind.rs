@@ -163,14 +163,14 @@ impl<'db> CallableItem<'db> {
         self.callable().as_result()?;
 
         self.as_constructor()
-            .and_then(|binding| binding.checked_downstream_constructor_bindings())
+            .and_then(|binding| binding.checked_downstream_constructor())
             .map_or(Ok(()), |bindings| bindings.as_result(db))
     }
 
     fn error_priority(&self, db: &'db dyn Db) -> CallErrorPriority {
         let priority = self.callable().error_priority();
         self.as_constructor()
-            .and_then(|binding| binding.checked_downstream_constructor_bindings())
+            .and_then(|binding| binding.checked_downstream_constructor())
             .map_or(priority, |bindings| {
                 priority.max(bindings.error_priority(db))
             })
@@ -407,7 +407,7 @@ impl<'db> Bindings<'db> {
                         // context for generic specialization inference (including literal
                         // promotion).
                         if let Some(downstream) = binding.downstream_constructor_mut() {
-                            downstream.bindings.set_constructor_instance_type_in_place(
+                            downstream.set_constructor_instance_type_in_place(
                                 db,
                                 constructor_instance_type,
                             );
@@ -444,9 +444,7 @@ impl<'db> Bindings<'db> {
                             );
                         }
                         if let Some(downstream) = binding.downstream_constructor_mut() {
-                            downstream
-                                .bindings
-                                .apply_generic_context_in_place(db, generic_context);
+                            downstream.apply_generic_context_in_place(db, generic_context);
                         }
                     }
                 }
@@ -633,7 +631,7 @@ impl<'db> Bindings<'db> {
             if let Some(constructor) = item.as_constructor()
                 && let Some(downstream) = &constructor.downstream_constructor
             {
-                downstream.bindings.collect_type_context_callables(out);
+                downstream.collect_type_context_callables(out);
             }
         }
     }
@@ -910,8 +908,7 @@ impl<'db> Bindings<'db> {
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
         for constructor in self.iter_constructor_items() {
-            let Some(downstream_bindings) = constructor.checked_downstream_constructor_bindings()
-            else {
+            let Some(downstream_bindings) = constructor.checked_downstream_constructor() else {
                 continue;
             };
             if !reported_ctor_init_callables.insert(downstream_bindings.callable_type()) {
