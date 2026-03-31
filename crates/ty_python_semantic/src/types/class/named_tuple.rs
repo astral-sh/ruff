@@ -43,7 +43,9 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             let generic_context = GenericContext::from_typevar_instances(db, variables);
 
-            let first_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+            // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
+            // `cls` remain usable as keyword arguments at call sites.
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
                 .with_annotated_type(SubclassOfType::from(db, self_typevar));
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
