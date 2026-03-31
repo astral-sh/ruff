@@ -13,7 +13,7 @@ use crate::{
         ClassType, StaticClassLiteral, Type, TypedDictType,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::{INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT},
+        diagnostic::{INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_STATEMENT},
         typed_dict::TypedDictField,
     },
 };
@@ -264,11 +264,11 @@ fn report_typed_dict_field_override<'db>(
     let Some(builder) = own_field_definition
         .and_then(|definition| {
             context.report_lint(
-                &INVALID_TYPED_DICT_HEADER,
+                &INVALID_TYPED_DICT_FIELD,
                 definition.full_range(db, context.module()),
             )
         })
-        .or_else(|| context.report_lint(&INVALID_TYPED_DICT_HEADER, class.header_range(db)))
+        .or_else(|| context.report_lint(&INVALID_TYPED_DICT_FIELD, class.header_range(db)))
     else {
         return;
     };

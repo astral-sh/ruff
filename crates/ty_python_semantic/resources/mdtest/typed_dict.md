@@ -2095,7 +2095,7 @@ bad_child2 = Child(b="test")
 ## Incompatible field overrides
 
 Overriding an inherited `TypedDict` field must preserve the compatibility rules from the typing
-spec. ty should reject both direct overwrites and incompatible merges from multiple bases.
+spec. We reject both direct overwrites and incompatible merges from multiple bases.
 
 ```py
 from typing import Collection, TypedDict
@@ -2105,13 +2105,13 @@ class Movie(TypedDict):
     name: str
 
 class BadMovie(Movie):
-    # error: [invalid-typed-dict-header]
+    # error: [invalid-typed-dict-field]
     name: int
 
 FunctionalMovie = TypedDict("FunctionalMovie", {"name": str})
 
 class BadFunctionalMovie(FunctionalMovie):
-    # error: [invalid-typed-dict-header]
+    # error: [invalid-typed-dict-field]
     name: int
 
 class L(TypedDict):
@@ -2120,7 +2120,7 @@ class L(TypedDict):
 class R(TypedDict):
     value: str
 
-class BadMerge(L, R):  # error: [invalid-typed-dict-header]
+class BadMerge(L, R):  # error: [invalid-typed-dict-field]
     pass
 
 class NamedDict(TypedDict):
@@ -2151,11 +2151,11 @@ class MutableBase(TypedDict):
     value: Required[int]
 
 class BadReadOnly(MutableBase):
-    # error: [invalid-typed-dict-header]
+    # error: [invalid-typed-dict-field]
     value: ReadOnly[int]
 
 class BadOptional(MutableBase):
-    # error: [invalid-typed-dict-header]
+    # error: [invalid-typed-dict-field]
     value: NotRequired[int]
 ```
 
