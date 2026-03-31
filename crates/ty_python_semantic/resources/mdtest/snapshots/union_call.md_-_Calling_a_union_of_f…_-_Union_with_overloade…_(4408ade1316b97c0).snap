@@ -42,8 +42,8 @@ error[invalid-argument-type]: Argument to bound method `split` is incorrect
 4 |     x.split(" ")
   |             ^^^ Expected `Buffer | None`, found `Literal[" "]`
   |
-info: protocol member `__buffer__` is not defined on type `Literal[" "]`
-info: └── type `Literal[" "]` is not compatible with protocol `Buffer`
+info: type `Literal[" "]` is not compatible with protocol `Buffer`
+info: └── protocol member `__buffer__` is not defined on type `Literal[" "]`
 info: Method defined here
     --> stdlib/builtins.pyi:1761:9
      |

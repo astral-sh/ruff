@@ -59,8 +59,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 8 |     f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
   |       ^ Expected `Number`, found `int | float`
   |
-info: type `int` is not assignable to `Number`
-info: └── union element `int` is not assignable
+info: element `int` of union `int | float` is not assignable to `Number`
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |

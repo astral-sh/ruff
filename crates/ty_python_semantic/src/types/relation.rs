@@ -636,6 +636,7 @@ impl TypeRelationErrorContext {
         let len = stack.len();
         stack
             .iter()
+            .rev()
             .enumerate()
             .map(|(i, message)| {
                 if i == 0 {
@@ -1107,9 +1108,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
                         if constraint_set.is_never_satisfied(db) {
-                            self.provide_error_context(db, elem_ty, target, || {
-                                format!("union element `{}` is not assignable", elem_ty.display(db))
-                            });
+                            self.provide_error_hint(|| {
+                            let union_display = source.display(db).to_string();
+                            format!(
+                                "element `{}` of union `{union_display}` is not assignable to `{}`",
+                                elem_ty.display(db),
+                                target.display(db),
+                            )
+                        });
                         }
                         constraint_set
                     })
