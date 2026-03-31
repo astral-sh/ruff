@@ -84,7 +84,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
    |             Declared type
    |
 info: type `CheckWithWrongSignature` is not compatible with protocol `SupportsCheck`
-info: ├── while checking protocol member `check`
+info: ├── protocol member `check` is incompatible
 info: └── incompatible parameter types `bytes` and `str`
 info: rule `invalid-assignment` is enabled by default
 

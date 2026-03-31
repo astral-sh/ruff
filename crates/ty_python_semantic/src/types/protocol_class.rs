@@ -774,7 +774,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         if result.is_never_satisfied(db) {
             let member_name = member.name;
-            self.provide_error_hint(|| format!("while checking protocol member `{member_name}`"));
+            self.provide_error_hint(|| format!("protocol member `{member_name}` is incompatible"));
         }
         result
     }
