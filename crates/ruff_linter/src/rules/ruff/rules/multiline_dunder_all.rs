@@ -153,7 +153,14 @@ fn check_multiline_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast:
 
     let mut diagnostic = checker.report_diagnostic(MultilineDunderAll, range);
 
-    diagnostic.set_fix(create_fix(range, elts, opening, closing, locator, checker.stylist()));
+    diagnostic.set_fix(create_fix(
+        range,
+        elts,
+        opening,
+        closing,
+        locator,
+        checker.stylist(),
+    ));
 }
 
 fn create_fix(
