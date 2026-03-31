@@ -54,7 +54,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, declaration_type,
+    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -737,6 +738,10 @@ struct DefinitionInferenceExtra<'db> {
 
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
+
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -808,6 +813,14 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    /// Get qualifiers for an annotation expression
+    pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.qualifiers.get(&expression.into()).copied())
+            .unwrap_or_default()
     }
 
     #[track_caller]
@@ -984,6 +997,7 @@ bitflags::bitflags! {
 }
 
 impl InferenceFlags {
+    #[must_use = "Inference flags should always be restored to the original value after being temporarily modified"]
     fn replace(&mut self, other: Self, set_to: bool) -> bool {
         let previously_contained_flag = self.contains(other);
         self.set(other, set_to);

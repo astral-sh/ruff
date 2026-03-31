@@ -12,12 +12,17 @@ license = { workspace = true }
 description = "WebAssembly bindings for ty"
 
 [package.metadata.cargo-shear]
-# Depended on only to enable `log` feature as of 2025-10-03.
-ignored = ["tracing"]
+ignored = [
+    # Depended on only to enable `log` feature as of 2025-10-03.
+    "tracing",
+
+    "uuid",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
+test = false
 
 [dependencies]
 ty_ide = { workspace = true }

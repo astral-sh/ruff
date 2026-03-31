@@ -4,6 +4,8 @@ packages = ["ruff"]
 
 # Config for 'dist'
 [dist]
+# We customize installation of `cargo-dist` in `release.yml` to avoid `curl | sh`
+allow-dirty = ["ci"]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.31.0"
 # Whether to consider the binaries in a package for distribution (defaults true)

@@ -35,6 +35,32 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// os.path.commonpath(["/usr/lib", "/usr/local/lib"])
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because `os.path.commonprefix` and
+/// `os.path.commonpath` have different semantics:
+///
+/// - `commonprefix` performs a character-by-character string comparison
+///   and returns the longest common string prefix.
+/// - `commonpath` compares path components and returns the longest common
+///   path prefix.
+///
+/// If you are intentionally using `commonprefix` for non-path string
+/// comparisons (e.g., finding a common prefix among arbitrary strings
+/// like version numbers or identifiers), see the
+/// [error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
+/// documentation for ways to disable this rule.
+///
+/// For example:
+///
+/// ```python
+/// import os
+///
+/// # commonprefix works on non-path strings
+/// os.path.commonprefix(["12345", "12378"])  # "123"
+/// os.path.commonpath(["12345", "12378"])  # ""
+/// ```
+///
 /// ## References
 /// - [Python documentation: `os.path.commonprefix`](https://docs.python.org/3/library/os.path.html#os.path.commonprefix)
 /// - [Python documentation: `os.path.commonpath`](https://docs.python.org/3/library/os.path.html#os.path.commonpath)

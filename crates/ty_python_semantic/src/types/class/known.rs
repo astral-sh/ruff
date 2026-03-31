@@ -125,7 +125,6 @@ pub enum KnownClass {
     // dataclasses
     Field,
     KwOnly,
-    InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
     NamedTupleLike,
@@ -243,7 +242,6 @@ impl KnownClass {
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -334,7 +332,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
@@ -425,7 +422,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
@@ -515,7 +511,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
@@ -617,7 +612,6 @@ impl KnownClass {
             | Self::UnionType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
             | Self::GenericContext
@@ -720,8 +714,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
-            | KnownClass::Specialization
-            | KnownClass::InitVar => false,
+            | KnownClass::Specialization => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
@@ -831,7 +824,6 @@ impl KnownClass {
             }
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
-            Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
@@ -1076,6 +1068,16 @@ impl KnownClass {
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
+    pub(crate) fn to_specialized_subclass_of<'db>(
+        self,
+        db: &'db dyn Db,
+        specialization: &[Type<'db>],
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .map(|class_type| SubclassOfType::from(db, class_type))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+    }
+
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
@@ -1202,7 +1204,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
-            Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
+            Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1287,7 +1289,6 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::AsyncIterator
@@ -1383,7 +1384,6 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::AsyncIterator
@@ -1498,7 +1498,6 @@ impl KnownClass {
             }
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
-            "InitVar" => &[Self::InitVar],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
@@ -1575,7 +1574,6 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
             | Self::TypeVar

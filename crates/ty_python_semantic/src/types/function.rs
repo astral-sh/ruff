@@ -1571,6 +1571,7 @@ fn is_instance_truthiness<'db>(
         | Type::TypeGuard(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
+        | Type::Divergent(_)
         | Type::Never
         | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear
@@ -1588,6 +1589,17 @@ fn last_definition_signature_cycle_initial<'db>(
     Signature::bottom()
 }
 
+/// Returns `true` if the function body is stub-like, ignoring a leading docstring.
+pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
+    let suite = ast::helpers::body_without_leading_docstring(&node.body);
+
+    suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    })
+}
+
 /// Classify the body of this function:
 /// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
 /// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
@@ -1602,19 +1614,9 @@ pub(super) fn function_body_kind<'db>(
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> FunctionBodyKind {
     // Allow docstrings, but only as the first statement.
-    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
-        && value.is_string_literal_expr()
-    {
-        &node.body[1..]
-    } else {
-        &node.body[..]
-    };
+    let suite = ast::helpers::body_without_leading_docstring(&node.body);
 
-    if suite.iter().all(|stmt| match stmt {
-        ast::Stmt::Pass(_) => true,
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
-        _ => false,
-    }) {
+    if function_has_stub_body(node) {
         return FunctionBodyKind::Stub;
     }
 
@@ -2041,8 +2043,9 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
-                let contains_unknown_or_todo =
-                    |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                let contains_unknown_or_todo = |ty: Type<'_>| {
+                    ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
+                };
                 if source_type.is_equivalent_to(db, *casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)

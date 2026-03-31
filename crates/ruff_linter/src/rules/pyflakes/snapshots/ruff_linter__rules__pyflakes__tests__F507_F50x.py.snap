@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-assertion_line: 192
 ---
 F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
  --> F50x.py:5:1
@@ -186,4 +185,91 @@ F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 43 | # ok: single placeholder with literal RHS
 44 | '%s' % 42
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:57:1
+   |
+56 | # F507: zero placeholders with literal non-tuple RHS
+57 | 'hello' % 42  # F507
+   | ^^^^^^^^^^^^
+58 | '' % 42  # F507
+59 | 'hello' % (1,)  # F507
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:58:1
+   |
+56 | # F507: zero placeholders with literal non-tuple RHS
+57 | 'hello' % 42  # F507
+58 | '' % 42  # F507
+   | ^^^^^^^
+59 | 'hello' % (1,)  # F507
+60 | # F507: zero placeholders with variable RHS (intentional use is very unlikely)
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:59:1
+   |
+57 | 'hello' % 42  # F507
+58 | '' % 42  # F507
+59 | 'hello' % (1,)  # F507
+   | ^^^^^^^^^^^^^^
+60 | # F507: zero placeholders with variable RHS (intentional use is very unlikely)
+61 | banana = 42
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:62:1
+   |
+60 | # F507: zero placeholders with variable RHS (intentional use is very unlikely)
+61 | banana = 42
+62 | 'hello' % banana  # F507
+   | ^^^^^^^^^^^^^^^^
+63 | '' % banana  # F507
+64 | 'hello' % unknown_var  # F507
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:63:1
+   |
+61 | banana = 42
+62 | 'hello' % banana  # F507
+63 | '' % banana  # F507
+   | ^^^^^^^^^^^
+64 | 'hello' % unknown_var  # F507
+65 | 'hello' % get_value()  # F507
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:64:1
+   |
+62 | 'hello' % banana  # F507
+63 | '' % banana  # F507
+64 | 'hello' % unknown_var  # F507
+   | ^^^^^^^^^^^^^^^^^^^^^
+65 | 'hello' % get_value()  # F507
+66 | 'hello' % obj.attr  # F507
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:65:1
+   |
+63 | '' % banana  # F507
+64 | 'hello' % unknown_var  # F507
+65 | 'hello' % get_value()  # F507
+   | ^^^^^^^^^^^^^^^^^^^^^
+66 | 'hello' % obj.attr  # F507
+67 | # ok: zero placeholders with empty tuple
+   |
+
+F507 `%`-format string has 0 placeholder(s) but 1 substitution(s)
+  --> F50x.py:66:1
+   |
+64 | 'hello' % unknown_var  # F507
+65 | 'hello' % get_value()  # F507
+66 | 'hello' % obj.attr  # F507
+   | ^^^^^^^^^^^^^^^^^^
+67 | # ok: zero placeholders with empty tuple
+68 | 'hello' % ()
    |

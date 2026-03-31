@@ -10,8 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-
 [dependencies]
 ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
@@ -56,3 +54,6 @@ test-uv = []
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

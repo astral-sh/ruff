@@ -284,7 +284,11 @@ impl<'db> AllMembers<'db> {
                 }
             },
 
-            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => {
                 self.extend_with_type(db, Type::object());
             }
 

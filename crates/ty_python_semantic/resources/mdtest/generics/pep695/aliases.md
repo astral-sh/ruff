@@ -45,6 +45,17 @@ You cannot use the same typevar more than once.
 type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
+Legacy type variables cannot be used:
+
+```py
+from typing import TypeVar
+
+V = TypeVar("V")
+
+# error: [unbound-type-variable]
+type TA1[K] = dict[K, V]
+```
+
 ## Specializing type aliases explicitly
 
 The type parameter can be specified explicitly:
