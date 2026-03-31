@@ -113,7 +113,8 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
-    /// Whether to hide the return type in signature display.
+    /// Whether to hide the return type of the outermost signature.
+    /// Return types of nested callable types inside parameters are still shown.
     pub hide_return_type: bool,
 }
 
@@ -2080,8 +2081,12 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         }
 
         // Parameters
+        let param_settings = DisplaySettings {
+            hide_return_type: false,
+            ..settings.clone()
+        };
         self.parameters
-            .display_with(self.db, settings.clone())
+            .display_with(self.db, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type

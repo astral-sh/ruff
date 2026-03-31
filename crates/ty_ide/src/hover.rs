@@ -1055,6 +1055,41 @@ mod tests {
     }
 
     #[test]
+    fn hover_class_init_with_callable_param() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable
+
+        class Handler:
+            def __init__(self, callback: Callable[[int, str], bool]):
+                self.callback = callback
+
+        x = Hand<CURSOR>ler(lambda i, s: True)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Handler(callback: (int, str, /) -> bool)
+        ---------------------------------------------
+        ```python
+        class Handler(callback: (int, str, /) -> bool)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |         self.callback = callback
+        7 |
+        8 | x = Handler(lambda i, s: True)
+          |     ^^^^-^^
+          |     |   |
+          |     |   Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_class_method() {
         let test = cursor_test(
             r#"
