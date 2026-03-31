@@ -2215,6 +2215,42 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
 
                         (
+                            ParameterKind::PositionalOnly { name, .. },
+                            ParameterKind::PositionalOrKeyword {
+                                name: target_name, ..
+                            },
+                        ) => {
+                            self.provide_error_hint(|| {
+                                if let Some(name) = name {
+                                    format!(
+                                        "parameter `{name}` is positional-only \
+                                         but must also accept keyword arguments",
+                                    )
+                                } else {
+                                    format!(
+                                        "parameter `{target_name}` must accept \
+                                         keyword arguments",
+                                    )
+                                }
+                            });
+                            return self.never();
+                        }
+
+                        (
+                            ParameterKind::KeywordOnly { name, .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            self.provide_error_hint(|| {
+                                format!(
+                                    "parameter `{name}` is keyword-only \
+                                     but must also accept positional arguments",
+                                )
+                            });
+                            return self.never();
+                        }
+
+                        (
                             _,
                             ParameterKind::KeywordOnly { .. }
                             | ParameterKind::KeywordVariadic { .. },

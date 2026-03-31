@@ -231,6 +231,7 @@ error[invalid-method-override]: Invalid override of method `get`
 6 |
 7 | get = 56
   |
+info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 
 ```

@@ -171,6 +171,7 @@ error[invalid-method-override]: Invalid override of method `method`
  3 |
  4 | class Sub1(Super):
    |
+info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 
 ```
@@ -213,6 +214,7 @@ error[invalid-method-override]: Invalid override of method `method2`
 60 |
 61 | class Sub17(Super2):
    |
+info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 
 ```
@@ -235,6 +237,7 @@ error[invalid-method-override]: Invalid override of method `method2`
 57 |
 58 | class Sub16(Super2):
    |
+info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 
 ```
