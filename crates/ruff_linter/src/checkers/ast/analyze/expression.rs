@@ -1277,6 +1277,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
                 ruff::rules::duplicate_entry_in_dunder_all_extend_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::MultilineDunderAll) {
+                ruff::rules::multiline_dunder_all_extend_call(checker, call);
+            }
             if checker.is_rule_enabled(Rule::DefaultFactoryKwarg) {
                 ruff::rules::default_factory_kwarg(checker, call);
             }

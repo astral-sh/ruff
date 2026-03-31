@@ -1,0 +1,208 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+ --> RUF074.py:3:11
+  |
+1 | # Errors: single-line __all__ with multiple items
+2 |
+3 | __all__ = ["a", "b", "c"]
+  |           ^^^^^^^^^^^^^^^
+4 | __all__ = ("a", "b", "c")
+5 | __all__ += ["x", "y"]
+  |
+help: Format `__all__` across multiple lines
+1  | # Errors: single-line __all__ with multiple items
+2  | 
+   - __all__ = ["a", "b", "c"]
+3  + __all__ = [
+4  +     "a",
+5  +     "b",
+6  +     "c",
+7  + ]
+8  | __all__ = ("a", "b", "c")
+9  | __all__ += ["x", "y"]
+10 | __all__: list[str] = ["foo", "bar", "baz"]
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+ --> RUF074.py:4:11
+  |
+3 | __all__ = ["a", "b", "c"]
+4 | __all__ = ("a", "b", "c")
+  |           ^^^^^^^^^^^^^^^
+5 | __all__ += ["x", "y"]
+6 | __all__: list[str] = ["foo", "bar", "baz"]
+  |
+help: Format `__all__` across multiple lines
+1  | # Errors: single-line __all__ with multiple items
+2  | 
+3  | __all__ = ["a", "b", "c"]
+   - __all__ = ("a", "b", "c")
+4  + __all__ = (
+5  +     "a",
+6  +     "b",
+7  +     "c",
+8  + )
+9  | __all__ += ["x", "y"]
+10 | __all__: list[str] = ["foo", "bar", "baz"]
+11 | __all__.extend(["one", "two"])
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+ --> RUF074.py:5:12
+  |
+3 | __all__ = ["a", "b", "c"]
+4 | __all__ = ("a", "b", "c")
+5 | __all__ += ["x", "y"]
+  |            ^^^^^^^^^^
+6 | __all__: list[str] = ["foo", "bar", "baz"]
+7 | __all__.extend(["one", "two"])
+  |
+help: Format `__all__` across multiple lines
+2  | 
+3  | __all__ = ["a", "b", "c"]
+4  | __all__ = ("a", "b", "c")
+   - __all__ += ["x", "y"]
+5  + __all__ += [
+6  +     "x",
+7  +     "y",
+8  + ]
+9  | __all__: list[str] = ["foo", "bar", "baz"]
+10 | __all__.extend(["one", "two"])
+11 | __all__.extend(("one", "two"))
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+ --> RUF074.py:6:22
+  |
+4 | __all__ = ("a", "b", "c")
+5 | __all__ += ["x", "y"]
+6 | __all__: list[str] = ["foo", "bar", "baz"]
+  |                      ^^^^^^^^^^^^^^^^^^^^^
+7 | __all__.extend(["one", "two"])
+8 | __all__.extend(("one", "two"))
+  |
+help: Format `__all__` across multiple lines
+3  | __all__ = ["a", "b", "c"]
+4  | __all__ = ("a", "b", "c")
+5  | __all__ += ["x", "y"]
+   - __all__: list[str] = ["foo", "bar", "baz"]
+6  + __all__: list[str] = [
+7  +     "foo",
+8  +     "bar",
+9  +     "baz",
+10 + ]
+11 | __all__.extend(["one", "two"])
+12 | __all__.extend(("one", "two"))
+13 | 
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+ --> RUF074.py:7:16
+  |
+5 | __all__ += ["x", "y"]
+6 | __all__: list[str] = ["foo", "bar", "baz"]
+7 | __all__.extend(["one", "two"])
+  |                ^^^^^^^^^^^^^^
+8 | __all__.extend(("one", "two"))
+  |
+help: Format `__all__` across multiple lines
+4  | __all__ = ("a", "b", "c")
+5  | __all__ += ["x", "y"]
+6  | __all__: list[str] = ["foo", "bar", "baz"]
+   - __all__.extend(["one", "two"])
+7  + __all__.extend([
+8  +     "one",
+9  +     "two",
+10 + ])
+11 | __all__.extend(("one", "two"))
+12 | 
+13 | # Non-string items are also flagged (formatting rule)
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+  --> RUF074.py:8:16
+   |
+ 6 | __all__: list[str] = ["foo", "bar", "baz"]
+ 7 | __all__.extend(["one", "two"])
+ 8 | __all__.extend(("one", "two"))
+   |                ^^^^^^^^^^^^^^
+ 9 |
+10 | # Non-string items are also flagged (formatting rule)
+   |
+help: Format `__all__` across multiple lines
+5  | __all__ += ["x", "y"]
+6  | __all__: list[str] = ["foo", "bar", "baz"]
+7  | __all__.extend(["one", "two"])
+   - __all__.extend(("one", "two"))
+8  + __all__.extend((
+9  +     "one",
+10 +     "two",
+11 + ))
+12 | 
+13 | # Non-string items are also flagged (formatting rule)
+14 | __all__ = [foo, bar]
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+  --> RUF074.py:11:11
+   |
+10 | # Non-string items are also flagged (formatting rule)
+11 | __all__ = [foo, bar]
+   |           ^^^^^^^^^^
+12 |
+13 | # Nested indentation context
+   |
+help: Format `__all__` across multiple lines
+8  | __all__.extend(("one", "two"))
+9  | 
+10 | # Non-string items are also flagged (formatting rule)
+   - __all__ = [foo, bar]
+11 + __all__ = [
+12 +     foo,
+13 +     bar,
+14 + ]
+15 | 
+16 | # Nested indentation context
+17 | if True:
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+  --> RUF074.py:15:15
+   |
+13 | # Nested indentation context
+14 | if True:
+15 |     __all__ = ["a", "b", "c"]
+   |               ^^^^^^^^^^^^^^^
+16 |     __all__ += ["d", "e"]
+   |
+help: Format `__all__` across multiple lines
+12 | 
+13 | # Nested indentation context
+14 | if True:
+   -     __all__ = ["a", "b", "c"]
+15 +     __all__ = [
+16 +         "a",
+17 +         "b",
+18 +         "c",
+19 +     ]
+20 |     __all__ += ["d", "e"]
+21 | 
+22 | # OK: already multiline
+
+RUF074 [*] Single-line `__all__` with multiple items should be multiline
+  --> RUF074.py:16:16
+   |
+14 | if True:
+15 |     __all__ = ["a", "b", "c"]
+16 |     __all__ += ["d", "e"]
+   |                ^^^^^^^^^^
+17 |
+18 | # OK: already multiline
+   |
+help: Format `__all__` across multiple lines
+13 | # Nested indentation context
+14 | if True:
+15 |     __all__ = ["a", "b", "c"]
+   -     __all__ += ["d", "e"]
+16 +     __all__ += [
+17 +         "d",
+18 +         "e",
+19 +     ]
+20 | 
+21 | # OK: already multiline
+22 |
