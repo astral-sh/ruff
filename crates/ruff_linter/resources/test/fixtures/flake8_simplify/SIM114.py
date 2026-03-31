@@ -163,6 +163,7 @@ else:
 # Comments between branches should make the fix unsafe
 if exc.status == 408:
     return True
+# This comment is between branches — fix must be unsafe
 elif exc.status == 429:
     return True
 elif exc.status == 500:

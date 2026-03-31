@@ -334,7 +334,7 @@ help: Combine `if` branches
 156 | else:
 157 |     print(2)
 
-SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114 [* unsafe] Combine `if` branches using logical `or` operator
    --> SIM114.py:164:1
     |
 162 |   # See: https://github.com/astral-sh/ruff/issues/19576
@@ -353,6 +353,7 @@ help: Combine `if` branches
 163 | # Comments between branches should make the fix unsafe
     - if exc.status == 408:
     -     return True
+    - # This comment is between branches — fix must be unsafe
     - elif exc.status == 429:
 164 + if exc.status == 408 or exc.status == 429:
 165 |     return True
