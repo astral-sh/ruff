@@ -7,7 +7,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::helpers::{is_dotted_name, map_subscript};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -7438,7 +7438,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // and assume that it's actually `typing.reveal_type`.
                         let is_reveal_type = match func.as_ref() {
                             ast::Expr::Name(name) => name.id == "reveal_type",
-                            ast::Expr::Attribute(attr) => attr.attr.id == "reveal_type",
+                            ast::Expr::Attribute(attr) => {
+                                attr.attr.id == "reveal_type" && is_dotted_name(func)
+                            }
                             _ => false,
                         };
                         if is_reveal_type && let Some(first_arg) = arguments.args.first() {
@@ -8345,14 +8347,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
-        fn is_dotted_name(attribute: &ast::Expr) -> bool {
-            match attribute {
-                ast::Expr::Name(_) => true,
-                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
-                _ => false,
-            }
-        }
-
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,

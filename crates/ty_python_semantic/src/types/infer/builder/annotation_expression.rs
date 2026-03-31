@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::helpers::is_dotted_name;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
@@ -188,22 +189,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 TypeAndQualifiers::declared(Type::unknown())
             }
 
-            ast::Expr::Attribute(attribute) => match attribute.ctx {
-                ast::ExprContext::Load => {
-                    let attribute_type = self.infer_attribute_expression(attribute);
-                    if let Type::TypeVar(typevar) = attribute_type
-                        && typevar.paramspec_attr(self.db()).is_some()
-                    {
-                        TypeAndQualifiers::declared(attribute_type)
-                    } else {
-                        infer_name_or_attribute(attribute_type, annotation, self, pep_613_policy)
-                    }
+            ast::Expr::Attribute(attribute) => {
+                if !is_dotted_name(annotation) {
+                    return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
                 }
-                ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
-                ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
-                    todo_type!("Attribute expression annotation in Store/Del context"),
-                ),
-            },
+                match attribute.ctx {
+                    ast::ExprContext::Load => {
+                        let attribute_type = self.infer_attribute_expression(attribute);
+                        if let Type::TypeVar(typevar) = attribute_type
+                            && typevar.paramspec_attr(self.db()).is_some()
+                        {
+                            TypeAndQualifiers::declared(attribute_type)
+                        } else {
+                            infer_name_or_attribute(
+                                attribute_type,
+                                annotation,
+                                self,
+                                pep_613_policy,
+                            )
+                        }
+                    }
+                    ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
+                    ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
+                        todo_type!("Attribute expression annotation in Store/Del context"),
+                    ),
+                }
+            }
 
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => infer_name_or_attribute(
@@ -219,9 +230,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
-                let value_ty = self.infer_expression(value, TypeContext::default());
+                if !is_dotted_name(value) {
+                    return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
+                }
 
                 let slice = &**slice;
+                let value_ty = self.infer_expression(value, TypeContext::default());
 
                 match value_ty {
                     Type::SpecialForm(special_form) => match special_form {

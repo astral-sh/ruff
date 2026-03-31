@@ -678,10 +678,7 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-# TODO: one error would be enough here
-#
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 WorseList = list[int][0]
 
 def _(doubly_specialized: List, doubly_specialized_2: WorseList):
@@ -783,7 +780,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [not-subscriptable] "Cannot subscript non-generic type"
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
@@ -796,7 +793,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
 # error: [unbound-type-variable]
 # error: [unbound-type-variable]
 x: (list[T] | set[T])[int]

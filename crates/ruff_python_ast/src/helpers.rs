@@ -1681,6 +1681,14 @@ pub fn comment_indentation_after(
         .unwrap_or_default()
 }
 
+pub fn is_dotted_name(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::Name(_) => true,
+        ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
