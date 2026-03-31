@@ -392,3 +392,164 @@ help: Replace with conversion flag
 59 | 
 60 | # Debug text cases - should not trigger RUF010
 61 | f"{str(1)=}"
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:69:4
+   |
+68 |   # Fix should be unsafe when it deletes a comment (https://github.com/astral-sh/ruff/issues/19745)
+69 |   f"{ascii(
+   |  ____^
+70 | |     # comment
+71 | |     1
+72 | | )}"
+   | |_^
+73 |
+74 |   f"{repr(
+   |
+help: Replace with conversion flag
+66 | f"{repr('hello')=}"
+67 | 
+68 | # Fix should be unsafe when it deletes a comment (https://github.com/astral-sh/ruff/issues/19745)
+   - f"{ascii(
+   -     # comment
+   -     1
+   - )}"
+69 + f"{1!a}"
+70 | 
+71 | f"{repr(
+72 |     # comment
+note: This is an unsafe fix and may change runtime behavior
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:74:4
+   |
+72 |   )}"
+73 |
+74 |   f"{repr(
+   |  ____^
+75 | |     # comment
+76 | |     1
+77 | | )}"
+   | |_^
+78 |
+79 |   f"{str(
+   |
+help: Replace with conversion flag
+71 |     1
+72 | )}"
+73 | 
+   - f"{repr(
+   -     # comment
+   -     1
+   - )}"
+74 + f"{1!r}"
+75 | 
+76 | f"{str(
+77 |     # comment
+note: This is an unsafe fix and may change runtime behavior
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:79:4
+   |
+77 |   )}"
+78 |
+79 |   f"{str(
+   |  ____^
+80 | |     # comment
+81 | |     1
+82 | | )}"
+   | |_^
+83 |
+84 |   # Fix should be safe when the comment is preserved inside extra parentheses
+   |
+help: Replace with conversion flag
+76 |     1
+77 | )}"
+78 | 
+   - f"{str(
+   -     # comment
+   -     1
+   - )}"
+79 + f"{1!s}"
+80 | 
+81 | # Fix should be safe when the comment is preserved inside extra parentheses
+82 | f"{ascii((
+note: This is an unsafe fix and may change runtime behavior
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:85:4
+   |
+84 |   # Fix should be safe when the comment is preserved inside extra parentheses
+85 |   f"{ascii((
+   |  ____^
+86 | |     # comment
+87 | |     1
+88 | | ))}"
+   | |__^
+89 |
+90 |   f"{repr((
+   |
+help: Replace with conversion flag
+82 | )}"
+83 | 
+84 | # Fix should be safe when the comment is preserved inside extra parentheses
+   - f"{ascii((
+85 + f"{(
+86 |     # comment
+87 |     1
+   - ))}"
+88 + )!a}"
+89 | 
+90 | f"{repr((
+91 |     # comment
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:90:4
+   |
+88 |   ))}"
+89 |
+90 |   f"{repr((
+   |  ____^
+91 | |     # comment
+92 | |     1
+93 | | ))}"
+   | |__^
+94 |
+95 |   f"{str((
+   |
+help: Replace with conversion flag
+87 |     1
+88 | ))}"
+89 | 
+   - f"{repr((
+90 + f"{(
+91 |     # comment
+92 |     1
+   - ))}"
+93 + )!r}"
+94 | 
+95 | f"{str((
+96 |     # comment
+
+RUF010 [*] Use explicit conversion flag
+  --> RUF010.py:95:4
+   |
+93 |   ))}"
+94 |
+95 |   f"{str((
+   |  ____^
+96 | |     # comment
+97 | |     1
+98 | | ))}"
+   | |__^
+   |
+help: Replace with conversion flag
+92 |     1
+93 | ))}"
+94 | 
+   - f"{str((
+95 + f"{(
+96 |     # comment
+97 |     1
+   - ))}"
+98 + )!s}"
