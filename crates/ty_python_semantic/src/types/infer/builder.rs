@@ -64,11 +64,12 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
     INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_set_call,
     report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
     report_invalid_assignment, report_invalid_attribute_assignment,
@@ -1455,6 +1456,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_alias: &ast::StmtTypeAlias,
         definition: Definition<'db>,
     ) {
+        self.report_invalid_type_alias_scope(type_alias, definition);
+        self.report_redeclared_type_alias(type_alias, definition);
+
         self.infer_expression(&type_alias.name, TypeContext::default());
 
         // Check that no type parameter with a default follows a TypeVarTuple
@@ -1484,6 +1488,80 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_alias.into(),
             definition,
             &DeclaredAndInferredType::are_the_same_type(type_alias_ty),
+        );
+    }
+
+    fn report_invalid_type_alias_scope(
+        &mut self,
+        type_alias: &ast::StmtTypeAlias,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        if !definition
+            .scope(db)
+            .scope(db)
+            .kind()
+            .is_non_lambda_function()
+        {
+            return;
+        }
+
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ALIAS, type_alias) {
+            builder.into_diagnostic("`type` statements are not allowed in function scopes");
+        }
+    }
+
+    fn report_redeclared_type_alias(
+        &mut self,
+        type_alias: &ast::StmtTypeAlias,
+        definition: Definition<'db>,
+    ) {
+        let Some(type_alias_name) = type_alias.name.as_name_expr() else {
+            return;
+        };
+
+        let db = self.db();
+        let scope = definition.scope(db);
+        let use_def = self.index.use_def_map(scope.file_scope_id(db));
+        let use_id = type_alias_name.scoped_use_id(db, scope);
+
+        let Some(previous_definition) = use_def
+            .bindings_at_use(use_id)
+            .filter_map(|binding| binding.binding.definition())
+            .filter(|definition| definition.scope(db) == scope)
+            .filter(|definition| {
+                matches!(
+                    definition.kind(db),
+                    DefinitionKind::TypeAlias(previous_type_alias)
+                        if previous_type_alias
+                            .node(self.module())
+                            .node_index()
+                            .load()
+                            < type_alias.node_index().load()
+                )
+            })
+            .max_by_key(|definition| definition.focus_range(db, self.module()).start())
+        else {
+            return;
+        };
+
+        let Some(builder) = self
+            .context
+            .report_lint(&INVALID_TYPE_ALIAS, &*type_alias.name)
+        else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Type alias `{}` is already defined in this scope",
+            type_alias_name.id
+        ));
+        diagnostic.annotate(
+            Annotation::secondary(previous_definition.focus_range(db, self.module()).into())
+                .message(format_args!(
+                    "`{}` previously defined here",
+                    type_alias_name.id
+                )),
         );
     }
 

@@ -251,9 +251,9 @@ def _(g: G):
 Unless a type default was provided:
 
 ```py
-type G[T = int] = list[T]
+type GWithDefault[T = int] = list[T]
 
-def _(g: G):
+def _(g: GWithDefault):
     reveal_type(g)  # revealed: list[int]
 ```
 
@@ -268,9 +268,9 @@ A self-referential default that does not reference itself in the alias body shou
 even when the default is evaluated (e.g., by omitting the type argument):
 
 ```py
-type B[T = B] = list[T]
+type SelfDefaultB[T = SelfDefaultB] = list[T]
 
-def _(x: B) -> None:
+def _(x: SelfDefaultB) -> None:
     pass
 ```
 
@@ -427,12 +427,12 @@ reveal_type(get_value(d, "a"))  # revealed: int
 It also works in the reverse direction, where the type alias is used as the argument type:
 
 ```py
-type MyList[T] = list[T]
+type MyListAlias[T] = list[T]
 
 def head[T](l: list[T]) -> T:
     return l[0]
 
-def _(x: MyList[int]):
+def _(x: MyListAlias[int]):
     reveal_type(head(x))  # revealed: int
 ```
 

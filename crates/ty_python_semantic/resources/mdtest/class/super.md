@@ -579,6 +579,7 @@ def f(x: int):
     # error: [invalid-super-argument] "`int` is not a valid class"
     super(x, x)
 
+    # error: [invalid-type-alias] "`type` statements are not allowed in function scopes"
     type IntAlias = int
     # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)

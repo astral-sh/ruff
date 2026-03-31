@@ -964,6 +964,16 @@
             }
           ]
         },
+        "invalid-type-alias": {
+          "title": "detects invalid PEP 695 `type` statements",
+          "description": "## What it does\nChecks for invalid PEP 695 `type` statements.\n\n## Why is this bad?\nA `type` statement is only valid in module and class scopes, and a type alias name should\nnot be redeclared in the same scope.\n\n## Examples\n```python\ntype Alias = int\ntype Alias = str  # error: type alias already defined\n\ndef f():\n    type Local = int  # error: type statements are not allowed in function scopes\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
           "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",

@@ -123,12 +123,34 @@ class Foo:
 But narrowing of names used in the type alias is still respected:
 
 ```py
-def _(flag: bool):
-    t = int if flag else None
-    if t is not None:
-        type Alias = t | str
-        def f(x: Alias):
-            reveal_type(x)  # revealed: int | str
+flag = True
+t = int if flag else None
+if t is not None:
+    type NarrowedAlias = t | str
+
+def f(x: NarrowedAlias):
+    reveal_type(x)  # revealed: int | str
+```
+
+`type` statements are only allowed in module and class scopes:
+
+```py
+class C:
+    type Alias = int
+
+def _():
+    # error: [invalid-type-alias] "`type` statements are not allowed in function scopes"
+    type Local = int
+```
+
+## Redeclared aliases
+
+<!-- snapshot-diagnostics -->
+
+```py
+type Redeclared = int
+# error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
+type Redeclared = str
 ```
 
 ## Generic type aliases

@@ -89,6 +89,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
+    registry.register_lint(&INVALID_TYPE_ALIAS);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&INVALID_METACLASS);
@@ -1383,6 +1384,29 @@ declare_lint! {
     pub(crate) static INVALID_PARAMSPEC = {
         summary: "detects invalid ParamSpec usage",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid PEP 695 `type` statements.
+    ///
+    /// ## Why is this bad?
+    /// A `type` statement is only valid in module and class scopes, and a type alias name should
+    /// not be redeclared in the same scope.
+    ///
+    /// ## Examples
+    /// ```python
+    /// type Alias = int
+    /// type Alias = str  # error: type alias already defined
+    ///
+    /// def f():
+    ///     type Local = int  # error: type statements are not allowed in function scopes
+    /// ```
+    pub(crate) static INVALID_TYPE_ALIAS = {
+        summary: "detects invalid PEP 695 `type` statements",
+        status: LintStatus::stable("0.0.28"),
         default_level: Level::Error,
     }
 }

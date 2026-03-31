@@ -511,9 +511,9 @@ def _(flag: bool):
     reveal_type(promotable4 or unpromotable4)  # revealed: Literal[True]
     reveal_type([promotable4 or unpromotable4])  # revealed: list[Literal[True]]
 
-type X = Literal[b"bar"]
+type XBytes = Literal[b"bar"]
 
-def _(x1: X | None, x2: X):
+def _(x1: XBytes | None, x2: XBytes):
     reveal_type([x1, x2])  # revealed: list[Literal[b"bar"] | None]
     reveal_type([x1 or x2])  # revealed: list[Literal[b"bar"]]
 ```

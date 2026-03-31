@@ -1,0 +1,35 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: pep695_type_aliases.md - PEP 695 type aliases - Redeclared aliases
+mdtest path: crates/ty_python_semantic/resources/mdtest/pep695_type_aliases.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | type Redeclared = int
+2 | # error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
+3 | type Redeclared = str
+```
+
+# Diagnostics
+
+```
+error[invalid-type-alias]: Type alias `Redeclared` is already defined in this scope
+ --> src/mdtest_snippet.py:1:6
+  |
+1 | type Redeclared = int
+  |      ---------- `Redeclared` previously defined here
+2 | # error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
+3 | type Redeclared = str
+  |      ^^^^^^^^^^
+  |
+info: rule `invalid-type-alias` is enabled by default
+
+```

@@ -1920,6 +1920,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .map(|name| name.id.clone())
                         .unwrap_or("<unknown>".into()),
                 );
+
+                if type_alias.name.as_name_expr().is_some() {
+                    let use_id = self.current_ast_ids().record_use(&*type_alias.name);
+                    self.current_use_def_map_mut()
+                        .record_use(symbol.into(), use_id);
+                }
+
                 self.add_definition(symbol.into(), type_alias);
                 self.visit_expr(&type_alias.name);
 
