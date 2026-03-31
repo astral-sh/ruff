@@ -746,6 +746,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn collects_error_context(&self) -> bool {
+        self.error_context.is_some()
+    }
+
     fn with_recursion_guard(
         &self,
         source: Type<'db>,

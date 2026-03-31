@@ -20,7 +20,7 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, missing_protocol_members, walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
@@ -493,23 +493,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let missing = missing_protocol_members(db, ty, protocol);
-        if !missing.is_empty() {
-            let ty_display = ty.display(db).to_string();
-            self.provide_error_hint(|| {
-                if missing.len() == 1 {
-                    format!(
-                        "protocol member `{}` is not defined on type `{ty_display}`",
-                        missing[0]
-                    )
-                } else {
-                    let members: Vec<_> = missing.iter().map(|n| format!("`{n}`")).collect();
-                    format!(
-                        "protocol members {} are not defined on type `{ty_display}`",
-                        members.join(", ")
-                    )
-                }
-            });
+        // Fast path: skip expensive per-member type comparisons when members are plainly
+        // missing. When collecting error context, we skip this and let the structural check
+        // below report per-member errors instead.
+        if !self.collects_error_context() && !has_all_protocol_members_defined(db, ty, protocol) {
             return result;
         }
 

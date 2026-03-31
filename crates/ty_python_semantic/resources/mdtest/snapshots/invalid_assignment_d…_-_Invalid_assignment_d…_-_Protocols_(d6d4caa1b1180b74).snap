@@ -53,6 +53,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
 11 |     def check(self, x: int, y: bytes) -> bool:
    |
 info: protocol member `check` is not defined on type `DoesNotHaveCheck`
+info: └── type `DoesNotHaveCheck` is not compatible with protocol `SupportsCheck`
 info: rule `invalid-assignment` is enabled by default
 
 ```

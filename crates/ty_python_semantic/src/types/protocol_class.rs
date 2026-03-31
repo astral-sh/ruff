@@ -1091,35 +1091,27 @@ fn protocol_bind_self<'db>(
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
 /// comparisons and generic protocol solving when the actual type is plainly missing a member.
-pub(super) fn missing_protocol_members<'db>(
+pub(super) fn has_all_protocol_members_defined<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
-) -> Vec<String> {
+) -> bool {
     let target_interface = protocol.interface(db);
 
     match ty {
-        Type::ProtocolInstance(source_protocol) => target_interface
-            .members(db)
-            .filter(|member| {
-                !source_protocol
-                    .interface(db)
-                    .includes_member(db, member.name())
-            })
-            .map(|member| member.name().to_string())
-            .collect(),
-        _ => target_interface
-            .members(db)
-            .filter(|member| {
-                !matches!(
-                    ty.member(db, member.name()).place,
-                    Place::Defined(DefinedPlace {
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    })
-                )
-            })
-            .map(|member| member.name().to_string())
-            .collect(),
+        Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
+            source_protocol
+                .interface(db)
+                .includes_member(db, member.name())
+        }),
+        _ => target_interface.members(db).all(|member| {
+            matches!(
+                ty.member(db, member.name()).place,
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                })
+            )
+        }),
     }
 }
