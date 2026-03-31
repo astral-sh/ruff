@@ -1090,6 +1090,7 @@ mod tests {
     }
 
     // TODO: should show `class Color(value: object)`
+    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_enum_constructor() {
         let test = cursor_test(
@@ -1182,7 +1183,8 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Movie(*, title: str, year: int): ...`
+    // TODO: should show `class Movie(title: str, year: int)`
+    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_typeddict_constructor() {
         let test = cursor_test(
