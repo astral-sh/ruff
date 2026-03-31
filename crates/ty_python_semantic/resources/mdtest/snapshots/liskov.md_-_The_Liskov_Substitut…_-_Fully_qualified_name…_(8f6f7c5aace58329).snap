@@ -42,6 +42,7 @@ error[invalid-method-override]: Invalid override of method `foo`
 2 |     def foo(self, x): ...
   |         ------------ `a.A.foo` defined here
   |
+info: parameter `y` does not match `x`
 info: This violates the Liskov Substitution Principle
 
 ```

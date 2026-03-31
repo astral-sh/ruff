@@ -1441,6 +1441,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 },
                             ) => {
                                 if self_name != other_name {
+                                    self.provide_error_hint(|| {
+                                        format!(
+                                            "parameter `{self_name}` does not match `{other_name}`",
+                                        )
+                                    });
                                     return self.never();
                                 }
                                 // The following checks are the same as positional-only parameters.
@@ -2126,6 +2131,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
+                                self.provide_error_hint(|| {
+                                    format!(
+                                        "parameter `{source_name}` does not match `{target_name}`",
+                                    )
+                                });
                                 return self.never();
                             }
                             // The following checks are the same as positional-only parameters.
