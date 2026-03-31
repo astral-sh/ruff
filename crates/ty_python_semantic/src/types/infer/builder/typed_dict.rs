@@ -173,16 +173,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             Name::new(name)
         } else {
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `typename` of `TypedDict()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
+            let is_str = name_type.is_assignable_to(db, KnownClass::Str.to_instance(db));
+            if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg) {
+                if let Some(assigned_name) = definition.and_then(|definition| definition.name(db))
+                    && is_str
+                {
+                    builder.into_diagnostic(format_args!(
+                        "The first argument to `TypedDict` must be the string literal `{assigned_name}`"
+                    ));
+                } else if is_str {
+                    builder.into_diagnostic(
+                        "The first argument to `TypedDict` must be a string literal",
+                    );
+                } else {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Invalid argument to parameter `typename` of `TypedDict()`"
+                    ));
+                    diagnostic.set_primary_message(format_args!(
+                        "Expected `str`, found `{}`",
+                        name_type.display(db)
+                    ));
+                }
             }
             Name::new_static("<unknown>")
         };
