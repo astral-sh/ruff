@@ -13,6 +13,11 @@ indent_size = 2
 [*.{rs,py,pyi,toml}]
 indent_size = 4
 
+# The following file has trailing white space in inline snapshot results.
+# Trimming them would cause tests to fail
+[crates/ty_ide/src/{hover,code_action,docstring}.rs]
+trim_trailing_whitespace = false
+
 [*.snap]
 trim_trailing_whitespace = false
 
