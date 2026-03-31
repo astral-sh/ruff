@@ -531,7 +531,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
 86 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
 87 | # error: [invalid-type-form]
 88 | Bad10 = TypedDict("Bad10", {name: 42})
-   |                                   ^^
+   |                                   ^^ Did you mean `typing.Literal[42]`?
 89 |
 90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
    |
@@ -563,7 +563,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
 90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
 91 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 92 | class Bad11(TypedDict("Bad11", {name: 42})): ...
-   |                                       ^^
+   |                                       ^^ Did you mean `typing.Literal[42]`?
 93 |
 94 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
    |
