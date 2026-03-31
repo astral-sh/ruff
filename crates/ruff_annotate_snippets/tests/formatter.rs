@@ -235,6 +235,18 @@ error
 }
 
 #[test]
+fn test_multiline_title() {
+    let input = Level::Info.title("first line\nsecond line\nthird line");
+    let expected = str![[r#"
+info: first line
+      second line
+      third line
+"#]];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input).to_string(), expected);
+}
+
+#[test]
 #[should_panic]
 fn test_i26() {
     let source = "short";

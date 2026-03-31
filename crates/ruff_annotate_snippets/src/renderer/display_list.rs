@@ -1115,7 +1115,7 @@ fn format_message<'m>(
 
     let mut sets = vec![];
     let body = if !snippets.is_empty() || primary {
-        vec![format_title(level, id, title, is_fixable)]
+        format_title(level, id, title, is_fixable)
     } else {
         format_footer(level, id, title)
     };
@@ -1161,17 +1161,32 @@ fn format_title<'a>(
     id: Option<Id<'a>>,
     label: &'a str,
     is_fixable: bool,
-) -> DisplayLine<'a> {
-    DisplayLine::Raw(DisplayRawLine::Annotation {
+) -> Vec<DisplayLine<'a>> {
+    let mut lines = label.lines();
+    let first = lines.next().unwrap_or("");
+    let mut result = vec![DisplayLine::Raw(DisplayRawLine::Annotation {
         annotation: Annotation {
             annotation_type: DisplayAnnotationType::from(level),
             id,
-            label: format_label(Some(label), Some(DisplayTextStyle::Emphasis)),
+            label: format_label(Some(first), Some(DisplayTextStyle::Emphasis)),
             is_fixable,
         },
         source_aligned: false,
         continuation: false,
-    })
+    })];
+    for line in lines {
+        result.push(DisplayLine::Raw(DisplayRawLine::Annotation {
+            annotation: Annotation {
+                annotation_type: DisplayAnnotationType::from(level),
+                id,
+                label: format_label(Some(line), Some(DisplayTextStyle::Emphasis)),
+                is_fixable: false,
+            },
+            source_aligned: false,
+            continuation: true,
+        }));
+    }
+    result
 }
 
 fn format_footer<'a>(
