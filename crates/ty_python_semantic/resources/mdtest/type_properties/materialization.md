@@ -581,6 +581,33 @@ def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantC
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
 ```
 
+## Bounded TypeVars
+
+When materializing a generic class, bounded TypeVars should have their materialized type capped by
+the upper bound. For example, `Unknown` materializes to `object` for a covariant TypeVar, but if the
+TypeVar has `bound=int`, the result should be `int` instead:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Generic, TypeVar, Never
+from ty_extensions import Bottom, Top, static_assert, is_equivalent_to
+
+T_bounded_co = TypeVar("T_bounded_co", bound=int, covariant=True)
+T_default_co = TypeVar("T_default_co", default=None, covariant=True)
+
+class BoundedAndDefaulted(Generic[T_bounded_co, T_default_co]):
+    pass
+
+# T_bounded_co should resolve to its bound `int`, not `object`.
+# T_default_co keeps its default `None` since `Top[Foo]` means `Top[Foo[Unknown, None]]`.
+def f(x: Top[BoundedAndDefaulted]):
+    reveal_type(x)  # revealed: BoundedAndDefaulted[int, None]
+```
+
 ## Invalid use
 
 `Top[]` and `Bottom[]` are special forms that take a single argument.
