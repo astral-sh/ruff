@@ -1089,6 +1089,135 @@ mod tests {
         "#);
     }
 
+    // TODO: should show `class Color(value: object)`
+    #[test]
+    fn hover_enum_constructor() {
+        let test = cursor_test(
+            r#"
+        from enum import Enum
+
+        class Color(Enum):
+            RED = 1
+            BLUE = 2
+
+        x = Col<CURSOR>or(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        class Color(
+            value: Any,
+            names: None = None
+        )
+        ---------------------------------------------
+        Either returns an existing member, or creates a new enum class.
+
+        This method is used both when an enum class is given a value to match
+        to an enumeration member (i.e. Color(3)) and for the functional API
+        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+
+        The value lookup branch is chosen if the enum is final.
+
+        When used for the functional API:
+
+        `value` will be the name of the new class.
+
+        `names` should be either a string of white-space/comma delimited names
+        (values will start at `start`), or an iterator/mapping of name, value pairs.
+
+        `module` should be set to the module this class is being created in;
+        if it is not set, an attempt to find that module will be made, but if
+        it fails the class will not be picklable.
+
+        `qualname` should be set to the actual location this class can be found
+        at in its module; by default it is set to the global scope.  If this is
+        not correct, unpickling will fail in some circumstances.
+
+        `type`, if set, will be mixed in as the first base class.
+
+        ---------------------------------------------
+        ```python
+        class Color(
+            value: Any,
+            names: None = None
+        )
+        ```
+        ---
+        Either returns an existing member, or creates a new enum class.  
+          
+        This method is used both when an enum class is given a value to match  
+        to an enumeration member (i.e. Color(3)) and for the functional API  
+        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).  
+          
+        The value lookup branch is chosen if the enum is final.  
+          
+        When used for the functional API:  
+          
+        `value` will be the name of the new class.  
+          
+        `names` should be either a string of white-space/comma delimited names  
+        (values will start at `start`), or an iterator/mapping of name, value pairs.  
+          
+        `module` should be set to the module this class is being created in;  
+        if it is not set, an attempt to find that module will be made, but if  
+        it fails the class will not be picklable.  
+          
+        `qualname` should be set to the actual location this class can be found  
+        at in its module; by default it is set to the global scope.  If this is  
+        not correct, unpickling will fail in some circumstances.  
+          
+        `type`, if set, will be mixed in as the first base class.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     BLUE = 2
+        7 |
+        8 | x = Color(1)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    // TODO: should show `class Movie(*, title: str, year: int): ...`
+    #[test]
+    fn hover_typeddict_constructor() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie(title="Alien", year=1979)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie()
+        ---------------------------------------------
+        ```python
+        class Movie()
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie(title="Alien", year=1979)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
     #[test]
     fn hover_class_method() {
         let test = cursor_test(
