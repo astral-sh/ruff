@@ -28,9 +28,6 @@ pub(super) struct ConstructorBinding<'db> {
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<Bindings<'db>>>,
-    /// Should we check downstream constructors? This starts out `None`, and is populated to a
-    /// `bool` by `check_types`, once we've type-checked our own overloads.
-    cached_should_check_downstream: Option<bool>,
 }
 
 impl<'db> ConstructorBinding<'db> {
@@ -42,7 +39,6 @@ impl<'db> ConstructorBinding<'db> {
             entry,
             constructor_context,
             downstream_constructor: None,
-            cached_should_check_downstream: None,
         }
     }
 
@@ -68,7 +64,7 @@ impl<'db> ConstructorBinding<'db> {
         // For layered mixed-constructor handling (metaclass `__call__` mixed with
         // downstream constructor logic), if the downstream constructor resolves to a
         // non-instance return, that becomes the effective constructor return.
-        if let Some(downstream) = self.checked_downstream_constructor()
+        if let Some(downstream) = self.downstream_constructor()
             && let Some(constructor_class_literal) = self.constructed_class_literal(db)
         {
             let downstream_return = downstream.return_type(db);
@@ -124,13 +120,15 @@ impl<'db> ConstructorBinding<'db> {
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
-        debug_assert!(self.cached_should_check_downstream.is_none());
-        self.cached_should_check_downstream = Some(self.determine_should_check_downstream(db));
+        if !self.should_check_downstream(db) {
+            // If not, we can discard the downstream constructor bindings entirely.
+            self.downstream_constructor = None;
+        }
 
         forms
     }
 
-    pub(super) fn maybe_check_downstream_constructor(
+    pub(super) fn check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
@@ -138,7 +136,7 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) {
-        if let Some(downstream) = self.checked_downstream_constructor_mut() {
+        if let Some(downstream) = self.downstream_constructor_mut() {
             // We discard the result here, but that's fine; it's `report_diagnostics` and
             // `as_result` that ultimately matter.
             let _ = downstream.check_types_impl(
@@ -151,40 +149,29 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
-    pub(super) fn checked_downstream_constructor(&self) -> Option<&Bindings<'db>> {
-        self.should_check_downstream()
-            .then_some(self.downstream_constructor.as_deref()?)
+    pub(super) fn downstream_constructor(&self) -> Option<&Bindings<'db>> {
+        self.downstream_constructor.as_deref()
+    }
+
+    pub(super) fn downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
+        self.downstream_constructor.as_deref_mut()
     }
 
     pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
     {
-        // We only map constructor bindings before we even set their downstream constructor.
-        debug_assert!(
+        // We only ever map constructor bindings before we set their downstream constructor; don't
+        // spend complexity on dead code.
+        assert!(
             self.downstream_constructor.is_none(),
             "map should not be used on a ConstructorBinding with downstream constructor"
-        );
-        debug_assert!(
-            self.cached_should_check_downstream.is_none(),
-            "map should not be used on a ConstructorBinding that has cached check_downstream"
         );
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
             downstream_constructor: None,
-            cached_should_check_downstream: None,
         }
-    }
-
-    fn checked_downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
-        self.should_check_downstream()
-            .then_some(self.downstream_constructor.as_deref_mut()?)
-    }
-
-    fn should_check_downstream(&self) -> bool {
-        self.cached_should_check_downstream
-            .expect("cached_should_check_downstream should have been set by check_types")
     }
 
     /// When inferring a specialization for a constructor return, we may have multiple matched
@@ -214,7 +201,7 @@ impl<'db> ConstructorBinding<'db> {
     ///
     /// This must be called after we've checked types on `self.entry` (in `self.check_types()`), so
     /// we know which overloads matched.
-    fn determine_should_check_downstream(&self, db: &'db dyn Db) -> bool {
+    fn should_check_downstream(&self, db: &'db dyn Db) -> bool {
         let constructor_kind = self.constructor_kind();
         if constructor_kind.is_init() || self.downstream_constructor().is_none() {
             return false;
@@ -317,7 +304,6 @@ impl<'db> ConstructorBinding<'db> {
     /// explicit `__new__` / `__call__` return annotation that is an instance of the constructed
     /// type or a subclass.
     fn instance_return_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        let include_downstream = self.should_check_downstream();
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
@@ -419,10 +405,7 @@ impl<'db> ConstructorBinding<'db> {
 
         combine_binding_specialization(self);
 
-        // Deferred downstream constructor bindings stay out-of-band for conditional validation.
-        // If all matched overloads are instance-returning, include inferred specializations from
-        // those deferred bindings as well.
-        if include_downstream && let Some(downstream) = self.downstream_constructor() {
+        if let Some(downstream) = self.downstream_constructor() {
             for downstream_binding in downstream
                 .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
@@ -566,14 +549,6 @@ impl<'db> ConstructorBinding<'db> {
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
         self.constructor_context.kind()
-    }
-
-    fn downstream_constructor(&self) -> Option<&Bindings<'db>> {
-        self.downstream_constructor.as_deref()
-    }
-
-    pub(super) fn downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
-        self.downstream_constructor.as_deref_mut()
     }
 }
 

@@ -163,14 +163,14 @@ impl<'db> CallableItem<'db> {
         self.callable().as_result()?;
 
         self.as_constructor()
-            .and_then(|binding| binding.checked_downstream_constructor())
+            .and_then(|binding| binding.downstream_constructor())
             .map_or(Ok(()), |bindings| bindings.as_result(db))
     }
 
     fn error_priority(&self, db: &'db dyn Db) -> CallErrorPriority {
         let priority = self.callable().error_priority();
         self.as_constructor()
-            .and_then(|binding| binding.checked_downstream_constructor())
+            .and_then(|binding| binding.downstream_constructor())
             .map_or(priority, |bindings| {
                 priority.max(bindings.error_priority(db))
             })
@@ -791,7 +791,7 @@ impl<'db> Bindings<'db> {
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
         for constructor in self.iter_constructor_items_mut() {
-            constructor.maybe_check_downstream_constructor(
+            constructor.check_downstream_constructor(
                 db,
                 constraints,
                 call_arguments,
@@ -908,7 +908,7 @@ impl<'db> Bindings<'db> {
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
         let mut reported_ctor_init_callables = FxHashSet::default();
         for constructor in self.iter_constructor_items() {
-            let Some(downstream_bindings) = constructor.checked_downstream_constructor() else {
+            let Some(downstream_bindings) = constructor.downstream_constructor() else {
                 continue;
             };
             if !reported_ctor_init_callables.insert(downstream_bindings.callable_type()) {
