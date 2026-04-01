@@ -228,6 +228,61 @@ mod tests {
         assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
     }
 
+    #[test]
+    fn provide_class_type_in_constructor_call() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            class A:
+                pass
+            <START>A<END>()
+            "#,
+        );
+
+        assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
+    }
+
+    #[test]
+    fn provide_exception_variable_type() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            try:
+                print("Test")
+            except IOError as <START>e<END>:
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.provided_type(), @"builtins.OSError");
+    }
+
+    #[test]
+    fn provide_exception_class_type() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            try:
+                print("Test")
+            except <START>IOError<END> as e:
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.provided_type(), @"builtins.type[builtins.OSError]");
+    }
+
+    #[test]
+    fn provide_function_parameter_annotation_type() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            class A:
+                pass
+            def f(a: <START>A<END> | None):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
+    }
+
     struct ProvideTypeTest {
         db: ty_project::TestDb,
         file: File,
