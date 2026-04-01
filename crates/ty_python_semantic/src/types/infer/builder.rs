@@ -1523,15 +1523,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = definition.scope(db);
         let use_def = self.index.use_def_map(scope.file_scope_id(db));
-        let use_id = type_alias_name.scoped_use_id(db, scope);
 
+        // Type alias redeclarations are a scope-level property, so we need all earlier
+        // definitions for this symbol in the scope, not just the bindings reachable here.
         let Some(previous_definition) = use_def
-            .bindings_at_use(use_id)
-            .filter_map(|binding| binding.binding.definition())
-            .filter(|definition| definition.scope(db) == scope)
-            .filter(|definition| {
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, _)| state.definition())
+            .filter(|previous_definition| previous_definition.place(db) == definition.place(db))
+            .filter(|previous_definition| {
                 matches!(
-                    definition.kind(db),
+                    previous_definition.kind(db),
                     DefinitionKind::TypeAlias(previous_type_alias)
                         if previous_type_alias
                             .node(self.module())

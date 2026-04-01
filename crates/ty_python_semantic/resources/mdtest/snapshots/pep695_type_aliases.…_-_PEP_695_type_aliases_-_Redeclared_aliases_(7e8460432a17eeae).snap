@@ -13,9 +13,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/pep695_type_aliases.md
 ## mdtest_snippet.py
 
 ```
-1 | type Redeclared = int
-2 | # error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
-3 | type Redeclared = str
+ 1 | type Redeclared = int
+ 2 | # error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
+ 3 | type Redeclared = str
+ 4 | from random import random
+ 5 | 
+ 6 | flag = random() > 0.5
+ 7 | if flag:
+ 8 |     type BranchRedeclared = int
+ 9 | else:
+10 |     # error: [invalid-type-alias] "Type alias `BranchRedeclared` is already defined in this scope"
+11 |     type BranchRedeclared = str
 ```
 
 # Diagnostics
@@ -29,7 +37,25 @@ error[invalid-type-alias]: Type alias `Redeclared` is already defined in this sc
 2 | # error: [invalid-type-alias] "Type alias `Redeclared` is already defined in this scope"
 3 | type Redeclared = str
   |      ^^^^^^^^^^
+4 | from random import random
   |
+info: rule `invalid-type-alias` is enabled by default
+
+```
+
+```
+error[invalid-type-alias]: Type alias `BranchRedeclared` is already defined in this scope
+  --> src/mdtest_snippet.py:8:10
+   |
+ 6 | flag = random() > 0.5
+ 7 | if flag:
+ 8 |     type BranchRedeclared = int
+   |          ---------------- `BranchRedeclared` previously defined here
+ 9 | else:
+10 |     # error: [invalid-type-alias] "Type alias `BranchRedeclared` is already defined in this scope"
+11 |     type BranchRedeclared = str
+   |          ^^^^^^^^^^^^^^^^
+   |
 info: rule `invalid-type-alias` is enabled by default
 
 ```

@@ -153,6 +153,17 @@ type Redeclared = int
 type Redeclared = str
 ```
 
+```py
+from random import random
+
+flag = random() > 0.5
+if flag:
+    type BranchRedeclared = int
+else:
+    # error: [invalid-type-alias] "Type alias `BranchRedeclared` is already defined in this scope"
+    type BranchRedeclared = str
+```
+
 ## Generic type aliases
 
 ```py
