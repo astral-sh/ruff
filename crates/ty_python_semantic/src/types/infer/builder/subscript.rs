@@ -241,13 +241,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
-                        let mut elements = tuple
-                            .elts
-                            .iter()
-                            .map(|elt| self.infer_type_expression(elt))
-                            .peekable();
+                        let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
-                        let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
@@ -256,7 +251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ),
                         ));
 
-                        if is_empty
+                        if tuple.is_empty()
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                         {
@@ -486,14 +481,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut first_excess_type_argument_index = None;
 
         // Helper to get the AST node corresponding to the type argument at `index`.
-        let get_node = |index: usize| -> ast::AnyNodeRef<'_> {
-            match slice_node {
-                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => elts
-                    .get(index)
-                    .expect("type argument index should not be out of range")
-                    .into(),
-                _ => slice_node.into(),
-            }
+        let get_node = |index| match slice_node {
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => &elts[index],
+            _ => slice_node,
         };
 
         let mut error: Option<ExplicitSpecializationError> = None;
@@ -670,8 +660,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
             if let Type::GenericAlias(alias) = value_ty
-                && let spec = alias.specialization(db)
-                && spec
+                && alias
+                    .specialization(db)
                     .types(db)
                     .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
             {
@@ -807,7 +797,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Parameters::todo()
                 } else {
                     Parameters::new(
-                        self.db(),
+                        db,
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
                         }),
@@ -851,7 +841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             diagnostic_builder.into_diagnostic(format_args!(
                                 "ParamSpec `{}` is unbound",
-                                typevar.name(self.db())
+                                typevar.name(db)
                             ));
                         }
                         return Err(());
@@ -867,12 +857,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Foo[ParamSpec]  # P: (ParamSpec, /)
                     // ```
                     Type::NominalInstance(nominal)
-                        if nominal.has_known_class(self.db(), KnownClass::ParamSpec) =>
+                        if nominal.has_known_class(db, KnownClass::ParamSpec) =>
                     {
                         return Ok(Type::paramspec_value_callable(
                             db,
                             Parameters::new(
-                                self.db(),
+                                db,
                                 [
                                     Parameter::positional_only(None)
                                         .with_annotated_type(param_type),
@@ -896,7 +886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 Parameters::todo()
                             } else {
                                 Parameters::new(
-                                    self.db(),
+                                    db,
                                     [Parameter::positional_only(None)
                                         .with_annotated_type(param_type)],
                                 )
