@@ -4500,8 +4500,10 @@ impl SequentMap {
         debug_assert!(!when.is_never_satisfied(db));
 
         // Fast path: If L is trivially always assignable to U, there are no derived constraints
-        // that we can infer. (This would be handled correctly by the logic below, but this is a
-        // useful early return.)
+        // that we can infer. This would be handled correctly by the logic below, but this is a
+        // useful early return. Since we only use this check as an early return happy path, we can
+        // accept false negatives. That lets us use the simpler and cheaper check against
+        // ALWAYS_TRUE, rather than a more expensive is_always_satisfiable call.
         if when.node == ALWAYS_TRUE {
             return;
         }
