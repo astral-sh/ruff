@@ -356,9 +356,12 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         let class_scope = ancestor.body_scope(db);
         let class_place_table = crate::semantic_index::place_table(db, class_scope);
 
-        // Look for class-level declarations and bindings
+        // Look for class-level declarations and bindings.
+        // Collect all definitions from the same scope before breaking,
+        // so that property getter+setter pairs are both returned.
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
+            let len_before = resolved.len();
 
             // Check declarations first
             for decl in use_def.reachable_symbol_declarations(place_id) {
@@ -369,21 +372,25 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                         Some(attribute_name),
                         ImportAliasResolution::ResolveAliases,
                     ));
-                    break 'scopes;
                 }
             }
 
-            // If no declarations found, check bindings
-            for binding in use_def.reachable_symbol_bindings(place_id) {
-                if let Some(def) = binding.binding.definition() {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                    break 'scopes;
+            // If no declarations found, check bindings (collect all)
+            if resolved.len() == len_before {
+                for binding in use_def.reachable_symbol_bindings(place_id) {
+                    if let Some(def) = binding.binding.definition() {
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(attribute_name),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
+                    }
                 }
+            }
+
+            if resolved.len() > len_before {
+                break 'scopes;
             }
         }
 
@@ -397,6 +404,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
+                let len_before = resolved.len();
 
                 // Check declarations first
                 for decl in use_def.reachable_member_declarations(place_id) {
@@ -407,21 +415,25 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                             Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
-                        break 'scopes;
                     }
                 }
 
-                // If no declarations found, check bindings
-                for binding in use_def.reachable_member_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                        break 'scopes;
+                // If no declarations found, check bindings (collect all)
+                if resolved.len() == len_before {
+                    for binding in use_def.reachable_member_bindings(place_id) {
+                        if let Some(def) = binding.binding.definition() {
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(attribute_name),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
+                        }
                     }
+                }
+
+                if resolved.len() > len_before {
+                    break 'scopes;
                 }
             }
         }
