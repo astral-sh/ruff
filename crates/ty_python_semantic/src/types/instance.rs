@@ -829,6 +829,10 @@ impl<'db> Protocol<'db> {
             )),
         }
     }
+
+    pub(super) const fn is_synthesized(self) -> bool {
+        matches!(self, Self::Synthesized(_))
+    }
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {

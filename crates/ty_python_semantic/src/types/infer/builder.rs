@@ -536,6 +536,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.in_stub()
     }
 
+    fn in_string_annotation(&self) -> bool {
+        self.deferred_state.in_string_annotation()
+    }
+
     /// Returns `true` if `expr` is a call to a known diagnostic function
     /// (e.g., `reveal_type` or `assert_type`) whose return value should not
     /// trigger the `unused-awaitable` lint.
@@ -7866,7 +7870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 place_from_bindings(db, use_def.reachable_bindings(place_id)).place
             } else {
                 assert!(
-                    self.deferred_state.in_string_annotation(),
+                    self.in_string_annotation(),
                     "Expected the place table to create a place for every valid PlaceExpr node"
                 );
                 Place::Undefined
@@ -9330,7 +9334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// The inference results can be merged into the current inference region using
     /// [`TypeInferenceBuilder::extend`].
-    fn speculate(&mut self) -> Self {
+    fn speculate(&self) -> Self {
         let Self {
             region,
             index,

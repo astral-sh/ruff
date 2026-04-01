@@ -678,8 +678,15 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-def _(doubly_specialized: List):
+# TODO: one error would be enough here
+#
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+WorseList = list[int][0]
+
+def _(doubly_specialized: List, doubly_specialized_2: WorseList):
     reveal_type(doubly_specialized)  # revealed: Unknown
+    reveal_type(doubly_specialized_2)  # revealed: Unknown
 
 Tuple = tuple[int, str]
 

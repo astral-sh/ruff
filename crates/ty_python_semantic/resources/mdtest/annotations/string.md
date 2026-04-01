@@ -354,12 +354,8 @@ o: "1 < 2"
 # error: [invalid-type-form]
 p: "call()"
 # error: [invalid-type-form] "List literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
 r: "[1, 2]"
 # error: [invalid-type-form] "Tuple literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
 s: "(1, 2)"
 ```
 

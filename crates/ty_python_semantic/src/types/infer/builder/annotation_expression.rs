@@ -172,6 +172,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     builder.into_diagnostic("Type expressions cannot use bytes literal");
                 }
+                if !self.in_string_annotation() {
+                    self.infer_bytes_literal_expression(bytes);
+                }
                 TypeAndQualifiers::declared(Type::unknown())
             }
 
@@ -179,7 +182,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(builder) = self.context.report_lint(&FSTRING_TYPE_ANNOTATION, fstring) {
                     builder.into_diagnostic("Type expressions cannot use f-strings");
                 }
-                self.infer_fstring_expression(fstring);
+                if !self.in_string_annotation() {
+                    self.infer_fstring_expression(fstring);
+                }
                 TypeAndQualifiers::declared(Type::unknown())
             }
 
