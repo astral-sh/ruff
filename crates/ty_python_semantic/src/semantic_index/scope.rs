@@ -50,7 +50,7 @@ impl<'db> ScopeId<'db> {
     }
 
     #[cfg(test)]
-    pub fn name<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast str {
+    pub(crate) fn name<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast str {
         match self.node(db) {
             NodeWithScopeKind::Module => "<module>",
             NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
@@ -102,7 +102,7 @@ impl FileScopeId {
 }
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
-pub struct Scope {
+pub(crate) struct Scope {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
 
@@ -136,7 +136,7 @@ impl Scope {
         }
     }
 
-    pub fn parent(&self) -> Option<FileScopeId> {
+    pub(crate) fn parent(&self) -> Option<FileScopeId> {
         self.parent
     }
 
@@ -144,7 +144,7 @@ impl Scope {
         &self.node
     }
 
-    pub fn kind(&self) -> ScopeKind {
+    pub(crate) fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
     }
 
@@ -210,7 +210,7 @@ impl ScopeLaziness {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ScopeKind {
+pub(crate) enum ScopeKind {
     Module,
     TypeParams,
     Class,
@@ -409,15 +409,15 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub(crate) fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef> {
-        self.as_class().expect("expected class")
-    }
-
     pub(crate) fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,
         }
+    }
+
+    pub(crate) fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef> {
+        self.as_class().expect("expected class")
     }
 
     pub(crate) fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {

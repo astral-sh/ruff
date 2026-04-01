@@ -82,10 +82,10 @@ use lsp_types::{
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
-use ty_server::server::api::requests::provide_type::{
-    ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse,
+use ty_server::{
+    ClientOptions, LogLevel, ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse, Server,
+    init_logging,
 };
-use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
 const RETRY_COUNT: usize = 5;

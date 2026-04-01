@@ -8,6 +8,8 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::Request;
 use lsp_types::{Range, TextDocumentIdentifier, Url};
+use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
 use serde::{Deserialize, Serialize};
 use ty_ide::provide_types;
 use ty_project::ProjectDatabase;

@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
-pub mod requests;
+mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
@@ -19,7 +19,10 @@ use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
-pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
+pub use requests::{
+    PartialWorkspaceProgress, PartialWorkspaceProgressParams, ProvideTypeParams,
+    ProvideTypeRequest, ProvideTypeResponse,
+};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -126,11 +129,9 @@ pub(super) fn request(req: server::Request) -> Task {
             req, BackgroundSchedule::Worker
         ),
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
-        requests::provide_type::ProvideTypeRequest::METHOD => background_document_request_task::<
-            requests::provide_type::ProvideTypeRequestHandler,
-        >(
-            req, BackgroundSchedule::Worker
-        ),
+        requests::ProvideTypeRequest::METHOD => background_document_request_task::<
+            requests::ProvideTypeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
