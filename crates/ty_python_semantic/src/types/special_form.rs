@@ -13,8 +13,7 @@ use crate::semantic_index::{
 };
 use crate::types::IntersectionType;
 use crate::types::{
-    CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
-    TypeDefinition, TypeQualifiers,
+    CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
@@ -649,7 +648,7 @@ impl SpecialFormType {
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
-    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+    ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),
@@ -673,12 +672,10 @@ impl SpecialFormType {
             Self::TypingSelf => {
                 let index = semantic_index(db, scope_id.file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::InvalidType(Type::SpecialForm(self), scope_id)
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::InvalidType(
+                        Type::SpecialForm(self),
+                        scope_id,
+                    ));
                 };
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
@@ -698,12 +695,7 @@ impl SpecialFormType {
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInStaticMethod
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInStaticMethod);
                 }
 
                 let is_in_metaclass = KnownClass::Type
@@ -715,12 +707,7 @@ impl SpecialFormType {
                             .is_subclass_of(db, type_class)
                     });
                 if is_in_metaclass {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInMetaclass
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInMetaclass);
                 }
 
                 Ok(typing_self
@@ -730,30 +717,17 @@ impl SpecialFormType {
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type
             // expression is an error.
-            Self::TypeAlias => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypeAlias],
-                fallback_type: Type::unknown(),
-            }),
-            Self::TypedDict => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypedDict],
-                fallback_type: Type::unknown(),
-            }),
+            Self::TypeAlias => Err(InvalidTypeExpression::TypeAlias),
+            Self::TypedDict => Err(InvalidTypeExpression::TypedDict),
 
-            Self::Literal | Self::Union | Self::Intersection => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Literal | Self::Union | Self::Intersection => {
+                Err(InvalidTypeExpression::RequiresArguments(self))
+            }
 
-            Self::Protocol => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Protocol],
-                fallback_type: Type::unknown(),
-            }),
-            Self::Generic => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Protocol => Err(InvalidTypeExpression::Protocol),
+            Self::Generic => Err(InvalidTypeExpression::Generic),
+            Self::Annotated => Err(InvalidTypeExpression::RequiresTwoArguments(self)),
+            Self::Concatenate => Err(InvalidTypeExpression::Concatenate),
 
             Self::Optional
             | Self::Not
@@ -764,34 +738,14 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::Unpack
             | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresOneArgument(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            Self::Annotated => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresTwoArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            Self::Concatenate => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Concatenate],
-                fallback_type: Type::unknown(),
-            }),
+            | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
-            SpecialFormType::TypeQualifier(qualifier) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![qualifier.in_type_expression()],
-                fallback_type: Type::unknown(),
-            }),
+            SpecialFormType::TypeQualifier(qualifier) => Err(qualifier.in_type_expression()),
         }
     }
 }
