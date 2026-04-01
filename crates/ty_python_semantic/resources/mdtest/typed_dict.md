@@ -2529,11 +2529,21 @@ Movie2 = TypedDict("Movie2", name=str, year=int)
 ```py
 from typing_extensions import TypedDict
 
-# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
+# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "The name of a `TypedDict` (`WrongName`) must match the name of the variable it is assigned to (`BadTypedDict3`)"
+# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
+
+def f(x: str) -> None:
+    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    Y = TypedDict(x, {})
+
+def g(x: str) -> None:
+    TypedDict(x, {})  # fine
+
+name = "GoodTypedDict"
+GoodTypedDict = TypedDict(name, {"name": str})
 
 # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
 Bad2 = TypedDict("Bad2", "not a dict")
@@ -2586,6 +2596,9 @@ Bad10 = TypedDict("Bad10", {name: 42})
 
 # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
 class Bad11(TypedDict("Bad11", {name: 42})): ...
+
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+class Bad12(TypedDict(123, {"field": int})): ...
 ```
 
 ## Functional `TypedDict` with unknown fields

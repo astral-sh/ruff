@@ -158,34 +158,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            let name = literal.value(db);
+        let name = name_type
+            .as_string_literal()
+            .map(|literal| Name::new(literal.value(db)));
 
-            if let Some(assigned_name) = definition.and_then(|definition| definition.name(db))
-                && name != assigned_name
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                builder.into_diagnostic(format_args!(
-                    "The name of a `TypedDict` (`{name}`) must match \
-                    the name of the variable it is assigned to (`{assigned_name}`)"
-                ));
-            }
-
-            Name::new(name)
-        } else {
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `typename` of `TypedDict()`"
-                ));
+        if let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && Some(assigned_name.as_str()) != name.as_deref()
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+        {
+            let mut diagnostic =
+                builder.into_diagnostic("TypedDict name must match the variable it is assigned to");
+            if let Some(name) = name.as_deref() {
                 diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
+                    "Expected \"{assigned_name}\", got \"{name}\""
+                ));
+            } else {
+                diagnostic.set_primary_message(format_args!(
+                    "Expected \"{assigned_name}\", got variable of type `{}`",
                     name_type.display(db)
                 ));
             }
-            Name::new_static("<unknown>")
-        };
+        } else if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `typename` of `TypedDict()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `str`, found `{}`",
+                name_type.display(db)
+            ));
+        }
+
+        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
 
         if let Some(definition) = definition {
             self.deferred.insert(definition);
