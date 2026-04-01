@@ -1,7 +1,6 @@
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
 use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
@@ -456,20 +455,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        /// For `list[int]`, `int` should be parsed as a type expression.
-        /// For `list[int][0]`, however, `0` should be parsed as a value expression.
-        fn infer_expr<'db>(
-            builder: &mut TypeInferenceBuilder<'db, '_>,
-            subscript: &ast::ExprSubscript,
-            expr: &ast::Expr,
-        ) -> Type<'db> {
-            if is_dotted_name(&subscript.value) {
-                builder.infer_type_expression(expr)
-            } else {
-                builder.infer_expression(expr, TypeContext::default())
-            }
-        }
-
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
@@ -520,7 +505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         })
                     } else {
-                        infer_expr(self, subscript, expr)
+                        self.infer_type_expression(expr)
                     };
 
                     inferred_type_arguments.push(provided_type);
@@ -647,7 +632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 EitherOrBoth::Right(expr) => {
-                    inferred_type_arguments.push(infer_expr(self, subscript, expr));
+                    inferred_type_arguments.push(self.infer_type_expression(expr));
                     first_excess_type_argument_index.get_or_insert(index);
                 }
             }

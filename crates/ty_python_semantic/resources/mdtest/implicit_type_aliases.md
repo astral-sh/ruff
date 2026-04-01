@@ -678,7 +678,10 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
+# TODO: one error would be enough here
+#
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 WorseList = list[int][0]
 
 def _(doubly_specialized: List, doubly_specialized_2: WorseList):
