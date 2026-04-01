@@ -158,6 +158,37 @@ def invalid_binary_operators(
     reveal_type(l)  # revealed: Unknown
 ```
 
+## Error recovery upon encountering invalid AST nodes
+
+Upon encountering an invalid-in-type-expression AST node, we try to avoid cascading diagnostics. For
+example, in this snippet, we only report the the outer list literal is invalid, and ignore the fact
+that there is also an invalid list literal inside the outer list literal node:
+
+```py
+# error: [invalid-type-form]
+x: [[int]]
+```
+
+However, runtime errors inside invalid AST nodes are still reported -- these errors are more serious
+than just "typing spec pedantry":
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [unresolved-reference] "Name `foo` used when not defined"
+x: [[foo]]
+```
+
+But we avoid false-positive diagnostics regarding unresolved references inside string annotations if
+we detect that the string annotation is an invalid type form. These diagnostics would just add
+noise, since stringized annotations are never executed at runtime. The following snippet causes us
+to emit `invalid-type-form`, but we ignore that `foo` is an "unresolved reference" inside the string
+annotation:
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+x: "[[foo]]"
+```
+
 ## Multiple starred expressions in a `tuple` specialization
 
 <!-- snapshot-diagnostics -->
