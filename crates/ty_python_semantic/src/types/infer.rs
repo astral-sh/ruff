@@ -845,6 +845,18 @@ impl<'db> DefinitionInference<'db> {
 
     #[track_caller]
     pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+        self.try_declaration_type(definition).expect(
+            "definition should belong to this TypeInference region and \
+                TypeInferenceBuilder should have inferred a type for it",
+        )
+    }
+
+    /// Like [`declaration_type`](Self::declaration_type), but returns `None`
+    /// instead of panicking when the definition has no declaration type.
+    pub(crate) fn try_declaration_type(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<TypeAndQualifiers<'db>> {
         self.declarations
             .iter()
             .find_map(|(def, qualifiers)| {
@@ -855,10 +867,6 @@ impl<'db> DefinitionInference<'db> {
                 }
             })
             .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
-            .expect(
-                "definition should belong to this TypeInference region and \
-                TypeInferenceBuilder should have inferred a type for it",
-            )
     }
 
     fn declarations(

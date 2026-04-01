@@ -8,6 +8,7 @@ use crate::server::api::diagnostics::publish_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
+use crate::tsp::handlers::send_snapshot_changed_if_needed;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
@@ -26,6 +27,8 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
+        let old_revision = session.revision();
+
         let mut document = session
             .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
@@ -35,6 +38,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         publish_diagnostics_if_needed(&document, session, client);
+        send_snapshot_changed_if_needed(old_revision, session, client);
 
         Ok(())
     }

@@ -1833,3 +1833,74 @@ fn class_literal_to_hierarchy_info(
         selection_range,
     }
 }
+
+// -- Declared-type and overload-decomposition APIs for external consumers -----
+
+/// Get the declared (annotated) type for a definition.
+///
+/// Returns the type from an explicit type annotation on the given definition,
+/// or `None` if the definition has no annotation or the declared type is unknown.
+pub fn declared_type_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let inference = crate::types::infer::infer_definition_types(db, definition);
+    // Use try_declaration_type to avoid panicking for binding-only definitions
+    let taq = inference.try_declaration_type(definition)?;
+    let ty = taq.inner_type();
+    if ty.is_unknown() { None } else { Some(ty) }
+}
+
+/// Information about a single overload or implementation of a function.
+#[derive(Debug)]
+pub struct OverloadDetail<'db> {
+    /// Display string for this overload's signature (e.g., `(x: int) -> str`).
+    pub display: String,
+    /// The definition for this overload, if available.
+    pub definition: Option<Definition<'db>>,
+    /// Whether this is an `@overload` signature (as opposed to the implementation).
+    pub is_overload: bool,
+}
+
+/// Information about the overloads and implementation of a function.
+#[derive(Debug)]
+pub struct OverloadInfo<'db> {
+    /// The `@overload` signatures, in source order.
+    pub overloads: Vec<OverloadDetail<'db>>,
+    /// The implementation signature (the non-`@overload` def), if present.
+    pub implementation: Option<OverloadDetail<'db>>,
+}
+
+/// Decompose a function type into its overload signatures and implementation.
+///
+/// Returns `None` if the type is not a function literal or if the function
+/// has no `@overload` signatures. For a plain function with a single definition,
+/// this returns `None` — use `Type::display()` directly for those.
+pub fn function_overload_info<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<OverloadInfo<'db>> {
+    let func_type = ty.as_function_literal()?;
+    let (overloads, implementation) = func_type.overloads_and_implementation(db);
+
+    if overloads.is_empty() {
+        return None;
+    }
+
+    let overload_details: Vec<OverloadDetail<'db>> = overloads
+        .iter()
+        .map(|ol| OverloadDetail {
+            display: ol.signature(db).display(db).to_string(),
+            definition: Some(ol.definition(db)),
+            is_overload: true,
+        })
+        .collect();
+
+    let impl_detail = implementation.map(|ol| OverloadDetail {
+        display: ol.signature(db).display(db).to_string(),
+        definition: Some(ol.definition(db)),
+        is_overload: false,
+    });
+
+    Some(OverloadInfo {
+        overloads: overload_details,
+        implementation: impl_detail,
+    })
+}

@@ -7,6 +7,7 @@ use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
 use crate::system::AnySystemPath;
+use crate::tsp::handlers::send_snapshot_changed_if_needed;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
 use rustc_hash::FxHashMap;
@@ -77,6 +78,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
+        let old_revision = session.revision();
+
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
 
@@ -101,6 +104,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         if client_capabilities.supports_inlay_hint_refresh() {
             client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});
         }
+
+        send_snapshot_changed_if_needed(old_revision, session, client);
 
         Ok(())
     }

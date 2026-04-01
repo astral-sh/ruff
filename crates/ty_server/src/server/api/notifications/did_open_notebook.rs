@@ -10,6 +10,7 @@ use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
+use crate::tsp::handlers::send_snapshot_changed_if_needed;
 
 pub(crate) struct DidOpenNotebookHandler;
 
@@ -31,6 +32,8 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             ..
         } = params.notebook_document;
 
+        let old_revision = session.revision();
+
         let notebook =
             NotebookDocument::new(notebook_uri, version, cells, metadata.unwrap_or_default())
                 .with_failure_code(ErrorCode::InternalError)?;
@@ -47,6 +50,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
 
         // Always publish diagnostics because notebooks only support publish diagnostics.
         publish_diagnostics(&document, session, client);
+        send_snapshot_changed_if_needed(old_revision, session, client);
 
         Ok(())
     }

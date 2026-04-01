@@ -12,12 +12,13 @@ mod notifications;
 mod requests;
 mod semantic_tokens;
 mod symbols;
-mod traits;
+pub(crate) mod traits;
 mod type_hierarchy;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
+use crate::tsp;
 pub(crate) use diagnostics::publish_settings_diagnostics;
 pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 use ruff_db::panic::PanicError;
@@ -126,6 +127,20 @@ pub(super) fn request(req: server::Request) -> Task {
             req, BackgroundSchedule::Worker
         ),
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
+
+        // TSP (Type Server Protocol) handlers
+        tsp::handlers::version::GetSupportedProtocolVersionHandler::METHOD => {
+            sync_request_task::<tsp::handlers::version::GetSupportedProtocolVersionHandler>(req)
+        }
+        tsp::handlers::snapshot::GetSnapshotHandler::METHOD => {
+            sync_request_task::<tsp::handlers::snapshot::GetSnapshotHandler>(req)
+        }
+        tsp::handlers::search_paths::GetPythonSearchPathsHandler::METHOD => {
+            background_request_task::<tsp::handlers::search_paths::GetPythonSearchPathsHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");

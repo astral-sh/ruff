@@ -44,7 +44,7 @@ use lsp_types::request::Request;
 use ty_project::ProjectDatabase;
 
 /// A supertrait for any server request handler.
-pub(super) trait RequestHandler {
+pub(crate) trait RequestHandler {
     type RequestType: Request;
     const METHOD: &'static str = <<Self as RequestHandler>::RequestType>::METHOD;
 }
@@ -54,7 +54,7 @@ pub(super) trait RequestHandler {
 /// This will block the main message receiver loop, meaning that no incoming requests or
 /// notifications will be handled while `run` is executing. Try to avoid doing any I/O or
 /// long-running computations.
-pub(super) trait SyncRequestHandler: RequestHandler {
+pub(crate) trait SyncRequestHandler: RequestHandler {
     fn run(
         session: &mut Session,
         client: &Client,
@@ -62,7 +62,7 @@ pub(super) trait SyncRequestHandler: RequestHandler {
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
-pub(super) trait RetriableRequestHandler: RequestHandler {
+pub(crate) trait RetriableRequestHandler: RequestHandler {
     /// Whether this request can be cancelled if the Salsa database is modified.
     const RETRY_ON_CANCELLATION: bool = false;
 
@@ -85,7 +85,7 @@ pub(super) trait RetriableRequestHandler: RequestHandler {
 /// A request handler that can be run on a background thread.
 ///
 /// This handler is specific to requests that operate on a single document.
-pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
+pub(crate) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
     /// Returns the URL of the document that this request handler operates on.
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
@@ -132,7 +132,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// which includes all the workspaces, without being tied to a specific document. It is useful for
 /// operations that require access to the entire session state, such as fetching workspace
 /// diagnostics.
-pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
+pub(crate) trait BackgroundRequestHandler: RetriableRequestHandler {
     /// Processes the request parameters and returns the LSP request result.
     ///
     /// This is the main method that handlers implement. It takes the request parameters
@@ -167,7 +167,7 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 }
 
 /// A supertrait for any server notification handler.
-pub(super) trait NotificationHandler {
+pub(crate) trait NotificationHandler {
     type NotificationType: Notification;
     const METHOD: &'static str = <<Self as NotificationHandler>::NotificationType>::METHOD;
 }
@@ -177,7 +177,7 @@ pub(super) trait NotificationHandler {
 /// This will block the main message receiver loop, meaning that no incoming requests or
 /// notifications will be handled while `run` is executing. Try to avoid doing any I/O or
 /// long-running computations.
-pub(super) trait SyncNotificationHandler: NotificationHandler {
+pub(crate) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
         client: &Client,
@@ -186,7 +186,7 @@ pub(super) trait SyncNotificationHandler: NotificationHandler {
 }
 
 /// A notification handler that can be run on a background thread.
-pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
+pub(crate) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// Returns the URL of the document that this notification handler operates on.
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
