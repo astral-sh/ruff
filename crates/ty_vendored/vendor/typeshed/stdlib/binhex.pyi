@@ -4,6 +4,7 @@ easy interface:
 binhex(inputfilename, outputfilename)
 hexbin(inputfilename, outputfilename)
 """
+
 from _typeshed import SizedBuffer
 from typing import IO, Any, Final
 from typing_extensions import TypeAlias

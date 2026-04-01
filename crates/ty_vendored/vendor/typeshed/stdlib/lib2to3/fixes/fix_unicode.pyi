@@ -7,6 +7,7 @@
 * Change u"..." into "...".
 
 """
+
 from _typeshed import StrPath
 from typing import ClassVar, Literal
 
