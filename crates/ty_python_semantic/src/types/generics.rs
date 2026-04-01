@@ -32,9 +32,9 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
+    MaterializationKind, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 
@@ -973,11 +973,8 @@ impl<'db> GenericContext<'db> {
             }
 
             if let Some(upper_bound) = typevar.typevar(db).upper_bound(db) {
-                let ty = IntersectionBuilder::new(db)
-                    .add_positive(upper_bound)
-                    .add_positive(Type::unknown())
-                    .build();
-                expanded[idx] = ty;
+                expanded[idx] =
+                    IntersectionType::from_two_elements(db, upper_bound, Type::unknown());
                 continue;
             }
         }
