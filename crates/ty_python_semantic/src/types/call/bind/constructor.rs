@@ -624,9 +624,15 @@ fn constructor_returns_instance<'db>(
         Type::Dynamic(_) => true,
         // A `Never` constructor return is terminal and does not run downstream construction.
         Type::Never => false,
-        Type::NominalInstance(instance) => {
-            is_subtype_of_class_literal(db, instance.class(db), class_literal)
-        }
+        Type::NominalInstance(instance) => instance
+            .class(db)
+            .is_subtype_of_class_literal(db, class_literal),
+        // We don't need to handle `ProtocolInstance` here, since the only way a protocol can be
+        // instantiated is if a nominal class inherits it. If the nominal class inherits a
+        // `__new__` from the protocol, either that `__new__` will return `Self` or equivalent,
+        // in which case we'll already solve it to the subclass and consider it an instance
+        // type, or it will return an explicit annotation of the protocol type itself, in which
+        // case we shouldn't (and don't) consider it an instance of the subclass.
         _ => false,
     }
 }
