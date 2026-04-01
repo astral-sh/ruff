@@ -8,13 +8,9 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::Request;
 use lsp_types::{Range, TextDocumentIdentifier, Url};
-use ruff_db::parsed::parsed_module;
-use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::find_node::covering_node;
 use serde::{Deserialize, Serialize};
+use ty_ide::provide_types;
 use ty_project::ProjectDatabase;
-use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
 
 pub(crate) struct ProvideTypeRequestHandler;
 
@@ -49,7 +45,7 @@ impl RequestHandler for ProvideTypeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
-    fn document_url(params: &ProvideTypeParams) -> Cow<Url> {
+    fn document_url(params: &ProvideTypeParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -63,38 +59,15 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let parsed = parsed_module(db, file).load(db);
         let url = Self::document_url(&params);
-
-        let model = SemanticModel::new(db, file);
-
-        let types: Vec<Option<String>> = params
-            .ranges
-            .iter()
-            .map(|range| {
-                let range_offset = if let Some(range_offset) =
-                    range.to_text_range(db, file, &url, snapshot.encoding())
-                {
-                    range_offset
-                } else {
-                    return None;
-                };
-
-                let covering_node = covering_node(parsed.syntax().into(), range_offset);
-                let node = match covering_node.find_first(|node| node.is_expression()) {
-                    Ok(found) => found.node(),
-                    Err(_) => return None,
-                };
-                let ty = node.as_expr_ref()?.inferred_type(&model);
-
-                ty.map(|ty| {
-                    ty.display_with(db, DisplaySettings::default().fully_qualified())
-                        .to_string()
-                })
-            })
-            .collect();
+        let types = provide_types(
+            db,
+            file,
+            params
+                .ranges
+                .iter()
+                .map(|range| range.to_text_range(db, file, &url, snapshot.encoding())),
+        );
 
         Ok(Some(ProvideTypeResponse { types }))
     }
