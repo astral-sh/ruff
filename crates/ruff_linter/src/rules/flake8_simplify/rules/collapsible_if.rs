@@ -42,6 +42,25 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because it may discard comments between the
+/// outer and inner `if` statements.
+///
+/// For example, this code:
+/// ```python
+/// if foo:
+///     # This comment will be removed
+///     if bar:
+///         ...
+/// ```
+///
+/// ...would be converted to:
+/// ```python
+/// if foo and bar:
+///     ...
+/// ```
+///
 /// ## Options
 ///
 /// The rule will consult these two settings when deciding if a fix can be provided:
