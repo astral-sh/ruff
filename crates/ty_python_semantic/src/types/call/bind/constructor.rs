@@ -4,9 +4,7 @@ use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
-use crate::types::{
-    BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, DynamicType, Type, TypeContext,
-};
+use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
 
 /// Bindings for a constructor call.
 ///
@@ -599,18 +597,6 @@ impl ConstructorCallableKind {
     fn is_init(self) -> bool {
         matches!(self, ConstructorCallableKind::Init)
     }
-}
-
-/// Return `true` if `class_ty` is a subtype of (any specialization of) `class_literal`.
-fn is_subtype_of_class_literal<'db>(
-    db: &'db dyn Db,
-    class_ty: ClassType<'db>,
-    class_literal: ClassLiteral<'db>,
-) -> bool {
-    class_ty
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .any(|base| base.class_literal(db) == class_literal)
 }
 
 /// Classify a return type as either being an instance of the given `class_literal` or not, for
