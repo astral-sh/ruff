@@ -79,6 +79,20 @@ reveal_type(x)  # revealed: dict[int | str, int | str]
 
 x: dict[int | str, int | str] = {str(i): i for i in range(3)}
 reveal_type(x)  # revealed: dict[int | str, int | str]
+
+# TODO: We currently eagerly pass type context to collection literals on either side of a binary
+# operator. That makes the cases above work, but it's not generally sound. For example, it gives the
+# wrong result in this case.
+class X:
+    def __add__(self, _: list[int]) -> list[int | str]:
+        return []
+
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `X` and `list[int | str]`"
+x: list[int | str] = X() + [1]
+
+# TODO: We also don't yet support generic function calls like this.
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[int | str]`"
+x: list[int | str] = list1(42) * 3
 ```
 
 `typed_dict.py`:
