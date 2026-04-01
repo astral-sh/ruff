@@ -38,6 +38,7 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -462,6 +463,8 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::LiteralValue(literal) => {
+                self.recursively_defined =
+                    self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
                     // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
                     // add it to, or an existing element that is a super-type of string literals, which
@@ -825,22 +828,34 @@ impl<'db> UnionBuilder<'db> {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::StringLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::BytesLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(literal, promotable))
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(self.recursively_defined),
+                        )
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
@@ -1131,18 +1146,13 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(mut self) -> Type<'db> {
-        // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
-        if self.intersections.len() == 1 {
-            self.intersections.pop().unwrap().build(self.db)
-        } else {
-            UnionType::from_elements(
-                self.db,
-                self.intersections
-                    .into_iter()
-                    .map(|inner| inner.build(self.db)),
-            )
-        }
+    pub(crate) fn build(self) -> Type<'db> {
+        UnionType::from_elements(
+            self.db,
+            self.intersections
+                .into_iter()
+                .map(|inner| inner.build(self.db)),
+        )
     }
 }
 
@@ -1334,10 +1344,20 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        // `Divergent & ~T` -> `Divergent`. Note that `~Divergent` becomes `Divergent` via the
-        // `Type::Dynamic` branch below, so we don't need a special case for that.
+        // `Never & ~T` -> `Never`.
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `Divergent & ~T` -> `Divergent`.
         if self.positive.iter().any(Type::is_divergent) {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
+        if let Some(negated_divergent) = new_negative.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated_divergent);
             return;
         }
 
@@ -1430,22 +1450,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    /// Tries to simplify any constrained typevars in the intersection:
+    /// Tries to simplify any constrained typevars in the intersection.
     ///
-    /// - If the intersection contains a positive entry for exactly one of the constraints, we can
-    ///   remove the typevar (effectively replacing it with that one positive constraint).
+    /// We must preserve the constrained `TypeVar` itself in the result, even if only a single
+    /// compatible constraint remains, because other occurrences of the same `TypeVar` still need
+    /// to correlate with it (for example, when returning a narrowed value as `T`).
     ///
     /// - If the intersection contains negative entries for all but one of the constraints, we can
-    ///   remove the negative constraints and replace the typevar with the remaining positive
-    ///   constraint.
+    ///   add that remaining constraint as a positive entry.
     ///
     /// - If the intersection contains negative entries for all of the constraints, the overall
     ///   intersection is `Never`.
     fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
-        let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
-        for (typevar_index, ty) in self.positive.iter().enumerate() {
+        for ty in &self.positive {
             let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
@@ -1455,35 +1474,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
 
-            // Determine which constraints appear as positive entries in the intersection. Note
-            // that we shouldn't have duplicate entries in the positive or negative lists, so we
-            // don't need to worry about finding any particular constraint more than once.
-            let constraints = constraints.elements(db);
-            let mut positive_constraint_count = 0;
-            for (i, positive) in self.positive.iter().enumerate() {
-                if i == typevar_index {
-                    continue;
-                }
-
-                // This linear search should be fine as long as we don't encounter typevars with
-                // thousands of constraints.
-                positive_constraint_count += constraints
-                    .iter()
-                    .filter(|c| c.is_subtype_of(db, *positive))
-                    .count();
-            }
-
-            // If precisely one constraint appears as a positive element, we can replace the
-            // typevar with that positive constraint.
-            if positive_constraint_count == 1 {
-                positive_to_remove.push(typevar_index);
-                continue;
-            }
-
             // Determine which constraints appear as negative entries in the intersection.
-            let mut to_remove = Vec::with_capacity(constraints.len());
+            let constraints = constraints.elements(db);
             let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
-            for (negative_index, negative) in self.negative.iter().enumerate() {
+            for negative in &self.negative {
                 // This linear search should be fine as long as we don't encounter typevars with
                 // thousands of constraints.
                 let matching_constraints = constraints
@@ -1491,7 +1485,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .enumerate()
                     .filter(|(_, c)| c.is_subtype_of(db, *negative));
                 for (constraint_index, _) in matching_constraints {
-                    to_remove.push(negative_index);
                     remaining_constraints[constraint_index] = None;
                 }
             }
@@ -1511,15 +1504,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             }
 
-            // Only one typevar constraint remains. Remove all of the negative constraints, and
-            // replace the typevar itself with the remaining positive constraint.
+            // Only one typevar constraint remains. Adding it as a positive element lets the normal
+            // intersection simplification remove any incompatible negatives, while keeping the
+            // original typevar in the result.
             to_add.push(remaining_constraint);
-            positive_to_remove.push(typevar_index);
-        }
-
-        // We don't need to sort the positive list, since we only append to it in increasing order.
-        for index in positive_to_remove.into_iter().rev() {
-            self.positive.swap_remove_index(index);
         }
 
         for remaining_constraint in to_add {
@@ -1534,30 +1522,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // to their upper bound and all constrained type variables to the union of their constraints.
         // If that speculative intersection simplifies to `Never`, this intersection must also simplify
         // to `Never`.
-        if self.positive.iter().any(|ty| ty.is_type_var()) {
-            let mut speculative = IntersectionBuilder::new(db);
-            for pos in &self.positive {
-                match pos {
-                    Type::TypeVar(type_var) => {
-                        match type_var.typevar(db).bound_or_constraints(db) {
-                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                speculative = speculative.add_positive(bound);
-                            }
-                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(constraints.as_type(db));
-                            }
-                            // TypeVars without a bound or constraint implicitly have `object` as their
-                            // upper bound, and it is always a no-op to add `object` to an intersection.
-                            None => {}
-                        }
-                    }
-                    _ => speculative = speculative.add_positive(*pos),
-                }
-            }
-            for neg in &self.negative {
-                speculative = speculative.add_negative(*neg);
-            }
-            if speculative.build().is_never() {
+        if self
+            .positive
+            .iter()
+            .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
+        {
+            let speculative =
+                expand_intersection_typevars_and_newtypes(db, &self.positive, &self.negative);
+            if speculative.is_never() {
                 return Type::Never;
             }
         }

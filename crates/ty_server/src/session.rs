@@ -27,7 +27,7 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::MisconfigurationMode;
+use ty_python_semantic::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -611,7 +611,7 @@ impl Session {
                     metadata.apply_overrides(overrides);
                 }
 
-                ProjectDatabase::new(metadata, system.clone())
+                ProjectDatabase::fallible(metadata, system.clone())
             });
 
         let (root, db) = match project {
@@ -627,15 +627,13 @@ impl Session {
                     self.client_name.log_guidance(),
                 ));
 
-                let db_with_default_settings = ProjectMetadata::from_options(
+                let Ok(metadata) = ProjectMetadata::from_options(
                     Options::default(),
                     root,
                     None,
-                    MisconfigurationMode::UseDefault,
-                )
-                .context("Failed to convert default options to metadata")
-                .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                .expect("Default configuration to be valid");
+                    &UseDefaultStrategy,
+                );
+                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
                 let default_root = db_with_default_settings
                     .project()
                     .root(&db_with_default_settings)

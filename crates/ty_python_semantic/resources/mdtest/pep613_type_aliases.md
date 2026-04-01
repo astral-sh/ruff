@@ -237,8 +237,7 @@ from typing_extensions import Callable, Concatenate, TypeAliasType
 MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
-    # TODO: should be (int, / ...) -> str
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
 
 T = TypeVar("T")
 
@@ -270,8 +269,7 @@ def _(x: ListOrDict[int]):
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
 
 def _(c: MyAlias7[int]):
-    # TODO: should be (int, / ...) -> None
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (int, /, *args: Any, **kwargs: Any) -> None
 ```
 
 ## Imported
@@ -310,13 +308,13 @@ def _(x: IntOrStr):
 from typing import TypeAlias, TypeVar, Union
 from types import UnionType
 
-RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
+RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
     # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
-RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
+RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
     # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
@@ -347,6 +345,20 @@ my_isinstance(1, (int, (str | float)))
 my_isinstance(1, 1)
 # TODO should be an invalid-argument-type error
 my_isinstance(1, (int, (str, 1)))
+```
+
+## Materialization of self-referential generic PEP 613 type aliases
+
+```py
+from typing import TypeAlias, TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
 ## Conditionally imported on Python < 3.10
@@ -486,6 +498,19 @@ bad10: TypeAlias = InitVar  # error: [invalid-type-form]
 # `Unpack` is not a type qualifier, and so the error message in our diagnostic
 # shouldn't say that it is.
 differently_bad: TypeAlias = Unpack[tuple[int, ...]]
+```
+
+## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing import TypeAlias
+from typing_extensions import TypeGuard, TypeIs
+
+RecursiveIs: TypeAlias = TypeIs["RecursiveIs"]
+RecursiveGuard: TypeAlias = TypeGuard["RecursiveGuard"]
+
+AliasIs: TypeAlias = RecursiveIs
+AliasGuard: TypeAlias = RecursiveGuard
 ```
 
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

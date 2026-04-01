@@ -22,6 +22,7 @@ use crate::semantic_index::scope::{FileScopeId, ScopeKind};
 use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::method::BoundMethodType;
@@ -70,11 +71,35 @@ impl<'db> NamedItem<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum SignatureNameDisplay {
+    #[default]
+    Auto,
+    Force,
+    Disallow,
+}
+
+impl SignatureNameDisplay {
+    const fn should_display(self, multiline: bool) -> bool {
+        match self {
+            Self::Auto => multiline,
+            Self::Force => true,
+            Self::Disallow => false,
+        }
+    }
+
+    const fn allows_type_parameters(self) -> bool {
+        !matches!(self, Self::Disallow)
+    }
+}
+
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
     pub multiline: bool,
+    /// Whether callable signatures should include their definition name.
+    signature_name_display: SignatureNameDisplay,
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
@@ -83,9 +108,6 @@ pub struct DisplaySettings<'db> {
     pub qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
-    /// Disallow Signature printing to introduce a name
-    /// (presumably because we rendered one already)
-    pub disallow_signature_name: bool,
     /// Scopes that are currently active in the display context (e.g. function scopes
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
@@ -93,6 +115,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Whether to hide the return type of the outermost signature.
+    /// Return types of nested callable types inside parameters are still shown.
+    pub hide_return_type: bool,
     /// Types that are currently being displayed in fully qualified form.
     /// Used to break recursive qualified-display cycles.
     pub visited_qualified_types: Rc<RefCell<FxHashSet<Type<'db>>>>,
@@ -136,7 +161,23 @@ impl<'db> DisplaySettings<'db> {
     #[must_use]
     pub fn disallow_signature_name(&self) -> Self {
         Self {
-            disallow_signature_name: true,
+            signature_name_display: SignatureNameDisplay::Disallow,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn force_signature_name(&self) -> Self {
+        Self {
+            signature_name_display: SignatureNameDisplay::Force,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn hide_return_type(&self) -> Self {
+        Self {
+            hide_return_type: true,
             ..self.clone()
         }
     }
@@ -912,6 +953,7 @@ impl<'db> DisplayRepresentation<'db> {
             ClassLiteral::Static(c) => c.body_scope(self.db),
             ClassLiteral::Dynamic(c) => c.scope(self.db),
             ClassLiteral::DynamicNamedTuple(c) => c.scope(self.db),
+            ClassLiteral::DynamicTypedDict(c) => { c.scope(self.db) },
         };
         let file = body_scope.file(self.db);
         let module_ast = parsed_module(self.db, file).load(self.db);
@@ -1201,6 +1243,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(self.ty), "{dynamic}")
                 }
             }
+            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => {
                 if self.settings.fully_qualified {
                     f.write_str("typing.Never")
@@ -2797,10 +2840,12 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str("Top[")?;
         }
 
-        // If we're multiline printing and a name hasn't been emitted, try to
+        // If the current display policy wants a signature name and a name hasn't been emitted,
         // remember what the name was by checking if we have a definition
-        if self.settings.multiline
-            && !self.settings.disallow_signature_name
+        if self
+            .settings
+            .signature_name_display
+            .should_display(self.settings.multiline)
             && let Some(definition) = self.definition
             && let Some(name) = definition.name(self.db)
         {
@@ -2821,8 +2866,12 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         };
 
         // Display type parameters if present, but only when the caller hasn't
-        // already displayed them (indicated by disallow_signature_name being false)
-        if !self.settings.disallow_signature_name {
+        // already displayed them.
+        if self
+            .settings
+            .signature_name_display
+            .allows_type_parameters()
+        {
             let hide_unused_self = self.should_hide_self_from_display(self.db);
 
             DisplayOptionalGenericContext {
@@ -2835,23 +2884,29 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         }
 
         // Parameters
+        let param_settings = DisplaySettings {
+            hide_return_type: false,
+            ..settings.clone()
+        };
         self.parameters
-            .display_with(self.db, settings.clone())
+            .display_with(self.db, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type
-        f.write_str(" -> ")?;
+        if !self.settings.hide_return_type {
+            f.write_str(" -> ")?;
 
-        let should_parenthesize_return_type =
-            should_parenthesize_callable_type(self.return_ty, self.db);
-        if should_parenthesize_return_type {
-            f.write_char('(')?;
-        }
-        self.return_ty
-            .display_with(self.db, settings.singleline())
-            .fmt_detailed(&mut f)?;
-        if should_parenthesize_return_type {
-            f.write_char(')')?;
+            let should_parenthesize_return_type =
+                should_parenthesize_callable_type(self.return_ty, self.db);
+            if should_parenthesize_return_type {
+                f.write_char('(')?;
+            }
+            self.return_ty
+                .display_with(self.db, settings.singleline())
+                .fmt_detailed(&mut f)?;
+            if should_parenthesize_return_type {
+                f.write_char(')')?;
+            }
         }
 
         if self.parameters.is_top() {
@@ -2901,77 +2956,111 @@ struct DisplayParameters<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        fn display_parameters<'db>(
+            display: &DisplayParameters<'_, 'db>,
+            f: &mut TypeWriter<'_, '_, 'db>,
+            parameters: &[Parameter<'db>],
+            arg_separator: &str,
+        ) -> fmt::Result {
+            let mut star_added = false;
+            let mut needs_slash = false;
+            let mut first = true;
+
+            for parameter in parameters {
+                // Handle special separators
+                if !star_added && parameter.is_keyword_only() {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('*')?;
+                    star_added = true;
+                    first = false;
+                }
+                if parameter.is_positional_only() {
+                    needs_slash = true;
+                } else if needs_slash {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('/')?;
+                    needs_slash = false;
+                    first = false;
+                }
+
+                // Add comma before parameter if not first
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+
+                // Write parameter with range tracking
+                let param_name = parameter
+                    .display_name()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                parameter
+                    .display_with(display.db, display.settings.singleline())
+                    .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                first = false;
+            }
+
+            if needs_slash {
+                if !first {
+                    f.write_str(arg_separator)?;
+                }
+                f.write_char('/')?;
+            }
+
+            Ok(())
+        }
+
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
-        // TODO: This might change once we support `Concatenate`
-        let multiline = self.settings.multiline
-            && self.parameters.len() > 1
-            && !matches!(
-                self.parameters.kind(),
-                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
-            );
+        // For `Concatenate` kind, use multiline only if there are more than 1 prefix parameters.
+        // For `Gradual` kind without prefix params (len <= 2), display as `...`.
+        let multiline = if self.settings.multiline {
+            match self.parameters.kind() {
+                ParametersKind::Standard => self.parameters.len() > 1,
+                ParametersKind::Gradual | ParametersKind::Top | ParametersKind::ParamSpec(_) => {
+                    false
+                }
+                ParametersKind::Concatenate(_) => {
+                    // The tail already represents 2 parameters. Additionally, there should be more
+                    // than 1 prefix parameters to use multiline, so the limit becomes 3.
+                    self.parameters.len() > 3
+                }
+            }
+        } else {
+            false
+        };
+
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {
             f.write_str("\n    ")?;
         }
+
+        let arg_separator = if multiline { ",\n    " } else { ", " };
+
         match self.parameters.kind() {
-            ParametersKind::Standard => {
-                let mut star_added = false;
-                let mut needs_slash = false;
-                let mut first = true;
-                let arg_separator = if multiline { ",\n    " } else { ", " };
-
-                for parameter in self.parameters.as_slice() {
-                    // Handle special separators
-                    if !star_added && parameter.is_keyword_only() {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('*')?;
-                        star_added = true;
-                        first = false;
-                    }
-                    if parameter.is_positional_only() {
-                        needs_slash = true;
-                    } else if needs_slash {
-                        if !first {
-                            f.write_str(arg_separator)?;
-                        }
-                        f.write_char('/')?;
-                        needs_slash = false;
-                        first = false;
-                    }
-
-                    // Add comma before parameter if not first
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-
-                    // Write parameter with range tracking
-                    let param_name = parameter
-                        .display_name()
-                        .map(|name| name.to_string())
-                        .unwrap_or_default();
-                    parameter
-                        .display_with(self.db, self.settings.singleline())
-                        .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
-
-                    first = false;
-                }
-
-                if needs_slash {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('/')?;
-                }
+            ParametersKind::Standard | ParametersKind::Concatenate(_) => {
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
-            ParametersKind::Gradual | ParametersKind::Top => {
-                // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
-                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
+            ParametersKind::Top => {
+                // TODO: Remove `...`, always display all the parameters
+                // Top parameters are displayed the same as gradual parameters, we just wrap the
+                // entire signature in `Top[]`
                 f.write_str("...")?;
+            }
+            ParametersKind::Gradual if self.parameters.len() == 2 => {
+                // TODO: Remove `...`, always display all the parameters
+                // For gradual parameters with only `(*args, **kwargs)`, display as `...` for
+                // simplicity ...
+                f.write_str("...")?;
+            }
+            ParametersKind::Gradual => {
+                // ... but otherwise display all the parameters as normal.
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
@@ -2984,9 +3073,11 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 }
             }
         }
+
         if multiline {
             f.write_char('\n')?;
         }
+
         // Closing parenthesis
         f.write_char(')')
     }
@@ -3173,9 +3264,39 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             )
         }
 
+        fn singleline_union_element_label<'db>(
+            db: &'db dyn Db,
+            element: Type<'db>,
+            settings: &DisplaySettings<'db>,
+        ) -> String {
+            element.display_with(db, settings.singleline()).to_string()
+        }
+
+        fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
+            let mut counts: FxHashMap<&str, usize> = FxHashMap::default();
+
+            for label in element_labels.iter().flatten() {
+                *counts.entry(&**label).or_default() += 1;
+            }
+
+            counts
+                .into_iter()
+                .filter_map(|(label, count)| (count > 1).then_some(label))
+                .collect()
+        }
+
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
         let mut subclass_of_types = vec![];
+        let element_labels: Vec<_> = elements
+            .iter()
+            .copied()
+            .map(|element| {
+                (!is_condensable(element) && !element.is_subclass_of())
+                    .then(|| singleline_union_element_label(self.db, element, &self.settings))
+            })
+            .collect();
+        let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
             if is_condensable(element) {
@@ -3201,7 +3322,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         let mut subclass_of_types = Some(subclass_of_types);
         let mut displayed_entries = 0usize;
 
-        for element in elements {
+        for (element, label) in elements.iter().zip(&element_labels) {
             if displayed_entries >= display_limit {
                 break;
             }
@@ -3226,10 +3347,18 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 }
             } else {
                 displayed_entries += 1;
+                let settings = if label
+                    .as_deref()
+                    .is_some_and(|label| duplicate_ambiguous_labels.contains(label))
+                {
+                    self.settings.singleline().force_signature_name()
+                } else {
+                    self.settings.singleline()
+                };
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
-                    settings: self.settings.singleline(),
+                    settings,
                 });
             }
         }
@@ -3690,15 +3819,30 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
             KnownInstanceType::Field(field) => {
                 f.with_type(ty).write_str("dataclasses.Field")?;
-                if let Some(default_ty) = field.default_type(self.db) {
+
+                let field_type = field
+                    .converter(self.db)
+                    .map(|(_, converter_output)| converter_output)
+                    .or(field.default_type(self.db));
+
+                if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(default_ty), "{}", default_ty.display(self.db))?;
+                    write!(f.with_type(field_ty), "{}", field_ty.display(self.db))?;
                     f.write_char(']')?;
                 }
                 Ok(())
             }
-            KnownInstanceType::ConstraintSet(_) => {
-                f.with_type(ty).write_str("ty_extensions.ConstraintSet")
+            KnownInstanceType::ConstraintSet(interned_set) => {
+                f.with_type(ty).write_str("ConstraintSet")?;
+                let constraints = ConstraintSetBuilder::new();
+                let set = constraints.load(self.db, interned_set.constraints(self.db));
+                if set.is_always_satisfied(self.db) {
+                    f.write_str("[Literal[True]]")
+                } else if set.is_never_satisfied(self.db) {
+                    f.write_str("[Literal[False]]")
+                } else {
+                    f.write_str("[bool]")
+                }
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty).write_str("ty_extensions.GenericContext")?;

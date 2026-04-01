@@ -3414,6 +3414,13 @@ impl<'a> ArgOrKeyword<'a> {
             ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
         }
     }
+
+    pub const fn as_variadic(self) -> Option<&'a Keyword> {
+        match self {
+            ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none() => Some(keyword),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
@@ -3590,6 +3597,15 @@ impl Deref for TypeParams {
 
     fn deref(&self) -> &Self::Target {
         &self.type_params
+    }
+}
+
+impl<'a> IntoIterator for &'a TypeParams {
+    type Item = &'a TypeParam;
+    type IntoIter = std::slice::Iter<'a, TypeParam>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.type_params.iter()
     }
 }
 

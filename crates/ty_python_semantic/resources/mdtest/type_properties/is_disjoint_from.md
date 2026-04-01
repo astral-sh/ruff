@@ -472,6 +472,88 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
+### Bound methods
+
+```py
+from typing import final
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+class A:
+    def foo(self) -> None: ...
+    def bar(self) -> None: ...
+
+class B:
+    def foo(self) -> None: ...
+
+# Bound methods with different names are disjoint.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[A().bar]))
+
+# Bound methods with the same name but different self types are not disjoint, because a subclass
+# could inherit from both...
+static_assert(not is_disjoint_from(TypeOf[A().foo], TypeOf[B().foo]))
+
+@final
+class F1:
+    def foo(self) -> None: ...
+
+@final
+class F2:
+    def foo(self) -> None: ...
+
+# ...unless one or both of those classes are `@final`.
+static_assert(is_disjoint_from(TypeOf[A().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[B().foo], TypeOf[F2().foo]))
+static_assert(is_disjoint_from(TypeOf[F1().foo], TypeOf[F2().foo]))
+```
+
+### Bound `@final` methods
+
+Two different `@final` methods are disjoint, even if they share the same name and neither class is
+`@final`, because no subclass could satisfy both without overriding one:
+
+```py
+from typing import final
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
+
+class C:
+    @final
+    def foo(self) -> None: ...
+
+class D:
+    @final
+    def foo(self) -> None: ...
+
+static_assert(is_disjoint_from(TypeOf[C().foo], TypeOf[D().foo]))
+```
+
+We do have to be careful not to get confused when the same `@final` method has different (but
+compatible) bound self types:
+
+```py
+class E(C): ...
+
+# `E.foo` and `C.foo` are the same method, so `E().foo` satisfies both `BoundMethod` types.
+static_assert(not is_disjoint_from(TypeOf[E().foo], TypeOf[C().foo]))
+static_assert(is_disjoint_from(TypeOf[E().foo], TypeOf[D().foo]))
+```
+
+Also, we can't establish disjointness when only one of the methods is `@final`. Consider this tricky
+multiple inheritance case:
+
+```py
+class F:
+    def foo(self) -> None: ...
+
+static_assert(not is_disjoint_from(TypeOf[C().foo], TypeOf[F().foo]))
+static_assert(not is_disjoint_from(TypeOf[D().foo], TypeOf[F().foo]))
+
+class G(C, F): ...
+
+static_assert(not is_disjoint_from(TypeOf[C().foo], TypeOf[G().foo]))
+static_assert(is_disjoint_from(TypeOf[D().foo], TypeOf[G().foo]))
+static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
+```
+
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
@@ -715,13 +797,13 @@ As such, for any two callable types, it is possible to conceive of a runtime cal
 would inhabit both types simultaneously.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
 
-static_assert(not is_disjoint_from(Callable[[], Never], CallableTypeOf[mixed]))
-static_assert(not is_disjoint_from(Callable[[int, str], float], CallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[], Never], RegularCallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[int, str], float], RegularCallableTypeOf[mixed]))
 
 # Using gradual form
 static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
@@ -736,7 +818,7 @@ static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int
 A callable type is disjoint from all literal types.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
@@ -749,7 +831,7 @@ A callable type is disjoint from nominal instance types where the classes are fi
 `__call__` is not callable.
 
 ```py
-from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Any, Callable, final
 
 @final

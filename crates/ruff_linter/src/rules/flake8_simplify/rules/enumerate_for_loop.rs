@@ -79,18 +79,19 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             };
 
             // If it's not an assignment (e.g., it's a function argument), ignore it.
-            let binding = checker.semantic().binding(id);
-            if !binding.kind.is_assignment() {
+            let initial_binding = checker.semantic().binding(id);
+            if !initial_binding.kind.is_assignment() {
                 continue;
             }
 
             // If the variable is global or nonlocal, ignore it.
-            if binding.is_global() || binding.is_nonlocal() {
+            if initial_binding.is_global() || initial_binding.is_nonlocal() {
                 continue;
             }
 
             // Ensure that the index variable was initialized to 0 (or instance of `int` if preview is enabled).
-            let Some(value) = typing::find_binding_value(binding, checker.semantic()) else {
+            let Some(value) = typing::find_binding_value(initial_binding, checker.semantic())
+            else {
                 continue;
             };
             if !(matches!(
@@ -112,7 +113,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             let Some(for_loop_id) = checker.semantic().current_statement_id() else {
                 continue;
             };
-            let Some(assignment_id) = binding.source else {
+            let Some(assignment_id) = initial_binding.source else {
                 continue;
             };
             if checker.semantic().parent_statement_id(for_loop_id)
@@ -124,7 +125,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             // Identify the binding created by the augmented assignment.
             // TODO(charlie): There should be a way to go from `ExprName` to `BindingId` (like
             // `resolve_name`, but for bindings rather than references).
-            let binding = {
+            let increment_binding = {
                 let mut bindings = checker
                     .semantic()
                     .current_scope()
@@ -144,10 +145,13 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 binding
             };
 
-            // If the variable is used outside the loop, ignore it.
-            if binding.references.iter().any(|id| {
-                let reference = checker.semantic().reference(*id);
-                !for_stmt.range().contains_range(reference.range())
+            // Reassignments in the same scope inherit older references. Ignore anything that
+            // predates the counter's initialization and only consider uses in its current lifetime.
+            let initial_binding_start = initial_binding.range.start();
+            if increment_binding.references().any(|id| {
+                let reference = checker.semantic().reference(id);
+                reference.start() >= initial_binding_start
+                    && !for_stmt.range().contains_range(reference.range())
             }) {
                 continue;
             }

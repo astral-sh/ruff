@@ -464,6 +464,29 @@ if False:
             print(x)
 ```
 
+This also applies to deferred annotations on Python 3.14+, which are resolved from the perspective
+of the end of the scope, which may not be part of the unreachable section.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TYPE_CHECKING
+
+class NonCallable:
+    pass
+
+if not TYPE_CHECKING:
+    def _(non_callable: NonCallable):
+        non_callable()
+
+if False:
+    def _(non_callable: NonCallable):
+        non_callable()
+```
+
 ### Type annotations
 
 Silencing of diagnostics also works for type annotations, even if they are stringified:
@@ -508,19 +531,19 @@ def _():
     class Sub(C): ...
 ```
 
-### Emit diagnostics for definitely wrong code
+### No diagnostics for unreachable statements
 
-Even though the expressions in the snippet below are unreachable, we still emit diagnostics for
-them:
+Our current strategy is to silence diagnostics unconditionally, even if the expression itself is
+obviously wrong in isolation:
 
 ```py
 if False:
-    1 + "a"  # error: [unsupported-operator]
+    1 + "a"
 
 def f():
     return
 
-    1 / 0  # error: [division-by-zero]
+    1 / 0
 ```
 
 ### Conflicting type information

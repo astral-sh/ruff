@@ -4,7 +4,7 @@ use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WritableSystem,
+    SystemPathBuf, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -312,8 +312,8 @@ impl System for MdtestSystem {
         self.as_system().case_sensitivity()
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.as_system().is_executable(path)
+    fn which(&self, name: &str) -> WhichResult {
+        self.as_system().which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -342,17 +342,6 @@ impl System for MdtestSystem {
         path: &SystemPath,
     ) -> ruff_db::system::walk_directory::WalkDirectoryBuilder {
         self.as_system().walk_directory(&self.normalize_path(path))
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
-        ruff_db::system::PatternError,
-    > {
-        self.as_system()
-            .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

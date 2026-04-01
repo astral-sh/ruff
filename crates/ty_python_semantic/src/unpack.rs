@@ -95,7 +95,7 @@ impl<'db> UnpackValue<'db> {
         db: &'db dyn Db,
         module: &'ast ParsedModuleRef,
     ) -> AnyNodeRef<'ast> {
-        self.expression().node_ref(db, module).into()
+        self.expression().node_ref(db).node(module).into()
     }
 
     pub(crate) const fn kind(self) -> UnpackKind {

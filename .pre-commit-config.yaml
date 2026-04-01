@@ -5,7 +5,6 @@ exclude: |
     .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
-    crates/ty_python_semantic/resources/corpus/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
@@ -27,6 +26,11 @@ repos:
     hooks:
       - id: check-merge-conflict
         priority: 0
+      - id: end-of-file-fixer
+        # Don't run this on all files: the absence of trailing newlines is often
+        # intentional in parser/linter/formatter tests
+        files: '^((crates/ty_python_semantic/resources/corpus/.*)|(.*\.toml))$'
+        priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.25
@@ -35,7 +39,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.43.5
+    rev: v1.44.0
     hooks:
       - id: typos
         priority: 0
@@ -48,7 +52,6 @@ repos:
         language: system
         types: [rust]
         priority: 0
-
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
     rev: v3.8.1
@@ -60,13 +63,13 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.22.0
+    rev: v1.23.1
     hooks:
       - id: zizmor
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.36.2
+    rev: 0.37.0
     hooks:
       - id: check-github-workflows
         priority: 0
@@ -93,19 +96,21 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.2
+    rev: v0.15.7
     hooks:
       - id: ruff-format
+        exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
+        exclude: crates/ty_python_semantic/resources/corpus/
         require_serial: true
         priority: 1
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.47.0
+    rev: v0.48.0
     hooks:
       - id: markdownlint-fix
         exclude: |
@@ -117,18 +122,10 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.2
+    rev: v0.15.7
     hooks:
       - id: ruff-format
         name: mdtest format
-        args:
-          [
-            "--preview",
-            "--line-length",
-            "130",
-            "--extension",
-            "py:pyi,python:pyi",
-          ]
         types_or: [markdown]
         files: '^crates/.*/resources/mdtest/.*\.md$'
         pass_filenames: true

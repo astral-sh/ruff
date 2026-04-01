@@ -678,8 +678,15 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-def _(doubly_specialized: List):
+# TODO: one error would be enough here
+#
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+WorseList = list[int][0]
+
+def _(doubly_specialized: List, doubly_specialized_2: WorseList):
     reveal_type(doubly_specialized)  # revealed: Unknown
+    reveal_type(doubly_specialized_2)  # revealed: Unknown
 
 Tuple = tuple[int, str]
 
@@ -1644,10 +1651,10 @@ python-version = "3.12"
 ```py
 from typing import List, Dict
 
-RecursiveList1 = list["RecursiveList1" | None]
-RecursiveList2 = List["RecursiveList2" | None]
-RecursiveDict1 = dict[str, "RecursiveDict1" | None]
-RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
+RecursiveList1 = list["RecursiveList1 | None"]
+RecursiveList2 = List["RecursiveList2 | None"]
+RecursiveDict1 = dict[str, "RecursiveDict1 | None"]
+RecursiveDict2 = Dict[str, "RecursiveDict2 | None"]
 RecursiveDict3 = dict["RecursiveDict3", int]
 RecursiveDict4 = Dict["RecursiveDict4", int]
 
@@ -1683,4 +1690,21 @@ def _(
 ):
     reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
     reveal_type(nested_list_str)  # revealed: list[Divergent]
+```
+
+### Materialization of self-referential generic implicit type aliases
+
+```py
+from typing import TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedList = list["NestedList[T] | None"]
+NestedDict = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```

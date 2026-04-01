@@ -1107,6 +1107,26 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
+/// Returns `true` if all statements in `body` are `pass` or `...` (ellipsis)
+///
+/// An empty body (`[]`) returns `false`
+pub fn is_stub_body(body: &[Stmt]) -> bool {
+    !body.is_empty()
+        && body.iter().all(|stmt| match stmt {
+            Stmt::Pass(_) => true,
+            Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+            _ => false,
+        })
+}
+
+/// Returns `body` without its leading docstring statement, if present.
+pub fn body_without_leading_docstring(body: &[Stmt]) -> &[Stmt] {
+    match body.split_first() {
+        Some((first, rest)) if is_docstring_stmt(first) => rest,
+        _ => body,
+    }
+}
+
 /// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {

@@ -6,8 +6,8 @@ use super::walk_directory::{
 };
 use crate::max_parallelism;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
@@ -129,15 +129,25 @@ impl System for OsSystem {
         self.inner.case_sensitivity
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        is_executable::is_executable(path.as_std_path())
+    fn which(&self, name: &str) -> WhichResult {
+        let path = which::which(name).map_err(|err| match err {
+            which::Error::CannotFindBinaryPath => WhichError::CannotFindBinaryPath,
+            which::Error::CannotGetCurrentDirAndPathListEmpty => {
+                WhichError::CannotGetCurrentDirAndPathListEmpty
+            }
+            which::Error::CannotCanonicalize => WhichError::CannotCanonicalize,
+        })?;
+
+        match SystemPathBuf::from_path_buf(path) {
+            Ok(path) => Ok(path),
+            Err(_) => Err(WhichError::NonUtf8Path),
+        }
     }
 
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
         // In testing, we allow overriding the user configuration directory by using a
         // thread local because overriding the environment variables breaks test isolation
@@ -154,23 +164,10 @@ impl System for OsSystem {
         SystemPathBuf::from_path_buf(strategy.config_dir()).ok()
     }
 
-    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
-    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
-    #[cfg(target_arch = "wasm32")]
-    fn user_config_directory(&self) -> Option<SystemPathBuf> {
-        #[cfg(feature = "testing")]
-        if let Ok(directory_override) = self.try_get_user_config_directory_override() {
-            return directory_override;
-        }
-
-        None
-    }
-
     /// Returns an absolute cache directory on the system.
     ///
     /// On Linux and macOS, uses `$XDG_CACHE_HOME/ty` or `.cache/ty`.
     /// On Windows, uses `C:\Users\User\AppData\Local\ty\cache`.
-    #[cfg(not(target_arch = "wasm32"))]
     fn cache_dir(&self) -> Option<SystemPathBuf> {
         use etcetera::BaseStrategy as _;
 
@@ -192,13 +189,6 @@ impl System for OsSystem {
         Some(cache_dir)
     }
 
-    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
-    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
-    #[cfg(target_arch = "wasm32")]
-    fn cache_dir(&self) -> Option<SystemPathBuf> {
-        None
-    }
-
     /// Creates a builder to recursively walk `path`.
     ///
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
@@ -210,30 +200,6 @@ impl System for OsSystem {
                 cwd: self.current_directory().to_path_buf(),
             },
         )
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        glob::PatternError,
-    > {
-        glob::glob(pattern).map(|inner| {
-            let iterator = inner.map(|result| {
-                let path = result?;
-
-                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
-                    path,
-                    error: GlobErrorKind::NonUtf8Path,
-                })?;
-
-                Ok(system_path)
-            });
-
-            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
-            boxed
-        })
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

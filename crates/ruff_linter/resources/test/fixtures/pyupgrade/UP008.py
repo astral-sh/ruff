@@ -36,11 +36,32 @@ class MyClass(BaseClass):
         super(MyClass, self).f()  # can use super()
         super().f()
 
+    def different_class(self):
+        super(BaseClass, self).f()  # CANNOT use super()
+
     def different_argument(self, other):
         super(MyClass, other).f()  # CANNOT use super()
 
     def comprehension_scope(self):
         [super(MyClass, self).f() for x in [1]]  # CANNOT use super()
+
+    def comprehension_scope_set(self):
+        {super(MyClass, self).f() for x in [1]}  # CANNOT use super()
+
+    def comprehension_scope_generator(self):
+        (super(MyClass, self).f() for x in [1])  # CANNOT use super()
+
+    def comprehension_scope_dict(self):
+        {True: super(MyClass, self).f() for x in [1]}  # CANNOT use super()
+
+    def nested_comprehension_scope(self):
+        [
+            (
+                [x for x in [1]],
+                super(MyClass, self).f(),
+            )
+            for _ in [1]
+        ]  # CANNOT use super()
 
     def inner_functions(self):
         def outer_argument():
@@ -53,6 +74,10 @@ class MyClass(BaseClass):
         outer_argument()
         inner_argument(self)
 
+    def lambda_closure(self):
+        g = lambda: super(MyClass, self).f()  # CANNOT use super()
+        g()
+
     def inner_class(self):
         class InnerClass:
             super(MyClass, self).f()  # CANNOT use super()
@@ -63,7 +88,6 @@ class MyClass(BaseClass):
         InnerClass().method()
 
     defined_outside = defined_outside
-
 
 from dataclasses import dataclass
 
@@ -303,3 +327,90 @@ class C(B):
     def f(self):
         __class__ = B  # Local variable __class__ shadows the implicit __class__
         return super(__class__, self).f()  # Should NOT trigger UP008
+
+class Base:
+    def __init__(self, foo):
+        self.foo = foo
+
+
+class Outer(Base):
+    def __init__(self, foo):
+        super().__init__(foo)  # Should not trigger UP008
+
+    class Inner(Base):
+        def __init__(self, foo):
+            super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
+
+
+# See: https://github.com/astral-sh/ruff/issues/24001
+# Bare and partially qualified class names should not match nested classes.
+class CommonNesting:
+    class C(Base):
+        def __init__(self, foo):
+            super(C, self).__init__(foo)  # Should NOT trigger UP008
+
+
+class HigherLevelsOfNesting:
+    class Inner:
+        class C(Base):
+            def __init__(self, foo):
+                super(Inner.C, self).__init__(foo)  # Should NOT trigger UP008
+
+
+# super() first arg is an attribute that only matches on the last segment,
+# but refers to a different class (Outer.Inner, not __class__ which is Inner).
+class Inner(Outer.Inner):
+    def __init__(self, foo):
+        super(Outer.Inner, self).__init__(foo)  # Should NOT trigger UP008
+
+# super() first arg has an unrelated module prefix
+class Outer2:
+    class Inner2(Base):
+        def __init__(self, foo):
+            super(some_module.Outer2.Inner2, self).__init__(foo)  # Should NOT trigger UP008
+
+# 3-level deep nesting: super(A.B.C, self) should trigger UP008
+class A:
+    class B:
+        class C(Base):
+            def __init__(self, foo):
+                super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+
+# Mismatched middle segment: Wrong.Inner doesn't match Outer3.Inner
+class Outer3:
+    class Inner(Base):
+        def __init__(self, foo):
+            super(Wrong.Inner, self).__init__(foo)  # Should NOT trigger UP008
+
+
+class Whitespace(BaseClass):
+    def f(self):
+        super (Whitespace, self).f()  # can use super()
+
+
+def function_local():
+    class LocalOuter:
+        class LocalInner(BaseClass):
+            def f(self):
+                super(LocalOuter.LocalInner, self).f()  # can use super()
+
+
+class LambdaMethod(BaseClass):
+    f = lambda self: super(LambdaMethod, self).f()  # can use super()
+
+
+class ClassMethod(BaseClass):
+    @classmethod
+    def f(cls):
+        super(ClassMethod, cls).f()  # can use super()
+
+
+class AsyncMethod(BaseClass):
+    async def f(self):
+        super(AsyncMethod, self).f()  # can use super()
+
+
+class OuterWithWhitespace:
+    class Inner(BaseClass):
+        def f(self):
+            super (OuterWithWhitespace.Inner, self).f()  # can use super()

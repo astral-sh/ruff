@@ -13,8 +13,8 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
+    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
@@ -228,8 +228,8 @@ impl System for LSPSystem {
         }
     }
 
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.native_system.is_executable(path)
+    fn which(&self, name: &str) -> WhichResult {
+        self.native_system.which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -253,16 +253,6 @@ impl System for LSPSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.native_system.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.native_system.glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

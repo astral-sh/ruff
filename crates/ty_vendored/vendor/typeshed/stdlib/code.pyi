@@ -121,6 +121,7 @@ class InteractiveConsole(InteractiveInterpreter):
     buffer: list[str]  # undocumented
     filename: str  # undocumented
     if sys.version_info >= (3, 13):
+        local_exit: bool  # undocumented
         def __init__(
             self, locals: dict[str, Any] | None = None, filename: str = "<console>", *, local_exit: bool = False
         ) -> None:

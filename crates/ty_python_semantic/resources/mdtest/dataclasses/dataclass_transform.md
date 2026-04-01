@@ -218,60 +218,99 @@ reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 
 ### `kw_only_default`
 
-When provided, sets the default value for the `kw_only` parameter of `field()`.
+When provided, sets the default value for the `kw_only` parameter of dataclass fields:
 
 ```py
 from typing import dataclass_transform
-from dataclasses import field
 
 @dataclass_transform(kw_only_default=True)
 def create_model(*, kw_only: bool = True): ...
 
 @create_model()
-class A:
+class Model1:
     name: str
 
-a = A(name="Harry")
+reveal_type(Model1.__init__)  # revealed: (self: Model1, *, name: str) -> None
+
+Model1(name="Harry")
 # error: [missing-argument]
 # error: [too-many-positional-arguments]
-a = A("Harry")
+Model1("Harry")
 ```
 
 This can be overridden by setting `kw_only=False` when applying the decorator:
 
 ```py
 @create_model(kw_only=False)
-class CustomerModel:
-    id: int
+class Model1KwOnlyFalse:
     name: str
 
-c = CustomerModel(1, "Harry")
+reveal_type(Model1KwOnlyFalse.__init__)  # revealed: (self: Model1KwOnlyFalse, name: str) -> None
+
+Model1KwOnlyFalse(name="Harry")
+Model1KwOnlyFalse("Harry")
 ```
 
 This also works for metaclass-based transformers:
 
 ```py
 @dataclass_transform(kw_only_default=True)
-class ModelMeta(type): ...
+class ModelMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        kw_only: bool = True,
+    ): ...
 
 class ModelBase(metaclass=ModelMeta): ...
 
-class TestMeta(ModelBase):
+class Model2(ModelBase):
     name: str
 
-reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
+reveal_type(Model2.__init__)  # revealed: (self: Model2, *, name: str) -> None
+
+Model2(name="Harry")
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Model2("Harry")
+
+class Model2KwOnlyFalse(ModelBase, kw_only=False):
+    name: str
+
+reveal_type(Model2KwOnlyFalse.__init__)  # revealed: (self: Model2KwOnlyFalse, name: str) -> None
+
+Model2KwOnlyFalse(name="Harry")
+Model2KwOnlyFalse("Harry")
 ```
 
 And for base-class-based transformers:
 
 ```py
 @dataclass_transform(kw_only_default=True)
-class ModelBase: ...
+class ModelBase:
+    def __init_subclass__(cls, kw_only: bool = False) -> None:
+        pass
 
-class TestBase(ModelBase):
+class Model3(ModelBase):
     name: str
 
-reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
+reveal_type(Model3.__init__)  # revealed: (self: Model3, *, name: str) -> None
+
+Model3(name="Harry")
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Model3("Harry")
+
+class Model3KwOnlyFalse(ModelBase, kw_only=False):
+    name: str
+
+reveal_type(Model3KwOnlyFalse.__init__)  # revealed: (self: Model3KwOnlyFalse, name: str) -> None
+
+Model3KwOnlyFalse(name="Harry")
+Model3KwOnlyFalse("Harry")
 ```
 
 ### `frozen_default`
@@ -330,6 +369,62 @@ class TestMeta(ModelBase):
 t = TestMeta(name="test")
 
 t.name = "new"  # error: [invalid-assignment]
+```
+
+### Transformers using `**kwargs`
+
+Dataclass transform parameters like `frozen` should be recognized even when the transformer doesn't
+explicitly list them in its signature, but instead uses `**kwargs`.
+
+#### Function-based transformer
+
+```py
+from typing import dataclass_transform, Callable
+
+@dataclass_transform()
+def create_model[T: type](**kwargs) -> Callable[[T], T]:
+    raise NotImplementedError
+
+@create_model(frozen=True)
+class Frozen:
+    name: str
+
+f = Frozen("Alice")
+f.name = "Bob"  # error: [invalid-assignment]
+```
+
+#### Metaclass-based transformer
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type):
+    def __new__(cls, name, bases, namespace, **kwargs): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Frozen(ModelBase, frozen=True):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
+```
+
+#### Base-class-based transformer
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelBase:
+    def __init_subclass__(cls, **kwargs): ...
+
+class Frozen(ModelBase, frozen=True):
+    name: str
+
+f = Frozen(name="test")
+f.name = "new"  # error: [invalid-assignment]
 ```
 
 ### Combining parameters
@@ -1691,6 +1786,306 @@ User(id=1, name="Test")
 
 # error: [missing-argument]
 User()
+```
+
+## Converters
+
+```toml
+[environment]
+python-version = "3.13"  # we need __replace__ below
+```
+
+When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
+should be the converter's input type (i.e. the type of its first positional parameter), not the
+field's declared type.
+
+```py
+from typing_extensions import Any, Callable, dataclass_transform
+
+def field[T, R](*, converter: Callable[[T], R] | None = None, default: T | None = None) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def str_to_int(x: str) -> int:
+    return int(x)
+
+@my_model
+class Basic:
+    a: int = field(converter=str_to_int)
+    b: int = field(converter=str_to_int, default="0")
+
+reveal_type(Basic.__init__)  # revealed: (self: Basic, a: str, b: str = ...) -> None
+
+Basic("1", "2")
+Basic("1")
+Basic(a="1", b="2")
+Basic(a="1")
+
+Basic("1", 2)  # error: [invalid-argument-type]
+Basic(1, "2")  # error: [invalid-argument-type]
+```
+
+Reading an attribute returns the field's declared type, but writes to an attribute are verified
+against the converter's input type:
+
+```py
+basic = Basic("1", "2")
+reveal_type(basic.a)  # revealed: int
+reveal_type(basic.b)  # revealed: int
+
+basic.a = "2"
+basic.a = 3  # error: [invalid-assignment]
+
+basic.b = "1"
+basic.b = 1  # error: [invalid-assignment]
+```
+
+This also works when the object type is a type alias to a dataclass instance:
+
+```py
+type BasicAlias = Basic
+
+def _(obj: BasicAlias):
+    reveal_type(obj.a)  # revealed: int
+    obj.a = "2"
+    obj.a = 3  # error: [invalid-assignment]
+```
+
+The default parameter for a converter field should also be verified against the converter's input
+type:
+
+```py
+@my_model
+class WrongDefault:
+    # Note: It is plausible that changes to the generics solver could make this error message better, but it's
+    # hard to come up with a good heuristic on what the rule should be. From looking at the code, it looks like
+    # the type of the `default` parameter is just wrong, but the error message wants you to change the converter
+    # function instead. And in principle, that is just as likely to be the issue. But especially since we expand
+    # `T` to a `str | Literal[0]` union here, this is a bit confusing:
+    # error: [invalid-argument-type] "Argument to function `field` is incorrect: Expected `((str | Literal[0], /) -> int) | None`, found `def str_to_int(x: str) -> int`"
+    a: int = field(converter=str_to_int, default=0)
+```
+
+When a field specifier declares a default value for `converter`, fields that don't explicitly pass a
+converter will use the default:
+
+```py
+from typing_extensions import Any
+
+# TODO: no error here (https://github.com/astral-sh/ty/issues/592)
+# error: [invalid-parameter-default]
+def field_with_default_converter[T, R](*, converter: Callable[[T], R] = str_to_int, default: T | None = None) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field_with_default_converter,))
+def model_with_default_converter[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model_with_default_converter
+class WithDefaultConverter:
+    with_default_converter: int = field_with_default_converter()
+    overwritten_converter: str = field_with_default_converter(converter=str)
+
+# revealed: (self: WithDefaultConverter, with_default_converter: str, overwritten_converter: object) -> None
+reveal_type(WithDefaultConverter.__init__)
+```
+
+Classes can also be used as converters:
+
+```py
+class PermissiveNumber:
+    def __init__(self, x: int | str):
+        self.value = int(x)
+
+@my_model
+class WithClassConverter:
+    a: PermissiveNumber = field(converter=PermissiveNumber)
+    b: float = field(converter=float)
+
+# revealed: (self: WithClassConverter, a: int | str, b: str | Buffer | SupportsFloat | SupportsIndex) -> None
+reveal_type(WithClassConverter.__init__)
+
+WithClassConverter(1, 2.5)
+WithClassConverter("1", "2.5")
+
+with_class_converter = WithClassConverter("1", "2.5")
+reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
+reveal_type(with_class_converter.b)  # revealed: int | float
+
+with_class_converter.a = "2"
+with_class_converter.a = 1.5  # error: [invalid-assignment]
+
+with_class_converter.b = "3.5"
+with_class_converter.b = None  # error: [invalid-assignment]
+```
+
+Generic classes and generic functions can also be used as converters:
+
+```py
+def duplicate[T](x: T) -> tuple[T, T]:
+    return (x, x)
+
+@my_model
+class WithGenericClassConverter:
+    a: list[str] = field(converter=list)
+    b: tuple[int, int] = field(converter=duplicate)
+
+# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+reveal_type(WithGenericClassConverter.__init__)
+
+WithGenericClassConverter(("a", "b", "c"), 1)
+
+# TODO: these should ideally be errors
+WithGenericClassConverter((1, 2, 3), 1)
+WithGenericClassConverter(("a", "b", "c"), "foo")
+```
+
+When a converter function is overloaded, the input type is the union of all first parameter types:
+
+```py
+from typing import overload
+
+@overload
+def serialize(x: str, /) -> bytes: ...
+@overload
+def serialize(x: list[str], /) -> bytes: ...
+def serialize(x: str | list[str], /) -> bytes:
+    raise NotImplementedError
+
+@my_model
+class WithOverloadedConverter:
+    data: bytes = field(converter=serialize)
+
+reveal_type(WithOverloadedConverter.__init__)  # revealed: (self: WithOverloadedConverter, data: str | list[str]) -> None
+
+WithOverloadedConverter("string")
+WithOverloadedConverter(["a", "b", "c"])
+
+WithOverloadedConverter(123)  # error: [invalid-argument-type]
+
+with_overloaded_converter = WithOverloadedConverter("string")
+reveal_type(with_overloaded_converter.data)  # revealed: bytes
+
+with_overloaded_converter.data = ["new", "data"]
+
+with_overloaded_converter.data = 123  # error: [invalid-assignment]
+```
+
+A variadic converter (`*args`) uses the variadic parameter's element type as the input type:
+
+```py
+def variadic_converter(*args: str) -> int:
+    return int(args[0])
+
+@my_model
+class WithVariadicConverter:
+    x: int = field(converter=variadic_converter)
+
+reveal_type(WithVariadicConverter.__init__)  # revealed: (self: WithVariadicConverter, x: str) -> None
+
+WithVariadicConverter("1")
+WithVariadicConverter(1)  # error: [invalid-argument-type]
+```
+
+When the declared field type does not match the converter's output type, we emit a diagnostic:
+
+```py
+@my_model
+class WrongConverterOutput:
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[int]` is not assignable to `bytes`"
+    x: bytes = field(converter=str_to_int)
+```
+
+This also works for overloaded converters with multiple output types:
+
+```py
+@overload
+def validate(x: str) -> str: ...
+@overload
+def validate(x: int) -> int: ...
+def validate(x: str | int) -> str | int:
+    return x
+
+@my_model
+class WrongOverloadedConverterOutput:
+    correct: str | int = field(converter=validate)
+
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `int`"
+    incorrect1: int = field(converter=validate)
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[str | int]` is not assignable to `str`"
+    incorrect2: str = field(converter=validate)
+```
+
+When a field-specifier call contains both a default value and a converter, the default value should
+be verified against the converter's input type, not the field's declared type:
+
+```py
+@my_model
+class ConverterWithDefault:
+    correct: int = field(converter=str_to_int, default="0")
+
+    # error: [invalid-argument-type]
+    incorrect1: int = field(converter=str_to_int, default=0)
+
+    # TODO: this should be an error
+    incorrect2: int = field(default="0")
+```
+
+We currently assume that the presence of a converter also implies that the this converter function
+will be called when using `replace` (this is how `attrs` behaves):
+
+```py
+basic = Basic("1", "2")
+
+# __replace__ uses the converter input type (str):
+reveal_type(Basic.__replace__)  # revealed: (self: Basic, *, a: str = ..., b: str = ...) -> Basic
+```
+
+Converter fields inherited from a base class should also be validated correctly:
+
+```py
+@my_model
+class Base:
+    a: int = field(converter=str_to_int)
+
+@my_model
+class Child(Base):
+    b: int = field(converter=str_to_int)
+
+child = Child("1", "2")
+reveal_type(child.a)  # revealed: int
+reveal_type(child.b)  # revealed: int
+
+child.a = "2"
+child.a = 3  # error: [invalid-assignment]
+
+child.b = "2"
+child.b = 3  # error: [invalid-assignment]
+```
+
+We also validate writes to unions of converter fields:
+
+```py
+def str_or_bytes_to_int(x: str | bytes) -> int:
+    raise NotImplementedError
+
+@my_model
+class ModelA:
+    x: int = field(converter=str_to_int)
+
+@my_model
+class ModelB:
+    x: int = field(converter=str_or_bytes_to_int)
+
+def _(m: ModelA | ModelB):
+    # Allowed, since both converters accept str
+    m.x = "1"
+
+    m.x = b"1"  # error: [invalid-assignment]
 ```
 
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033

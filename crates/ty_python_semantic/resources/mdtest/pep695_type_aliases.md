@@ -40,6 +40,36 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
+## No type qualifiers
+
+The right-hand side of a type alias definition is a type expression, not an annotation expression.
+Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
+appear at the top level of a PEP 695 alias definition:
+
+```py
+from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
+from dataclasses import InitVar
+
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad1 = ClassVar[str]
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad2 = ClassVar
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+type Bad3 = Final[int]
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+type Bad4 = Final
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type expressions (only in annotation expressions)"
+type Bad5 = Required[int]
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type expressions (only in annotation expressions)"
+type Bad6 = NotRequired[int]
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type expressions (only in annotation expressions)"
+type Bad7 = ReadOnly[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type expressions (only in annotation expressions)"
+type Bad8 = InitVar[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)"
+type Bad9 = InitVar
+```
+
 ## Type aliases in type aliases
 
 ```py
@@ -129,6 +159,31 @@ except Exception:
 
 def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
+```
+
+## Stringified values
+
+<!-- snapshot-diagnostics -->
+
+Stringifying the right-hand side of a type alias is redundant, but allowed:
+
+```py
+type X = "int | str"
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: int | str
+```
+
+The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
+accesses the `.__value__` attribute. Normal runtime rules still therefore apply regarding partially
+stringified alias values:
+
+```py
+# error: [unsupported-operator]
+type Y = "int" | str
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: int | str
 ```
 
 ## In unions and intersections
@@ -276,7 +331,7 @@ in a tuple unpacking is not supported.
 from typing_extensions import TypeAliasType
 
 # error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
-TypeAliasType("IntOrStr", int | str)
+TypeAliasType("IntOrStr", "int | str")
 ```
 
 ### Mutually recursive `TypeAliasType` definitions
@@ -469,7 +524,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list[A | str]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
@@ -522,4 +577,23 @@ def foo(a: int, b: int) -> RecursiveT:
     some_intermediate_var = (a, b)
     # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
+```
+
+### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+from collections.abc import Callable
+
+type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
+type RecursiveGuard = TypeGuard[RecursiveGuard]
+
+type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
+type AliasGuard = RecursiveGuard
+
+type CallableIs = TypeIs[Callable[[], CallableIs]]
+type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
+
+reveal_type(CallableIs)  # revealed: TypeAliasType
+reveal_type(CallableGuard)  # revealed: TypeAliasType
 ```

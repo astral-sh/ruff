@@ -422,11 +422,16 @@ fn convert_to_list_extend(
     };
 
     let variable_name = locator.slice(binding);
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[to_append.range(), for_stmt.iter.range()],
-    );
+    let mut ranges_to_ignore = vec![
+        to_append.range(),
+        for_stmt.iter.range(),
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 

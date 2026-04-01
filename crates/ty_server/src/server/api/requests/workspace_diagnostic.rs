@@ -17,11 +17,14 @@ use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use ty_project::{ProgressReporter, ProjectDatabase};
+use ty_python_semantic::types::ide_support::UnusedBinding;
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::diagnostics::{
+    Diagnostics, collect_unused_bindings, to_lsp_diagnostic, unused_bindings_to_lsp_diagnostics,
+};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -235,6 +238,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
+        let unused_bindings = collect_unused_bindings(db, file);
+
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -255,10 +260,10 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
-        if !diagnostics.is_empty() {
+        if !diagnostics.is_empty() || !unused_bindings.is_empty() {
             state
                 .response
-                .write_diagnostics_for_file(db, file, diagnostics);
+                .write_diagnostics_for_file(db, file, diagnostics, &unused_bindings);
         }
 
         state.response.maybe_flush();
@@ -281,7 +286,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            response.write_diagnostics_for_file(db, file, &diagnostics);
+            response.write_diagnostics_for_file(db, file, &diagnostics, &[]);
         }
         response.maybe_flush();
     }
@@ -371,6 +376,7 @@ impl<'a> ResponseWriter<'a> {
         db: &ProjectDatabase,
         file: File,
         diagnostics: &[Diagnostic],
+        unused_bindings: &[UnusedBinding],
     ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
@@ -392,7 +398,7 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| i64::from(doc.version()))
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(diagnostics);
+        let result_id = Diagnostics::result_id_from_hash(diagnostics, unused_bindings);
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
@@ -409,7 +415,7 @@ impl<'a> ResponseWriter<'a> {
                 )
             }
             new_id => {
-                let lsp_diagnostics = diagnostics
+                let mut lsp_diagnostics = diagnostics
                     .iter()
                     .filter_map(|diagnostic| {
                         Some(
@@ -424,6 +430,12 @@ impl<'a> ResponseWriter<'a> {
                         )
                     })
                     .collect::<Vec<_>>();
+                lsp_diagnostics.extend(unused_bindings_to_lsp_diagnostics(
+                    db,
+                    file,
+                    self.position_encoding,
+                    unused_bindings,
+                ));
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                     uri: url,
@@ -477,7 +489,7 @@ impl<'a> ResponseWriter<'a> {
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 
-            let new_result_id = Diagnostics::result_id_from_hash(&[]);
+            let new_result_id = Diagnostics::result_id_from_hash(&[], &[]);
 
             let report = match new_result_id {
                 Some(new_id) if new_id == previous_result_id => {

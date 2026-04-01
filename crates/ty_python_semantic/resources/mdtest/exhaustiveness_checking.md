@@ -167,6 +167,18 @@ def match_exhaustive_no_assertion(x: Color) -> int:
         case Color.BLUE:
             return 3
 
+def match_exhaustive_through_instance(x: Color) -> int:
+    match x:
+        case x.RED:
+            reveal_type(x)  # revealed: Literal[Color.RED]
+            return 1
+        case x.GREEN:
+            reveal_type(x)  # revealed: Literal[Color.GREEN]
+            return 2
+        case x.BLUE:
+            reveal_type(x)  # revealed: Literal[Color.BLUE]
+            return 3
+
 def match_non_exhaustive(x: Color):
     match x:
         case Color.RED:
@@ -474,4 +486,150 @@ def i[T: (int, str)](x: T) -> T:
             assert_never(x)
 
     return x
+
+def eq_narrow_match_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    match x:
+        case "foo":
+            pass
+        case "bar":
+            pass
+        case _:
+            assert_never(x)
+
+    return x
+
+def eq_narrow_if_bounded[T: Literal["foo", "bar"]](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+
+def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+```
+
+In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
+`else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
+`assert_type` calls, since these call expressions can create their own `IsNonTerminalCall`
+predicates in our reachability infrastructure!
+
+```py
+class A: ...
+class B: ...
+
+def j[T: A | B](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def k[T: (A, B)](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def l[T](x: T) -> bool:
+    if isinstance(x, int):
+        return True
+    elif not isinstance(x, int):
+        return False
+
+def m[T: A | B](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+
+def n[T: (A, B)](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+
+def o[T: Literal["foo", "bar"]](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def p[T: Literal["foo", "bar"]](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+
+def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+```
+
+## Exhaustiveness checking for `NewType`s of `float` and `complex`
+
+```py
+from typing_extensions import NewType, assert_never
+
+FloatN = NewType("FloatN", float)
+ComplexN = NewType("ComplexN", complex)
+
+def f(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+    else:
+        assert_never(x)
+
+def g(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+    else:
+        assert_never(x)
+
+# the same version of the above tests, but isolated
+# from the fact that `assert_never` creates its own
+# reachability constraint:
+
+# no `invalid-return-type` diagnostic
+def h(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+
+# no `invalid-return-type` diagnostic
+def i(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
 ```

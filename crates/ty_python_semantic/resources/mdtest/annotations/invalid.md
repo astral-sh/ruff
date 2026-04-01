@@ -86,7 +86,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
         c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
         d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
-        e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+        e: int | b"foo",
         f: 1 and 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
         h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
@@ -97,8 +99,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-        # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [unsupported-operator]
+        # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+        p: int | f"foo",
         # error: [invalid-type-form] "Invalid subscript"
         q: [1, 2, 3][1:2],
     ):
@@ -155,6 +158,37 @@ def invalid_binary_operators(
     reveal_type(l)  # revealed: Unknown
 ```
 
+## Error recovery upon encountering invalid AST nodes
+
+Upon encountering an invalid-in-type-expression AST node, we try to avoid cascading diagnostics. For
+example, in this snippet, we only report the the outer list literal is invalid, and ignore the fact
+that there is also an invalid list literal inside the outer list literal node:
+
+```py
+# error: [invalid-type-form]
+x: [[int]]
+```
+
+However, runtime errors inside invalid AST nodes are still reported -- these errors are more serious
+than just "typing spec pedantry":
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [unresolved-reference] "Name `foo` used when not defined"
+x: [[foo]]
+```
+
+But we avoid false-positive diagnostics regarding unresolved references inside string annotations if
+we detect that the string annotation is an invalid type form. These diagnostics would just add
+noise, since stringized annotations are never executed at runtime. The following snippet causes us
+to emit `invalid-type-form`, but we ignore that `foo` is an "unresolved reference" inside the string
+annotation:
+
+```py
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+x: "[[foo]]"
+```
+
 ## Multiple starred expressions in a `tuple` specialization
 
 <!-- snapshot-diagnostics -->
@@ -202,12 +236,19 @@ python-version = "3.11"
 ```
 
 ```py
+t1: tuple[int, ...]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
-a: tuple[...]
+t2: tuple[int, int, ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t3: tuple[...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t4: tuple[..., int]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+t5: tuple[int, ..., int]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
-b: tuple[*tuple[int, ...], ...]
-# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
-c: tuple[int, str, ...]
+t6: tuple[*tuple[str], ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+t7: tuple[*tuple[str, ...], ...]
 ```
 
 ## Invalid AST nodes in string annotations
@@ -235,7 +276,6 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        # error: [invalid-type-form] "Slices are not allowed in type expressions"
         # error: [invalid-type-form] "Invalid subscript"
         o: "[1, 2, 3][1:2]",
     ):
@@ -271,7 +311,7 @@ def _(
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
     f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
-    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
+    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
     g: [int, str],
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
     h: (int, str),
@@ -292,7 +332,6 @@ class name_0[name_2: [int]]:
     pass
 
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Dict literals are not allowed in type expressions"
 class name_4[name_1: [{}]]:
     pass
 ```
@@ -329,16 +368,15 @@ from PIL import Image
 def g(x: Image): ...  # error: [invalid-type-form]
 ```
 
-### List-literal used when you meant to use a list or tuple
+### List-literal used when you meant to use a list
 
 ```py
 def _(
     x: [int],  # error: [invalid-type-form]
 ) -> [int]:  # error: [invalid-type-form]
     return x
-```
 
-```py
+# No special hints for these: it's unclear what the user meant:
 def _(
     x: [int, str],  # error: [invalid-type-form]
 ) -> [int, str]:  # error: [invalid-type-form]

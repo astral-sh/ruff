@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-warning[possibly-missing-attribute]: Attribute `attr` may be missing on class `C`
+info[possibly-missing-attribute]: Attribute `attr` may be missing on class `C`
  --> src/mdtest_snippet.py:6:5
   |
 4 |             attr: int = 0
@@ -42,7 +42,7 @@ info: rule `possibly-missing-attribute` is enabled by default
 ```
 
 ```
-warning[possibly-missing-attribute]: Attribute `attr` may be missing on object of type `C`
+info[possibly-missing-attribute]: Attribute `attr` may be missing on object of type `C`
  --> src/mdtest_snippet.py:9:5
   |
 8 |     instance = C()

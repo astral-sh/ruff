@@ -96,6 +96,8 @@ We promote in non-covariant position in the return type of a generic function, o
 generic class:
 
 ```py
+from typing import Callable, Literal
+
 class Bivariant[T]:
     def __init__(self, value: T): ...
 
@@ -124,6 +126,8 @@ def f8[T](x: T) -> Invariant[T] | Covariant[T] | None: ...
 def f9[T](x: T) -> tuple[Invariant[T], Invariant[T]] | None: ...
 def f10[T, U](x: T, y: U) -> tuple[Invariant[T], Covariant[U]] | None: ...
 def f11[T, U](x: T, y: U) -> tuple[Invariant[Covariant[T] | None], Covariant[U]] | None: ...
+def f12[T](x: T) -> Callable[[T], bool] | None: ...
+def f13[T](x: T) -> Callable[[bool], Invariant[T]] | None: ...
 
 reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
 reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
@@ -144,6 +148,9 @@ reveal_type(f9(1))  # revealed: tuple[Invariant[int], Invariant[int]] | None
 
 reveal_type(f10(1, 1))  # revealed: tuple[Invariant[int], Covariant[Literal[1]]] | None
 reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Covariant[Literal[1]]] | None
+
+reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
+reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
 ```
 
 ## Promotion is recursive
@@ -190,6 +197,7 @@ declared in a promotable position:
 ```py
 from enum import Enum
 from typing import Sequence, Literal, LiteralString
+from typing import Callable
 
 class Color(Enum):
     RED = "red"
@@ -238,7 +246,7 @@ x11: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[Literal[1, 2, 3]]
 
 x12: Y[Y[Literal[1]]] = [[1]]
-reveal_type(x12)  # revealed: list[Y[Literal[1]]]
+reveal_type(x12)  # revealed: list[list[Literal[1]]]
 
 x13: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(x13)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
@@ -274,6 +282,18 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 
 x22: X[Literal[1]] | None = x([1])
 reveal_type(x22)  # revealed: X[Literal[1]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+x23: Callable[[Literal[1]], bool] = make_callable(1)
+reveal_type(x23)  # revealed: (Literal[1], /) -> bool
+
+x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
+reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
 ## Literal annotations see through subtyping
@@ -403,7 +423,7 @@ later used in a promotable position:
 
 ```py
 from enum import Enum
-from typing import Literal
+from typing import Callable, Literal
 
 def promote[T](x: T) -> list[T]:
     return [x]
@@ -449,6 +469,16 @@ class MyEnum(Enum):
 def _(x: Literal[MyEnum.A, MyEnum.B]):
     reveal_type(x)  # revealed: Literal[MyEnum.A, MyEnum.B]
     reveal_type([x])  # revealed: list[Literal[MyEnum.A, MyEnum.B]]
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+def _(x: Literal[1]):
+    reveal_type(make_callable(x))  # revealed: (Literal[1], /) -> bool
+    reveal_type(maybe_make_callable(x))  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
 Literal promotability is respected by unions:
@@ -500,4 +530,27 @@ def _(a: A | None):
         d = {"a": a}
         reveal_type(d)  # revealed: dict[str, A]
     return {}
+```
+
+## Module-literal types are not promoted
+
+Since module-literal types are "literal" types in a certain sense (each type is a singleton type),
+we used to promote module-literal types to `types.ModuleType`. We no longer do, because
+`types.ModuleType` is a very broad type that is not particularly useful. The fake
+`types.ModuleType.__getattr__` method that typeshed provides also meant that you would not receive
+any errors from clearly incorrect code like this:
+
+`module1.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import module1
+
+my_modules = [module1]
+reveal_type(my_modules)  # revealed: list[<module 'module1'>]
+my_modules[0].flibbertigibbet  # error: [unresolved-attribute]
 ```

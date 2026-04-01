@@ -198,6 +198,9 @@ impl Configuration {
                     ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
             quote_style,
+            nested_string_quote_style: format
+                .nested_string_quote_style
+                .unwrap_or(format_defaults.nested_string_quote_style),
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
@@ -400,7 +403,8 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_tidy_imports: lint
                     .flake8_tidy_imports
-                    .map(Flake8TidyImportsOptions::into_settings)
+                    .map(Flake8TidyImportsOptions::try_into_settings)
+                    .transpose()?
                     .unwrap_or_default(),
                 flake8_type_checking: lint
                     .flake8_type_checking
@@ -1250,6 +1254,7 @@ pub struct FormatConfiguration {
 
     pub indent_style: Option<IndentStyle>,
     pub quote_style: Option<QuoteStyle>,
+    pub nested_string_quote_style: Option<ruff_python_formatter::NestedStringQuoteStyle>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
@@ -1274,6 +1279,7 @@ impl FormatConfiguration {
             preview: options.preview.map(PreviewMode::from),
             indent_style: options.indent_style,
             quote_style: options.quote_style,
+            nested_string_quote_style: options.nested_string_quote_style,
             magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
                 if skip {
                     MagicTrailingComma::Ignore
@@ -1301,6 +1307,9 @@ impl FormatConfiguration {
             extension: self.extension.or(config.extension),
             indent_style: self.indent_style.or(config.indent_style),
             quote_style: self.quote_style.or(config.quote_style),
+            nested_string_quote_style: self
+                .nested_string_quote_style
+                .or(config.nested_string_quote_style),
             magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
             line_ending: self.line_ending.or(config.line_ending),
             docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),

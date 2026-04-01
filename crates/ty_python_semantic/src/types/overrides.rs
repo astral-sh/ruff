@@ -268,6 +268,10 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
+                ClassBase::Divergent(_) => {
+                    has_dynamic_superclass = true;
+                    continue;
+                }
                 ClassBase::TypedDict => {
                     has_typeddict_in_mro = true;
                     continue;
@@ -611,7 +615,7 @@ fn check_explicit_overrides<'db>(
     let function_literal = if context.in_stub() {
         decorated_function.first_overload_or_implementation(db)
     } else {
-        decorated_function.literal(db).last_definition(db)
+        decorated_function.literal(db).last_definition
     };
 
     let Some(builder) = context.report_lint(

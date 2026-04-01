@@ -1,0 +1,170 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: classes.md - Generic classes: PEP 695 syntax - Default type parameter after `TypeVarTuple`
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+ 2 | class Foo[*Ts, T = int]: ...
+ 3 | 
+ 4 | # error: [invalid-type-variable-default]
+ 5 | class Bar[T1, *Ts, T2 = int]: ...
+ 6 | 
+ 7 | # error: [invalid-type-variable-default]
+ 8 | class Baz[*Ts, T1 = int, T2 = str]: ...
+ 9 | 
+10 | # Note: the spec says this is fine,
+11 | # but it raises `TypeError` at runtime
+12 | # (<https://github.com/python/typing/issues/2211>)
+13 | #
+14 | # error: [invalid-type-variable-default]
+15 | class Qux[*Ts, **P = [int, str]]: ...
+16 | 
+17 | # error: [invalid-type-variable-default]
+18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...
+19 | 
+20 | # error: [invalid-type-variable-default]
+21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
+22 | 
+23 | # error: [invalid-type-variable-default]
+24 | class Grault[*Us, *Ts = *tuple[int, str]]: ...
+25 | 
+26 | # These are fine:
+27 | class Ok1[T, *Ts]: ...
+28 | class Ok3[*Ts]: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:2:11
+  |
+1 | # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+2 | class Foo[*Ts, T = int]: ...
+  |           ---  ^^^^^^^ `T` has a default
+  |           |
+  |           `Ts` is a TypeVarTuple
+3 |
+4 | # error: [invalid-type-variable-default]
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:5:15
+  |
+4 | # error: [invalid-type-variable-default]
+5 | class Bar[T1, *Ts, T2 = int]: ...
+  |               ---  ^^^^^^^^ `T2` has a default
+  |               |
+  |               `Ts` is a TypeVarTuple
+6 |
+7 | # error: [invalid-type-variable-default]
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+  --> src/mdtest_snippet.py:8:11
+   |
+ 7 | # error: [invalid-type-variable-default]
+ 8 | class Baz[*Ts, T1 = int, T2 = str]: ...
+   |           ---  ^^^^^^^^  -------- `T2` also has a default
+   |           |    |
+   |           |    `T1` has a default
+   |           `Ts` is a TypeVarTuple
+ 9 |
+10 | # Note: the spec says this is fine,
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+  --> src/mdtest_snippet.py:15:11
+   |
+13 | #
+14 | # error: [invalid-type-variable-default]
+15 | class Qux[*Ts, **P = [int, str]]: ...
+   |           ---  ^^^^^^^^^^^^^^^^ `P` has a default
+   |           |
+   |           `Ts` is a TypeVarTuple
+16 |
+17 | # error: [invalid-type-variable-default]
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+  --> src/mdtest_snippet.py:18:12
+   |
+17 | # error: [invalid-type-variable-default]
+18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...
+   |            ---  ^^^^^^^^  ---------------- `P` also has a default
+   |            |    |
+   |            |    `T1` has a default
+   |            `Ts` is a TypeVarTuple
+19 |
+20 | # error: [invalid-type-variable-default]
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+  --> src/mdtest_snippet.py:21:13
+   |
+20 | # error: [invalid-type-variable-default]
+21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
+   |             ---  ^^^^^^^^  --------  ---------------- `P` also has a default
+   |             |    |         |
+   |             |    |         `T2` also has a default
+   |             |    `T1` has a default
+   |             `Ts` is a TypeVarTuple
+22 |
+23 | # error: [invalid-type-variable-default]
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+  --> src/mdtest_snippet.py:24:14
+   |
+23 | # error: [invalid-type-variable-default]
+24 | class Grault[*Us, *Ts = *tuple[int, str]]: ...
+   |              ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+   |              |
+   |              `Us` is a TypeVarTuple
+25 |
+26 | # These are fine:
+   |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

@@ -212,7 +212,6 @@ fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
             "@Todo(StarredExpression)",
             "@Todo(typing.Unpack)",
             "@Todo(TypeVarTuple)",
-            "@Todo(Functional TypedDicts)",
         ];
 
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
@@ -425,7 +424,9 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
     use ty_module_resolver::SearchPathSettings;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_python_semantic::{
+        FallibleStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    };
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -473,7 +474,7 @@ mod tests {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search paths settings"),
         };
         Program::init_or_update(&mut db, settings);

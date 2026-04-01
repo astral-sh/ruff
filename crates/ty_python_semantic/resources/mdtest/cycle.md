@@ -42,7 +42,7 @@ python-version = "3.12"  # typing.TypeAliasType
 ```py
 from typing import Union, TypeAliasType, Sequence, Mapping
 
-A = list["A" | None]
+A = list["A | None"]
 
 def f(x: A):
     # TODO: should be `list[A | None]`?
@@ -128,16 +128,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown
+        # revealed: (positional=...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Unknown) | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown
+        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Unknown) | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 

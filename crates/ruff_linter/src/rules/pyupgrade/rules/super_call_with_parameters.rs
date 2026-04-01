@@ -2,7 +2,7 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -75,15 +75,20 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     if !is_super_call_with_arguments(call, checker) {
         return;
     }
-    let scope = checker.semantic().current_scope();
-
-    // Check: are we in a Function scope?
-    if !scope.kind.is_function() {
+    // Check: are we in a callable scope (function or lambda)?
+    let callable_scope = match &checker.semantic().current_scope().kind {
+        ScopeKind::Function(_) | ScopeKind::Lambda(_) => Some(checker.semantic().current_scope()),
+        ScopeKind::DunderClassCell => checker
+            .semantic()
+            .first_non_type_parent_scope(checker.semantic().current_scope())
+            .filter(|scope| matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_))),
+        _ => None,
+    };
+    let Some(callable_scope) = callable_scope else {
         return;
-    }
+    };
 
     let mut parents = checker.semantic().current_statements();
-
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
@@ -91,58 +96,122 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    // Find the enclosing function definition (if any).
-    let Some(
-        func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters: parent_parameters,
+    // Find the enclosing callable and extract the name of its first parameter.
+    let (parent_arg_name, has_local_dunder_class_var_ref) = match &callable_scope.kind {
+        ScopeKind::Function(_) => {
+            let Some(
+                func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
+                    parameters: parent_parameters,
+                    ..
+                }),
+            ) = parents.find(|stmt| stmt.is_function_def_stmt())
+            else {
+                return;
+            };
+
+            let Some(parent_arg) = parent_parameters.args.first() else {
+                return;
+            };
+
+            (
+                parent_arg.name().as_str(),
+                has_local_dunder_class_var_ref(callable_scope, |finder| {
+                    finder.visit_stmt(func_stmt);
+                }),
+            )
+        }
+        ScopeKind::Lambda(ast::ExprLambda {
+            parameters: Some(parent_parameters),
+            body,
             ..
-        }),
-    ) = parents.find(|stmt| stmt.is_function_def_stmt())
-    else {
-        return;
+        }) => {
+            let Some(parent_arg) = parent_parameters.args.first() else {
+                return;
+            };
+
+            (
+                parent_arg.name().as_str(),
+                has_local_dunder_class_var_ref(callable_scope, |finder| {
+                    finder.visit_expr(body);
+                }),
+            )
+        }
+        _ => return,
     };
 
-    if is_builtins_super(checker.semantic(), call)
-        && !has_local_dunder_class_var_ref(checker.semantic(), func_stmt)
-    {
+    if is_builtins_super(checker.semantic(), call) && !has_local_dunder_class_var_ref {
         return;
     }
 
-    // Extract the name of the first argument to the enclosing function.
-    let Some(parent_arg) = parent_parameters.args.first() else {
-        return;
-    };
+    let mut enclosing_classes = checker.semantic().current_scopes().filter_map(|scope| {
+        let ScopeKind::Class(class_def) = &scope.kind else {
+            return None;
+        };
+        Some(*class_def)
+    });
 
     // Find the enclosing class definition (if any).
-    let Some(Stmt::ClassDef(ast::StmtClassDef {
+    let Some(ast::StmtClassDef {
         name: parent_name,
         decorator_list,
         ..
-    })) = parents.find(|stmt| stmt.is_class_def_stmt())
+    }) = enclosing_classes.next()
     else {
         return;
     };
 
-    let (
-        Expr::Name(ast::ExprName {
-            id: first_arg_id, ..
-        }),
-        Expr::Name(ast::ExprName {
-            id: second_arg_id, ..
-        }),
-    ) = (first_arg, second_arg)
+    let Expr::Name(ast::ExprName {
+        id: second_arg_id, ..
+    }) = second_arg
     else {
         return;
     };
 
-    // The `super(__class__, self)` and `super(ParentClass, self)` patterns are redundant in Python 3
-    // when the first argument refers to the implicit `__class__` cell or to the enclosing class.
-    // Avoid triggering if a local variable shadows either name.
-    if !(((first_arg_id == "__class__") || (first_arg_id == parent_name.as_str()))
-        && !checker.semantic().current_scope().has(first_arg_id)
-        && second_arg_id == parent_arg.name().as_str())
-    {
+    if second_arg_id != parent_arg_name {
         return;
+    }
+
+    // Verify the first argument matches the enclosing class chain.
+    // For `super(__class__, self)` or `super(ClassName, self)`, just check the immediate class.
+    // For `super(Outer.Inner, self)`, verify each segment matches the enclosing class nesting.
+    match first_arg {
+        Expr::Name(ast::ExprName { id, .. }) => {
+            if callable_scope.has(id) {
+                return;
+            }
+
+            if id != "__class__" && id == parent_name.as_str() {
+                if enclosing_classes.next().is_some() {
+                    return;
+                }
+            } else if id != "__class__" {
+                return;
+            }
+        }
+        Expr::Attribute(_) => {
+            let chain = collect_attribute_chain(first_arg);
+            // The innermost name must match the immediately enclosing class.
+            if chain.last() != Some(&parent_name.as_str()) {
+                return;
+            }
+            // Each preceding name must match the next enclosing class.
+            for name in chain.iter().rev().skip(1) {
+                let Some(ast::StmtClassDef {
+                    name: enclosing_name,
+                    ..
+                }) = enclosing_classes.next()
+                else {
+                    return;
+                };
+                if *name != enclosing_name.as_str() {
+                    return;
+                }
+            }
+            if enclosing_classes.next().is_some() {
+                return;
+            }
+        }
+        _ => return,
     }
 
     drop(parents);
@@ -197,23 +266,50 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     }
 }
 
+/// Collects the chain of names from an attribute expression.
+///
+/// For example, `A.B.C` returns `["A", "B", "C"]`.
+fn collect_attribute_chain(expr: &Expr) -> Vec<&str> {
+    let mut chain = Vec::new();
+    let mut current = expr;
+    loop {
+        match current {
+            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                chain.push(attr.id.as_str());
+                current = value;
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                chain.push(id.as_str());
+                break;
+            }
+            _ => return Vec::new(),
+        }
+    }
+    chain.reverse();
+    chain
+}
+
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
     checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
 }
 
-/// Returns `true` if the function contains load references to `__class__` or `super` without
-/// local binding.
+/// Returns `true` if the callable body contains load references to `__class__` or `super` without
+/// a local binding.
 ///
-/// This indicates that the function relies on the implicit `__class__` cell variable created by
-/// Python when `super()` is called without arguments, making it unsafe to remove `super()` parameters.
-fn has_local_dunder_class_var_ref(semantic: &SemanticModel, func_stmt: &Stmt) -> bool {
-    if semantic.current_scope().has("__class__") {
+/// This indicates that the callable relies on the implicit `__class__` cell variable created by
+/// Python when `super()` is called without arguments, making it unsafe to remove `super()`
+/// parameters.
+fn has_local_dunder_class_var_ref(
+    callable_scope: &Scope,
+    visit: impl FnOnce(&mut ClassCellReferenceFinder),
+) -> bool {
+    if callable_scope.has("__class__") {
         return false;
     }
 
     let mut finder = ClassCellReferenceFinder::new();
-    finder.visit_stmt(func_stmt);
+    visit(&mut finder);
 
     finder.found()
 }

@@ -230,14 +230,10 @@ def f(x):
 *This feature is currently only available in [preview mode](preview.md#preview).*
 
 The Ruff formatter can also format Python code blocks in Markdown files.
-In these files, Ruff will format any CommonMark [fenced code blocks][]
-with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
-Fenced code blocks without an info string are assumed to be Python code examples
-and will also be formatted.
-
-If a code example is recognized and treated as Python, the Ruff formatter will
-automatically skip it if the code does not parse as valid Python or if the
-reformatted code would produce an invalid Python program.
+In these files, Ruff will format any CommonMark [fenced code blocks][] with
+the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`. The
+formatter will automatically skip a code block if the code does not parse as
+valid Python or if the reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
@@ -310,7 +306,7 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.8
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
@@ -557,8 +553,9 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
-outermost f-string. For example, consider the following f-string:
+By default, or when targeting Python versions below 3.12, Ruff alternates quote styles for nested
+f-strings, starting with the [configured quote style] for the outermost f-string.
+For example, consider the following f-string:
 
 ```python
 # format.quote-style = "double"
@@ -566,10 +563,17 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with `nested-string-quote-style = "preferred"`,
+Ruff will use the configured quote style for nested strings:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks
