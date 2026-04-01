@@ -632,7 +632,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 EitherOrBoth::Right(expr) => {
-                    inferred_type_arguments.push(self.infer_type_expression(expr));
+                    // If there are no typevars at all, this is not a generic type,
+                    // so we should not infer excess arguments as type expressions.
+                    // For example, `list[int][0]` — the `0` is not a type expression.
+                    if typevars_len == 0 {
+                        inferred_type_arguments
+                            .push(self.infer_expression(expr, TypeContext::default()));
+                    } else {
+                        inferred_type_arguments.push(self.infer_type_expression(expr));
+                    }
                     first_excess_type_argument_index.get_or_insert(index);
                 }
             }
