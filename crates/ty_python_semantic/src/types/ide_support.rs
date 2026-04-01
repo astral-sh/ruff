@@ -709,6 +709,42 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Resolve overloads for a callable type using call arguments,
+/// returning the single matching signature if exactly one matches.
+fn resolve_single_overload<'db>(
+    model: &SemanticModel<'db>,
+    callable_type: Type<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<Signature<'db>> {
+    let db = model.db();
+    let bindings = callable_type.bindings(db);
+
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
+    });
+
+    let constraints = ConstraintSetBuilder::new();
+    let mut resolved: Vec<_> = bindings
+        .match_parameters(db, &args)
+        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .iter()
+        .flat_map(super::call::bind::Bindings::iter_flat)
+        .flat_map(|binding| {
+            binding
+                .matching_overloads()
+                .map(|(_, overload)| overload.signature.clone())
+        })
+        .collect();
+
+    if resolved.len() != 1 {
+        return None;
+    }
+
+    resolved.pop()
+}
+
 /// Given a call expression that has overloads, and whose overload is resolved to a
 /// single option by its arguments, return the type of the Signature.
 ///
@@ -727,48 +763,21 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
-    let bindings = callable_type.bindings(db);
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = bindings.single_element()
+    if let Some(binding) = callable_type.bindings(db).single_element()
         && binding.overloads().len() < 2
     {
         return None;
     }
 
-    // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    // Try to resolve overloads with the arguments/types we have
-    let constraints = ConstraintSetBuilder::new();
-    let mut resolved = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        // Only use the Ok
-        .iter()
-        .flat_map(super::call::bind::Bindings::iter_flat)
-        .flat_map(|binding| {
-            binding.matching_overloads().map(|(_, overload)| {
-                overload
-                    .signature
-                    .display_with(db, DisplaySettings::default().multiline())
-                    .to_string()
-            })
-        })
-        .collect::<Vec<_>>();
-
-    // If at the end of this we still got multiple signatures (or no signatures), give up
-    if resolved.len() != 1 {
-        return None;
-    }
-
-    resolved.pop()
+    let signature = resolve_single_overload(model, callable_type, call_expr)?;
+    Some(
+        signature
+            .display_with(db, DisplaySettings::default().multiline())
+            .to_string(),
+    )
 }
 
 /// Returns the definitions of the binary operation along with its callable type.
@@ -1831,5 +1840,51 @@ fn class_literal_to_hierarchy_info(
         file,
         full_range,
         selection_range,
+    }
+}
+
+pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
+    let function_ty = call_expr.func.inferred_type(model)?;
+    let db = model.db();
+    let class_name = function_ty.as_class_literal()?.name(db);
+    let display_sig = |signature: &Signature| {
+        let params = signature
+            .display_with(
+                db,
+                DisplaySettings::default()
+                    .multiline()
+                    .disallow_signature_name()
+                    .hide_return_type(),
+            )
+            .to_string();
+
+        format!("class {class_name}{params}")
+    };
+    let callable_type = function_ty.try_upcast_to_callable(db)?.into_type(db);
+    let bindings = callable_type.bindings(db);
+
+    if let Some(binding) = bindings.single_element()
+        && binding.overloads().len() == 1
+    {
+        return binding
+            .overloads()
+            .first()
+            .map(|overload| display_sig(&overload.signature));
+    }
+
+    if let Some(signature) = resolve_single_overload(model, callable_type, call_expr) {
+        return Some(display_sig(&signature));
+    }
+
+    let all_sigs: Vec<String> = bindings
+        .iter_flat()
+        .flatten()
+        .map(|binding| display_sig(&binding.signature))
+        .collect();
+
+    if all_sigs.is_empty() {
+        None
+    } else {
+        Some(all_sigs.join("\n"))
     }
 }
