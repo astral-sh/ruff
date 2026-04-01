@@ -15,12 +15,12 @@ help: Replace with `numpy.exceptions.DTypePromotionError`
 1 + from numpy.exceptions import DTypePromotionError
 2 | def func():
 3 |     import numpy as np
-4 | 
+4 |
   -     np.DTypePromotionError
 5 +     DTypePromotionError
-6 | 
+6 |
 7 |     np.ModuleDeprecationWarning
-8 | 
+8 |
 
 NPY201 [*] `np.ModuleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ModuleDeprecationWarning` instead.
  --> NPY201_3.py:6:5
@@ -36,14 +36,14 @@ help: Replace with `numpy.exceptions.ModuleDeprecationWarning`
 1  + from numpy.exceptions import ModuleDeprecationWarning
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 5  |     np.DTypePromotionError
-6  | 
+6  |
    -     np.ModuleDeprecationWarning
 7  +     ModuleDeprecationWarning
-8  | 
+8  |
 9  |     np.RankWarning
-10 | 
+10 |
 
 NPY201 [*] `np.RankWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.RankWarning` on NumPy 2.0, or ignore this warning on earlier versions.
   --> NPY201_3.py:8:5
@@ -59,16 +59,16 @@ help: Replace with `numpy.exceptions.RankWarning` (requires NumPy 2.0 or greater
 1  + from numpy.exceptions import RankWarning
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 --------------------------------------------------------------------------------
-6  | 
+6  |
 7  |     np.ModuleDeprecationWarning
-8  | 
+8  |
    -     np.RankWarning
 9  +     RankWarning
-10 | 
+10 |
 11 |     np.TooHardError
-12 | 
+12 |
 note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.TooHardError` will be removed in NumPy 2.0. Use `numpy.exceptions.TooHardError` instead.
@@ -85,16 +85,16 @@ help: Replace with `numpy.exceptions.TooHardError`
 1  + from numpy.exceptions import TooHardError
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 --------------------------------------------------------------------------------
-8  | 
+8  |
 9  |     np.RankWarning
-10 | 
+10 |
    -     np.TooHardError
 11 +     TooHardError
-12 | 
+12 |
 13 |     np.VisibleDeprecationWarning
-14 | 
+14 |
 
 NPY201 [*] `np.VisibleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.VisibleDeprecationWarning` instead.
   --> NPY201_3.py:12:5
@@ -110,16 +110,16 @@ help: Replace with `numpy.exceptions.VisibleDeprecationWarning`
 1  + from numpy.exceptions import VisibleDeprecationWarning
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 --------------------------------------------------------------------------------
-10 | 
+10 |
 11 |     np.TooHardError
-12 | 
+12 |
    -     np.VisibleDeprecationWarning
 13 +     VisibleDeprecationWarning
-14 | 
+14 |
 15 |     np.chararray
-16 | 
+16 |
 
 NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `numpy.char.chararray` instead.
   --> NPY201_3.py:14:5
@@ -135,14 +135,14 @@ help: Replace with `numpy.char.chararray`
 1  + from numpy.char import chararray
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 --------------------------------------------------------------------------------
-12 | 
+12 |
 13 |     np.VisibleDeprecationWarning
-14 | 
+14 |
    -     np.chararray
 15 +     chararray
-16 | 
+16 |
 17 |     np.format_parser
 
 NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.format_parser` instead.
@@ -157,10 +157,10 @@ help: Replace with `numpy.rec.format_parser`
 1  + from numpy.rec import format_parser
 2  | def func():
 3  |     import numpy as np
-4  | 
+4  |
 --------------------------------------------------------------------------------
-14 | 
+14 |
 15 |     np.chararray
-16 | 
+16 |
    -     np.format_parser
 17 +     format_parser

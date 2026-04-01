@@ -11,13 +11,13 @@ UP041 [*] Replace aliased errors with `TimeoutError`
 11 |     pass
    |
 help: Replace `socket.timeout` with builtin `TimeoutError`
-7  | 
+7  |
 8  | try:
 9  |     pass
    - except socket.timeout:
 10 + except TimeoutError:
 11 |     pass
-12 | 
+12 |
 13 | # Should NOT be in parentheses when replaced
 
 UP041 [*] Replace aliased errors with `TimeoutError`
@@ -30,13 +30,13 @@ UP041 [*] Replace aliased errors with `TimeoutError`
 23 |     pass
    |
 help: Replace with builtin `TimeoutError`
-19 | 
+19 |
 20 | try:
 21 |     pass
    - except (socket.timeout,):
 22 + except TimeoutError:
 23 |     pass
-24 | 
+24 |
 25 | try:
 
 UP041 [*] Replace aliased errors with `TimeoutError`
@@ -49,13 +49,13 @@ UP041 [*] Replace aliased errors with `TimeoutError`
 28 |     pass
    |
 help: Replace with builtin `TimeoutError`
-24 | 
+24 |
 25 | try:
 26 |     pass
    - except (asyncio.TimeoutError, socket.timeout,):
 27 + except (TimeoutError, asyncio.TimeoutError):
 28 |     pass
-29 | 
+29 |
 30 | # Should be kept in parentheses (because multiple)
 
 UP041 [*] Replace aliased errors with `TimeoutError`
@@ -68,11 +68,11 @@ UP041 [*] Replace aliased errors with `TimeoutError`
 35 |     pass
    |
 help: Replace with builtin `TimeoutError`
-31 | 
+31 |
 32 | try:
 33 |     pass
    - except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
 34 + except (asyncio.TimeoutError, KeyError, TimeoutError):
 35 |     pass
-36 | 
+36 |
 37 | # First should change, second should not

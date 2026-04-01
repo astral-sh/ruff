@@ -37,8 +37,8 @@ help: Remove assignment to unused variable `I`
    -     I = 1
 18 +     pass
 19 |     # ruff: enable[E741, F841]
-20 | 
-21 | 
+20 |
+21 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF103 [*] Invalid suppression comment: no matching 'disable' comment
@@ -54,8 +54,8 @@ help: Remove suppression comment
 17 |     # should be generated.
 18 |     I = 1
    -     # ruff: enable[E741, F841]
-19 | 
-20 | 
+19 |
+20 |
 21 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -75,8 +75,8 @@ help: Remove assignment to unused variable `I`
    -     I = 1
 26 +     pass
 27 |     # ruff: enable[E741]
-28 | 
-29 | 
+28 |
+29 |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `l` is assigned to but never used
@@ -127,8 +127,8 @@ help: Remove unused suppression
    -     # ruff: disable[E501]
 46 |     I = 1
    -     # ruff: enable[E501]
-47 | 
-48 | 
+47 |
+48 |
 49 | def f():
 
 E741 Ambiguous variable name: `I`
@@ -157,8 +157,8 @@ help: Remove assignment to unused variable `I`
    -     I = 1
 47 +     pass
 48 |     # ruff: enable[E501]
-49 | 
-50 | 
+49 |
+50 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF100 [*] Unused `noqa` directive (unused: `E741`, `F841`)
@@ -177,8 +177,8 @@ help: Remove unused `noqa` directive
    -     I = 1  # noqa: E741,F841
 55 +     I = 1
 56 |     # ruff:enable[E741,F841]
-57 | 
-58 | 
+57 |
+58 |
 
 RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:61:5
@@ -200,14 +200,14 @@ RUF100 [*] Unused suppression (duplicated: `F841`)
 62 |     foo = 0
    |
 help: Remove unused suppression
-58 | 
+58 |
 59 | def f():
 60 |     # Duplicate codes that are actually used.
    -     # ruff: disable[F841, F841]
 61 +     # ruff: disable[F841]
 62 |     foo = 0
-63 | 
-64 | 
+63 |
+64 |
 
 RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:68:5
@@ -235,8 +235,8 @@ help: Remove unused suppression
 68 |     # ruff: disable[F841]
    -     # ruff: disable[F841]
 69 |     foo = 0
-70 | 
-71 | 
+70 |
+71 |
 
 RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:75:5
@@ -258,14 +258,14 @@ RUF100 [*] Unused suppression (unused: `E741`; non-enabled: `F401`)
 76 |     foo = 0
    |
 help: Remove unused suppression
-72 | 
+72 |
 73 | def f():
 74 |     # Multiple codes but only one is used
    -     # ruff: disable[E741, F401, F841]
 75 +     # ruff: disable[F841]
 76 |     foo = 0
-77 | 
-78 | 
+77 |
+78 |
 
 RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:81:5
@@ -287,14 +287,14 @@ RUF100 [*] Unused suppression (non-enabled: `F401`)
 82 |     I = 0
    |
 help: Remove unused suppression
-78 | 
+78 |
 79 | def f():
 80 |     # Multiple codes but only two are used
    -     # ruff: disable[E741, F401, F841]
 81 +     # ruff: disable[E741, F841]
 82 |     I = 0
-83 | 
-84 | 
+83 |
+84 |
 
 RUF100 [*] Unused suppression (unused: `E741`, `F841`; non-enabled: `F401`)
   --> suppressions.py:87:5
@@ -306,13 +306,13 @@ RUF100 [*] Unused suppression (unused: `E741`, `F841`; non-enabled: `F401`)
 88 |     print("hello")
    |
 help: Remove unused suppression
-84 | 
+84 |
 85 | def f():
 86 |     # Multiple codes but none are used
    -     # ruff: disable[E741, F401, F841]
 87 |     print("hello")
-88 | 
-89 | 
+88 |
+89 |
 
 RUF102 [*] Invalid rule code in suppression: YF829
   --> suppressions.py:93:21
@@ -329,7 +329,7 @@ RUF102 [*] Invalid rule code in suppression: YF829
    |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
-90 | 
+90 |
 91 | def f():
 92 |     # Unknown rule codes
    -     # ruff: disable[YF829]
@@ -337,8 +337,8 @@ help: Remove the suppression comment
 94 |     value = 0
 95 |     # ruff: enable[F841, RQW320]
    -     # ruff: enable[YF829]
-96 | 
-97 | 
+96 |
+97 |
 98 | def f():
 
 RUF102 [*] Invalid rule code in suppression: RQW320
@@ -364,8 +364,8 @@ help: Remove the rule code `RQW320`
    -     # ruff: enable[F841, RQW320]
 96 +     # ruff: enable[F841]
 97 |     # ruff: enable[YF829]
-98 | 
-99 | 
+98 |
+99 |
 
 RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
    --> suppressions.py:109:5
@@ -378,13 +378,13 @@ RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, .
 111 |     print("hello")
     |
 help: Remove suppression comment
-106 | 
+106 |
 107 | def f():
 108 |     # Empty or missing rule codes
     -     # ruff: disable
 109 |     # ruff: disable[]
 110 |     print("hello")
-111 | 
+111 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
@@ -402,8 +402,8 @@ help: Remove suppression comment
 109 |     # ruff: disable
     -     # ruff: disable[]
 110 |     print("hello")
-111 | 
-112 | 
+111 |
+112 |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF100 [*] Unused suppression (non-enabled: `F401`)
@@ -418,7 +418,7 @@ RUF100 [*] Unused suppression (non-enabled: `F401`)
     | -------------------
     |
 help: Remove unused suppression
-113 | 
+113 |
 114 | # Ensure LAST suppression in file is reported.
 115 | # https://github.com/astral-sh/ruff/issues/23235
     - # ruff:disable[F401]

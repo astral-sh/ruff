@@ -556,7 +556,7 @@ info: `Foo.bar` is decorated with `@final`, forbidding overrides
 help: Remove the override of `bar`
 info: rule `override-of-final-method` is enabled by default
 109 |     def bar(self): ...
-110 | 
+110 |
 111 | class Baz(Foo):
     -     def bar(self): ...  # error: [override-of-final-method]
 112 +     pass  # error: [override-of-final-method]

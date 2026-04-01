@@ -320,7 +320,7 @@ help: Remove the unused suppression comment
    -     A,  # type: ignore[ty:duplicate-base]
 72 +     A,
 73 | ): ...
-74 | 
+74 |
 75 | # error: [duplicate-base]
 
 ```
@@ -372,7 +372,7 @@ help: Remove the unused suppression comment
 80 |     # error: [unused-type-ignore-comment]
    -     x: int  # type: ignore[ty:duplicate-base]
 81 +     x: int
-82 | 
+82 |
 83 | # fmt: on
 
 ```

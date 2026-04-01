@@ -10,8 +10,8 @@ E303 [*] Too many blank lines (3)
   |
 help: Remove extraneous blank line(s)
 1 | """Test where the error is after the module's docstring."""
-2 | 
-3 | 
-  - 
+2 |
+3 |
+  -
 4 | def fn():
 5 |     pass

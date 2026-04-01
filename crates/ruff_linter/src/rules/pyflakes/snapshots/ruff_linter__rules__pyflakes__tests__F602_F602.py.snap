@@ -52,7 +52,7 @@ help: Remove repeated key `a`
 12 |     a: 3,
    -     a: 3,
 13 | }
-14 | 
+14 |
 15 | x = {
 note: This is an unsafe fix and may change runtime behavior
 
@@ -97,7 +97,7 @@ help: Remove repeated key `a`
    -     a: 3,
 20 |     a: 4,
 21 | }
-22 | 
+22 |
 note: This is an unsafe fix and may change runtime behavior
 
 F602 Dictionary key `a` repeated
@@ -122,7 +122,7 @@ F602 [*] Dictionary key `a` repeated
 28 |     a: 3,
    |
 help: Remove repeated key `a`
-23 | 
+23 |
 24 | x = {
 25 |     a: 1,
    -     a: 1,
@@ -233,7 +233,7 @@ F602 [*] Dictionary key `a` repeated
 help: Remove repeated key `a`
 41 |     a: 4,
 42 | }
-43 | 
+43 |
    - x = {a: 1, a: 1}
 44 + x = {a: 1}
 45 | x = {a: 1, b: 2, a: 1}
@@ -248,7 +248,7 @@ F602 [*] Dictionary key `a` repeated
    |
 help: Remove repeated key `a`
 42 | }
-43 | 
+43 |
 44 | x = {a: 1, a: 1}
    - x = {a: 1, b: 2, a: 1}
 45 + x = {a: 1, b: 2}

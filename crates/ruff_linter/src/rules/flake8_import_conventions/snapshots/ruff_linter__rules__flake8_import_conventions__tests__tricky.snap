@@ -12,7 +12,7 @@ ICN001 [*] `pandas` should be imported as `pd`
 9 |         return False
   |
 help: Alias `pandas` to `pd`
-3 | 
+3 |
 4 | def rename_global():
 5 |     try:
   -         global pandas

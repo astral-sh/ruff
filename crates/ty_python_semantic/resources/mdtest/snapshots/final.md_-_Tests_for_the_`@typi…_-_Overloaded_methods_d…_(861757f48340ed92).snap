@@ -155,7 +155,7 @@ info: `Good.bar` is decorated with `@final`, forbidding overrides
 help: Remove all overloads for `bar`
 info: rule `override-of-final-method` is enabled by default
 13 |     def baz(self, x: int) -> int: ...
-14 | 
+14 |
 15 | class ChildOfGood(Good):
    -     @overload
    -     def bar(self, x: str) -> str: ...
@@ -205,7 +205,7 @@ info: rule `override-of-final-method` is enabled by default
    -     def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
 20 +     
 21 +       # error: [override-of-final-method]
-22 | 
+22 |
 23 | class Bad:
 24 |     @overload
 note: This is an unsafe fix and may change runtime behavior
@@ -278,7 +278,7 @@ info: `Bad.bar` is decorated with `@final`, forbidding overrides
 help: Remove all overloads for `bar`
 info: rule `override-of-final-method` is enabled by default
 37 |     def baz(self, x: int) -> int: ...
-38 | 
+38 |
 39 | class ChildOfBad(Bad):
    -     @overload
    -     def bar(self, x: str) -> str: ...
@@ -350,7 +350,7 @@ info: `Good.f` is decorated with `@final`, forbidding overrides
 help: Remove all overloads and the implementation for `f`
 info: rule `override-of-final-method` is enabled by default
 10 |         return x
-11 | 
+11 |
 12 | class ChildOfGood(Good):
    -     @overload
    -     def f(self, x: str) -> str: ...
@@ -358,12 +358,12 @@ info: rule `override-of-final-method` is enabled by default
    -     def f(self, x: int) -> int: ...
 13 +     pass
 14 +     pass
-15 | 
+15 |
 16 |     # error: [override-of-final-method]
    -     def f(self, x: int | str) -> int | str:
    -         return x
 17 +     pass
-18 | 
+18 |
 19 | class Bad:
 20 |     @overload
 note: This is an unsafe fix and may change runtime behavior

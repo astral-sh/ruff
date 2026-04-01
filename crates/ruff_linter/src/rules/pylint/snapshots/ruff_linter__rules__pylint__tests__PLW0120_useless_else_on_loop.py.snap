@@ -19,8 +19,8 @@ help: Remove `else`
    -         print("math is broken")
 9  +     print("math is broken")
 10 |     return None
-11 | 
-12 | 
+11 |
+12 |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:18:5
@@ -40,8 +40,8 @@ help: Remove `else`
    -         print("math is broken")
 18 +     print("math is broken")
 19 |     return None
-20 | 
-21 | 
+20 |
+21 |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:30:1
@@ -55,12 +55,12 @@ PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else`
 help: Remove `else`
 27 |         for _ in range(10):
 28 |             break
-29 | 
+29 |
    - else:  # [useless-else-on-loop]
    -     print("or else!")
 30 + print("or else!")
-31 | 
-32 | 
+31 |
+32 |
 33 | while True:
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -79,7 +79,7 @@ help: Remove `else`
    - else:  # [useless-else-on-loop]
    -     print("or else!")
 37 + print("or else!")
-38 | 
+38 |
 39 | for j in range(10):
 40 |     pass
 
@@ -94,7 +94,7 @@ PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else`
 44 |     for j in range(10):
    |
 help: Remove `else`
-39 | 
+39 |
 40 | for j in range(10):
 41 |     pass
    - else:  # [useless-else-on-loop]
@@ -104,8 +104,8 @@ help: Remove `else`
 42 + print("fat chance")
 43 + for j in range(10):
 44 +     break
-45 | 
-46 | 
+45 |
+46 |
 47 | def test_return_for2():
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -126,8 +126,8 @@ help: Remove `else`
    -         return True
 88 +     return True
 89 |     return False
-90 | 
-91 | 
+90 |
+91 |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    --> useless_else_on_loop.py:98:9
