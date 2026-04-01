@@ -1003,4 +1003,27 @@ def subclass_lower_bound[T, A]():
     static_assert(not constraints.implies_subtype_of(str, T))
 ```
 
+### Transitivity should not introduce impossible constraints
+
+```py
+from typing import Never, TypeVar, Union
+from ty_extensions import ConstraintSet, static_assert
+
+def impossible_result[A, T, U]():
+    constraint_a = ConstraintSet.range(int, A, Union[T, U])
+    constraint_t = ConstraintSet.range(Never, T, str)
+    constraint_u = ConstraintSet.range(Never, U, bytes)
+
+    # Given (int ≤ A ≤ T | U), we can infer that (int ≤ T) ∨ (int ≤ U). If we intersect that with
+    # (T ≤ str), we get false ∨ (int ≤ U) — that is, there is no valid solution for T. Therefore A
+    # cannot be a subtype of T; it must be a subtype of U.
+    constraints = constraint_a & constraint_t
+    static_assert(constraints.implies_subtype_of(int, U))
+
+    # And if we intersect with (U ≤ bytes) as well, then there are no valid solutions for either T
+    # or U, and the constraint set as a whole becomes unsatisfiable.
+    constraints = constraint_a & constraint_t & constraint_u
+    static_assert(not constraints)
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

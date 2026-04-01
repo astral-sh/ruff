@@ -4386,6 +4386,16 @@ impl SequentMap {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
+        // If the post constraint is unsatisfiable, then the antecedents contradict each other.
+        let post_data = builder.constraint_data(post);
+        let when = post_data
+            .lower
+            .when_constraint_set_assignable_to(db, post_data.upper, builder);
+        if when.is_never_satisfied(db) {
+            self.add_pair_impossibility(db, builder, ante1, ante2);
+            return;
+        }
+
         // If either antecedent implies the consequent on its own, this new sequent is redundant.
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
