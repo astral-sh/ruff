@@ -518,9 +518,34 @@ pub enum ComparableInterpolatedStringElement<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableDebugText<'a> {
+    leading: Cow<'a, str>,
+    source: Cow<'a, str>,
+    trailing: Cow<'a, str>,
+}
+
+impl<'a> From<&'a ast::DebugText> for ComparableDebugText<'a> {
+    fn from(debug_text: &'a ast::DebugText) -> Self {
+        Self {
+            leading: normalize_newlines(debug_text.leading()),
+            source: normalize_newlines(debug_text.source()),
+            trailing: normalize_newlines(debug_text.trailing()),
+        }
+    }
+}
+
+fn normalize_newlines(contents: &str) -> Cow<'_, str> {
+    if contents.contains('\r') {
+        Cow::Owned(contents.replace("\r\n", "\n").replace('\r', "\n"))
+    } else {
+        Cow::Borrowed(contents)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct InterpolatedElement<'a> {
     expression: ComparableExpr<'a>,
-    debug_text: Option<&'a ast::DebugText>,
+    debug_text: Option<ComparableDebugText<'a>>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Vec<ComparableInterpolatedStringElement<'a>>>,
 }
@@ -552,7 +577,7 @@ impl<'a> From<&'a ast::InterpolatedElement> for InterpolatedElement<'a> {
 
         Self {
             expression: (expression).into(),
-            debug_text: debug_text.as_ref(),
+            debug_text: debug_text.as_ref().map(Into::into),
             conversion: *conversion,
             format_spec: format_spec
                 .as_ref()
@@ -926,7 +951,7 @@ pub struct ExprCall<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprInterpolatedElement<'a> {
     value: Box<ComparableExpr<'a>>,
-    debug_text: Option<&'a ast::DebugText>,
+    debug_text: Option<ComparableDebugText<'a>>,
     conversion: ast::ConversionFlag,
     format_spec: Vec<ComparableInterpolatedStringElement<'a>>,
 }
