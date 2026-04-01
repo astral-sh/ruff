@@ -1,21 +1,20 @@
 use std::ops::Deref;
 
-use crate::Db;
-use crate::ast_node_ref::AstNodeRef;
-use crate::node_key::NodeKey;
-use crate::semantic_index::LoopToken;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::{FileScopeId, ScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::unpack::{Unpack, UnpackPosition};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_module_resolver::file_to_module;
+
+use crate::Db;
+use crate::ast_node_ref::AstNodeRef;
+use crate::node_key::NodeKey;
+use crate::semantic_index::LoopToken;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::unpack::{Unpack, UnpackPosition};
 
 /// A definition of a place.
 ///
@@ -52,7 +51,7 @@ pub struct Definition<'db> {
 impl get_size2::GetSize for Definition<'_> {}
 
 impl<'db> Definition<'db> {
-    pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 
