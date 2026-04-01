@@ -1261,7 +1261,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_check_unbound_typevars = self
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
+        self.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let value_ty = self.infer_type_expression(&type_alias.value);
+        self.inference_flags.remove(InferenceFlags::IN_TYPE_ALIAS);
         self.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,

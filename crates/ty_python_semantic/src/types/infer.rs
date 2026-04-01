@@ -979,7 +979,7 @@ impl<'db> ExpressionInference<'db> {
 }
 
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub(crate) struct InferenceFlags: u8 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
@@ -997,8 +997,19 @@ bitflags::bitflags! {
         /// Whether the visitor is currently visiting a vararg annotation
         /// (e.g., `*args: int` or `**kwargs: int` in a function definition).
         const IN_VARARG_ANNOTATION = 1 << 2;
+
+        /// Whether the visitor is currently visiting a return-type annotation
+        const IN_RETURN_TYPE = 1 << 3;
+
+        /// Whether the visitor is currently visiting a type alias value expression
+        const IN_TYPE_ALIAS = 1 << 4;
+
+        /// Whether the visitor is currently visiting a parameter annotation
+        const IN_PARAMETER_ANNOTATION = 1 << 5;
     }
 }
+
+impl get_size2::GetSize for InferenceFlags {}
 
 impl InferenceFlags {
     #[must_use = "Inference flags should always be restored to the original value after being temporarily modified"]
@@ -1006,5 +1017,17 @@ impl InferenceFlags {
         let previously_contained_flag = self.contains(other);
         self.set(other, set_to);
         previously_contained_flag
+    }
+
+    pub(super) const fn type_expression_context(self) -> &'static str {
+        if self.contains(InferenceFlags::IN_RETURN_TYPE) {
+            "return type annotation"
+        } else if self.contains(InferenceFlags::IN_PARAMETER_ANNOTATION) {
+            "parameter annotation"
+        } else if self.contains(InferenceFlags::IN_TYPE_ALIAS) {
+            "type alias value"
+        } else {
+            "type expression"
+        }
     }
 }

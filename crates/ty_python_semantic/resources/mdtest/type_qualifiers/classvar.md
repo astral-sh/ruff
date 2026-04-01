@@ -347,21 +347,19 @@ class C:
         # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
         y: ClassVar[int] = 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f(x: ClassVar[int]) -> None:
     pass
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f() -> ClassVar[int]:
     return 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f[T](x: T) -> ClassVar[T]:
     return x
 

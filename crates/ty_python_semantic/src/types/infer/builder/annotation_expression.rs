@@ -39,18 +39,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Allowed)
     }
 
-    /// Similar to [`infer_annotation_expression`], but accepts an optional annotation expression
-    /// and returns [`None`] if the annotation is [`None`].
-    ///
-    /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
-    pub(super) fn infer_optional_annotation_expression(
-        &mut self,
-        annotation: Option<&ast::Expr>,
-        deferred_state: DeferredExpressionState,
-    ) -> Option<TypeAndQualifiers<'db>> {
-        annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
-    }
-
     fn infer_annotation_expression_inner(
         &mut self,
         annotation: &ast::Expr,
@@ -148,7 +136,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.typevar_binding_context,
                         builder.inference_flags,
                     )
-                    .unwrap_or_else(|error| error.into_fallback_type(&builder.context, annotation));
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &builder.context,
+                            annotation,
+                            builder.inference_flags,
+                        )
+                    });
                 let result_ty = builder.check_for_unbound_type_variable(annotation, result_ty);
                 TypeAndQualifiers::declared(result_ty)
             })
@@ -223,7 +217,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.inference_flags,
                                 )
                                 .unwrap_or_else(|err| {
-                                    err.into_fallback_type(&self.context, subscript)
+                                    err.into_fallback_type(
+                                        &self.context,
+                                        subscript,
+                                        self.inference_flags,
+                                    )
                                 });
                             TypeAndQualifiers::declared(in_type_expression)
                                 .with_qualifier(inferred.qualifiers())

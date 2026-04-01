@@ -25,7 +25,7 @@ def _(
 ):
     def foo(): ...
     def invalid(
-        a_: a,  # error: [invalid-type-form] "Variable of type `type[int]` is not allowed in a type expression"
+        a_: a,  # error: [invalid-type-form] "Variable of type `type[int]` is not allowed in a parameter annotation"
         b_: b,  # error: [invalid-type-form]
         c_: c,  # error: [invalid-type-form]
         d_: d,  # error: [invalid-type-form]
@@ -35,8 +35,8 @@ def _(
         h_: h,  # error: [invalid-type-form]
         i_: typing,  # error: [invalid-type-form]
         j_: foo,  # error: [invalid-type-form]
-        k_: i,  # error: [invalid-type-form] "Variable of type `int` is not allowed in a type expression"
-        l_: j,  # error: [invalid-type-form] "Variable of type `A` is not allowed in a type expression"
+        k_: i,  # error: [invalid-type-form] "Variable of type `int` is not allowed in a parameter annotation"
+        l_: j,  # error: [invalid-type-form] "Variable of type `A` is not allowed in a parameter annotation"
     ):
         reveal_type(a_)  # revealed: Unknown
         reveal_type(b_)  # revealed: Unknown

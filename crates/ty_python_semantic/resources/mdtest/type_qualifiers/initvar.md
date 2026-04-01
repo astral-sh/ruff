@@ -149,10 +149,12 @@ from dataclasses import InitVar, dataclass
 # error: [invalid-type-form] "`InitVar` annotations are only allowed in class-body scopes"
 x: InitVar[int] = 1
 
-def f(x: InitVar[int]) -> None:  # error: [invalid-type-form] "`InitVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in parameter annotations"
+def f(x: InitVar[int]) -> None:
     pass
 
-def g() -> InitVar[int]:  # error: [invalid-type-form] "`InitVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in return type annotations"
+def g() -> InitVar[int]:
     return 1
 
 class C:

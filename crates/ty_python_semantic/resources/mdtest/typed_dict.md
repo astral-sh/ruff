@@ -2778,11 +2778,11 @@ x: TypedDict = {"name": "Alice"}
 from typing_extensions import Required, NotRequired, ReadOnly
 
 def bad(
-    # error: [invalid-type-form] "`Required` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in parameter annotations"
     a: Required[int],
-    # error: [invalid-type-form] "`NotRequired` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in parameter annotations"
     b: NotRequired[int],
-    # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in parameter annotations"
     c: ReadOnly[int],
 ): ...
 ```

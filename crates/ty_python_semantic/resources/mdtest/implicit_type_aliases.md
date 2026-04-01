@@ -1582,7 +1582,7 @@ errors:
 ```py
 AliasForStr = "str"
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a parameter annotation"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 

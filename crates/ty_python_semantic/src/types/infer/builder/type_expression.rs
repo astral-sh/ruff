@@ -1,6 +1,7 @@
 use itertools::Either;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
@@ -51,7 +52,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
-    fn infer_type_expression_with_state(
+    pub(super) fn infer_type_expression_with_state(
         &mut self,
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,
@@ -64,7 +65,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn report_invalid_type_expression(
         &self,
-        expression: &ast::Expr,
+        expression: impl Ranged,
         message: impl std::fmt::Display,
     ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
@@ -90,7 +91,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.inference_flags,
                         )
                         .unwrap_or_else(|error| {
-                            error.into_fallback_type(&self.context, expression)
+                            error.into_fallback_type(
+                                &self.context,
+                                expression,
+                                self.inference_flags,
+                            )
                         });
                     self.check_for_unbound_type_variable(expression, ty)
                 }
@@ -103,18 +108,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(attribute_expression) => {
                 if is_dotted_name(expression) {
                     match attribute_expression.ctx {
-                        ast::ExprContext::Load => self
-                            .infer_attribute_expression(attribute_expression)
-                            .default_specialize(self.db())
-                            .in_type_expression(
-                                self.db(),
-                                self.scope(),
-                                self.typevar_binding_context,
-                                self.inference_flags,
-                            )
-                            .unwrap_or_else(|error| {
-                                error.into_fallback_type(&self.context, expression)
-                            }),
+                        ast::ExprContext::Load => {
+                            let ty = self.infer_attribute_expression(attribute_expression);
+
+                            if let Type::TypeVar(tvar) = ty
+                                && tvar.paramspec_attr(self.db()).is_some()
+                            {
+                                ty
+                            } else {
+                                ty.default_specialize(self.db())
+                                    .in_type_expression(
+                                        self.db(),
+                                        self.scope(),
+                                        self.typevar_binding_context,
+                                        self.inference_flags,
+                                    )
+                                    .unwrap_or_else(|error| {
+                                        error.into_fallback_type(
+                                            &self.context,
+                                            expression,
+                                            self.inference_flags,
+                                        )
+                                    })
+                            }
+                        }
                         ast::ExprContext::Invalid => Type::unknown(),
                         ast::ExprContext::Store | ast::ExprContext::Del => {
                             todo_type!("Attribute expression annotation in Store/Del context")
@@ -1682,7 +1699,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
                 .inner_type()
                 .in_type_expression(self.db(), self.scope(), None, self.inference_flags)
-                .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript)),
+                .unwrap_or_else(|err| {
+                    err.into_fallback_type(&self.context, subscript, self.inference_flags)
+                }),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
@@ -1912,12 +1931,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_parameterized_legacy_typing_alias(subscript, alias)
             }
             SpecialFormType::TypeQualifier(qualifier) => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    let diag = builder.into_diagnostic(format_args!(
-                        "Type qualifier `{qualifier}` is not allowed in type expressions \
-                         (only in annotation expressions)",
-                    ));
-                    diagnostic::add_type_expression_reference_link(diag);
+                if self.inference_flags.intersects(
+                    InferenceFlags::IN_PARAMETER_ANNOTATION
+                        | InferenceFlags::IN_RETURN_TYPE
+                        | InferenceFlags::IN_TYPE_ALIAS,
+                ) {
+                    self.report_invalid_type_expression(
+                        subscript,
+                        format_args!(
+                            "Type qualifier `{qualifier}` is not allowed in {}s",
+                            self.inference_flags.type_expression_context(),
+                        ),
+                    );
+                } else {
+                    self.report_invalid_type_expression(
+                        subscript,
+                        format_args!(
+                            "Type qualifier `{qualifier}` is not allowed in type expressions \
+                            (only in annotation expressions)",
+                        ),
+                    );
                 }
                 self.infer_type_expression(arguments_slice)
             }

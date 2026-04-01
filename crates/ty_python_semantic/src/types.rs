@@ -6834,7 +6834,12 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(self, context: &InferContext, node: &impl Ranged) -> Type<'db> {
+    fn into_fallback_type(
+        self,
+        context: &InferContext,
+        node: &impl Ranged,
+        flags: InferenceFlags,
+    ) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
@@ -6843,7 +6848,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
                 continue;
             };
-            let diagnostic = builder.into_diagnostic(error.reason(context.db()));
+            let diagnostic = builder.into_diagnostic(error.reason(context.db(), flags));
             error.add_subdiagnostics(context.db(), diagnostic, node);
         }
         fallback_type
@@ -6883,12 +6888,8 @@ enum InvalidTypeExpression<'db> {
     /// Same for `typing.Concatenate`, anywhere except for as the first parameter of a `Callable`
     /// type expression
     Concatenate,
-    /// Type qualifiers are always invalid in *type expressions*,
-    /// but these ones are okay with 0 arguments in *annotation expressions*
+    /// Type qualifiers are always invalid in type expressions
     TypeQualifier(TypeQualifier),
-    /// Type qualifiers that are invalid in type expressions,
-    /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(TypeQualifier),
     /// `typing.Self` cannot be used in `@staticmethod` definitions.
     TypingSelfInStaticMethod,
     /// `typing.Self` cannot be used in metaclass definitions.
@@ -6899,14 +6900,17 @@ enum InvalidTypeExpression<'db> {
 }
 
 impl<'db> InvalidTypeExpression<'db> {
-    const fn reason(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    const fn reason(self, db: &'db dyn Db, flags: InferenceFlags) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             error: InvalidTypeExpression<'db>,
             db: &'db dyn Db,
+            flags: InferenceFlags,
         }
 
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let location = self.flags.type_expression_context();
+
                 match self.error {
                     InvalidTypeExpression::RequiresOneArgument(special_form) => write!(
                         f,
@@ -6921,47 +6925,68 @@ impl<'db> InvalidTypeExpression<'db> {
                         "`{special_form}` requires at least two arguments when used in a type expression",
                     ),
                     InvalidTypeExpression::Protocol => {
-                        f.write_str("`typing.Protocol` is not allowed in type expressions")
+                        write!(f, "`typing.Protocol` is not allowed in {location}s")
                     }
                     InvalidTypeExpression::Generic => {
-                        f.write_str("`typing.Generic` is not allowed in type expressions")
+                        write!(f, "`typing.Generic` is not allowed in {location}s")
                     }
                     InvalidTypeExpression::Deprecated => {
-                        f.write_str("`warnings.deprecated` is not allowed in type expressions")
+                        write!(f, "`warnings.deprecated` is not allowed in {location}s")
                     }
                     InvalidTypeExpression::Field => {
-                        f.write_str("`dataclasses.Field` is not allowed in type expressions")
+                        write!(f, "`dataclasses.Field` is not allowed in {location}s")
                     }
-                    InvalidTypeExpression::ConstraintSet => f.write_str(
-                        "`ty_extensions.ConstraintSet` is not allowed in type expressions",
+                    InvalidTypeExpression::ConstraintSet => write!(
+                        f,
+                        "`ty_extensions.ConstraintSet` is not allowed in {location}s",
                     ),
-                    InvalidTypeExpression::GenericContext => f.write_str(
-                        "`ty_extensions.GenericContext` is not allowed in type expressions",
-                    ),
-                    InvalidTypeExpression::Specialization => f.write_str(
-                        "`ty_extensions.GenericContext` is not allowed in type expressions",
+                    InvalidTypeExpression::GenericContext => {
+                        write!(
+                            f,
+                            "`ty_extensions.GenericContext` is not allowed in {location}s"
+                        )
+                    }
+                    InvalidTypeExpression::Specialization => write!(
+                        f,
+                        "`ty_extensions.GenericContext` is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::NamedTupleSpec => {
-                        f.write_str("`NamedTupleSpec` is not allowed in type expressions")
+                        write!(f, "`NamedTupleSpec` is not allowed in {location}s")
                     }
-                    InvalidTypeExpression::TypedDict => f.write_str(
+                    InvalidTypeExpression::TypedDict => write!(
+                        f,
                         "The special form `typing.TypedDict` \
-                            is not allowed in type expressions",
+                            is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::TypeAlias => f.write_str(
                         "`typing.TypeAlias` is only allowed \
                             as the sole annotation on an annotated assignment",
                     ),
-                    InvalidTypeExpression::TypeQualifier(qualifier) => write!(
-                        f,
-                        "Type qualifier `{qualifier}` is not allowed in type expressions \
-                        (only in annotation expressions)",
-                    ),
-                    InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
-                        f,
-                        "Type qualifier `{qualifier}` is not allowed in type expressions \
-                        (only in annotation expressions, and only with exactly one argument)",
-                    ),
+                    InvalidTypeExpression::TypeQualifier(qualifier) => {
+                        if self.flags.intersects(
+                            InferenceFlags::IN_PARAMETER_ANNOTATION
+                                | InferenceFlags::IN_RETURN_TYPE
+                                | InferenceFlags::IN_TYPE_ALIAS,
+                        ) {
+                            write!(
+                                f,
+                                "Type qualifier `{qualifier}` is not allowed in {location}s",
+                            )
+                        } else if qualifier.requires_one_argument() {
+                            write!(
+                                f,
+                                "Type qualifier `{qualifier}` is not allowed in type expressions \
+                                (only in annotation expressions, and only with \
+                                exactly one argument)",
+                            )
+                        } else {
+                            write!(
+                                f,
+                                "Type qualifier `{qualifier}` is not allowed in type expressions \
+                                (only in annotation expressions)"
+                            )
+                        }
+                    }
                     InvalidTypeExpression::TypingSelfInStaticMethod => {
                         f.write_str("`Self` cannot be used in a static method")
                     }
@@ -6971,18 +6996,18 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
-                            "Function `{function}` is not valid in a type expression",
+                            "Function `{function}` is not valid in a {location}",
                             function = function.name(self.db)
                         )
                     }
                     InvalidTypeExpression::InvalidType(Type::ModuleLiteral(module), _) => write!(
                         f,
-                        "Module `{module}` is not valid in a type expression",
+                        "Module `{module}` is not valid in a {location}",
                         module = module.module(self.db).name(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
-                        "Variable of type `{ty}` is not allowed in a type expression",
+                        "Variable of type `{ty}` is not allowed in a {location}",
                         ty = ty.display(self.db)
                     ),
                     InvalidTypeExpression::InvalidBareParamSpec(paramspec) => write!(
@@ -6997,7 +7022,11 @@ impl<'db> InvalidTypeExpression<'db> {
             }
         }
 
-        Display { error: self, db }
+        Display {
+            error: self,
+            db,
+            flags,
+        }
     }
 
     fn add_subdiagnostics(
