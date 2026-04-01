@@ -232,38 +232,34 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
     let mut result = String::with_capacity(text.len() + indent.len());
 
     for line in text.universal_newlines() {
-        let trimmed = line.trim_whitespace_start();
-        if trimmed.is_empty() {
-            if let Some(line_ending) = line.line_ending() {
-                result.push_str(&line_ending);
-            }
+        let formfeed_count = line.chars().take_while(|&c| c == '\x0C').count();
+        let (formfeeds, content) = line.split_at(formfeed_count);
+        let line_ending = if let Some(line_ending) = line.line_ending() {
+            line_ending.as_str()
         } else {
-            let formfeed_count = line.chars().take_while(|&c| c == '\x0C').count();
-            let content = if line.starts_with('\x0C') {
-                &line[formfeed_count..]
-            } else {
-                line.as_full_str()
-            };
-            // Determine the current indentation level.
-            let current_indent_len = content.len() - trimmed.len();
-            if current_indent_len < existing_indent_len {
-                // If the current indentation level is less than the baseline, keep it as is.
-                result.push_str(line.as_full_str());
-            } else {
-                // Otherwise, reduce the indentation level.
-                if line.starts_with('\x0C') {
-                    for _ in 0..formfeed_count {
-                        result.push('\x0C');
-                    }
-                    result.push_str(&content[dedent_len..]);
-                    if let Some(line_ending) = line.line_ending() {
-                        result.push_str(&line_ending);
-                    }
-                } else {
-                    result.push_str(&line.as_full_str()[dedent_len..]);
-                }
-            }
+            ""
+        };
+
+        let trimmed = line.trim_whitespace_start();
+
+        if trimmed.is_empty() {
+            result.push_str(line_ending);
+            continue;
         }
+
+        // Determine the current indentation level.
+        let current_indent_len = content.len() - trimmed.len();
+
+        if current_indent_len < existing_indent_len {
+            // If the current indentation level is less than the baseline, keep it as is.
+            result.push_str(line.as_full_str());
+            continue;
+        }
+        let dedented_content = &content[dedent_len..];
+
+        result.push_str(formfeeds);
+        result.push_str(dedented_content);
+        result.push_str(line_ending);
     }
     Some(result)
 }
@@ -719,5 +715,33 @@ mod tests {
         ].join("\n");
         let first_result = dedent_to(&x, "  ").unwrap();
         assert_eq!(dedent_to(&first_result, "  "), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_preserves_less_indented_later_line() {
+        let x = [
+            "   foo\n",
+            "  bar\n",
+        ].join("");
+        let y = [
+            "foo\n",
+            "  bar\n",
+        ].join("");
+        assert_eq!(dedent_to(&x, ""), Some(y));
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_preserves_less_indented_later_line_with_crlf() {
+        let x = [
+            "   foo\r\n",
+            "  bar\r\n",
+        ].join("");
+        let y = [
+            "foo\r\n",
+            "  bar\r\n",
+        ].join("");
+        assert_eq!(dedent_to(&x, ""), Some(y));
     }
 }
