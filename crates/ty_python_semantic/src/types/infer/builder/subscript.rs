@@ -455,21 +455,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        fn infer_expr<'db>(
-            builder: &mut TypeInferenceBuilder<'db, '_>,
-            subscript: &ast::ExprSubscript,
-            expr: &ast::Expr,
-        ) -> Type<'db> {
-            if matches!(
-                &*subscript.value,
-                ast::Expr::Name(_) | ast::Expr::Attribute(_)
-            ) {
-                builder.infer_type_expression(expr)
-            } else {
-                builder.infer_expression(expr, TypeContext::default())
-            }
-        }
-
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
@@ -520,7 +505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         })
                     } else {
-                        infer_expr(self, subscript, expr)
+                        self.infer_type_expression(expr)
                     };
 
                     inferred_type_arguments.push(provided_type);
@@ -647,7 +632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 EitherOrBoth::Right(expr) => {
-                    inferred_type_arguments.push(infer_expr(self, subscript, expr));
+                    inferred_type_arguments.push(self.infer_type_expression(expr));
                     first_excess_type_argument_index.get_or_insert(index);
                 }
             }
