@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
+use ruff_python_ast::helpers::is_dotted_name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -3770,14 +3771,6 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    fn is_dotted_name(expr: &ast::Expr) -> bool {
-        match expr {
-            ast::Expr::Name(_) => true,
-            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
-            _ => false,
-        }
-    }
-
     match expr {
         ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
         ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {

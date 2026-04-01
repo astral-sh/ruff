@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
@@ -99,22 +100,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             },
 
-            ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => self
-                    .infer_attribute_expression(attribute_expression)
-                    .default_specialize(self.db())
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags,
-                    )
-                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
-                ast::ExprContext::Invalid => Type::unknown(),
-                ast::ExprContext::Store | ast::ExprContext::Del => {
-                    todo_type!("Attribute expression annotation in Store/Del context")
+            ast::Expr::Attribute(attribute_expression) => {
+                if is_dotted_name(expression) {
+                    match attribute_expression.ctx {
+                        ast::ExprContext::Load => self
+                            .infer_attribute_expression(attribute_expression)
+                            .default_specialize(self.db())
+                            .in_type_expression(
+                                self.db(),
+                                self.scope(),
+                                self.typevar_binding_context,
+                                self.inference_flags,
+                            )
+                            .unwrap_or_else(|error| {
+                                error.into_fallback_type(&self.context, expression)
+                            }),
+                        ast::ExprContext::Invalid => Type::unknown(),
+                        ast::ExprContext::Store | ast::ExprContext::Del => {
+                            todo_type!("Attribute expression annotation in Store/Del context")
+                        }
+                    }
+                } else {
+                    if !self.in_string_annotation() {
+                        self.infer_attribute_expression(attribute_expression);
+                    }
+                    self.report_invalid_type_expression(
+                        expression,
+                        "Only simple names, dotted names and subscripts \
+                        can be used in type expressions",
+                    );
+                    Type::unknown()
                 }
-            },
+            }
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db()),
 
@@ -132,7 +149,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let value_ty = self.infer_expression(value, TypeContext::default());
 
-                self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                if is_dotted_name(value) {
+                    self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                } else {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(slice, TypeContext::default());
+                    }
+                    self.report_invalid_type_expression(
+                        expression,
+                        "Only simple names and dotted names can be subscripted in type expressions",
+                    );
+                    Type::unknown()
+                }
             }
 
             ast::Expr::BinOp(binary) => {

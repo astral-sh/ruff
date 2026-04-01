@@ -71,6 +71,10 @@ def _(
 ## Invalid AST nodes
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 def bar() -> None:
     return None
 
@@ -102,8 +106,12 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         # error: [unsupported-operator]
         # error: [invalid-type-form] "F-strings are not allowed in type expressions"
         p: int | f"foo",
-        # error: [invalid-type-form] "Invalid subscript"
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
         q: [1, 2, 3][1:2],
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+        r: list[T][int],
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+        s: list[list[T][int]],
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -276,8 +284,12 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-        # error: [invalid-type-form] "Invalid subscript"
+        # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
         o: "[1, 2, 3][1:2]",
+        # error: [invalid-type-form] "Only simple names, dotted names and subscripts can be used in type expressions"
+        p: list[int].append,
+        # error: [invalid-type-form] "Only simple names, dotted names and subscripts can be used in type expressions"
+        q: list[list[int].append],
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -294,6 +306,8 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         reveal_type(m)  # revealed: Unknown
         reveal_type(n)  # revealed: Unknown
         reveal_type(o)  # revealed: Unknown
+        reveal_type(p)  # revealed: Unknown
+        reveal_type(q)  # revealed: list[Unknown]
 ```
 
 ## Invalid Collection based AST nodes
