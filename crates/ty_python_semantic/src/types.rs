@@ -1705,6 +1705,72 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return `true` if `self` is a type that is suitable for displaying
+    /// in a "Did you mean...?" hint message in diagnostics
+    fn is_hintable(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(_)
+            | Type::NewTypeInstance(_)
+            | Type::LiteralValue(_)
+            | Type::TypeAlias(_) => true,
+
+            Type::Intersection(_)
+            | Type::Divergent(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::PropertyInstance(_)
+            | Type::FunctionLiteral(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::KnownInstance(_) => false,
+
+            // `Never` is spellable and could result from an explicit type annotation,
+            // but also could just be the result of us inferring an unreachable region.
+            // Best to avoid showing it in hints.
+            Type::Never => false,
+
+            // All `Callable` types are spellable in some way,
+            // but they're generally not spellable with the syntax we use by default
+            // in our type display
+            Type::Callable(_) => false,
+
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(_) => true,
+                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db),
+                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db),
+            },
+
+            Type::TypeVar(tvar) => tvar.typevar(db).definition(db).is_some(),
+
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db)),
+
+            Type::TypedDict(td) => td.defining_class().is_some(),
+
+            Type::ProtocolInstance(ProtocolInstanceType { inner, .. }) => !inner.is_synthesized(),
+
+            Type::Dynamic(dynamic) => match dynamic {
+                DynamicType::Any => true,
+                DynamicType::Unknown
+                | DynamicType::UnknownGeneric(_)
+                | DynamicType::UnspecializedTypeVar
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoTypeVarTuple
+                | DynamicType::Todo(_)
+                | DynamicType::TodoStarredExpression => false,
+            },
+        }
+    }
+
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///

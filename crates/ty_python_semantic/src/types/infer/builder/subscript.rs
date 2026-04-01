@@ -241,7 +241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
-                        let elements = tuple.elts.iter().map(|elt| self.infer_type_expression(elt));
+                        let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
