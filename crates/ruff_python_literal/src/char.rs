@@ -1,4 +1,4 @@
-use unic_ucd_category::GeneralCategory;
+use icu_properties::props::{EnumeratedProperty, GeneralCategory};
 
 /// According to python following categories aren't printable:
 /// * Cc (Other, Control)
@@ -10,6 +10,17 @@ use unic_ucd_category::GeneralCategory;
 /// * Zp Separator, Paragraph ('\u2029', PARAGRAPH SEPARATOR)
 /// * Zs (Separator, Space) other than ASCII space('\x20').
 pub fn is_printable(c: char) -> bool {
-    let cat = GeneralCategory::of(c);
-    !(cat.is_other() || cat.is_separator())
+    let cat = GeneralCategory::for_char(c);
+
+    !matches!(
+        cat,
+        GeneralCategory::SpaceSeparator
+            | GeneralCategory::LineSeparator
+            | GeneralCategory::ParagraphSeparator
+            | GeneralCategory::Control
+            | GeneralCategory::Format
+            | GeneralCategory::Surrogate
+            | GeneralCategory::PrivateUse
+            | GeneralCategory::Unassigned
+    )
 }
