@@ -15,13 +15,13 @@ help: Move out of type-checking block
 1   + from pandas import DataFrame
 2   | def f():
 3   |     from pandas import DataFrame
-4   | 
+4   |
 --------------------------------------------------------------------------------
 108 |     from typing import TypeAlias, TYPE_CHECKING
-109 | 
+109 |
 110 |     if TYPE_CHECKING:
     -         from pandas import DataFrame
 111 +         pass
-112 | 
+112 |
 113 |     x: TypeAlias = DataFrame | None
 note: This is an unsafe fix and may change runtime behavior

@@ -14,10 +14,10 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 1 + # Future imports
 2 | from __future__ import annotations
-3 + 
+3 +
 4 + # Standard library imports
 5 | from typing import Any
-6 | 
+6 |
   - import requests
 7 + # Third party imports
 8 | import pandas

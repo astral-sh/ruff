@@ -13,7 +13,7 @@ help: Remove `from __future__ import annotations`
 1 | # Bad import.
   - from __future__ import annotations # PYI044.
 2 | from __future__ import annotations, with_statement # PYI044.
-3 | 
+3 |
 4 | # Good imports.
 
 PYI044 [*] `from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics
@@ -31,6 +31,6 @@ help: Remove `from __future__ import annotations`
 2 | from __future__ import annotations # PYI044.
   - from __future__ import annotations, with_statement # PYI044.
 3 + from __future__ import with_statement # PYI044.
-4 | 
+4 |
 5 | # Good imports.
 6 | from __future__ import with_statement

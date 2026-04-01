@@ -12,7 +12,7 @@ AIR302 [*] `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `ALL_NAMESPACES` from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types` instead.
 1  | from __future__ import annotations
-2  | 
+2  |
 3  | from airflow.executors.kubernetes_executor_types import (
    -     ALL_NAMESPACES,
 4  |     POD_EXECUTOR_DONE_KEY,
@@ -23,7 +23,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `ALL_NAM
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types import ALL_NAMESPACES
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -38,7 +38,7 @@ AIR302 [*] `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` i
 25 | K8SModel()
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `POD_EXECUTOR_DONE_KEY` from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types` instead.
-2  | 
+2  |
 3  | from airflow.executors.kubernetes_executor_types import (
 4  |     ALL_NAMESPACES,
    -     POD_EXECUTOR_DONE_KEY,
@@ -50,7 +50,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `POD_EXE
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types import POD_EXECUTOR_DONE_KEY
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -77,7 +77,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `K8SMode
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.k8s_model import K8SModel
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -104,7 +104,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `append_
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.k8s_model import append_to_pod
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -132,7 +132,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `_disabl
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.kube_client import _disable_verify_ssl
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -158,7 +158,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `_enable
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.kube_client import _enable_tcp_keepalive
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -185,7 +185,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `get_kub
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.kube_client import get_kube_client
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -205,18 +205,18 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=10.0.0` and use `add_un
 19 |     create_pod_id,
 20 | )
 21 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import add_unique_suffix
-22 | 
+22 |
 23 | ALL_NAMESPACES
 24 | POD_EXECUTOR_DONE_KEY
 --------------------------------------------------------------------------------
 30 | _enable_tcp_keepalive()
 31 | get_kube_client()
-32 | 
+32 |
    - add_pod_suffix()
 33 + add_unique_suffix()
 34 | annotations_for_logging_task_metadata()
 35 | create_pod_id()
-36 | 
+36 |
 
 AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
   --> AIR302_kubernetes.py:33:1
@@ -234,7 +234,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `annotat
 18 |     create_pod_id,
 19 | )
 20 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import annotations_for_logging_task_metadata
-21 | 
+21 |
 22 | ALL_NAMESPACES
 23 | POD_EXECUTOR_DONE_KEY
 note: This is an unsafe fix and may change runtime behavior
@@ -252,17 +252,17 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=10.0.0` and use `create
 19 |     create_pod_id,
 20 | )
 21 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import create_unique_id
-22 | 
+22 |
 23 | ALL_NAMESPACES
 24 | POD_EXECUTOR_DONE_KEY
 --------------------------------------------------------------------------------
-32 | 
+32 |
 33 | add_pod_suffix()
 34 | annotations_for_logging_task_metadata()
    - create_pod_id()
 35 + create_unique_id()
-36 | 
-37 | 
+36 |
+37 |
 38 | from airflow.kubernetes.pod_generator import (
 
 AIR302 [*] `airflow.kubernetes.pod_generator.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
@@ -276,8 +276,8 @@ AIR302 [*] `airflow.kubernetes.pod_generator.PodDefaults` is moved into `cncf-ku
 51 | add_pod_suffix()
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefaults` from `airflow.providers.cncf.kubernetes.utils.xcom_sidecar` instead.
-35 | 
-36 | 
+35 |
+36 |
 37 | from airflow.kubernetes.pod_generator import (
    -     PodDefaults,
 38 |     PodGenerator,
@@ -288,7 +288,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefa
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.utils.xcom_sidecar import PodDefaults
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -303,7 +303,7 @@ AIR302 [*] `airflow.kubernetes.pod_generator.PodGenerator` is moved into `cncf-k
 52 | datetime_to_label_safe_datestring()
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGenerator` from `airflow.providers.cncf.kubernetes.pod_generator` instead.
-36 | 
+36 |
 37 | from airflow.kubernetes.pod_generator import (
 38 |     PodDefaults,
    -     PodGenerator,
@@ -315,7 +315,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGene
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import PodGenerator
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -335,7 +335,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=10.0.0` and use `add_un
 46 |     rand_str,
 47 | )
 48 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import add_unique_suffix
-49 | 
+49 |
 50 | PodDefaults()
 51 | PodGenerator()
    - add_pod_suffix()
@@ -366,7 +366,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `datetim
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import datetime_to_label_safe_datestring
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -392,7 +392,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `extend_
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import extend_object_field
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -417,7 +417,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `label_s
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import label_safe_datestring_to_datetime
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -441,7 +441,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `make_sa
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import make_safe_label_value
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -463,7 +463,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `merge_o
 45 |     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.pod_generator import merge_objects
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -485,7 +485,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `rand_st
    -     rand_str,
 46 | )
 47 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import rand_str
-48 | 
+48 |
 49 | PodDefaults()
 50 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -502,7 +502,7 @@ AIR302 [*] `airflow.kubernetes.pod_generator_deprecated.PodDefaults` is moved in
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefaults` from `airflow.providers.cncf.kubernetes.utils.xcom_sidecar` instead.
 57 | rand_str()
-58 | 
+58 |
 59 | from airflow.kubernetes.pod_generator_deprecated import (
    -     PodDefaults,
 60 |     PodGenerator,
@@ -513,7 +513,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefa
 65 |     PodStatus,
 66 | )
 67 + from airflow.providers.cncf.kubernetes.utils.xcom_sidecar import PodDefaults
-68 | 
+68 |
 69 | PodDefaults()
 70 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -527,7 +527,7 @@ AIR302 [*] `airflow.kubernetes.pod_generator_deprecated.PodGenerator` is moved i
 71 | make_safe_label_value()
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGenerator` from `airflow.providers.cncf.kubernetes.pod_generator` instead.
-58 | 
+58 |
 59 | from airflow.kubernetes.pod_generator_deprecated import (
 60 |     PodDefaults,
    -     PodGenerator,
@@ -538,7 +538,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGene
 65 |     PodStatus,
 66 | )
 67 + from airflow.providers.cncf.kubernetes.pod_generator import PodGenerator
-68 | 
+68 |
 69 | PodDefaults()
 70 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -564,7 +564,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `make_sa
 65 |     PodStatus,
 66 | )
 67 + from airflow.providers.cncf.kubernetes.pod_generator import make_safe_label_value
-68 | 
+68 |
 69 | PodDefaults()
 70 | PodGenerator()
 note: This is an unsafe fix and may change runtime behavior
@@ -583,15 +583,15 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=3.0.0` and use `PodMana
 66 |     PodStatus,
 67 | )
 68 + from airflow.providers.cncf.kubernetes.utils.pod_manager import PodManager
-69 | 
+69 |
 70 | PodDefaults()
 71 | PodGenerator()
 72 | make_safe_label_value()
-73 | 
+73 |
    - PodLauncher()
 74 + PodManager()
 75 | PodStatus()
-76 | 
+76 |
 77 | from airflow.kubernetes.pod_launcher_deprecated import (
 
 AIR302 [*] `airflow.kubernetes.pod_launcher.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
@@ -608,15 +608,15 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=3.0.0` and use `PodPhas
 66 |     PodStatus,
 67 | )
 68 + from  airflow.providers.cncf.kubernetes.utils.pod_manager import PodPhase
-69 | 
+69 |
 70 | PodDefaults()
 71 | PodGenerator()
 72 | make_safe_label_value()
-73 | 
+73 |
 74 | PodLauncher()
    - PodStatus()
 75 + PodPhase()
-76 | 
+76 |
 77 | from airflow.kubernetes.pod_launcher_deprecated import (
 78 |     PodDefaults,
 
@@ -632,7 +632,7 @@ AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.PodDefaults` is moved int
    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefaults` from `airflow.providers.cncf.kubernetes.utils.xcom_sidecar` instead.
 74 | PodStatus()
-75 | 
+75 |
 76 | from airflow.kubernetes.pod_launcher_deprecated import (
    -     PodDefaults,
 77 |     PodLauncher,
@@ -643,7 +643,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodDefa
 86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.utils.xcom_sidecar import PodDefaults
-89 | 
+89 |
 90 | PodDefaults()
 91 | PodLauncher()
 note: This is an unsafe fix and may change runtime behavior
@@ -662,13 +662,13 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=3.0.0` and use `PodMana
 87 | from airflow.kubernetes.volume import Volume
 88 | from airflow.kubernetes.volume_mount import VolumeMount
 89 + from airflow.providers.cncf.kubernetes.utils.pod_manager import PodManager
-90 | 
+90 |
 91 | PodDefaults()
    - PodLauncher()
 92 + PodManager()
 93 | PodStatus()
 94 | get_kube_client()
-95 | 
+95 |
 
 AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
   --> AIR302_kubernetes.py:92:1
@@ -684,13 +684,13 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=3.0.0` and use `PodPhas
 87 | from airflow.kubernetes.volume import Volume
 88 | from airflow.kubernetes.volume_mount import VolumeMount
 89 + from  airflow.providers.cncf.kubernetes.utils.pod_manager import PodPhase
-90 | 
+90 |
 91 | PodDefaults()
 92 | PodLauncher()
    - PodStatus()
 93 + PodPhase()
 94 | get_kube_client()
-95 | 
+95 |
 96 | PodRuntimeInfoEnv()
 
 AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.get_kube_client` is moved into `cncf-kubernetes` provider in Airflow 3.0;
@@ -716,7 +716,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `get_kub
 86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.kube_client import get_kube_client
-89 | 
+89 |
 90 | PodDefaults()
 91 | PodLauncher()
 note: This is an unsafe fix and may change runtime behavior
@@ -736,12 +736,12 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `V1EnvVa
 87 | from airflow.kubernetes.volume import Volume
 88 | from airflow.kubernetes.volume_mount import VolumeMount
 89 + from kubernetes.client.models import V1EnvVar
-90 | 
+90 |
 91 | PodDefaults()
 92 | PodLauncher()
 93 | PodStatus()
 94 | get_kube_client()
-95 | 
+95 |
    - PodRuntimeInfoEnv()
 96 + V1EnvVar()
 97 | K8SModel()
@@ -767,7 +767,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `K8SMode
 86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.k8s_model import K8SModel
-89 | 
+89 |
 90 | PodDefaults()
 91 | PodLauncher()
 note: This is an unsafe fix and may change runtime behavior
@@ -791,7 +791,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `Secret`
 86 | from airflow.kubernetes.volume import Volume
 87 | from airflow.kubernetes.volume_mount import VolumeMount
 88 + from airflow.providers.cncf.kubernetes.secret import Secret
-89 | 
+89 |
 90 | PodDefaults()
 91 | PodLauncher()
 note: This is an unsafe fix and may change runtime behavior
@@ -810,7 +810,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `V1Volum
 87  | from airflow.kubernetes.volume import Volume
 88  | from airflow.kubernetes.volume_mount import VolumeMount
 89  + from kubernetes.client.models import V1Volume
-90  | 
+90  |
 91  | PodDefaults()
 92  | PodLauncher()
 --------------------------------------------------------------------------------
@@ -820,7 +820,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `V1Volum
     - Volume()
 99  + V1Volume()
 100 | VolumeMount()
-101 | 
+101 |
 102 | from airflow.kubernetes.kubernetes_helper_functions import (
 
 AIR302 [*] `airflow.kubernetes.volume_mount.VolumeMount` is moved into `cncf-kubernetes` provider in Airflow 3.0;
@@ -838,7 +838,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `V1Volum
 87  | from airflow.kubernetes.volume import Volume
 88  | from airflow.kubernetes.volume_mount import VolumeMount
 89  + from kubernetes.client.models import V1VolumeMount
-90  | 
+90  |
 91  | PodDefaults()
 92  | PodLauncher()
 --------------------------------------------------------------------------------
@@ -847,7 +847,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `V1Volum
 99  | Volume()
     - VolumeMount()
 100 + V1VolumeMount()
-101 | 
+101 |
 102 | from airflow.kubernetes.kubernetes_helper_functions import (
 103 |     annotations_to_key,
 
@@ -863,14 +863,14 @@ AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.annotations_to_key` i
     |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `annotations_to_key` from `airflow.providers.cncf.kubernetes.kubernetes_helper_functions` instead.
 99  | VolumeMount()
-100 | 
+100 |
 101 | from airflow.kubernetes.kubernetes_helper_functions import (
     -     annotations_to_key,
 102 |     get_logs_task_metadata,
 103 |     rand_str,
 104 | )
 105 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import annotations_to_key
-106 | 
+106 |
 107 | annotations_to_key()
 108 | get_logs_task_metadata()
 note: This is an unsafe fix and may change runtime behavior
@@ -884,14 +884,14 @@ AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.get_logs_task_metadat
 109 | rand_str()
     |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `get_logs_task_metadata` from `airflow.providers.cncf.kubernetes.kubernetes_helper_functions` instead.
-100 | 
+100 |
 101 | from airflow.kubernetes.kubernetes_helper_functions import (
 102 |     annotations_to_key,
     -     get_logs_task_metadata,
 103 |     rand_str,
 104 | )
 105 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import get_logs_task_metadata
-106 | 
+106 |
 107 | annotations_to_key()
 108 | get_logs_task_metadata()
 note: This is an unsafe fix and may change runtime behavior
@@ -913,7 +913,7 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `rand_st
     -     rand_str,
 104 | )
 105 + from airflow.providers.cncf.kubernetes.kubernetes_helper_functions import rand_str
-106 | 
+106 |
 107 | annotations_to_key()
 108 | get_logs_task_metadata()
 note: This is an unsafe fix and may change runtime behavior
@@ -928,9 +928,9 @@ AIR302 [*] `airflow.kubernetes.pod_generator.PodGeneratorDeprecated` is moved in
     |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGenerator` from `airflow.providers.cncf.kubernetes.pod_generator` instead.
 109 | rand_str()
-110 | 
+110 |
 111 | from airflow.kubernetes.pod_generator import PodGeneratorDeprecated
 112 + from airflow.providers.cncf.kubernetes.pod_generator import PodGenerator
-113 | 
+113 |
 114 | PodGeneratorDeprecated()
 note: This is an unsafe fix and may change runtime behavior

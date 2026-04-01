@@ -20,7 +20,7 @@ help: Remove the `else` clause
   -     pass
 7 | finally:
 8 |     pass
-9 | 
+9 |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:9:1
@@ -39,7 +39,7 @@ help: Remove the `finally` clause
 8  |     pass
    - finally:
    -     pass
-9  | 
+9  |
 10 | # All non-body clauses are no-ops
 11 | try:
 
@@ -62,7 +62,7 @@ help: Remove the `else` clause
    -     pass
 17 | finally:
 18 |     pass
-19 | 
+19 |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:19:1
@@ -81,7 +81,7 @@ help: Remove the `finally` clause
 18 |     pass
    - finally:
    -     pass
-19 | 
+19 |
 20 | # Only the `finally` is empty; `else` has real code
 21 | try:
 

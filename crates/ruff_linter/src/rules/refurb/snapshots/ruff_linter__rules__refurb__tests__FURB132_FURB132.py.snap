@@ -11,13 +11,13 @@ FURB132 [*] Use `s.discard("x")` instead of check and `remove`
    |
 help: Replace with `s.discard("x")`
 9  | # these should match
-10 | 
+10 |
 11 | # FURB132
    - if "x" in s:
    -     s.remove("x")
 12 + s.discard("x")
-13 | 
-14 | 
+13 |
+14 |
 15 | # FURB132
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,14 +30,14 @@ FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
    | |__________________^
    |
 help: Replace with `s3.discard("x")`
-19 | 
-20 | 
+19 |
+20 |
 21 | # FURB132
    - if "x" in s3:
    -     s3.remove("x")
 22 + s3.discard("x")
-23 | 
-24 | 
+23 |
+24 |
 25 | var = "y"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,14 +51,14 @@ FURB132 [*] Use `s.discard(var)` instead of check and `remove`
    | |_________________^
    |
 help: Replace with `s.discard(var)`
-25 | 
+25 |
 26 | var = "y"
 27 | # FURB132
    - if var in s:
    -     s.remove(var)
 28 + s.discard(var)
-29 | 
-30 | 
+29 |
+30 |
 31 | if f"{var}:{var}" in s:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -71,12 +71,12 @@ FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
    |
 help: Replace with `s.discard(f"{var}:{var}")`
 29 |     s.remove(var)
-30 | 
-31 | 
+30 |
+31 |
    - if f"{var}:{var}" in s:
    -     s.remove(f"{var}:{var}")
 32 + s.discard(f"{var}:{var}")
-33 | 
-34 | 
+33 |
+34 |
 35 | def identity(x):
 note: This is an unsafe fix and may change runtime behavior

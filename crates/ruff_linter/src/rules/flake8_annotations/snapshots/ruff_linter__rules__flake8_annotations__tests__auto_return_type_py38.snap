@@ -12,8 +12,8 @@ help: Add return type annotation: `int`
   - def func():
 1 + def func() -> int:
 2 |     return 1
-3 | 
-4 | 
+3 |
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -25,13 +25,13 @@ ANN201 [*] Missing return type annotation for public function `func`
   |
 help: Add return type annotation: `float`
 2 |     return 1
-3 | 
-4 | 
+3 |
+4 |
   - def func():
 5 + def func() -> float:
 6 |     return 1.5
-7 | 
-8 | 
+7 |
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -44,8 +44,8 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `float`
 6  |     return 1.5
-7  | 
-8  | 
+7  |
+8  |
    - def func(x: int):
 9  + def func(x: int) -> float:
 10 |     if x > 0:
@@ -62,13 +62,13 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `bool`
 13 |         return 1.5
-14 | 
-15 | 
+14 |
+15 |
    - def func():
 16 + def func() -> bool:
 17 |     return True
-18 | 
-19 | 
+18 |
+19 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -81,8 +81,8 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `None`
 17 |     return True
-18 | 
-19 | 
+18 |
+19 |
    - def func(x: int):
 20 + def func(x: int) -> None:
 21 |     if x > 0:
@@ -101,16 +101,16 @@ help: Add return type annotation: `Union[str, float]`
 1  + from typing import Union
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 25 |         return
-26 | 
-27 | 
+26 |
+27 |
    - def func(x: int):
 28 + def func(x: int) -> Union[str, float]:
 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-30 | 
-31 | 
+30 |
+31 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -124,16 +124,16 @@ help: Add return type annotation: `Union[str, float]`
 1  + from typing import Union
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-30 | 
-31 | 
+30 |
+31 |
    - def func(x: int):
 32 + def func(x: int) -> Union[str, float]:
 33 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
-34 | 
-35 | 
+34 |
+35 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 Missing return type annotation for public function `func`
@@ -165,8 +165,8 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `int`
 42 |     return {"foo": 1}
-43 | 
-44 | 
+43 |
+44 |
    - def func(x: int):
 45 + def func(x: int) -> int:
 46 |     if not x:
@@ -186,11 +186,11 @@ help: Add return type annotation: `Optional[int]`
 1  + from typing import Optional
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 50 |         return True
-51 | 
-52 | 
+51 |
+52 |
    - def func(x: int):
 53 + def func(x: int) -> Optional[int]:
 54 |     if not x:
@@ -210,11 +210,11 @@ help: Add return type annotation: `Union[str, int, None]`
 1  + from typing import Union
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 57 |         return None
-58 | 
-59 | 
+58 |
+59 |
    - def func(x: int):
 60 + def func(x: int) -> Union[str, int, None]:
 61 |     if not x:
@@ -234,16 +234,16 @@ help: Add return type annotation: `Optional[int]`
 1  + from typing import Optional
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 66 |         return None
-67 | 
-68 | 
+67 |
+68 |
    - def func(x: int):
 69 + def func(x: int) -> Optional[int]:
 70 |     if x:
 71 |         return 1
-72 | 
+72 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -255,13 +255,13 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `None`
 70 |         return 1
-71 | 
-72 | 
+71 |
+72 |
    - def func():
 73 + def func() -> None:
 74 |     x = 1
-75 | 
-76 | 
+75 |
+76 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -276,16 +276,16 @@ help: Add return type annotation: `Optional[int]`
 1  + from typing import Optional
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 75 |     x = 1
-76 | 
-77 | 
+76 |
+77 |
    - def func(x: int):
 78 + def func(x: int) -> Optional[int]:
 79 |     if x > 0:
 80 |         return 1
-81 | 
+81 |
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
@@ -300,11 +300,11 @@ help: Add return type annotation: `Union[str, int, None]`
 1  + from typing import Union
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 80 |         return 1
-81 | 
-82 | 
+81 |
+82 |
    - def func(x: int):
 83 + def func(x: int) -> Union[str, int, None]:
 84 |     match x:
@@ -324,11 +324,11 @@ help: Add return type annotation: `Optional[int]`
 1  + from typing import Optional
 2  | def func():
 3  |     return 1
-4  | 
+4  |
 --------------------------------------------------------------------------------
 88 |             return "foo"
-89 | 
-90 | 
+89 |
+90 |
    - def func(x: int):
 91 + def func(x: int) -> Optional[int]:
 92 |     for i in range(5):
@@ -346,8 +346,8 @@ ANN201 [*] Missing return type annotation for public function `func`
    |
 help: Add return type annotation: `int`
 93 |             return 1
-94 | 
-95 | 
+94 |
+95 |
    - def func(x: int):
 96 + def func(x: int) -> int:
 97 |     for i in range(5):
@@ -367,11 +367,11 @@ help: Add return type annotation: `Optional[int]`
 1   + from typing import Optional
 2   | def func():
 3   |     return 1
-4   | 
+4   |
 --------------------------------------------------------------------------------
 102 |         return 4
-103 | 
-104 | 
+103 |
+104 |
     - def func(x: int):
 105 + def func(x: int) -> Optional[int]:
 106 |     for i in range(5):
@@ -391,11 +391,11 @@ help: Add return type annotation: `Optional[int]`
 1   + from typing import Optional
 2   | def func():
 3   |     return 1
-4   | 
+4   |
 --------------------------------------------------------------------------------
 110 |         return 4
-111 | 
-112 | 
+111 |
+112 |
     - def func(x: int):
 113 + def func(x: int) -> Optional[int]:
 114 |     try:
@@ -413,8 +413,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 116 |         return 1
-117 | 
-118 | 
+117 |
+118 |
     - def func(x: int):
 119 + def func(x: int) -> int:
 120 |     try:
@@ -432,8 +432,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 125 |         return 2
-126 | 
-127 | 
+126 |
+127 |
     - def func(x: int):
 128 + def func(x: int) -> int:
 129 |     try:
@@ -453,11 +453,11 @@ help: Add return type annotation: `Optional[int]`
 1   + from typing import Optional
 2   | def func():
 3   |     return 1
-4   | 
+4   |
 --------------------------------------------------------------------------------
 135 |         return 2
-136 | 
-137 | 
+136 |
+137 |
     - def func(x: int):
 138 + def func(x: int) -> Optional[int]:
 139 |     try:
@@ -477,11 +477,11 @@ help: Add return type annotation: `Optional[int]`
 1   + from typing import Optional
 2   | def func():
 3   |     return 1
-4   | 
+4   |
 --------------------------------------------------------------------------------
 144 |         pass
-145 | 
-146 | 
+145 |
+146 |
     - def func(x: int):
 147 + def func(x: int) -> Optional[int]:
 148 |     while x > 0:
@@ -553,7 +553,7 @@ ANN201 [*] Missing return type annotation for public function `method`
     |
 help: Add return type annotation: `float`
 177 |         pass
-178 | 
+178 |
 179 |     @abstractmethod
     -     def method(self):
 180 +     def method(self) -> float:
@@ -571,17 +571,17 @@ ANN201 [*] Missing return type annotation for public function `func`
 189 |         pass
     |
 help: Add return type annotation: `Optional[int]`
-151 | 
+151 |
 152 | import abc
 153 | from abc import abstractmethod
 154 + from typing import Optional
-155 | 
-156 | 
+155 |
+156 |
 157 | class Foo(abc.ABC):
 --------------------------------------------------------------------------------
 185 |             return 1.5
-186 | 
-187 | 
+186 |
+187 |
     - def func(x: int):
 188 + def func(x: int) -> Optional[int]:
 189 |     try:
@@ -599,8 +599,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 191 |         return 2
-192 | 
-193 | 
+192 |
+193 |
     - def func(x: int):
 194 + def func(x: int) -> int:
 195 |     try:
@@ -617,17 +617,17 @@ ANN201 [*] Missing return type annotation for public function `func`
 205 |         raise ValueError
     |
 help: Add return type annotation: `NoReturn`
-151 | 
+151 |
 152 | import abc
 153 | from abc import abstractmethod
 154 + from typing import NoReturn
-155 | 
-156 | 
+155 |
+156 |
 157 | class Foo(abc.ABC):
 --------------------------------------------------------------------------------
 201 |         return 3
-202 | 
-203 | 
+202 |
+203 |
     - def func(x: int):
 204 + def func(x: int) -> NoReturn:
 205 |     if not x:
@@ -645,8 +645,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 207 |         raise TypeError
-208 | 
-209 | 
+208 |
+209 |
     - def func(x: int):
 210 + def func(x: int) -> int:
 211 |     if not x:
@@ -664,8 +664,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 231 |     return i
-232 | 
-233 | 
+232 |
+233 |
     - def func(x: int):
 234 + def func(x: int) -> int:
 235 |     if not x:
@@ -683,8 +683,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 237 |     raise ValueError
-238 | 
-239 | 
+238 |
+239 |
     - def func(x: int):
 240 + def func(x: int) -> int:
 241 |     if not x:
@@ -702,17 +702,17 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `Optional[int]`
 214 |         return 1
-215 | 
-216 | 
+215 |
+216 |
     - from typing import overload
 217 + from typing import overload, Optional
-218 | 
-219 | 
+218 |
+219 |
 220 | @overload
 --------------------------------------------------------------------------------
 245 |     raise ValueError
-246 | 
-247 | 
+246 |
+247 |
     - def func():
 248 + def func() -> Optional[int]:
 249 |     try:
@@ -730,17 +730,17 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `Optional[int]`
 214 |         return 1
-215 | 
-216 | 
+215 |
+216 |
     - from typing import overload
 217 + from typing import overload, Optional
-218 | 
-219 | 
+218 |
+219 |
 220 | @overload
 --------------------------------------------------------------------------------
 252 |         return 2
-253 | 
-254 | 
+253 |
+254 |
     - def func():
 255 + def func() -> Optional[int]:
 256 |     try:
@@ -758,8 +758,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 259 |         pass
-260 | 
-261 | 
+260 |
+261 |
     - def func(x: int):
 262 + def func(x: int) -> int:
 263 |     for _ in range(3):
@@ -777,8 +777,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `None`
 266 |     raise ValueError
-267 | 
-268 | 
+267 |
+268 |
     - def func(x: int):
 269 + def func(x: int) -> None:
 270 |     if x > 5:
@@ -796,8 +796,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `None`
 273 |         pass
-274 | 
-275 | 
+274 |
+275 |
     - def func(x: int):
 276 + def func(x: int) -> None:
 277 |     if x > 5:
@@ -815,17 +815,17 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `Optional[int]`
 214 |         return 1
-215 | 
-216 | 
+215 |
+216 |
     - from typing import overload
 217 + from typing import overload, Optional
-218 | 
-219 | 
+218 |
+219 |
 220 | @overload
 --------------------------------------------------------------------------------
 280 |         pass
-281 | 
-282 | 
+281 |
+282 |
     - def func(x: int):
 283 + def func(x: int) -> Optional[int]:
 284 |     if x > 5:
@@ -843,8 +843,8 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `int`
 287 |         return 5
-288 | 
-289 | 
+288 |
+289 |
     - def func():
 290 + def func() -> int:
 291 |     try:
@@ -862,17 +862,17 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `Union[str, int]`
 214 |         return 1
-215 | 
-216 | 
+215 |
+216 |
     - from typing import overload
 217 + from typing import overload, Union
-218 | 
-219 | 
+218 |
+219 |
 220 | @overload
 --------------------------------------------------------------------------------
 296 |     raise ValueError
-297 | 
-298 | 
+297 |
+298 |
     - def func(x: int):
 299 + def func(x: int) -> Union[str, int]:
 300 |     match x:
@@ -932,16 +932,16 @@ ANN201 [*] Missing return type annotation for public function `func`
     |
 help: Add return type annotation: `NoReturn`
 214 |         return 1
-215 | 
-216 | 
+215 |
+216 |
     - from typing import overload
 217 + from typing import overload, NoReturn
-218 | 
-219 | 
+218 |
+219 |
 220 | @overload
 --------------------------------------------------------------------------------
-323 | 
-324 | 
+323 |
+324 |
 325 | # Test case: function that raises other exceptions should still get NoReturn
     - def func():
 326 + def func() -> NoReturn:

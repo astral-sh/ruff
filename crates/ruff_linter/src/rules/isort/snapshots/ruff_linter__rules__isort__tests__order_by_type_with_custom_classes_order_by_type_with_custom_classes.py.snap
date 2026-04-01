@@ -16,7 +16,7 @@ help: Organize imports
   - from module import CLASS, Class, CONSTANT, function, BASIC, Apple
   - from torch.nn import SELU, AClass, A_CONSTANT
 1 + from subprocess import PIPE, STDOUT, N_CLASS, Popen
-2 + 
+2 +
 3 + from module import BASIC, CONSTANT, Apple, CLASS, Class, function
 4 + from sklearn.svm import CONST, Klass, SVC, func
 5 + from torch.nn import A_CONSTANT, AClass, SELU

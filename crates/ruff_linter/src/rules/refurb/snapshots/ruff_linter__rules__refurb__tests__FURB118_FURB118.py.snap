@@ -38,7 +38,7 @@ help: Replace with `operator.not_`
 4 + op_not = operator.not_
 5 | op_pos = lambda x: +x
 6 | op_neg = lambda x: -x
-7 | 
+7 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.pos` instead of defining a lambda
@@ -58,7 +58,7 @@ help: Replace with `operator.pos`
   - op_pos = lambda x: +x
 5 + op_pos = operator.pos
 6 | op_neg = lambda x: -x
-7 | 
+7 |
 8 | op_add = lambda x, y: x + y
 note: This is an unsafe fix and may change runtime behavior
 
@@ -80,7 +80,7 @@ help: Replace with `operator.neg`
 5 | op_pos = lambda x: +x
   - op_neg = lambda x: -x
 6 + op_neg = operator.neg
-7 | 
+7 |
 8 | op_add = lambda x, y: x + y
 9 | op_sub = lambda x, y: x - y
 note: This is an unsafe fix and may change runtime behavior
@@ -102,7 +102,7 @@ help: Replace with `operator.add`
 4  | op_not = lambda x: not x
 5  | op_pos = lambda x: +x
 6  | op_neg = lambda x: -x
-7  | 
+7  |
    - op_add = lambda x, y: x + y
 8  + op_add = operator.add
 9  | op_sub = lambda x, y: x - y
@@ -126,7 +126,7 @@ help: Replace with `operator.sub`
 4  | op_not = lambda x: not x
 5  | op_pos = lambda x: +x
 6  | op_neg = lambda x: -x
-7  | 
+7  |
 8  | op_add = lambda x, y: x + y
    - op_sub = lambda x, y: x - y
 9  + op_sub = operator.sub
@@ -152,7 +152,7 @@ help: Replace with `operator.mul`
 4  | op_not = lambda x: not x
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-7  | 
+7  |
 8  | op_add = lambda x, y: x + y
 9  | op_sub = lambda x, y: x - y
    - op_mult = lambda x, y: x * y
@@ -375,7 +375,7 @@ help: Replace with `operator.xor`
 18 + op_xor = operator.xor
 19 | op_bitand = lambda x, y: x & y
 20 | op_floordiv = lambda x, y: x // y
-21 | 
+21 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.and_` instead of defining a lambda
@@ -400,7 +400,7 @@ help: Replace with `operator.and_`
    - op_bitand = lambda x, y: x & y
 19 + op_bitand = operator.and_
 20 | op_floordiv = lambda x, y: x // y
-21 | 
+21 |
 22 | op_eq = lambda x, y: x == y
 note: This is an unsafe fix and may change runtime behavior
 
@@ -426,7 +426,7 @@ help: Replace with `operator.floordiv`
 19 | op_bitand = lambda x, y: x & y
    - op_floordiv = lambda x, y: x // y
 20 + op_floordiv = operator.floordiv
-21 | 
+21 |
 22 | op_eq = lambda x, y: x == y
 23 | op_ne = lambda x, y: x != y
 note: This is an unsafe fix and may change runtime behavior
@@ -450,7 +450,7 @@ help: Replace with `operator.eq`
 --------------------------------------------------------------------------------
 19 | op_bitand = lambda x, y: x & y
 20 | op_floordiv = lambda x, y: x // y
-21 | 
+21 |
    - op_eq = lambda x, y: x == y
 22 + op_eq = operator.eq
 23 | op_ne = lambda x, y: x != y
@@ -475,7 +475,7 @@ help: Replace with `operator.ne`
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
 20 | op_floordiv = lambda x, y: x // y
-21 | 
+21 |
 22 | op_eq = lambda x, y: x == y
    - op_ne = lambda x, y: x != y
 23 + op_ne = operator.ne
@@ -501,7 +501,7 @@ help: Replace with `operator.lt`
 4  | op_not = lambda x: not x
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-21 | 
+21 |
 22 | op_eq = lambda x, y: x == y
 23 | op_ne = lambda x, y: x != y
    - op_lt = lambda x, y: x < y
@@ -778,7 +778,7 @@ help: Replace with `operator.itemgetter(slice(None))`
 34 + op_itemgetter = operator.itemgetter(slice(None))
 35 | op_itemgetter = lambda x: x[0, 1]
 36 | op_itemgetter = lambda x: x[(0, 1)]
-37 | 
+37 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
@@ -803,8 +803,8 @@ help: Replace with `operator.itemgetter((0, 1))`
    - op_itemgetter = lambda x: x[0, 1]
 35 + op_itemgetter = operator.itemgetter((0, 1))
 36 | op_itemgetter = lambda x: x[(0, 1)]
-37 | 
-38 | 
+37 |
+38 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
@@ -827,8 +827,8 @@ help: Replace with `operator.itemgetter((0, 1))`
 35 | op_itemgetter = lambda x: x[0, 1]
    - op_itemgetter = lambda x: x[(0, 1)]
 36 + op_itemgetter = operator.itemgetter((0, 1))
-37 | 
-38 | 
+37 |
+38 |
 39 | def op_not2(x):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -866,12 +866,12 @@ help: Replace with `operator.itemgetter((slice(None), 1))`
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
 86 |         return x + y
-87 | 
+87 |
 88 | # See https://github.com/astral-sh/ruff/issues/13508
    - op_itemgetter = lambda x: x[:, 1]
 89 + op_itemgetter = operator.itemgetter((slice(None), 1))
 90 | op_itemgetter = lambda x: x[1, :]
-91 | 
+91 |
 92 | # With a slice, trivia is dropped
 note: This is an unsafe fix and may change runtime behavior
 
@@ -892,12 +892,12 @@ help: Replace with `operator.itemgetter((1, slice(None)))`
 4  | op_not = lambda x: not x
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-87 | 
+87 |
 88 | # See https://github.com/astral-sh/ruff/issues/13508
 89 | op_itemgetter = lambda x: x[:, 1]
    - op_itemgetter = lambda x: x[1, :]
 90 + op_itemgetter = operator.itemgetter((1, slice(None)))
-91 | 
+91 |
 92 | # With a slice, trivia is dropped
 93 | op_itemgetter = lambda x: x[1,          :]
 note: This is an unsafe fix and may change runtime behavior
@@ -919,11 +919,11 @@ help: Replace with `operator.itemgetter((1, slice(None)))`
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
 90 | op_itemgetter = lambda x: x[1, :]
-91 | 
+91 |
 92 | # With a slice, trivia is dropped
    - op_itemgetter = lambda x: x[1,          :]
 93 + op_itemgetter = operator.itemgetter((1, slice(None)))
-94 | 
+94 |
 95 | # Without a slice, trivia is retained
 96 | op_itemgetter = lambda x: x[1,          2]
 note: This is an unsafe fix and may change runtime behavior
@@ -943,12 +943,12 @@ help: Replace with `operator.itemgetter((1,          2))`
 5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
 93 | op_itemgetter = lambda x: x[1,          :]
-94 | 
+94 |
 95 | # Without a slice, trivia is retained
    - op_itemgetter = lambda x: x[1,          2]
 96 + op_itemgetter = operator.itemgetter((1,          2))
-97 | 
-98 | 
+97 |
+98 |
 99 | # All methods in classes are ignored, even those defined using lambdas:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -967,8 +967,8 @@ help: Replace with `operator.itemgetter(slice(-2, None))`
 112 | # To avoid false positives, we shouldn't flag any of these either:
 113 | from typing import final, override, no_type_check
 114 + import operator
-115 | 
-116 | 
+115 |
+116 |
 117 | class Foo:
 --------------------------------------------------------------------------------
 127 |     @pytest.mark.parametrize(
@@ -996,8 +996,8 @@ help: Replace with `operator.itemgetter(slice(-5, -3))`
 112 | # To avoid false positives, we shouldn't flag any of these either:
 113 | from typing import final, override, no_type_check
 114 + import operator
-115 | 
-116 | 
+115 |
+116 |
 117 | class Foo:
 --------------------------------------------------------------------------------
 128 |         "slicer, expected",

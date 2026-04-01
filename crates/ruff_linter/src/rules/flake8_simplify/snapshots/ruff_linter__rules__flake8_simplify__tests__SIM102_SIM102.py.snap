@@ -17,7 +17,7 @@ help: Combine `if` statements using `and`
   -         c
 2 + if a and b:
 3 +     c
-4 | 
+4 |
 5 | # SIM102
 6 | if a:
 note: This is an unsafe fix and may change runtime behavior
@@ -34,7 +34,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
    |
 help: Combine `if` statements using `and`
 4  |         c
-5  | 
+5  |
 6  | # SIM102
    - if a:
    -     if b:
@@ -43,7 +43,7 @@ help: Combine `if` statements using `and`
 7  + if a and b:
 8  +     if c:
 9  +         d
-10 | 
+10 |
 11 | # SIM102
 12 | if a:
 note: This is an unsafe fix and may change runtime behavior
@@ -59,7 +59,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
 10 |               d
    |
 help: Combine `if` statements using `and`
-5  | 
+5  |
 6  | # SIM102
 7  | if a:
    -     if b:
@@ -67,7 +67,7 @@ help: Combine `if` statements using `and`
    -             d
 8  +     if b and c:
 9  +         d
-10 | 
+10 |
 11 | # SIM102
 12 | if a:
 note: This is an unsafe fix and may change runtime behavior
@@ -91,7 +91,7 @@ help: Combine `if` statements using `and`
    -         d
 15 + elif b and c:
 16 +     d
-17 | 
+17 |
 18 | # SIM102
 19 | if a:
 note: This is an unsafe fix and may change runtime behavior
@@ -120,7 +120,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
    |
 help: Combine `if` statements using `and`
 23 |         c
-24 | 
+24 |
 25 | # SIM102
    - if a:
    -     if b:
@@ -129,7 +129,7 @@ help: Combine `if` statements using `and`
 26 + if a and b:
 27 +     # Fixable due to placement of this comment.
 28 +     c
-29 | 
+29 |
 30 | # OK
 31 | if a:
 note: This is an unsafe fix and may change runtime behavior
@@ -146,7 +146,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
 54 |   is valid"""
    |
 help: Combine `if` statements using `and`
-48 | 
+48 |
 49 | while x > 0:
 50 |     # SIM102
    -     if y > 0:
@@ -155,20 +155,20 @@ help: Combine `if` statements using `and`
 51 +     if y > 0 and z > 0:
 52 +         """this
 53 | is valid"""
-54 | 
+54 |
    -             """the indentation on
 55 +         """the indentation on
 56 |             this line is significant"""
-57 | 
+57 |
    -             "this is" \
 58 +         "this is" \
 59 | "allowed too"
-60 | 
+60 |
    -             ("so is"
 61 +         ("so is"
 62 | "this for some reason")
-63 | 
-64 | 
+63 |
+64 |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
@@ -182,8 +182,8 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
 70 |   is valid"""
    |
 help: Combine `if` statements using `and`
-64 | 
-65 | 
+64 |
+65 |
 66 | # SIM102
    - if x > 0:
    -     if y > 0:
@@ -191,19 +191,19 @@ help: Combine `if` statements using `and`
 67 + if x > 0 and y > 0:
 68 +     """this
 69 | is valid"""
-70 | 
+70 |
    -         """the indentation on
 71 +     """the indentation on
 72 |         this line is significant"""
-73 | 
+73 |
    -         "this is" \
 74 +     "this is" \
 75 | "allowed too"
-76 | 
+76 |
    -         ("so is"
 77 +     ("so is"
 78 | "this for some reason")
-79 | 
+79 |
 80 | while x > 0:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -220,7 +220,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
 87 |               print("Bad module!")
    |
 help: Combine `if` statements using `and`
-80 | 
+80 |
 81 | while x > 0:
 82 |     # SIM102
    -     if node.module:
@@ -232,7 +232,7 @@ help: Combine `if` statements using `and`
 84 +         "multiprocessing."
 85 +     )):
 86 +         print("Bad module!")
-87 | 
+87 |
 88 | # SIM102 (auto-fixable)
 89 | if node.module012345678:
 note: This is an unsafe fix and may change runtime behavior
@@ -250,7 +250,7 @@ SIM102 [*] Use a single `if` statement instead of nested `if` statements
    |
 help: Combine `if` statements using `and`
 87 |             print("Bad module!")
-88 | 
+88 |
 89 | # SIM102 (auto-fixable)
    - if node.module012345678:
    -     if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
@@ -261,7 +261,7 @@ help: Combine `if` statements using `and`
 91 +     "multiprocessing."
 92 + )):
 93 +     print("Bad module!")
-94 | 
+94 |
 95 | # SIM102 (not auto-fixable)
 96 | if node.module0123456789:
 note: This is an unsafe fix and may change runtime behavior
@@ -301,7 +301,7 @@ help: Combine `if` statements using `and`
 107 +         print("if")
 108 | elif d:
 109 |     print("elif")
-110 | 
+110 |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
@@ -326,7 +326,7 @@ help: Combine `if` statements using `and`
 133 +         print("foo")
 134 | else:
 135 |     print("bar")
-136 | 
+136 |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements

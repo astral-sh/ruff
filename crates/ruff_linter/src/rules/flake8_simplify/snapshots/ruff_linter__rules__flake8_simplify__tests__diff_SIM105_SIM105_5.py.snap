@@ -24,7 +24,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
   |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
 1 | """Case: except* and except with py311 and higher"""
-2 | 
+2 |
 3 | # SIM105
   - try:
   -     pass
@@ -32,6 +32,6 @@ help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): 
 4 + import contextlib
 5 + with contextlib.suppress(ValueError):
 6 |     pass
-7 | 
+7 |
 8 | # SIM105
 note: This is an unsafe fix and may change runtime behavior

@@ -27,5 +27,5 @@ help: Organize imports
 6  +   sin,
 7  +   tan,
 8  | )
-9  | 
+9  |
 10 | del sin, cos, tan, pi, nan

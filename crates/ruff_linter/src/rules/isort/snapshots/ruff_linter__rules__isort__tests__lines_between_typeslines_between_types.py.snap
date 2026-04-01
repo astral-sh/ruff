@@ -24,11 +24,11 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
 9  | import requests
-10 | 
-11 | 
+10 |
+11 |
 12 + from loguru import Logger
 13 | from sanic import Sanic
    - from loguru import Logger
-14 | 
+14 |
 15 | from . import config
 16 | from .data import Data

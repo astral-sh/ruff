@@ -6,7 +6,7 @@ I002 [*] Missing required import: `from __future__ import generator_stop`
 help: Insert required import: `from __future__ import generator_stop`
 1 | """Hello, world!"""
 2 + from __future__ import generator_stop
-3 | 
+3 |
 4 | x = 1
 
 I002 [*] Missing required import: `from __future__ import annotations`
@@ -14,5 +14,5 @@ I002 [*] Missing required import: `from __future__ import annotations`
 help: Insert required import: `from __future__ import annotations`
 1 | """Hello, world!"""
 2 + from __future__ import annotations
-3 | 
+3 |
 4 | x = 1

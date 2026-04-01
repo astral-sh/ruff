@@ -16,15 +16,15 @@ Q001 [*] Single quote multiline found but double quotes preferred
 help: Replace single multiline quotes with double quotes
 2  | Single quotes multiline module docstring
 3  | '''
-4  | 
+4  |
    - '''
 5  + """
 6  | this is not a docstring
    - '''
 7  + """
-8  | 
+8  |
 9  | l = []
-10 | 
+10 |
 
 Q001 [*] Single quote multiline found but double quotes preferred
   --> docstring_singles.py:11:21
@@ -40,9 +40,9 @@ Q001 [*] Single quote multiline found but double quotes preferred
 15 |       Single quotes multiline class docstring
    |
 help: Replace single multiline quotes with double quotes
-8  | 
+8  |
 9  | l = []
-10 | 
+10 |
    - class Cls(MakeKlass('''
 11 + class Cls(MakeKlass("""
 12 |     class params \t not a docstring
@@ -67,13 +67,13 @@ Q001 [*] Single quote multiline found but double quotes preferred
 help: Replace single multiline quotes with double quotes
 15 |     Single quotes multiline class docstring
 16 |     '''
-17 | 
+17 |
    -     '''
 18 +     """
 19 |     this is not a docstring
    -     '''
 20 +     """
-21 | 
+21 |
 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
 23 |     def f(self, bar='''
 
@@ -90,7 +90,7 @@ Q001 [*] Single quote multiline found but double quotes preferred
    |
 help: Replace single multiline quotes with double quotes
 20 |     '''
-21 | 
+21 |
 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
    -     def f(self, bar='''
    -         definitely not a docstring''',
@@ -113,15 +113,15 @@ Q001 [*] Single quote multiline found but double quotes preferred
 36 |           if l:
    |
 help: Replace single multiline quotes with double quotes
-29 | 
+29 |
 30 |         some_expression = 'hello world'
-31 | 
+31 |
    -         '''
 32 +         """
 33 |         this is not a docstring
    -         '''
 34 +         """
-35 | 
+35 |
 36 |         if l:
 37 |             '''
 
@@ -137,7 +137,7 @@ Q001 [*] Single quote multiline found but double quotes preferred
    |
 help: Replace single multiline quotes with double quotes
 34 |         '''
-35 | 
+35 |
 36 |         if l:
    -             '''
 37 +             """

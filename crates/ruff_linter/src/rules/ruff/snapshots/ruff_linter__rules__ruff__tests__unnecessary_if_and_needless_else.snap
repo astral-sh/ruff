@@ -18,7 +18,7 @@ help: Remove the `else` clause
 5 |     pass
   - else:
   -     pass
-6 | 
+6 |
 7 | # Same with elif.
 8 | if sys.version_info >= (3, 11):
 
@@ -39,7 +39,7 @@ help: Remove the `else` clause
 13 |     pass
    - else:
    -     pass
-14 | 
+14 |
 15 | # Side-effect in condition: RUF047 removes the else, then RUF050
 16 | # replaces the remaining `if` with the condition expression
 
@@ -58,6 +58,6 @@ help: Remove the `else` clause
 20 |     pass
    - else:
    -     pass
-21 | 
-22 | 
+21 |
+22 |
 23 | ### No errors

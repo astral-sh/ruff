@@ -13,8 +13,8 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | from typing import Dict, List, Optional, Set, Union, cast
-3 | 
-4 | 
+3 |
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`
@@ -29,6 +29,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | from typing import Dict, List, Optional, Set, Union, cast
-3 | 
-4 | 
+3 |
+4 |
 note: This is an unsafe fix and may change runtime behavior
