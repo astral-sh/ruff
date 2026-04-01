@@ -9,8 +9,6 @@ use crate::session::client::Client;
 use lsp_types::request::Request;
 use lsp_types::{Range, TextDocumentIdentifier, Url};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::find_node::covering_node;
 use serde::{Deserialize, Serialize};
 use ty_project::ProjectDatabase;
@@ -19,7 +17,7 @@ use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
 pub(crate) struct ProvideTypeRequestHandler;
 
 #[derive(Debug)]
-pub enum ProvideTypeRequest {}
+pub(crate) enum ProvideTypeRequest {}
 
 impl Request for ProvideTypeRequest {
     type Params = ProvideTypeParams;
@@ -29,7 +27,7 @@ impl Request for ProvideTypeRequest {
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProvideTypeParams {
+pub(crate) struct ProvideTypeParams {
     /// The text document.
     pub text_document: TextDocumentIdentifier,
 
@@ -39,7 +37,7 @@ pub struct ProvideTypeParams {
 
 #[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProvideTypeResponse {
+pub(crate) struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
     pub types: Vec<Option<String>>,
 }
@@ -49,7 +47,7 @@ impl RequestHandler for ProvideTypeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
-    fn document_url(params: &ProvideTypeParams) -> Cow<Url> {
+    fn document_url(params: &ProvideTypeParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -63,8 +61,6 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
         let parsed = parsed_module(db, file).load(db);
         let url = Self::document_url(&params);
 

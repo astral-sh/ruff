@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
-pub mod requests;
+mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
@@ -126,11 +126,9 @@ pub(super) fn request(req: server::Request) -> Task {
             req, BackgroundSchedule::Worker
         ),
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
-        requests::provide_type::ProvideTypeRequest::METHOD => background_document_request_task::<
-            requests::provide_type::ProvideTypeRequestHandler,
-        >(
-            req, BackgroundSchedule::Worker
-        ),
+        requests::ProvideTypeRequest::METHOD => background_document_request_task::<
+            requests::ProvideTypeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
