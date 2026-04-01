@@ -2255,7 +2255,7 @@ from typing_extensions import TypedDict
 
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 Empty = TypedDict("Empty")
-reveal_type(Empty)  # revealed: <class 'Empty'>
+reveal_type(Empty)  # revealed: type[Mapping[str, object]] & Unknown
 ```
 
 Constructor validation also works with dict literals:
@@ -2526,8 +2526,17 @@ Movie2 = TypedDict("Movie2", name=str, year=int)
 
 ## Function syntax with invalid arguments
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing_extensions import TypedDict
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `TypedDict`: expected 2, got 3"
+TypedDict("Foo", {}, {})
+# error: [missing-argument] "No arguments provided for required parameters `typename` and `fields` of function `TypedDict`"
+TypedDict()
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
+TypedDict("Foo")
 
 # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
@@ -2547,6 +2556,8 @@ GoodTypedDict = TypedDict(name, {"name": str})
 
 # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
 Bad2 = TypedDict("Bad2", "not a dict")
+# error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+TypedDict("Bad2", "not a dict")
 
 def get_fields() -> dict[str, object]:
     return {"name": str}
@@ -2570,7 +2581,7 @@ Bad5 = TypedDict(*tup)
 Bad6 = TypedDict("Bad6", {"name": str}, **kw)
 
 # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
-Bad7 = TypedDict(*tup, **kw)
+Bad7 = TypedDict(*tup, "foo", "bar", **kw)
 
 # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
 # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
@@ -2578,9 +2589,22 @@ Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
 
 kwargs = {"x": int}
 
-# error: [invalid-argument-type] "Expected a dict literal with string-literal keys for parameter `fields` of `TypedDict()`"
-# error: [invalid-type-form]
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
 Bad8 = TypedDict("Bad8", {**kwargs})
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+TypedDict("Bad8", {**kwargs})
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+TypedDict("Bad81", {**kwargs, **kwargs})
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
+# error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+TypedDict("Bad82", {**kwargs, "foo": []})
 
 def get_name() -> str:
     return "x"
@@ -2595,6 +2619,7 @@ Bad9 = TypedDict("Bad9", {name: int})
 Bad10 = TypedDict("Bad10", {name: 42})
 
 # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 class Bad11(TypedDict("Bad11", {name: 42})): ...
 
 # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
