@@ -12,7 +12,7 @@ help: Rewrite as a dict comprehension
   - dict([(i, i) for i in range(3)])
 1 + {i: i for i in range(3)}
 2 | dict([(i, i) for i in range(3)], z=4)
-3 | 
+3 |
 4 | def f(x):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,7 +29,7 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
 help: Rewrite as a dict comprehension
 4  | def f(x):
 5  |     return x
-6  | 
+6  |
    - f'{dict([(s,s) for s in "ab"])}'
 7  + f'{ {s: s for s in "ab"} }'
 8  | f"{dict([(s,s) for s in 'ab'])}"
@@ -48,13 +48,13 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
 5  |     return x
-6  | 
+6  |
 7  | f'{dict([(s,s) for s in "ab"])}'
    - f"{dict([(s,s) for s in 'ab'])}"
 8  + f"{ {s: s for s in 'ab'} }"
 9  | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 note: This is an unsafe fix and may change runtime behavior
 
 C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
@@ -67,13 +67,13 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
    |
 help: Rewrite as a dict comprehension
-6  | 
+6  |
 7  | f'{dict([(s,s) for s in "ab"])}'
 8  | f"{dict([(s,s) for s in 'ab'])}"
    - f"{dict([(s, s) for s in 'ab'])}"
 9  + f"{ {s: s for s in 'ab'} }"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 note: This is an unsafe fix and may change runtime behavior
 
@@ -93,7 +93,7 @@ help: Rewrite as a dict comprehension
 9  | f"{dict([(s, s) for s in 'ab'])}"
    - f"{dict([(s,f(s)) for s in 'ab'])}"
 10 + f"{ {s: f(s) for s in 'ab'} }"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 note: This is an unsafe fix and may change runtime behavior
@@ -110,11 +110,11 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
 help: Rewrite as a dict comprehension
 9  | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
    - f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 12 + f'{ {s: s for s in "ab"} | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 note: This is an unsafe fix and may change runtime behavior
 
@@ -130,11 +130,11 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
 help: Rewrite as a dict comprehension
 9  | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
    - f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 12 + f'{dict([(s,s) for s in "ab"]) | {s: s for s in "ab"} }'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 note: This is an unsafe fix and may change runtime behavior
 
@@ -149,11 +149,11 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    - f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 13 + f'{ {s: s for s in "ab"} | dict([(s,s) for s in "ab"]) }'
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 note: This is an unsafe fix and may change runtime behavior
@@ -169,11 +169,11 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-11 | 
+11 |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    - f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 13 + f'{ dict([(s,s) for s in "ab"]) | {s: s for s in "ab"} }'
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 note: This is an unsafe fix and may change runtime behavior
@@ -187,7 +187,7 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
-14 | 
+14 |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    - saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 16 + saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})

@@ -172,9 +172,9 @@ E221 [*] Multiple spaces before operator
 help: Replace with single space
 181 |     pass
 182 | #:
-183 | 
+183 |
     - if a  ==  1:
 184 + if a ==  1:
 185 |     print(a)
-186 | 
+186 |
 187 |

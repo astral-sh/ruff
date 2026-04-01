@@ -80,17 +80,18 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
-        if let Type::Union(union) = ty {
-            return UnionType::try_from_elements(
+        match ty {
+            Type::Union(union) => UnionType::try_from_elements(
                 db,
                 union
                     .elements(db)
                     .iter()
                     .map(|element| Self::try_from_instance(db, *element)),
-            );
+            ),
+            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
+            _ => SubclassOfInner::try_from_instance(db, ty)
+                .map(|subclass_of| Self::from(db, subclass_of)),
         }
-
-        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
@@ -423,9 +424,6 @@ impl<'db> SubclassOfInner<'db> {
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
-            Type::ProtocolInstance(_) => {
-                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic())
-            }
             _ => return None,
         })
     }

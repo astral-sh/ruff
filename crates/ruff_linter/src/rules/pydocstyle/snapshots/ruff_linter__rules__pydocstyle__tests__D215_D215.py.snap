@@ -14,5 +14,5 @@ help: Remove over-indentation from "TODO" underline
 1 | """
 2 | TODO:
   -     -
-3 + 
+3 +
 4 | """

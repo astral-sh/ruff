@@ -209,12 +209,18 @@ impl std::fmt::Display for Diff<'_> {
 
                         write!(
                             f,
-                            "{line} {sign} ",
+                            "{line} {sign}",
                             line = fmt_styled(line, self.stylesheet.line_no),
                             sign = fmt_styled(sign, line_no_style),
                         )?;
 
+                        let mut needs_separator = true;
                         for (emphasized, value) in change.iter_strings_lossy() {
+                            if needs_separator && !value.trim_end_matches(['\n', '\r']).is_empty() {
+                                f.write_str(" ")?;
+                                needs_separator = false;
+                            }
+
                             let value = show_nonprinting(&value);
                             let styled = fmt_styled(value, style);
                             if emphasized {

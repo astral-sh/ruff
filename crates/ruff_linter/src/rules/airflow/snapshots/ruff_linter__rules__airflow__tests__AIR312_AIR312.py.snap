@@ -13,7 +13,7 @@ AIR312 [*] `airflow.hooks.filesystem.FSHook` is deprecated and moved into `stand
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `FSHook` from `airflow.providers.standard.hooks.filesystem` instead.
 1  | from __future__ import annotations
-2  | 
+2  |
    - from airflow.hooks.filesystem import FSHook
 3  | from airflow.hooks.package_index import PackageIndexHook
 4  | from airflow.hooks.subprocess import SubprocessHook
@@ -23,7 +23,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `FSHook` from `
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.hooks.filesystem import FSHook
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -38,7 +38,7 @@ AIR312 [*] `airflow.hooks.package_index.PackageIndexHook` is deprecated and move
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `PackageIndexHook` from `airflow.providers.standard.hooks.package_index` instead.
 1  | from __future__ import annotations
-2  | 
+2  |
 3  | from airflow.hooks.filesystem import FSHook
    - from airflow.hooks.package_index import PackageIndexHook
 4  | from airflow.hooks.subprocess import SubprocessHook
@@ -49,7 +49,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PackageIndexHo
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.hooks.package_index import PackageIndexHook
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -65,7 +65,7 @@ AIR312 [*] `airflow.hooks.subprocess.SubprocessHook` is deprecated and moved int
 17 | BashOperator()
    |
 help: Install `apache-airflow-providers-standard>=0.0.3` and use `SubprocessHook` from `airflow.providers.standard.hooks.subprocess` instead.
-2  | 
+2  |
 3  | from airflow.hooks.filesystem import FSHook
 4  | from airflow.hooks.package_index import PackageIndexHook
    - from airflow.hooks.subprocess import SubprocessHook
@@ -76,7 +76,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `SubprocessHook
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.hooks.subprocess import SubprocessHook
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -102,7 +102,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashOperator` 
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.bash import BashOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -126,7 +126,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchDateTime
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.datetime import BranchDateTimeOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -147,7 +147,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunO
    - from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -171,7 +171,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator`
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.empty import EmptyOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -193,7 +193,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `LatestOnlyOper
 9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 10 | from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.latest_only import LatestOnlyOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -213,7 +213,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchDayOfWee
 10 | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
    - from airflow.operators.weekday import BranchDayOfWeekOperator
 11 + from airflow.providers.standard.operators.weekday import BranchDayOfWeekOperator
-12 | 
+12 |
 13 | FSHook()
 14 | PackageIndexHook()
 note: This is an unsafe fix and may change runtime behavior
@@ -230,7 +230,7 @@ AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and mov
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOperator` from `airflow.providers.standard.operators.python` instead.
 23 | BranchDayOfWeekOperator()
-24 | 
+24 |
 25 | from airflow.operators.python import (
    -     BranchPythonOperator,
 26 |     PythonOperator,
@@ -240,7 +240,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOp
 30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import BranchPythonOperator
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -255,7 +255,7 @@ AIR312 [*] `airflow.operators.python.PythonOperator` is deprecated and moved int
 37 | ShortCircuitOperator()
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator` from `airflow.providers.standard.operators.python` instead.
-24 | 
+24 |
 25 | from airflow.operators.python import (
 26 |     BranchPythonOperator,
    -     PythonOperator,
@@ -265,7 +265,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator
 30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import PythonOperator
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -289,7 +289,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtuale
 30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import PythonVirtualenvOperator
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -313,7 +313,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOp
 30 | from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.operators.python import ShortCircuitOperator
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -335,7 +335,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashSensor` fr
    - from airflow.sensors.bash import BashSensor
 31 | from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.sensor.bash import BashSensor
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -355,7 +355,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensor
 31 | from airflow.sensors.bash import BashSensor
    - from airflow.sensors.date_time import DateTimeSensor
 32 + from airflow.providers.standard.sensors.date_time import DateTimeSensor
-33 | 
+33 |
 34 | BranchPythonOperator()
 35 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -372,7 +372,7 @@ AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and mov
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOperator` from `airflow.providers.standard.operators.python` instead.
 23 | BranchDayOfWeekOperator()
-24 | 
+24 |
 25 | from airflow.operators.python import (
    -     BranchPythonOperator,
 26 |     PythonOperator,
@@ -383,7 +383,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOp
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.operators.python import BranchPythonOperator
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -398,7 +398,7 @@ AIR312 [*] `airflow.operators.python.PythonOperator` is deprecated and moved int
 52 | ShortCircuitOperator()
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator` from `airflow.providers.standard.operators.python` instead.
-24 | 
+24 |
 25 | from airflow.operators.python import (
 26 |     BranchPythonOperator,
    -     PythonOperator,
@@ -410,7 +410,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.operators.python import PythonOperator
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -438,7 +438,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtuale
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.operators.python import PythonVirtualenvOperator
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -466,7 +466,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOp
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.operators.python import ShortCircuitOperator
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -482,7 +482,7 @@ AIR312 [*] `airflow.sensors.date_time.DateTimeSensorAsync` is deprecated and mov
 55 | ExternalTaskSensor()
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensorAsync` from `airflow.providers.standard.sensors.date_time` instead.
-38 | 
+38 |
 39 | BashSensor()
 40 | DateTimeSensor()
    - from airflow.sensors.date_time import DateTimeSensorAsync
@@ -493,7 +493,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensor
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.date_time import DateTimeSensorAsync
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -518,7 +518,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMa
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.external_task import ExternalTaskMarker
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -542,7 +542,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSe
 45 | from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -563,7 +563,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `FileSensor` fr
    - from airflow.sensors.filesystem import FileSensor
 46 | from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.filesystem import FileSensor
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -584,7 +584,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonSensor` 
 46 | from airflow.sensors.filesystem import FileSensor
    - from airflow.sensors.python import PythonSensor
 47 + from airflow.providers.standard.sensors.python import PythonSensor
-48 | 
+48 |
 49 | BranchPythonOperator()
 50 | PythonOperator()
 note: This is an unsafe fix and may change runtime behavior
@@ -600,13 +600,13 @@ AIR312 [*] `airflow.sensors.time_sensor.TimeSensor` is deprecated and moved into
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensor` from `airflow.providers.standard.sensors.time` instead.
 57 | PythonSensor()
-58 | 
+58 |
 59 | from airflow.sensors.time_sensor import (
    -     TimeSensor,
 60 |     TimeSensorAsync,
 61 | )
 62 + from airflow.providers.standard.sensors.time import TimeSensor
-63 | 
+63 |
 64 | TimeSensor()
 65 | TimeSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -621,13 +621,13 @@ AIR312 [*] `airflow.sensors.time_sensor.TimeSensorAsync` is deprecated and moved
 67 | from airflow.sensors.time_delta import (
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensorAsync` from `airflow.providers.standard.sensors.time` instead.
-58 | 
+58 |
 59 | from airflow.sensors.time_sensor import (
 60 |     TimeSensor,
    -     TimeSensorAsync,
 61 | )
 62 + from airflow.providers.standard.sensors.time import TimeSensorAsync
-63 | 
+63 |
 64 | TimeSensor()
 65 | TimeSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -644,7 +644,7 @@ AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensor` is deprecated and moved 
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSensor` from `airflow.providers.standard.sensors.time_delta` instead.
 65 | TimeSensorAsync()
-66 | 
+66 |
 67 | from airflow.sensors.time_delta import (
    -     TimeDeltaSensor,
 68 |     TimeDeltaSensorAsync,
@@ -655,7 +655,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSenso
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.sensors.time_delta import TimeDeltaSensor
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -670,7 +670,7 @@ AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensorAsync` is deprecated and m
 85 | DagStateTrigger()
    |
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSensorAsync` from `airflow.providers.standard.sensors.time_delta` instead.
-66 | 
+66 |
 67 | from airflow.sensors.time_delta import (
 68 |     TimeDeltaSensor,
    -     TimeDeltaSensorAsync,
@@ -682,7 +682,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSenso
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.sensors.time_delta import TimeDeltaSensorAsync
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -710,7 +710,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `DayOfWeekSenso
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.sensors.weekday import DayOfWeekSensor
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -738,7 +738,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `DagStateTrigge
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.external_task import DagStateTrigger
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -765,7 +765,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `WorkflowTrigge
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.external_task import WorkflowTrigger
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -790,7 +790,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `FileTrigger` f
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.file import FileTrigger
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -812,7 +812,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `DateTimeTrigge
 78 |     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.temporal import DateTimeTrigger
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior
@@ -832,7 +832,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigg
    -     TimeDeltaTrigger,
 79 | )
 80 + from airflow.providers.standard.triggers.temporal import TimeDeltaTrigger
-81 | 
+81 |
 82 | TimeDeltaSensor()
 83 | TimeDeltaSensorAsync()
 note: This is an unsafe fix and may change runtime behavior

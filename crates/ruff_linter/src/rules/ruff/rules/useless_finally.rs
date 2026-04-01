@@ -59,7 +59,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///   so RUF072 must remove it first
 /// - [`useless-try-except`][TRY203]: Flags `try/except` that only re-raises
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.8")]
 pub(crate) struct UselessFinally;
 
 impl Violation for UselessFinally {

@@ -3,13 +3,15 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -188,7 +190,7 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            Type::Dynamic(_) => Some(classinfo),
+            Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
@@ -272,6 +274,11 @@ impl ClassInfoConstraintFunction {
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
                     .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+
+                // `InitVar` is a class at runtime, so can be used in `isinstance()`,
+                // but we can't represent internally the type that we should narrow to after an `isinstance()` check,
+                // so just intersect with `Any` in those cases.
+                SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => Some(Type::any()),
 
                 _ => None,
             },
@@ -761,7 +768,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::IsNonTerminalCall(call_expr) => call_expr.scope(self.db),
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(self.db)
+            }
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
@@ -2022,6 +2031,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
 
         Type::Dynamic(_)
+        | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
@@ -2110,6 +2120,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
         // always guarded by that check.
         Type::Dynamic(_)
+        | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)

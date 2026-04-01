@@ -12,5 +12,5 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 1 | from __future__ import annotations
 2 | from typing import Any
-3 + 
+3 +
 4 | from . import my_local_folder_object

@@ -56,7 +56,7 @@ help: Organize imports
 4  +     glob,
 5  +     iglob,
 6  | )
-7  | 
+7  |
 8  | # No magic comma, this will be rolled into one line.
    - from os import (
    -     path,
@@ -64,7 +64,7 @@ help: Organize imports
    -     execl,
    -     execv
    - )
-   - 
+   -
    - from glob import (
    -     glob,
    -     iglob,
@@ -76,12 +76,12 @@ help: Organize imports
 13 +     stderr,
 14 +     stdout,
 15 | )
-16 | 
+16 |
 17 | # These will be combined, but without a trailing comma.
    - from foo import bar
    - from foo import baz
 18 + from foo import bar, baz
-19 | 
+19 |
 20 | # These will be combined, _with_ a trailing comma.
    - from module1 import member1
 21 | from module1 import (
@@ -89,7 +89,7 @@ help: Organize imports
 23 |     member2,
 24 |     member3,
 25 | )
-26 | 
+26 |
 27 | # These will be combined, _with_ a trailing comma.
    - from module2 import member1, member2
 28 | from module2 import (

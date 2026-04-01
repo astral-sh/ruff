@@ -15,14 +15,14 @@ SIM401 [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
    |
 help: Replace with `var = a_dict.get(key, "default1")`
 5  | a_dict = {}
-6  | 
+6  |
 7  | # SIM401 (pattern-1)
    - if key in a_dict:
    -     var = a_dict[key]
    - else:
    -     var = "default1"
 8  + var = a_dict.get(key, "default1")
-9  | 
+9  |
 10 | # SIM401 (pattern-2)
 11 | if key not in a_dict:
 note: This is an unsafe fix and may change runtime behavior
@@ -41,14 +41,14 @@ SIM401 [*] Use `var = a_dict.get(key, "default2")` instead of an `if` block
    |
 help: Replace with `var = a_dict.get(key, "default2")`
 11 |     var = "default1"
-12 | 
+12 |
 13 | # SIM401 (pattern-2)
    - if key not in a_dict:
    -     var = "default2"
    - else:
    -     var = a_dict[key]
 14 + var = a_dict.get(key, "default2")
-15 | 
+15 |
 16 | # OK (default contains effect)
 17 | if key in a_dict:
 note: This is an unsafe fix and may change runtime behavior
@@ -67,16 +67,16 @@ SIM401 [*] Use `var = a_dict.get(keys[idx], "default")` instead of an `if` block
    |
 help: Replace with `var = a_dict.get(keys[idx], "default")`
 23 |     var = val1 + val2
-24 | 
+24 |
 25 | # SIM401 (complex expression in key)
    - if keys[idx] in a_dict:
    -     var = a_dict[keys[idx]]
    - else:
    -     var = "default"
 26 + var = a_dict.get(keys[idx], "default")
-27 | 
+27 |
 28 | dicts = {"key": a_dict}
-29 | 
+29 |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")` instead of an `if` block
@@ -93,14 +93,14 @@ SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ67
    |
 help: Replace with `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")`
 37 |     var = "default"
-38 | 
+38 |
 39 | # SIM401 (complex expression in var)
    - if key in a_dict:
    -     vars[idx] = a_dict[key]
    - else:
    -     vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
 40 + vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")
-41 | 
+41 |
 42 | # SIM401
 43 | if foo():
 note: This is an unsafe fix and may change runtime behavior
@@ -127,7 +127,7 @@ help: Replace with `vars[idx] = a_dict.get(key, "default")`
    -     else:
    -         vars[idx] = "default"
 49 +     vars[idx] = a_dict.get(key, "default")
-50 | 
+50 |
 51 | ###
 52 | # Negative cases
 note: This is an unsafe fix and may change runtime behavior
@@ -143,11 +143,11 @@ SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if` block
     |
 help: Replace with `a_dict.get(key, "default3")`
 146 | ###
-147 | 
+147 |
 148 | # SIM401
     - var = a_dict[key] if key in a_dict else "default3"
 149 + var = a_dict.get(key, "default3")
-150 | 
+150 |
 151 | # SIM401
 152 | var = "default-1" if key not in a_dict else a_dict[key]
 note: This is an unsafe fix and may change runtime behavior
@@ -163,11 +163,11 @@ SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if` block
     |
 help: Replace with `a_dict.get(key, "default-1")`
 149 | var = a_dict[key] if key in a_dict else "default3"
-150 | 
+150 |
 151 | # SIM401
     - var = "default-1" if key not in a_dict else a_dict[key]
 152 + var = a_dict.get(key, "default-1")
-153 | 
+153 |
 154 | # OK (default contains effect)
 155 | var = a_dict[key] if key in a_dict else val1 + val2
 note: This is an unsafe fix and may change runtime behavior

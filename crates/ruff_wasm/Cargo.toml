@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.15.7"
+version = "0.15.8"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -14,6 +14,7 @@ description = "WebAssembly bindings for Ruff"
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
+test = false
 
 [dependencies]
 ruff_formatter = { workspace = true }
@@ -49,3 +50,8 @@ default = ["console_error_panic_hook"]
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+ignored = [
+    "uuid",
+]

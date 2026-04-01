@@ -13,11 +13,11 @@ E266 [*] Too many leading `#` before block comment
 help: Remove leading `#`
 16 | #: E266:3:5 E266:6:5
 17 | def how_it_feel(r):
-18 | 
+18 |
    -     ### This is a variable ###
 19 +     # This is a variable ###
 20 |     a = 42
-21 | 
+21 |
 22 |     ### Of course it is unused
 
 E266 [*] Too many leading `#` before block comment
@@ -33,7 +33,7 @@ E266 [*] Too many leading `#` before block comment
 help: Remove leading `#`
 19 |     ### This is a variable ###
 20 |     a = 42
-21 | 
+21 |
    -     ### Of course it is unused
 22 +     # Of course it is unused
 23 |     return
@@ -71,7 +71,7 @@ E266 [*] Too many leading `#` before block comment
    |
 help: Remove leading `#`
 66 | a = 42  #  (Two spaces)
-67 | 
+67 |
 68 | #: E265:5:1
    - ### Means test is not done yet
 69 + # Means test is not done yet
@@ -90,11 +90,11 @@ E266 [*] Too many leading `#` before block comment
 84 | a = 1  ## Foo
    |
 help: Remove leading `#`
-79 | 
+79 |
 80 | # We should strip the space, but preserve the hashes.
 81 | #: E266:1:3
    - ##  Foo
 82 + # Foo
-83 | 
+83 |
 84 | a = 1  ## Foo
 85 |

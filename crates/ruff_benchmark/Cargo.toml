@@ -93,3 +93,17 @@ required-features = ["ty_walltime"]
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+# We use optional dependencies even for dev dependencies for faster CI compile times.
+# This is fine because this crate is "dev-only".
+ignored = [
+    "divan",
+    "ruff_linter",
+    "ruff_python_formatter",
+    "ruff_python_parser",
+    "ruff_python_trivia",
+    "ty-project",
+    "mimalloc",
+    "tikv-jemallocator"
+]

@@ -10,6 +10,7 @@ use crate::{
             builder::{DeclaredAndInferredType, DeferredExpressionState},
         },
         signatures::ParameterForm,
+        special_form::TypeQualifier,
     },
 };
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
@@ -166,9 +167,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
 
+        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
         let in_typing_module = || {
             matches!(
-                file_to_module(db, self.file()).and_then(|module| module.known(db)),
+                known_module(),
                 Some(KnownModule::Typing | KnownModule::TypingExtensions)
             )
         };
@@ -178,6 +180,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
             (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
+            (None, "InitVar") if known_module() == Some(KnownModule::Dataclasses) => {
+                Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar))
+            }
             _ => Type::from(StaticClassLiteral::new(
                 db,
                 name.id.clone(),
@@ -225,7 +230,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .iter()
                     .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
             {
-                self.deferred.insert(definition, self.multi_inference_state);
+                self.deferred.insert(definition);
             } else {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);

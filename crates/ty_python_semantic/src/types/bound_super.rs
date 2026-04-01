@@ -8,9 +8,9 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
-        MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
-        Type, TypeVarBoundOrConstraints, UnionBuilder,
+        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
+        IntersectionBuilder, KnownClass, MemberLookupPolicy, NominalInstanceType, SpecialFormType,
+        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -187,6 +187,7 @@ impl<'db> BoundSuperError<'db> {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
+    Divergent(DivergentType),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
     /// An instance-like type variable owner (e.g., `self: Self` in an instance method).
@@ -208,6 +209,7 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
+            SuperOwnerKind::Divergent(_) => Some(self),
             SuperOwnerKind::Class(class) => Some(SuperOwnerKind::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -226,6 +228,9 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
             }
+            SuperOwnerKind::Divergent(divergent) => {
+                Either::Left(ClassBase::Divergent(divergent).mro(db, None))
+            }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
             SuperOwnerKind::Instance(instance) => Either::Right(instance.class(db).iter_mro(db)),
             SuperOwnerKind::InstanceTypeVar(_, class) | SuperOwnerKind::ClassTypeVar(_, class) => {
@@ -236,7 +241,7 @@ impl<'db> SuperOwnerKind<'db> {
 
     fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            SuperOwnerKind::Dynamic(_) => None,
+            SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
             SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
             SuperOwnerKind::InstanceTypeVar(_, class) | SuperOwnerKind::ClassTypeVar(_, class) => {
@@ -258,6 +263,7 @@ impl<'db> SuperOwnerKind<'db> {
     pub(super) fn owner_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SuperOwnerKind::Divergent(divergent) => Type::Divergent(divergent),
             SuperOwnerKind::Class(class) => class.into(),
             SuperOwnerKind::Instance(instance) => instance.into(),
             SuperOwnerKind::InstanceTypeVar(bound_typevar, _) => Type::TypeVar(bound_typevar),
@@ -356,6 +362,7 @@ impl<'db> BoundSuperType<'db> {
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
             Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+            Type::Divergent(divergent) => ClassBase::Divergent(divergent),
             _ => {
                 return Err(BoundSuperError::InvalidPivotClassType {
                     pivot_class: pivot_class_type,
@@ -383,7 +390,7 @@ impl<'db> BoundSuperType<'db> {
                             // Validate constraint is a subclass of pivot class.
                             if let Some(pivot) = pivot_class_literal {
                                 if !class.iter_mro(db).any(|superclass| match superclass {
-                                    ClassBase::Dynamic(_) => true,
+                                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
                                     ClassBase::Generic
                                     | ClassBase::Protocol
                                     | ClassBase::TypedDict => false,
@@ -418,6 +425,7 @@ impl<'db> BoundSuperType<'db> {
         let owner = match owner_type {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
+            Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::ClassLiteral(class) => SuperOwnerKind::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Class(class) => SuperOwnerKind::Class(class),
@@ -599,7 +607,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let pivot_class = pivot_class.class_literal(db);
             if !owner_class.iter_mro(db).any(|superclass| match superclass {
-                ClassBase::Dynamic(_) => true,
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
                 ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
                 ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
             }) {
@@ -659,7 +667,7 @@ impl<'db> BoundSuperType<'db> {
         match owner {
             // If the owner is a dynamic type, we can't tell whether it's a class or an instance.
             // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
-            SuperOwnerKind::Dynamic(_) => None,
+            SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
             SuperOwnerKind::Class(_) => Some(
                 Type::try_call_dunder_get_on_attribute(db, attribute, None, owner.owner_type(db)).0,
             ),
@@ -696,6 +704,11 @@ impl<'db> BoundSuperType<'db> {
                 return Type::Dynamic(dynamic)
                     .find_name_in_mro_with_policy(db, name, policy)
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
+            }
+            SuperOwnerKind::Divergent(_) => {
+                return Type::unknown()
+                    .find_name_in_mro_with_policy(db, name, policy)
+                    .expect("Calling `find_name_in_mro` on Unknown should return `Some`");
             }
             SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class(db),
@@ -767,12 +780,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Class(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
-            (
-                ClassBase::Dynamic(DynamicType::Divergent(l)),
-                ClassBase::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from_bool(self.constraints, l == r),
-            (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (ClassBase::Divergent(l), ClassBase::Divergent(r)) => {
+                ConstraintSet::from_bool(self.constraints, l == r)
+            }
+            (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
             (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
             (ClassBase::Dynamic(_), _) => self.never(),
 
@@ -800,12 +811,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (SuperOwnerKind::Instance(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
-            (
-                SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
-                SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from_bool(self.constraints, l == r),
-            (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => self.never(),
+            (SuperOwnerKind::Divergent(l), SuperOwnerKind::Divergent(r)) => {
+                ConstraintSet::from_bool(self.constraints, l == r)
+            }
+            (SuperOwnerKind::Divergent(_), _) | (_, SuperOwnerKind::Divergent(_)) => self.never(),
             (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),
             (SuperOwnerKind::Dynamic(_), _) => self.never(),
 

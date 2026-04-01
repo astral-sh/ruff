@@ -570,18 +570,19 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
 
     setup_rayon();
 
-    let mut code = String::new();
-    writeln!(&mut code, "from enum import Enum").ok();
+    let mut code = "from enum import Enum\n".to_string();
 
-    writeln!(&mut code, "class E(Enum):").ok();
+    code.push_str("class E(Enum):\n");
     for i in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    m{i} = {i}").ok();
     }
-    writeln!(&mut code).ok();
+    code.push('\n');
 
+    code.push_str("print((");
     for i in 0..NUM_ENUM_MEMBERS {
-        writeln!(&mut code, "print(E.m{i})").ok();
+        write!(&mut code, "E.m{i}, ").ok();
     }
+    code.push_str("))");
 
     criterion.bench_function("ty_micro[many_enum_members]", |b| {
         b.iter_batched_ref(
@@ -672,13 +673,11 @@ class E(Enum):
         .ok();
     }
 
-    write!(
-        &mut code,
+    code.push_str(
         "
             case _:
-                assert_never(self)"
-    )
-    .ok();
+                assert_never(self)",
+    );
 
     criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
         b.iter_batched_ref(
@@ -782,26 +781,47 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
 
     setup_rayon();
 
-    let mut code = String::new();
-    writeln!(&mut code, "class Base: ...").ok();
+    let mut code = "class Base: ...\n".to_string();
     for i in 0..NUM_CLASSES {
         writeln!(&mut code, "class C{i}(Base): ...").ok();
     }
-    writeln!(&mut code).ok();
+    code.push('\n');
 
-    writeln!(&mut code, "def f(obj: Base) -> None:").ok();
+    code.push_str("def f(obj: Base) -> None:\n");
     for i in 0..NUM_CLASSES {
         if i == 0 {
             writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
         } else {
             writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
         }
-        writeln!(&mut code, "        pass").ok();
+        code.push_str("        pass\n");
     }
 
     criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3120>.
+///
+/// Sequential (`TypeIs`) narrowing on a large `Literal` union, combined with
+/// `match`/`assert_never` on another `Literal` union, caused a combinatorial
+/// explosion when the `PredicateNode::IsNonTerminalCall` optimization was
+/// removed.
+fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[typeis_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(include_str!("../resources/typeis_narrowing.py")),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();
@@ -1009,6 +1029,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

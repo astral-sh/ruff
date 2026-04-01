@@ -10,7 +10,7 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
   |
 help: Replace TypeVar `S` with `Self`
 1 | import typing
-2 | 
+2 |
 3 | class F:
   -     def m[S](self: S) -> S: ...
 4 +     def m(self) -> typing.Self: ...

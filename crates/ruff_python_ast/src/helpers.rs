@@ -1119,6 +1119,14 @@ pub fn is_stub_body(body: &[Stmt]) -> bool {
         })
 }
 
+/// Returns `body` without its leading docstring statement, if present.
+pub fn body_without_leading_docstring(body: &[Stmt]) -> &[Stmt] {
+    match body.split_first() {
+        Some((first, rest)) if is_docstring_stmt(first) => rest,
+        _ => body,
+    }
+}
+
 /// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {

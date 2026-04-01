@@ -17,7 +17,7 @@ help: Remove unnecessary parentheses
 4 |     # RSE102
   -     raise ValueError()
 5 +     raise ValueError
-6 | 
+6 |
 7 | try:
 8 |     x = 1 / 0
 
@@ -32,11 +32,11 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 10 |     raise
-11 | 
+11 |
 12 | # RSE102
    - raise TypeError()
 13 + raise TypeError
-14 | 
+14 |
 15 | # RSE102
 16 | raise TypeError ()
 
@@ -51,11 +51,11 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 13 | raise TypeError()
-14 | 
+14 |
 15 | # RSE102
    - raise TypeError ()
 16 + raise TypeError 
-17 | 
+17 |
 18 | # RSE102
 19 | raise TypeError \
 
@@ -70,12 +70,12 @@ RSE102 [*] Unnecessary parentheses on raised exception
 22 | # RSE102
    |
 help: Remove unnecessary parentheses
-17 | 
+17 |
 18 | # RSE102
 19 | raise TypeError \
    -     ()
 20 +     
-21 | 
+21 |
 22 | # RSE102
 23 | raise TypeError \
 
@@ -90,12 +90,12 @@ RSE102 [*] Unnecessary parentheses on raised exception
 26 | # RSE102
    |
 help: Remove unnecessary parentheses
-21 | 
+21 |
 22 | # RSE102
 23 | raise TypeError \
    -     ();
 24 +     ;
-25 | 
+25 |
 26 | # RSE102
 27 | raise TypeError(
 
@@ -113,13 +113,13 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 24 |     ();
-25 | 
+25 |
 26 | # RSE102
    - raise TypeError(
-   - 
+   -
    - )
 27 + raise TypeError
-28 | 
+28 |
 29 | # RSE102
 30 | raise (TypeError) (
 
@@ -137,13 +137,13 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 29 | )
-30 | 
+30 |
 31 | # RSE102
    - raise (TypeError) (
-   - 
+   -
    - )
 32 + raise (TypeError) 
-33 | 
+33 |
 34 | # RSE102
 35 | raise TypeError(
 
@@ -161,13 +161,13 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 34 | )
-35 | 
+35 |
 36 | # RSE102
    - raise TypeError(
    -     # Hello, world!
    - )
 37 + raise TypeError
-38 | 
+38 |
 39 | # OK
 40 | raise AssertionError
 note: This is an unsafe fix and may change runtime behavior
@@ -182,12 +182,12 @@ RSE102 [*] Unnecessary parentheses on raised exception
 76 | raise IndexError()\
    |
 help: Remove unnecessary parentheses
-71 | 
-72 | 
+71 |
+72 |
 73 | # RSE102
    - raise IndexError()from ZeroDivisionError
 74 + raise IndexError from ZeroDivisionError
-75 | 
+75 |
 76 | raise IndexError()\
 77 | from ZeroDivisionError
 
@@ -203,11 +203,11 @@ RSE102 [*] Unnecessary parentheses on raised exception
 help: Remove unnecessary parentheses
 73 | # RSE102
 74 | raise IndexError()from ZeroDivisionError
-75 | 
+75 |
    - raise IndexError()\
 76 + raise IndexError\
 77 | from ZeroDivisionError
-78 | 
+78 |
 79 | raise IndexError() from ZeroDivisionError
 
 RSE102 [*] Unnecessary parentheses on raised exception
@@ -223,12 +223,12 @@ RSE102 [*] Unnecessary parentheses on raised exception
 help: Remove unnecessary parentheses
 76 | raise IndexError()\
 77 | from ZeroDivisionError
-78 | 
+78 |
    - raise IndexError() from ZeroDivisionError
 79 + raise IndexError from ZeroDivisionError
-80 | 
+80 |
 81 | raise IndexError();
-82 | 
+82 |
 
 RSE102 [*] Unnecessary parentheses on raised exception
   --> RSE102.py:81:17
@@ -241,12 +241,12 @@ RSE102 [*] Unnecessary parentheses on raised exception
 83 | # RSE102
    |
 help: Remove unnecessary parentheses
-78 | 
+78 |
 79 | raise IndexError() from ZeroDivisionError
-80 | 
+80 |
    - raise IndexError();
 81 + raise IndexError;
-82 | 
+82 |
 83 | # RSE102
 84 | raise Foo()
 
@@ -261,11 +261,11 @@ RSE102 [*] Unnecessary parentheses on raised exception
    |
 help: Remove unnecessary parentheses
 81 | raise IndexError();
-82 | 
+82 |
 83 | # RSE102
    - raise Foo()
 84 + raise Foo
-85 | 
+85 |
 86 | # OK
 87 | raise ctypes.WinError()
 note: This is an unsafe fix and may change runtime behavior
@@ -284,8 +284,8 @@ help: Remove unnecessary parentheses
 106 | if future.exception():
     -     raise future.Exception()
 107 +     raise future.Exception
-108 | 
-109 | 
+108 |
+109 |
 110 | raise TypeError(
 note: This is an unsafe fix and may change runtime behavior
 
@@ -300,8 +300,8 @@ RSE102 [*] Unnecessary parentheses on raised exception
     |
 help: Remove unnecessary parentheses
 107 |     raise future.Exception()
-108 | 
-109 | 
+108 |
+109 |
     - raise TypeError(
     -     # comment
     - )

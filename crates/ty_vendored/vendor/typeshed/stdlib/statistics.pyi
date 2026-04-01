@@ -109,7 +109,7 @@ from _typeshed import SupportsRichComparisonT
 from collections.abc import Callable, Hashable, Iterable, Sequence, Sized
 from decimal import Decimal
 from fractions import Fraction
-from typing import Literal, NamedTuple, Protocol, SupportsFloat, SupportsIndex, TypeVar
+from typing import Literal, NamedTuple, Protocol, SupportsFloat, SupportsIndex, TypeVar, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -150,7 +150,9 @@ _Seed: TypeAlias = int | float | str | bytes | bytearray  # noqa: Y041
 # Used in linear_regression
 _T_co = TypeVar("_T_co", covariant=True)
 
+@type_check_only
 class _SizedIterable(Iterable[_T_co], Sized, Protocol[_T_co]): ...
+
 class StatisticsError(ValueError): ...
 
 if sys.version_info >= (3, 11):

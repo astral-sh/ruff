@@ -11,13 +11,13 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
   |
 help: Replace with `Path.stat(...).st_ctime`
 3 | from os.path import getctime
-4 | 
-5 | 
+4 |
+5 |
   - os.path.getctime("filename")
 6 + Path("filename").stat().st_ctime
 7 | os.path.getctime(b"filename")
 8 | os.path.getctime(Path("filename"))
-9 | 
+9 |
 
 PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
  --> PTH205.py:7:1
@@ -28,13 +28,13 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 8 | os.path.getctime(Path("filename"))
   |
 help: Replace with `Path.stat(...).st_ctime`
-4  | 
-5  | 
+4  |
+5  |
 6  | os.path.getctime("filename")
    - os.path.getctime(b"filename")
 7  + Path(b"filename").stat().st_ctime
 8  | os.path.getctime(Path("filename"))
-9  | 
+9  |
 10 | getctime("filename")
 
 PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
@@ -48,12 +48,12 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 10 | getctime("filename")
    |
 help: Replace with `Path.stat(...).st_ctime`
-5  | 
+5  |
 6  | os.path.getctime("filename")
 7  | os.path.getctime(b"filename")
    - os.path.getctime(Path("filename"))
 8  + Path("filename").stat().st_ctime
-9  | 
+9  |
 10 | getctime("filename")
 11 | getctime(b"filename")
 
@@ -70,7 +70,7 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 help: Replace with `Path.stat(...).st_ctime`
 7  | os.path.getctime(b"filename")
 8  | os.path.getctime(Path("filename"))
-9  | 
+9  |
    - getctime("filename")
 10 + Path("filename").stat().st_ctime
 11 | getctime(b"filename")
@@ -86,7 +86,7 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 help: Replace with `Path.stat(...).st_ctime`
 8  | os.path.getctime(Path("filename"))
-9  | 
+9  |
 10 | getctime("filename")
    - getctime(b"filename")
 11 + Path(b"filename").stat().st_ctime
@@ -101,7 +101,7 @@ PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    | ^^^^^^^^
    |
 help: Replace with `Path.stat(...).st_ctime`
-9  | 
+9  |
 10 | getctime("filename")
 11 | getctime(b"filename")
    - getctime(Path("filename"))

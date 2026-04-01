@@ -154,8 +154,9 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf
             | Self::Unknown
             | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::TypeQualifier(_) => KnownClass::SpecialForm,
+            | Self::AlwaysFalsy => KnownClass::SpecialForm,
+
+            Self::TypeQualifier(qualifier) => qualifier.class(),
 
             // Typeshed says it's an instance of `_SpecialForm`,
             // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
@@ -239,6 +240,7 @@ impl SpecialFormType {
             List,
             Dict,
             FrozenSet,
+            InitVar,
             Set,
             ChainMap,
             Counter,
@@ -306,6 +308,7 @@ impl SpecialFormType {
                         TypeQualifier::ReadOnly => Self::ReadOnly,
                         TypeQualifier::Required => Self::Required,
                         TypeQualifier::NotRequired => Self::NotRequired,
+                        TypeQualifier::InitVar => Self::InitVar,
                     },
                 }
             }
@@ -371,6 +374,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::NotRequired => {
                     Self::TypeQualifier(TypeQualifier::NotRequired)
                 }
+                SpecialFormTypeBuilder::InitVar => Self::TypeQualifier(TypeQualifier::InitVar),
             })
     }
 
@@ -380,8 +384,8 @@ impl SpecialFormType {
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
     pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::TypeQualifier(TypeQualifier::ClassVar)
-            | Self::LegacyStdlibAlias(_)
+            Self::TypeQualifier(qualifier) => qualifier.check_module(module),
+            Self::LegacyStdlibAlias(_)
             | Self::Optional
             | Self::Union
             | Self::NoReturn
@@ -394,12 +398,6 @@ impl SpecialFormType {
             | Self::Literal
             | Self::LiteralString
             | Self::Never
-            | Self::TypeQualifier(
-                TypeQualifier::Final
-                | TypeQualifier::Required
-                | TypeQualifier::NotRequired
-                | TypeQualifier::ReadOnly,
-            )
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -460,6 +458,8 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type => false,
 
+            Self::TypeQualifier(qualifier) => qualifier.is_callable(),
+
             // All other special forms are also not callable
             Self::Annotated
             | Self::Literal
@@ -480,7 +480,6 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf
             | Self::Callable
             | Self::TypingSelf
-            | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -496,6 +495,8 @@ impl SpecialFormType {
     /// to `issubclass()` and `isinstance()` calls.
     pub(super) const fn is_valid_isinstance_target(self) -> bool {
         match self {
+            Self::TypeQualifier(qualifier) => qualifier.is_valid_isinstance_target(),
+
             Self::Callable
             | Self::LegacyStdlibAlias(_)
             | Self::Tuple
@@ -509,7 +510,6 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf
-            | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Intersection
             | Self::Literal
@@ -536,6 +536,7 @@ impl SpecialFormType {
     /// Return the name of the symbol at runtime
     pub(super) const fn name(self) -> &'static str {
         match self {
+            SpecialFormType::TypeQualifier(qualifier) => qualifier.name(),
             SpecialFormType::Any => "Any",
             SpecialFormType::Annotated => "Annotated",
             SpecialFormType::Literal => "Literal",
@@ -547,13 +548,9 @@ impl SpecialFormType {
             SpecialFormType::Tuple => "Tuple",
             SpecialFormType::Type => "Type",
             SpecialFormType::TypingSelf => "Self",
-            SpecialFormType::TypeQualifier(TypeQualifier::Final) => "Final",
-            SpecialFormType::TypeQualifier(TypeQualifier::ClassVar) => "ClassVar",
             SpecialFormType::Callable => "Callable",
             SpecialFormType::Concatenate => "Concatenate",
             SpecialFormType::Unpack => "Unpack",
-            SpecialFormType::TypeQualifier(TypeQualifier::Required) => "Required",
-            SpecialFormType::TypeQualifier(TypeQualifier::NotRequired) => "NotRequired",
             SpecialFormType::TypeAlias => "TypeAlias",
             SpecialFormType::TypeGuard => "TypeGuard",
             SpecialFormType::TypedDict => "TypedDict",
@@ -567,7 +564,6 @@ impl SpecialFormType {
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Deque) => "Deque",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::ChainMap) => "ChainMap",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::OrderedDict) => "OrderedDict",
-            SpecialFormType::TypeQualifier(TypeQualifier::ReadOnly) => "ReadOnly",
             SpecialFormType::Unknown => "Unknown",
             SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
             SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
@@ -598,7 +594,6 @@ impl SpecialFormType {
             | SpecialFormType::Tuple
             | SpecialFormType::Type
             | SpecialFormType::TypingSelf
-            | SpecialFormType::TypeQualifier(_)
             | SpecialFormType::Callable
             | SpecialFormType::Concatenate
             | SpecialFormType::Unpack
@@ -612,6 +607,8 @@ impl SpecialFormType {
             | SpecialFormType::LegacyStdlibAlias(_) => {
                 &[KnownModule::Typing, KnownModule::TypingExtensions]
             }
+
+            SpecialFormType::TypeQualifier(qualifier) => qualifier.definition_modules(),
 
             SpecialFormType::Unknown
             | SpecialFormType::AlwaysTruthy
@@ -791,22 +788,10 @@ impl SpecialFormType {
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
-            SpecialFormType::TypeQualifier(qualifier) => {
-                let err = match qualifier {
-                    TypeQualifier::Final | TypeQualifier::ClassVar => {
-                        InvalidTypeExpression::TypeQualifier(qualifier)
-                    }
-                    TypeQualifier::ReadOnly
-                    | TypeQualifier::NotRequired
-                    | TypeQualifier::Required => {
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier)
-                    }
-                };
-                Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![err],
-                    fallback_type: Type::unknown(),
-                })
-            }
+            SpecialFormType::TypeQualifier(qualifier) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![qualifier.in_type_expression()],
+                fallback_type: Type::unknown(),
+            }),
         }
     }
 }
@@ -879,6 +864,85 @@ pub enum TypeQualifier {
     ClassVar,
     Required,
     NotRequired,
+    /// The symbol `dataclasses.InitVar`.
+    ///
+    /// Typeshed defines this symbol as a class, which is accurate, but we represent it as a
+    /// special form internally as it's more similar semantically to `ClassVar`/`Final` etc.
+    /// than to a regular generic class.
+    InitVar,
+}
+
+impl TypeQualifier {
+    const fn is_callable(self) -> bool {
+        match self {
+            Self::InitVar => true,
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                false
+            }
+        }
+    }
+
+    const fn check_module(self, module: KnownModule) -> bool {
+        match self {
+            Self::InitVar => module.is_dataclasses(),
+            Self::ClassVar => module.is_typing(),
+            Self::ReadOnly | Self::Final | Self::Required | Self::NotRequired => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+        }
+    }
+
+    const fn is_valid_isinstance_target(self) -> bool {
+        match self {
+            Self::InitVar => true,
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                false
+            }
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::ReadOnly => "ReadOnly",
+            Self::Final => "Final",
+            Self::ClassVar => "ClassVar",
+            Self::Required => "Required",
+            Self::NotRequired => "NotRequired",
+            Self::InitVar => "InitVar",
+        }
+    }
+
+    const fn definition_modules(self) -> &'static [KnownModule] {
+        match self {
+            Self::InitVar => &[KnownModule::Dataclasses],
+            Self::ClassVar | Self::ReadOnly | Self::Final | Self::Required | Self::NotRequired => {
+                &[KnownModule::Typing, KnownModule::TypingExtensions]
+            }
+        }
+    }
+
+    const fn class(self) -> KnownClass {
+        match self {
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                KnownClass::SpecialForm
+            }
+            Self::InitVar => KnownClass::Type,
+        }
+    }
+
+    const fn in_type_expression(self) -> InvalidTypeExpression<'static> {
+        match self {
+            TypeQualifier::Final | TypeQualifier::ClassVar => {
+                InvalidTypeExpression::TypeQualifier(self)
+            }
+            TypeQualifier::ReadOnly
+            | TypeQualifier::NotRequired
+            | TypeQualifier::InitVar
+            | TypeQualifier::Required => {
+                InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
+            }
+        }
+    }
 }
 
 impl From<TypeQualifier> for SpecialFormType {
@@ -895,6 +959,7 @@ impl From<TypeQualifier> for TypeQualifiers {
             TypeQualifier::ClassVar => TypeQualifiers::CLASS_VAR,
             TypeQualifier::Required => TypeQualifiers::REQUIRED,
             TypeQualifier::NotRequired => TypeQualifiers::NOT_REQUIRED,
+            TypeQualifier::InitVar => TypeQualifiers::INIT_VAR,
         }
     }
 }

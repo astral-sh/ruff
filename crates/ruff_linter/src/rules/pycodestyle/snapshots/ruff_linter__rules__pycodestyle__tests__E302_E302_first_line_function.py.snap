@@ -13,7 +13,7 @@ E302 [*] Expected 2 blank lines, found 1
 help: Add missing blank line(s)
 1 | def fn1():
 2 |     pass
-3 | 
-4 + 
+3 |
+4 +
 5 | def fn2():
 6 |     pass

@@ -53,29 +53,56 @@ reveal_type(b)  # revealed: list[list[int]]
 `typed_dict.py`:
 
 ```py
-from typing import TypedDict
+from typing import Callable, Hashable, Mapping, TypedDict
 
 class TD(TypedDict):
     x: int
 
-d1 = {"x": 1}
-d2: TD = {"x": 1}
-d3: dict[str, int] = {"x": 1}
-d4: TD = dict(x=1)
-d5: TD = dict(x="1")  # error: [invalid-argument-type]
+d1_literal = {"x": 1}
+d1_dict = dict(x=1)
 
-reveal_type(d1)  # revealed: dict[str, int]
-reveal_type(d2)  # revealed: TD
-reveal_type(d3)  # revealed: dict[str, int]
-reveal_type(d4)  # revealed: TD
+reveal_type(d1_literal)  # revealed: dict[str, int]
+reveal_type(d1_dict)  # revealed: dict[str, int]
 
-def _() -> TD:
+d2_literal: TD = {"x": 1}
+d2_dict: TD = dict(x=1)
+
+reveal_type(d2_literal)  # revealed: TD
+reveal_type(d2_dict)  # revealed: TD
+
+d3_literal: dict[str, int] = {"x": 1}
+d3_dict: dict[str, int] = dict(x=1)
+
+reveal_type(d3_literal)  # revealed: dict[str, int]
+reveal_type(d3_dict)  # revealed: dict[str, int]
+
+d4_invalid_literal: TD = {"x": "1"}  # error: [invalid-argument-type]
+d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
+
+reveal_type(d4_invalid_literal)  # revealed: TD
+reveal_type(d4_invalid_dict)  # revealed: TD
+
+# Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
+# in typeshed, which require the key type to be `str` when using keyword arguments. However, we
+# special-case this pattern to match the behavior of `d5_literal`.
+d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
+d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+
+def return_literal() -> TD:
     return {"x": 1}
 
-def _() -> TD:
+def return_dict() -> TD:
+    return dict(x=1)
+
+def return_invalid_literal() -> TD:
+    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the `return_invalid_dict` case below).
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
     # error: [invalid-return-type]
     return {}
+
+def return_invalid_dict() -> TD:
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    return dict()
 ```
 
 ## Propagating return type annotation
@@ -390,6 +417,59 @@ def _(flag: bool):
     reveal_type(x2)  # revealed: list[int | None]
 ```
 
+## Lambda expressions
+
+If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
+the annotated return type as type context, and the annotated parameter types are respected:
+
+```py
+from typing import Callable, TypedDict
+
+class Bar(TypedDict):
+    bar: int
+
+f1 = lambda x: {"bar": 1}
+reveal_type(f1)  # revealed: (x) -> dict[str, int]
+
+f2: Callable[[int], Bar] = lambda x: {"bar": 1}
+reveal_type(f2)  # revealed: (x: int) -> Bar
+
+# error: [missing-typed-dict-key] "Missing required key 'bar' in TypedDict `Bar` constructor"
+# error: [invalid-assignment] "Object of type `(x: int) -> dict[Unknown, Unknown]` is not assignable to `(int, /) -> Bar`"
+f3: Callable[[int], Bar] = lambda x: {}
+reveal_type(f3)  # revealed: (int, /) -> Bar
+
+# TODO: This should reveal `str`.
+f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
+reveal_type(f4)  # revealed: (x: str) -> Unknown
+
+# TODO: This should not error once we support `Unpack`.
+# error: [invalid-assignment]
+f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
+reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
+
+f6: Callable[[int, str], None] = lambda *args: None
+reveal_type(f6)  # revealed: (*args) -> None
+
+# N.B. `Callable` annotations only support positional parameters.
+# error: [invalid-assignment]
+f7: Callable[[int], None] = lambda *, x=1: None
+reveal_type(f7)  # revealed: (int, /) -> None
+
+# TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
+f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
+reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+```
+
+We do not currently account for type annotations present later in the scope:
+
+```py
+f9 = lambda: [1]
+# TODO: This should not error.
+_: list[int | str] = f9()  # error: [invalid-assignment]
+reveal_type(f9)  # revealed: () -> list[int]
+```
+
 ## Dunder Calls
 
 The key and value parameters types are used as type context for `__setitem__` dunder calls:
@@ -480,6 +560,27 @@ def _(x: Intersection[X, Y]):
     # TODO: Reveal `Bar` and `Baz` here.
     x |= reveal_type({"bar": [1, "2"]})  # revealed: dict[str, list[int | str]]
     x |= reveal_type({"bar": [1, None]})  # revealed: dict[str, list[int | None]]
+```
+
+## `await` expressions
+
+Type context is also propagated through `await` expressions:
+
+```py
+from typing import Literal
+
+async def make_lst[T](x: T) -> list[T]:
+    return [x]
+
+async def _():
+    x1 = await make_lst(1)
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[Literal[1]] = await make_lst(1)
+    reveal_type(x2)  # revealed: list[Literal[1]]
+
+    x3: list[int | None] = await make_lst(1)
+    reveal_type(x3)  # revealed: list[int | None]
 ```
 
 ## Multi-inference diagnostics

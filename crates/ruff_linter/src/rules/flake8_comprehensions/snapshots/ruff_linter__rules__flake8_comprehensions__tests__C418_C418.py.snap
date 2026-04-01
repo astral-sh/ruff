@@ -75,7 +75,7 @@ help: Remove outer `dict()` call
   -     {'x': 1 for x in range(10)}
   - )
 4 + {'x': 1 for x in range(10)}
-5 | 
+5 |
 6 | dict({}, a=1)
 7 | dict({x: 1 for x in range(1)}, a=1)
 note: This is an unsafe fix and may change runtime behavior

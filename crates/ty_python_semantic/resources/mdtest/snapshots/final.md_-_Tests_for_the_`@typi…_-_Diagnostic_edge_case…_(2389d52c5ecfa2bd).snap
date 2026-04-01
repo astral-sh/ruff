@@ -51,7 +51,7 @@ info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
 help: Remove the override of `f`
 info: rule `override-of-final-method` is enabled by default
 1 | import module1
-2 | 
+2 |
 3 | class Foo(module1.Foo):
   -     def f(self): ...  # error: [override-of-final-method]
 4 +     pass  # error: [override-of-final-method]
