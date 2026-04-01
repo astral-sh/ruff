@@ -3,25 +3,25 @@ use anyhow::Context;
 use lsp_types::{Position, Range};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
-use ty_server::server::api::requests::provide_type::ProvideTypeResponse;
+use ty_server::ProvideTypeResponse;
 
 fn assert_provide_type_snapshot(
     file_content: &str,
     request_range: Range,
 ) -> anyhow::Result<ProvideTypeResponse> {
     let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
+    let file = SystemPath::new("src/foo.py");
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, Some(ClientOptions::default()))?
-        .with_file(foo, file_content)?
+        .with_file(file, file_content)?
         .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, file_content, 1);
+    server.open_text_document(file, file_content, 1);
     server
-        .provide_type_request(foo, request_range)
+        .provide_type_request(file, request_range)
         .context("Unable to request type")
 }
 
