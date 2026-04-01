@@ -3820,6 +3820,7 @@ impl<'db> Type<'db> {
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
                 SubclassOfInner::TypeVar(tvar) => {
+                    let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
                         None => KnownClass::Type.to_instance(db).bindings(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -3835,11 +3836,22 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    bindings.into_constructor_bindings(
-                        db,
-                        Type::TypeVar(tvar),
-                        ConstructorCallableKind::TypeVar,
-                    )
+                    // TODO We would ideally be able to just do `into_constructor_bindings` in the
+                    // no-bounds/constraints case above (where we get back the bindings for
+                    // `Type.__call__`), and just do `with_constructed_instance_type` in the
+                    // bound/constrained cases, where we should get back constructor bindings (or
+                    // if we don't, we probably shouldn't return `T` from the call?). But currently
+                    // we can't because we special-case some built-in types to return regular
+                    // (not constructor) bindings from `constructor_bindings()`.
+                    bindings
+                        // `into_constructor_bindings` is a no-op for already-constructor bindings,
+                        // so we are just setting the `MetaclassCall` type for `Type.__call__`, or
+                        // the special-cased builtin classes that return regular bindings.
+                        .into_constructor_bindings(
+                            constructor_instance_type,
+                            ConstructorCallableKind::MetaclassCall,
+                        )
+                        .with_constructed_instance_type(db, constructor_instance_type)
                 }
             },
 
@@ -4451,10 +4463,10 @@ impl<'db> Type<'db> {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type)
                             .into_constructor_bindings(
-                                db,
                                 constructor_instance_ty,
                                 ConstructorCallableKind::New,
-                            );
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
@@ -4475,11 +4487,13 @@ impl<'db> Type<'db> {
                 }),
                 _,
             ) => {
-                let mut bindings = init_method.bindings(db).into_constructor_bindings(
-                    db,
-                    constructor_instance_ty,
-                    ConstructorCallableKind::Init,
-                );
+                let mut bindings = init_method
+                    .bindings(db)
+                    .into_constructor_bindings(
+                        constructor_instance_ty,
+                        ConstructorCallableKind::Init,
+                    )
+                    .with_constructed_instance_type(db, constructor_instance_ty);
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
@@ -4497,11 +4511,13 @@ impl<'db> Type<'db> {
                         definedness,
                         ..
                     }) => {
-                        let mut bindings = init_method.bindings(db).into_constructor_bindings(
-                            db,
-                            constructor_instance_ty,
-                            ConstructorCallableKind::Init,
-                        );
+                        let mut bindings = init_method
+                            .bindings(db)
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::Init,
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }
@@ -4519,11 +4535,12 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::gradual_form(), constructor_instance_ty),
                         )
                         .into();
-                        bindings = bindings.into_constructor_bindings(
-                            db,
-                            constructor_instance_ty,
-                            ConstructorCallableKind::Init,
-                        );
+                        bindings = bindings
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::Init,
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
                         Some(bindings)
                     }
@@ -4551,10 +4568,10 @@ impl<'db> Type<'db> {
             let mut metaclass_bindings = metaclass_call_method
                 .bindings(db)
                 .into_constructor_bindings(
-                    db,
                     constructor_instance_ty,
                     ConstructorCallableKind::MetaclassCall,
-                );
+                )
+                .with_constructed_instance_type(db, constructor_instance_ty);
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.

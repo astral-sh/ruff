@@ -194,7 +194,7 @@ impl<'db> CallableItem<'db> {
         }
     }
 
-    fn into_constructor(
+    fn wrap_as_constructor(
         self,
         constructed_instance_type: Type<'db>,
         constructor_kind: ConstructorCallableKind,
@@ -204,10 +204,7 @@ impl<'db> CallableItem<'db> {
                 binding,
                 ConstructorContext::new(constructed_instance_type, constructor_kind),
             )),
-            CallableItem::Constructor(mut binding) => {
-                binding.set_constructed_instance_type(constructed_instance_type);
-                CallableItem::Constructor(binding)
-            }
+            CallableItem::Constructor(binding) => CallableItem::Constructor(binding),
         }
     }
 }
@@ -524,20 +521,26 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn into_constructor_bindings(
+    pub(crate) fn with_constructed_instance_type(
         mut self,
         db: &'db dyn Db,
+        constructor_instance_type: Type<'db>,
+    ) -> Self {
+        self.set_constructor_instance_type_in_place(db, constructor_instance_type);
+        self
+    }
+
+    pub(crate) fn into_constructor_bindings(
+        mut self,
         constructor_instance_type: Type<'db>,
         constructor_kind: ConstructorCallableKind,
     ) -> Self {
         for element in &mut self.elements {
             element.items = std::mem::take(&mut element.items)
                 .into_iter()
-                .map(|item| item.into_constructor(constructor_instance_type, constructor_kind))
+                .map(|item| item.wrap_as_constructor(constructor_instance_type, constructor_kind))
                 .collect();
         }
-
-        self.set_constructor_instance_type_in_place(db, constructor_instance_type);
         self
     }
 

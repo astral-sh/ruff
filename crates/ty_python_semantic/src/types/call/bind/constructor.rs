@@ -582,9 +582,6 @@ impl<'db> ConstructorContext<'db> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConstructorCallableKind {
-    /// Bindings for constructing a `T` from a call to a `type[T]`, which may have any or all of
-    /// the below as downstream constructors (depending on the upper bound/constraints of `T`).
-    TypeVar,
     /// A metaclass `__call__` method.
     MetaclassCall,
     /// A `__new__` constructor.
