@@ -17,7 +17,7 @@ use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
 pub(crate) struct ProvideTypeRequestHandler;
 
 #[derive(Debug)]
-pub(crate) enum ProvideTypeRequest {}
+pub enum ProvideTypeRequest {}
 
 impl Request for ProvideTypeRequest {
     type Params = ProvideTypeParams;
@@ -27,7 +27,7 @@ impl Request for ProvideTypeRequest {
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProvideTypeParams {
+pub struct ProvideTypeParams {
     /// The text document.
     pub text_document: TextDocumentIdentifier,
 
@@ -37,7 +37,7 @@ pub(crate) struct ProvideTypeParams {
 
 #[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProvideTypeResponse {
+pub struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
     pub types: Vec<Option<String>>,
 }
@@ -62,7 +62,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
         };
 
         let parsed = parsed_module(db, file).load(db);
-        let url = Self::document_url(&params);
+        let url = &params.text_document.uri;
 
         let model = SemanticModel::new(db, file);
 
@@ -71,7 +71,7 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             .iter()
             .map(|range| {
                 let range_offset = if let Some(range_offset) =
-                    range.to_text_range(db, file, &url, snapshot.encoding())
+                    range.to_text_range(db, file, url, snapshot.encoding())
                 {
                     range_offset
                 } else {
@@ -83,12 +83,12 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
                     Ok(found) => found.node(),
                     Err(_) => return None,
                 };
-                let ty = node.as_expr_ref()?.inferred_type(&model);
+                let ty = node.as_expr_ref()?.inferred_type(&model)?;
 
-                ty.map(|ty| {
+                Some(
                     ty.display_with(db, DisplaySettings::default().fully_qualified())
-                        .to_string()
-                })
+                        .to_string(),
+                )
             })
             .collect();
 

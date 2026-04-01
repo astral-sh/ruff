@@ -53,7 +53,7 @@ pub(super) use hover::HoverRequestHandler;
 pub(super) use inlay_hints::InlayHintRequestHandler;
 pub(super) use prepare_rename::PrepareRenameRequestHandler;
 pub(super) use prepare_type_hierarchy::PrepareTypeHierarchyRequestHandler;
-pub(super) use provide_type::{ProvideTypeRequest, ProvideTypeRequestHandler};
+pub(super) use provide_type::ProvideTypeRequestHandler;
 pub(super) use references::ReferencesRequestHandler;
 pub(super) use rename::RenameRequestHandler;
 pub(super) use selection_range::SelectionRangeRequestHandler;
@@ -66,4 +66,5 @@ pub(super) use type_hierarchy_supertypes::TypeHierarchySupertypesRequestHandler;
 pub(super) use workspace_diagnostic::WorkspaceDiagnosticRequestHandler;
 pub(super) use workspace_symbols::WorkspaceSymbolRequestHandler;
 
+pub use provide_type::{ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse};
 pub use workspace_diagnostic::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};

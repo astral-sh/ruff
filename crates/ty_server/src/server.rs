@@ -24,7 +24,10 @@ pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
-pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
+pub use api::{
+    PartialWorkspaceProgress, PartialWorkspaceProgressParams, ProvideTypeParams,
+    ProvideTypeRequest, ProvideTypeResponse,
+};
 
 pub struct Server {
     connection: Connection,
