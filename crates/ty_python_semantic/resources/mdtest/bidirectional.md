@@ -262,7 +262,9 @@ def _(xy: X | Y):
 The type context of all matching overloads are considered during argument inference:
 
 ```py
-from typing import overload, TypedDict
+from concurrent.futures import Future
+from os.path import abspath
+from typing import Awaitable, Callable, TypeVar, Union, overload, TypedDict
 
 def int_or_str() -> int | str:
     raise NotImplementedError
@@ -357,6 +359,24 @@ def f7(y: object) -> object:
 # TODO: We should reveal `list[int | str]` here.
 x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
+
+# TODO: We should not error here once call inference can conjoin constraints
+# from all call arguments.
+def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
+    # error: [invalid-return-type]
+    return tuple(map(abspath, xs))
+
+T2 = TypeVar("T2")
+
+def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> None:
+    raise NotImplementedError
+
+# TODO: This should not error once we conjoin constraints from all call arguments.
+def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
+    future: Future[T2] = Future()
+    # error: [invalid-argument-type]
+    sink(func, future)
+    return future
 ```
 
 ## Class constructor parameters

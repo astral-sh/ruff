@@ -1414,6 +1414,10 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
+    pub(crate) const fn is_intersection(self) -> bool {
+        matches!(self, Type::Intersection(_))
+    }
+
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
     /// intersection containing a single negative branch, which this method does _not_ consider a
     /// "real" intersection.)
