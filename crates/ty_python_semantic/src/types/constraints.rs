@@ -1135,6 +1135,8 @@ impl<'db> Constraint<'db> {
             _ => {}
         }
 
+        builder.intern_constraint_typevars(db, typevar, lower, upper);
+
         // If `lower ≰ upper` for every possible assignment of typevars, then the constraint cannot
         // be satisfied, since there is no type that is both greater than `lower`, and less than
         // `upper`. We use an existential check here ("is there *some* assignment where
@@ -1146,8 +1148,6 @@ impl<'db> Constraint<'db> {
         {
             return ALWAYS_FALSE;
         }
-
-        builder.intern_constraint_typevars(db, typevar, lower, upper);
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
         // typevars, we have to ensure that the bounds are "later" according to that order than the
