@@ -6,8 +6,7 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::request::Request;
-use lsp_types::{Range, TextDocumentIdentifier, Url};
+use lsp_types::{LspRequestMethod, MessageDirection, Range, Request, TextDocumentIdentifier, Uri};
 use serde::{Deserialize, Serialize};
 use ty_ide::provide_types;
 use ty_project::ProjectDatabase;
@@ -15,17 +14,18 @@ use ty_project::ProjectDatabase;
 pub(crate) struct ProvideTypeRequestHandler;
 
 #[derive(Debug)]
-pub enum ProvideTypeRequest {}
+pub(crate) enum ProvideTypeRequest {}
 
 impl Request for ProvideTypeRequest {
     type Params = ProvideTypeParams;
     type Result = Option<ProvideTypeResponse>;
-    const METHOD: &'static str = "types/provide-type";
+    const METHOD: LspRequestMethod<'static> = LspRequestMethod::new("types/provide-type");
+    const MESSAGE_DIRECTION: MessageDirection = MessageDirection::ClientToServer;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProvideTypeParams {
+pub(crate) struct ProvideTypeParams {
     /// The text document.
     pub text_document: TextDocumentIdentifier,
 
@@ -35,7 +35,7 @@ pub struct ProvideTypeParams {
 
 #[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProvideTypeResponse {
+pub(crate) struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
     pub types: Vec<Option<String>>,
 }
@@ -45,7 +45,7 @@ impl RequestHandler for ProvideTypeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
-    fn document_url(params: &ProvideTypeParams) -> Cow<'_, Url> {
+    fn document_uri(params: &ProvideTypeParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -59,14 +59,14 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             return Ok(None);
         };
 
-        let url = Self::document_url(&params);
+        let uri = Self::document_uri(&params);
         let types = provide_types(
             db,
             file,
             params
                 .ranges
                 .iter()
-                .map(|range| range.to_text_range(db, file, &url, snapshot.encoding())),
+                .map(|range| range.to_text_range(db, file, &uri, snapshot.encoding())),
         );
 
         Ok(Some(ProvideTypeResponse { types }))
