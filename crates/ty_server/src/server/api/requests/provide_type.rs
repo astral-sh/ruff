@@ -14,7 +14,7 @@ use ty_project::ProjectDatabase;
 pub(crate) struct ProvideTypeRequestHandler;
 
 #[derive(Debug)]
-pub(crate) enum ProvideTypeRequest {}
+pub enum ProvideTypeRequest {}
 
 impl Request for ProvideTypeRequest {
     type Params = ProvideTypeParams;
@@ -25,7 +25,7 @@ impl Request for ProvideTypeRequest {
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProvideTypeParams {
+pub struct ProvideTypeParams {
     /// The text document.
     pub text_document: TextDocumentIdentifier,
 
@@ -35,7 +35,7 @@ pub(crate) struct ProvideTypeParams {
 
 #[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProvideTypeResponse {
+pub struct ProvideTypeResponse {
     /// Fully qualified names of the types, one per input range
     pub types: Vec<Option<String>>,
 }
