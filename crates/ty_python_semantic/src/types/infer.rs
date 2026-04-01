@@ -993,6 +993,10 @@ bitflags::bitflags! {
         /// are an error. It is unset in other contexts (e.g., `TypeVar` defaults, explicit class
         /// specialization) where unbound type variables are expected.
         const CHECK_UNBOUND_TYPEVARS = 1 << 1;
+
+        /// Whether the visitor is currently visiting a vararg annotation
+        /// (e.g., `*args: int` or `**kwargs: int` in a function definition).
+        const IN_VARARG_ANNOTATION = 1 << 2;
     }
 }
 

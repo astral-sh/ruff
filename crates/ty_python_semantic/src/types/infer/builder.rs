@@ -301,8 +301,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
-    inferring_vararg_annotation: bool,
-
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
@@ -344,7 +342,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
-            inferring_vararg_annotation: false,
             expressions: FxHashMap::default(),
             expression_cache: None,
             qualifiers: FxHashMap::default(),
@@ -9082,7 +9079,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,
@@ -9168,7 +9164,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            inferring_vararg_annotation: _,
             index: _,
             region: _,
             cycle_recovery: _,
@@ -9212,7 +9207,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            inferring_vararg_annotation: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -9298,7 +9292,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,
@@ -9336,7 +9329,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             inference_flags,
             typevar_binding_context,
-            inferring_vararg_annotation,
             ref expression_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
@@ -9366,7 +9358,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
         builder.inference_flags = inference_flags;
-        builder.inferring_vararg_annotation = inferring_vararg_annotation;
         builder.expression_cache.clone_from(expression_cache);
         builder
             .return_types_and_ranges
@@ -9400,7 +9391,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             inference_flags: _,
             deferred_state: _,
-            inferring_vararg_annotation: _,
             called_functions: _,
             index: _,
             region: _,

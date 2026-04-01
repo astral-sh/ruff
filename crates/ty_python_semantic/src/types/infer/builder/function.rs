@@ -21,7 +21,7 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            TypeInferenceBuilder,
+            InferenceFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -550,9 +550,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
-            self.inferring_vararg_annotation = true;
+            self.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
-            self.inferring_vararg_annotation = false;
+            self.inference_flags
+                .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
