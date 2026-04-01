@@ -613,6 +613,15 @@ class Person(TypedDict):
 alice_bad: Person = {"name": None}  # type: ignore
 Person(name=None, age=30)  # type: ignore
 Person(name="Alice", age=30, extra=True)  # type: ignore
+
+class NamedPerson(TypedDict):
+    name: str
+
+class IgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore
+
+class SpecificallyIgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore[ty:invalid-typed-dict-field]
 ```
 
 ## Positional dictionary constructor pattern
@@ -3087,6 +3096,26 @@ If the key uses single quotes, the autofix preserves that quoting style:
 def write_to_non_existing_key_single_quotes(person: Person):
     # error: [invalid-key]
     person['nane'] = "Alice"  # fmt: skip
+```
+
+Field override diagnostics should point at the incompatible child declaration and show inherited
+declarations as separate notes:
+
+```py
+class MovieBase(TypedDict):
+    name: str
+
+class BadMovie(MovieBase):
+    name: int  # error: [invalid-typed-dict-field]
+
+class LeftBase(TypedDict):
+    value: int
+
+class RightBase(TypedDict):
+    value: str
+
+class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+    pass
 ```
 
 ## Import aliases

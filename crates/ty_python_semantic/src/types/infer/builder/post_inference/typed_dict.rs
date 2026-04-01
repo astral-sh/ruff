@@ -1,5 +1,5 @@
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span},
+    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
 use ruff_python_ast as ast;
@@ -25,7 +25,7 @@ pub(super) fn validate_typed_dict_class<'db>(
     direct_bases: &[ClassType<'db>],
 ) {
     validate_typed_dict_class_body(context, class_node);
-    validate_typed_dict_field_overrides(context, class, class_node, direct_bases);
+    validate_typed_dict_field_overrides(context, class, direct_bases);
 }
 
 fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &ast::StmtClassDef) {
@@ -81,7 +81,6 @@ fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &a
 fn validate_typed_dict_field_overrides<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
     direct_bases: &[ClassType<'db>],
 ) {
     let db = context.db();
@@ -116,7 +115,6 @@ fn validate_typed_dict_field_overrides<'db>(
             report_typed_dict_field_override(
                 context,
                 class,
-                class_node,
                 field_name.as_str(),
                 reason,
                 base.name(db),
@@ -252,7 +250,6 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
 fn report_typed_dict_field_override<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
     field_name: &str,
     reason: TypedDictFieldOverrideReason<'db>,
     base_name: &str,
@@ -261,15 +258,15 @@ fn report_typed_dict_field_override<'db>(
     inherited_field_definition: Option<Definition<'db>>,
 ) {
     let db = context.db();
-    let Some(builder) = own_field_definition
-        .and_then(|definition| {
-            context.report_lint(
-                &INVALID_TYPED_DICT_FIELD,
-                definition.full_range(db, context.module()),
-            )
-        })
-        .or_else(|| context.report_lint(&INVALID_TYPED_DICT_FIELD, class.header_range(db)))
-    else {
+    let builder = if let Some(definition) = own_field_definition {
+        context.report_lint(
+            &INVALID_TYPED_DICT_FIELD,
+            definition.full_range(db, context.module()),
+        )
+    } else {
+        context.report_lint(&INVALID_TYPED_DICT_FIELD, class.header_range(db))
+    };
+    let Some(builder) = builder else {
         return;
     };
 
@@ -285,15 +282,8 @@ fn report_typed_dict_field_override<'db>(
 
     diagnostic.set_primary_message(format_args!("{reason}"));
 
-    if own_field_definition.is_some() {
-        annotate_definition(
-            db,
-            &mut diagnostic,
-            own_field_definition,
-            format_args!("Field `{field_name}` redeclared here"),
-        );
-    } else {
-        annotate_definition(
+    if own_field_definition.is_none() {
+        add_definition_subdiagnostic(
             db,
             &mut diagnostic,
             inherited_field_definition,
@@ -301,21 +291,15 @@ fn report_typed_dict_field_override<'db>(
         );
     }
 
-    annotate_definition(
+    add_definition_subdiagnostic(
         db,
         &mut diagnostic,
         base_definition,
         format_args!("Inherited field `{field_name}` declared here on base `{base_name}`"),
     );
-
-    diagnostic.annotate(
-        context
-            .secondary(class_node)
-            .message(format_args!("In TypedDict class `{}`", class.name(db))),
-    );
 }
 
-fn annotate_definition<'db>(
+fn add_definition_subdiagnostic<'db>(
     db: &'db dyn Db,
     diagnostic: &mut Diagnostic,
     definition: Option<Definition<'db>>,
@@ -327,10 +311,12 @@ fn annotate_definition<'db>(
 
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
-    diagnostic.annotate(
+    let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field declaration");
+    sub.annotate(
         Annotation::secondary(
-            Span::from(file).with_range(definition.focus_range(db, &module).range()),
+            Span::from(file).with_range(definition.full_range(db, &module).range()),
         )
         .message(message),
     );
+    diagnostic.sub(sub);
 }
