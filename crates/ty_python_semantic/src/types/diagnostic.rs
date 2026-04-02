@@ -150,6 +150,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
@@ -3008,6 +3009,31 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects invalid `TypedDict` field declarations.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the
+    /// subtype guarantees that `TypedDict` inheritance is meant to preserve.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Base(TypedDict):
+    ///     x: int
+    ///
+    /// class Child(Base):
+    ///     x: str  # error: [invalid-typed-dict-field]
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_FIELD = {
+        summary: "detects invalid `TypedDict` field declarations",
+        status: LintStatus::stable("0.0.28"),
         default_level: Level::Error,
     }
 }

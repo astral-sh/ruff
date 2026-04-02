@@ -613,6 +613,15 @@ class Person(TypedDict):
 alice_bad: Person = {"name": None}  # type: ignore
 Person(name=None, age=30)  # type: ignore
 Person(name="Alice", age=30, extra=True)  # type: ignore
+
+class NamedPerson(TypedDict):
+    name: str
+
+class IgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore
+
+class SpecificallyIgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore[ty:invalid-typed-dict-field]
 ```
 
 ## Positional dictionary constructor pattern
@@ -2092,6 +2101,140 @@ bad_child1 = Child(c=[1])
 bad_child2 = Child(b="test")
 ```
 
+## Incompatible field overrides
+
+Overriding an inherited `TypedDict` field must preserve the compatibility rules from the typing
+spec. We reject both direct overwrites and incompatible merges from multiple bases.
+
+Mutable fields are invariant, so they cannot be overwritten with a different type, even if the new
+type is a subtype of the old one:
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired, ReadOnly, Required
+
+class Base(TypedDict):
+    value: int
+
+class BadSubtype(Base):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
+
+FunctionalBase = TypedDict("FunctionalBase", {"value": int})
+
+class BadFunctionalSubtype(FunctionalBase):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
+
+class L(TypedDict):
+    value: int
+
+class R(TypedDict):
+    value: bool
+
+class BadMerge(L, R):  # error: [invalid-typed-dict-field] "Inherited mutable field type `bool` is incompatible with `int`"
+    pass
+
+class R2(TypedDict):
+    value: int
+    other: str
+
+class GoodMerge(L, R2):
+    pass
+```
+
+Read-only fields, on the other hand, can be overwritten with a compatible read-only type (a
+subtype):
+
+```py
+class ReadOnlyBase(TypedDict):
+    value: ReadOnly[int]
+
+class ReadOnlySubtype(ReadOnlyBase):
+    value: ReadOnly[bool]
+
+class BadReadOnlySubtype(ReadOnlyBase):
+    # error: [invalid-typed-dict-field] "Inherited read-only field type `int` is not assignable from `object`"
+    value: ReadOnly[object]
+```
+
+Read-only fields can be made mutable in a subtype, but not the other way around:
+
+```py
+named_dict: ReadOnlyBase = {"value": 1}
+named_dict["value"] = 2  # error: [invalid-assignment]
+
+class MutableSubtype(ReadOnlyBase):
+    value: int
+
+album: MutableSubtype = {"value": 1}
+album["value"] = 2  # no error here
+
+class MutableBase(TypedDict):
+    value: int
+
+class BadReadOnlySubtype(MutableBase):
+    # error: [invalid-typed-dict-field] "Mutable inherited fields cannot be redeclared as read-only"
+    value: ReadOnly[int]
+```
+
+Read-only, non-required fields can be made required in a subtype, but not the other way around:
+
+```py
+class OptionalName(TypedDict):
+    name: ReadOnly[NotRequired[str]]
+
+optional_name: OptionalName = {}
+
+class RequiredName(OptionalName):
+    name: ReadOnly[Required[str]]
+
+required_name: RequiredName = {"name": "Flood"}
+bad_required_name: RequiredName = {}  # error: [missing-typed-dict-key]
+
+class RequiredName(TypedDict):
+    name: ReadOnly[Required[str]]
+
+class BadOptionalName(RequiredName):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
+    name: ReadOnly[NotRequired[str]]
+```
+
+This is not allowed for mutable fields, however (in either direction):
+
+```py
+class MutableNotRequired(TypedDict):
+    value: NotRequired[int]
+
+class BadNonRequiredSubtype(MutableNotRequired):
+    # error: [invalid-typed-dict-field] "Mutable inherited `NotRequired` fields cannot be redeclared as required"
+    value: Required[int]
+
+class MutableRequired(TypedDict):
+    value: Required[int]
+
+class BadRequiredSubtype(MutableRequired):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
+    value: NotRequired[int]
+```
+
+Inconsistencies are reported only once per field, even if they occur multiple times in the
+hierarchy:
+
+```py
+class P1(TypedDict):
+    value: str
+
+class P2(TypedDict):
+    value: str
+
+class P3(TypedDict):
+    value: str
+
+class Child(P1, P2, P3):
+    value: bytes  # error: [invalid-typed-dict-field]
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
@@ -2175,6 +2318,32 @@ static_assert(not is_assignable_to(Items[str], Items[int]))
 static_assert(not is_subtype_of(Items[str], Items[int]))
 static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
+```
+
+### Validation of generic `TypedDict`s
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class L[T](TypedDict):
+    value: T
+
+class R[T](TypedDict):
+    value: T
+
+class Merge(L[int], R[int]): ...
+class MergeGeneric[T](L[T], R[T]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `str` is incompatible with `int`"
+class BadMerge(L[int], R[str]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `T@BadMergeGeneric` is incompatible with `int`"
+class BadMergeGeneric[T](L[int], R[T]): ...
 ```
 
 ## Recursive `TypedDict`
@@ -3020,6 +3189,26 @@ If the key uses single quotes, the autofix preserves that quoting style:
 def write_to_non_existing_key_single_quotes(person: Person):
     # error: [invalid-key]
     person['nane'] = "Alice"  # fmt: skip
+```
+
+Field override diagnostics should point at the incompatible child declaration and show inherited
+declarations as separate notes:
+
+```py
+class MovieBase(TypedDict):
+    name: str
+
+class BadMovie(MovieBase):
+    name: int  # error: [invalid-typed-dict-field]
+
+class LeftBase(TypedDict):
+    value: int
+
+class RightBase(TypedDict):
+    value: str
+
+class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+    pass
 ```
 
 ## Import aliases
