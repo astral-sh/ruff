@@ -42,6 +42,7 @@ use crate::{
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
         generics::enclosing_generic_contexts,
+        infer::deferred::typed_dict::validate_typed_dict_class,
         infer_definition_types,
         mro::StaticMroErrorKind,
         overrides,
@@ -50,8 +51,6 @@ use crate::{
         visitor::find_over_type,
     },
 };
-
-use super::typed_dict::validate_typed_dict_class;
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done
