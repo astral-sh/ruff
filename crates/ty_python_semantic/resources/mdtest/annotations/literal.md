@@ -48,6 +48,10 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-type-form]
 invalid3: Literal[(3, 4)]
+# error: [invalid-type-form]
+invalid4: Literal[-3.14]
+# error: [invalid-type-form]
+invalid5: Literal[-3j]
 
 hello = "hello"
 invalid4: Literal[

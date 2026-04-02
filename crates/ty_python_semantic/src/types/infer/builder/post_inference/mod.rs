@@ -5,6 +5,7 @@ pub(super) mod dynamic_class;
 pub(super) mod final_variable;
 pub(super) mod function;
 pub(super) mod overloaded_function;
+pub(super) mod pep_613_alias;
 pub(super) mod static_class;
 pub(super) mod type_param_validation;
 pub(super) mod typed_dict;
