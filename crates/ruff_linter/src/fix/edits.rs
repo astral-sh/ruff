@@ -3,10 +3,12 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::token::{self, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
     PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content, is_python_whitespace,
@@ -394,6 +396,23 @@ pub(crate) fn add_parameter(
             parameter.to_string(),
             parameters.start() + TextSize::from(1),
         ))
+    }
+}
+
+/// Return a fresh binding name derived from `base` that does not shadow an
+/// existing non-builtin symbol in the current semantic scope.
+pub(crate) fn fresh_binding_name(semantic: &SemanticModel<'_>, base: &str) -> Name {
+    if semantic.is_available(base) {
+        return Name::new(base);
+    }
+
+    let mut index = 0;
+    loop {
+        let candidate = format!("{base}_{index}");
+        if semantic.is_available(&candidate) {
+            return Name::new(candidate);
+        }
+        index += 1;
     }
 }
 
