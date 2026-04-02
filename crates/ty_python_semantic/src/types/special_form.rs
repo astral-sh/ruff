@@ -813,7 +813,7 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumIter)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,
@@ -857,7 +857,7 @@ impl TypeQualifier {
         }
     }
 
-    const fn name(self) -> &'static str {
+    pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::ReadOnly => "ReadOnly",
             Self::Final => "Final",
@@ -892,6 +892,16 @@ impl TypeQualifier {
         match self {
             Self::Final | Self::ClassVar => false,
             Self::Required | Self::NotRequired | Self::InitVar | Self::ReadOnly => true,
+        }
+    }
+    pub(crate) const fn is_valid_for_non_name_targets(self) -> bool {
+        match self {
+            TypeQualifier::ReadOnly
+            | TypeQualifier::Required
+            | TypeQualifier::NotRequired
+            | TypeQualifier::ClassVar
+            | TypeQualifier::InitVar => false,
+            TypeQualifier::Final => true,
         }
     }
 }
