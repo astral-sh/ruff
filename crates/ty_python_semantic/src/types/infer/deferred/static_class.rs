@@ -17,9 +17,9 @@ use crate::{
         SemanticIndex, attribute_assignments, definition::DefinitionKind, scope::ScopeId,
     },
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, GenericAlias,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
+        SpecialFormType, StaticClassLiteral, Type,
         call::{Argument, CallError, CallErrorKind},
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
@@ -30,11 +30,11 @@ use crate::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
             INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
             INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
-            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
-            report_conflicting_metaclass_from_bases, report_duplicate_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
+            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
+            report_duplicate_bases, report_instance_layout_conflict,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable, report_unsupported_base,
@@ -338,6 +338,32 @@ pub(crate) fn check_static_class_definitions<'db>(
                 &class_node.bases()[i],
                 base_is_frozen,
             );
+        }
+
+        if base_class.has_dataclass_param(db, DataclassFlags::ORDER) {
+            // Suppress the diagnostic if the child class overrides all comparison
+            // methods, since the user has explicitly fixed the LSP violation.
+            // This includes the case where the child class also has `order=True`,
+            // which generates all four comparison methods.
+            let child_has_order = class_kind
+                .is_some_and(|kind| class.has_dataclass_param(db, kind, DataclassFlags::ORDER));
+            let all_overridden = child_has_order || class.has_all_own_ordering_methods(db);
+
+            if !all_overridden {
+                if let Some(builder) =
+                    context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, &class_node.bases()[i])
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                        class.name(db),
+                        base_class.name(db),
+                    ));
+                    diagnostic.info(
+                        "Comparison of instances of the child class with instances \
+                        of the parent class will raise `TypeError` at runtime",
+                    );
+                }
+            }
         }
     }
 
