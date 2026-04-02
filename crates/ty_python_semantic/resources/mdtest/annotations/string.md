@@ -217,32 +217,44 @@ class Foo: ...
 
 ```py
 def f1(
-    # error: [raw-string-type-annotation] "Type expressions cannot use raw string literal"
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in type expressions"
     a: r"int",
-    # error: [fstring-type-annotation] "Type expressions cannot use f-strings"
-    b: f"int",
-    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
-    c: b"int",
-    d: "int",
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in type expressions"
+    b: list[r"int"],
+    # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+    c: f"int",
+    # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+    d: list[f"int"],
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    e: b"int",
+    f: "int",
     # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
-    e: "in" "t",
-    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
-    f: "\N{LATIN SMALL LETTER I}nt",
-    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
-    g: "\x69nt",
-    h: """int""",
-    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
-    i: "b'int'",
+    g: "in" "t",
+    # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
+    h: list["in" "t"],
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in type expressions"
+    i: "\N{LATIN SMALL LETTER I}nt",
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in type expressions"
+    j: "\x69nt",
+    k: """int""",
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    l: "b'int'",
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    m: list[b"int"],
 ):  # fmt:skip
     reveal_type(a)  # revealed: Unknown
-    reveal_type(b)  # revealed: Unknown
+    reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: Unknown
-    reveal_type(d)  # revealed: int
+    reveal_type(d)  # revealed: list[Unknown]
     reveal_type(e)  # revealed: Unknown
-    reveal_type(f)  # revealed: Unknown
+    reveal_type(f)  # revealed: int
     reveal_type(g)  # revealed: Unknown
-    reveal_type(h)  # revealed: int
+    reveal_type(h)  # revealed: list[Unknown]
     reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: Unknown
+    reveal_type(k)  # revealed: int
+    reveal_type(l)  # revealed: Unknown
+    reveal_type(m)  # revealed: list[Unknown]
 ```
 
 ## Various string kinds in `typing.Literal`
@@ -305,17 +317,17 @@ shouldn't panic.
 
 ```py
 # Regression test for https://github.com/astral-sh/ty/issues/1865
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_conditional: "f'{1 if 1 else 1}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_boolean_expression: "f'{1 or 2}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_generator_expression: "f'{(i for i in range(5))}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_list_comprehension: "f'{[i for i in range(5)]}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_dict_comprehension: "f'{ {i: i for i in range(5)} }'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_set_comprehension: "f'{ {i for i in range(5)} }'"
 
 # error: [invalid-type-form]
