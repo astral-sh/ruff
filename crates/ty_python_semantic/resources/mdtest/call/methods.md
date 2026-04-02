@@ -659,6 +659,18 @@ class Base:
 class Valid(Base, arg=5, metaclass=object): ...
 ```
 
+Class keyword arguments are inferred with type context from the corresponding `__init_subclass__`
+parameters:
+
+```py
+class Base:
+    def __init_subclass__(cls, *, xs: list[int | None]) -> None:
+        pass
+
+# No error here:
+class Sub(Base, xs=[1, 2]): ...
+```
+
 ## `@staticmethod`
 
 ### Basic
