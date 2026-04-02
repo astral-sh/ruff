@@ -1,15 +1,19 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use smallvec::SmallVec;
+use strum::IntoEnumIterator;
 
 use super::TypeInferenceBuilder;
+use crate::TypeQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT,
 };
+use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{TypedDictSchema, functional_typed_dict_field};
-use crate::types::{IntersectionType, KnownClass, Type, TypeContext};
+use crate::types::{IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
@@ -124,7 +128,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 "extra_items" => {
                     if definition.is_none() {
-                        self.infer_annotation_expression(&kw.value, self.deferred_state);
+                        self.infer_extra_items_kwarg(&kw.value);
                     }
                 }
                 unknown_kwarg => {
@@ -293,7 +297,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return TypedDictSchema::default();
             };
 
-            let annotation = self.infer_annotation_expression(&item.value, self.deferred_state);
+            let annotation = self.infer_typeddict_field(&item.value);
 
             schema.insert(
                 Name::new(key_literal.value(db)),
@@ -321,14 +325,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(ast::Expr::Dict(dict_expr)) = arguments.args.get(1) {
             for ast::DictItem { key, value } in dict_expr {
                 if key.is_some() {
-                    self.infer_annotation_expression(value, self.deferred_state);
+                    self.infer_typeddict_field(value);
                 }
             }
         }
 
         if let Some(extra_items_kwarg) = arguments.find_keyword("extra_items") {
-            self.infer_annotation_expression(&extra_items_kwarg.value, self.deferred_state);
+            self.infer_extra_items_kwarg(&extra_items_kwarg.value);
         }
+    }
+
+    fn infer_typeddict_field(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
+        let annotation = self.infer_annotation_expression(value, self.deferred_state);
+        for qualifier in TypeQualifier::iter() {
+            if !qualifier.is_valid_in_typeddict_field()
+                && annotation
+                    .qualifiers
+                    .contains(TypeQualifiers::from(qualifier))
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Type qualifier `{qualifier}` is not valid in a TypedDict field"
+                ));
+                diagnostic.info(
+                    "Only `Required`, `NotRequired` and `ReadOnly` are valid in this context",
+                );
+            }
+        }
+        annotation
+    }
+
+    fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
+        let annotation = self.infer_annotation_expression(value, self.deferred_state);
+        for qualifier in TypeQualifier::iter() {
+            if qualifier != TypeQualifier::ReadOnly
+                && annotation
+                    .qualifiers
+                    .contains(TypeQualifiers::from(qualifier))
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Type qualifier `{qualifier}` is not valid in a TypedDict `extra_items` argument"
+                ));
+                diagnostic.info("`ReadOnly` is the only permitted type qualifier here");
+            }
+        }
+        annotation
     }
 
     /// Infer all non-type expressions in the `fields` argument of a functional `TypedDict` definition,

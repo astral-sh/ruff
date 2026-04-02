@@ -904,6 +904,13 @@ impl TypeQualifier {
             TypeQualifier::Final => true,
         }
     }
+
+    pub(crate) const fn is_valid_in_typeddict_field(self) -> bool {
+        match self {
+            TypeQualifier::ReadOnly | TypeQualifier::Required | TypeQualifier::NotRequired => true,
+            TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => false,
+        }
+    }
 }
 
 impl From<TypeQualifier> for SpecialFormType {

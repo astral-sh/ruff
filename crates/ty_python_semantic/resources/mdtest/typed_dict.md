@@ -2373,6 +2373,23 @@ partial_no_year = PartialWithRequired(name="The Matrix")
 reveal_type(partial_no_year)  # revealed: PartialWithRequired
 ```
 
+## Function syntax with invalid qualifiers
+
+All type qualifiers except for `ReadOnly`, `Required` and `NotRequired` are rejected:
+
+```py
+from typing_extensions import ClassVar, Final, TypedDict
+from dataclasses import InitVar
+
+TD1 = TypedDict("TD1", {"x": ClassVar[int]})  # error: [invalid-type-form]
+TD2 = TypedDict("TD2", {"x": Final[int]})  # error: [invalid-type-form]
+TD3 = TypedDict("TD3", {"x": InitVar[int]})  # error: [invalid-type-form]
+
+class TD4(TypedDict("TD4", {"x": ClassVar[int]})): ...  # error: [invalid-type-form]
+class TD5(TypedDict("TD5", {"x": Final[int]})): ...  # error: [invalid-type-form]
+class TD6(TypedDict("TD6", {"x": InitVar[int]})): ...  # error: [invalid-type-form]
+```
+
 ## Function syntax with `closed`
 
 The `closed` keyword is accepted but not yet fully supported:
@@ -2398,7 +2415,8 @@ def f(closed: bool) -> None:
 The `extra_items` keyword is accepted and validated as an annotation expression:
 
 ```py
-from typing_extensions import ReadOnly, TypedDict
+from typing_extensions import ReadOnly, TypedDict, NotRequired, Required, ClassVar, Final
+from dataclasses import InitVar
 
 # extra_items is accepted (no error)
 MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
@@ -2415,10 +2433,24 @@ class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
 
-# Type qualifiers like ReadOnly are valid in extra_items (annotation expression, not type expression):
+# The `ReadOnly` type qualifier is valid in `extra_items` (annotation expression, not type expression):
 TD2 = TypedDict("TD2", {}, extra_items=ReadOnly[int])
 
 class Bar(TypedDict("TD3", {}, extra_items=ReadOnly[int])): ...
+
+# But all other qualifiers are rejected:
+
+TD4 = TypedDict("TD4", {}, extra_items=Required[int])  # error: [invalid-type-form]
+TD5 = TypedDict("TD5", {}, extra_items=NotRequired[int])  # error: [invalid-type-form]
+TD6 = TypedDict("TD6", {}, extra_items=ClassVar[int])  # error: [invalid-type-form]
+TD7 = TypedDict("TD7", {}, extra_items=InitVar[int])  # error: [invalid-type-form]
+TD8 = TypedDict("TD8", {}, extra_items=Final[int])  # error: [invalid-type-form]
+
+class TD9(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD10(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD11(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD12(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD13(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
 ```
 
 ## Function syntax with forward references
