@@ -2218,6 +2218,23 @@ class BadRequiredSubtype(MutableRequired):
     value: NotRequired[int]
 ```
 
+Inconsistencies are reported only once per field, even if they occur multiple times in the
+hierarchy:
+
+```py
+class P1(TypedDict):
+    value: str
+
+class P2(TypedDict):
+    value: str
+
+class P3(TypedDict):
+    value: str
+
+class Child(P1, P2, P3):
+    value: bytes  # error: [invalid-typed-dict-field]
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
