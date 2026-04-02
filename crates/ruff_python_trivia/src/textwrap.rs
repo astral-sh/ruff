@@ -758,4 +758,18 @@ mod tests {
         ].join("");
         assert_eq!(dedent_to(&x, ""), Some(y));
     }
+
+    #[test]
+    #[rustfmt::skip]
+    fn dedent_to_ignores_leading_form_feeds_in_provided_indentation() {
+        let x = [
+            "  1",
+            "  2",
+        ].join("\n");
+        let y = [
+            "1",
+            "2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "\x0C\x0C"), Some(y));
+    }
 }
