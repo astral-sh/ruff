@@ -682,18 +682,18 @@ class C:
         self.LEGAL_H: Final[int]
         self.LEGAL_H = 1
 
-# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:
     pass
 
-# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in parameter annotations"
 def f[T](ILLEGAL: Final[T]) -> T:
     return ILLEGAL
 
-# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in return type annotations"
 def f() -> Final[None]: ...
 
-# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in return type annotations"
 def f[T](x: T) -> Final[T]:
     return x
 

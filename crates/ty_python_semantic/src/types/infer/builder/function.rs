@@ -1,5 +1,4 @@
 use crate::{
-    TypeQualifiers,
     semantic_index::{
         definition::{Definition, DefinitionKind},
         scope::NodeWithScopeRef,
@@ -428,10 +427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
         if !has_type_params {
-            self.infer_return_type_annotation(
-                function.returns.as_deref(),
-                self.defer_annotations().into(),
-            );
+            self.infer_return_type_annotation(function.returns.as_deref());
             self.infer_parameters(function.parameters.as_ref());
         }
 
@@ -488,32 +484,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    fn infer_return_type_annotation(
-        &mut self,
-        returns: Option<&ast::Expr>,
-        deferred_expression_state: DeferredExpressionState,
-    ) {
-        let Some(returns) = returns else {
-            return;
-        };
-        let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
-
-        if annotated.qualifiers.is_empty() {
-            return;
-        }
-        for qualifier in [
-            TypeQualifiers::FINAL,
-            TypeQualifiers::CLASS_VAR,
-            TypeQualifiers::INIT_VAR,
-        ] {
-            if annotated.qualifiers.contains(qualifier)
-                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns)
-            {
-                builder.into_diagnostic(format!(
-                    "`{name}` is not allowed in function return type annotations",
-                    name = qualifier.name()
-                ));
-            }
+    fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {
+        if let Some(returns) = returns {
+            self.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
+            self.infer_type_expression_with_state(
+                returns,
+                DeferredExpressionState::from(self.defer_annotations()),
+            );
+            self.inference_flags.remove(InferenceFlags::IN_RETURN_TYPE);
         }
     }
 
@@ -526,10 +504,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        self.infer_return_type_annotation(
-            function.returns.as_deref(),
-            self.defer_annotations().into(),
-        );
+        self.infer_return_type_annotation(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
         self.typevar_binding_context = previous_typevar_binding_context;
@@ -546,6 +521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kwarg,
         } = parameters;
 
+        self.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
         for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
@@ -558,6 +534,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
         }
+        self.inference_flags
+            .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
     }
 
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
@@ -568,37 +546,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default: _,
         } = parameter_with_default;
 
-        let annotated = self.infer_optional_annotation_expression(
-            parameter.annotation.as_deref(),
-            self.defer_annotations().into(),
-        );
-
-        let Some(annotated) = annotated else {
-            return;
-        };
-
-        let qualifiers = annotated.qualifiers;
-
-        if qualifiers.is_empty() {
-            return;
-        }
-
-        for qualifier in [
-            TypeQualifiers::FINAL,
-            TypeQualifiers::CLASS_VAR,
-            TypeQualifiers::INIT_VAR,
-            TypeQualifiers::REQUIRED,
-            TypeQualifiers::NOT_REQUIRED,
-            TypeQualifiers::READ_ONLY,
-        ] {
-            if qualifiers.contains(qualifier)
-                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter)
-            {
-                builder.into_diagnostic(format!(
-                    "`{name}` is not allowed in function parameter annotations",
-                    name = qualifier.name()
-                ));
-            }
+        if let Some(annotation) = parameter.annotation.as_deref() {
+            self.infer_type_expression_with_state(
+                annotation,
+                DeferredExpressionState::from(self.defer_annotations()),
+            );
         }
     }
 
@@ -610,10 +562,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation,
         } = parameter;
 
-        self.infer_optional_annotation_expression(
-            annotation.as_deref(),
-            self.defer_annotations().into(),
-        );
+        if let Some(annotation) = annotation.as_deref() {
+            self.infer_type_expression_with_state(
+                annotation,
+                DeferredExpressionState::from(self.defer_annotations()),
+            );
+        }
     }
 
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,

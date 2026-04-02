@@ -217,29 +217,29 @@ class Foo: ...
 
 ```py
 def f1(
-    # error: [raw-string-type-annotation] "Raw string literals are not allowed in type expressions"
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in parameter annotations"
     a: r"int",
-    # error: [raw-string-type-annotation] "Raw string literals are not allowed in type expressions"
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in parameter annotations"
     b: list[r"int"],
-    # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+    # error: [invalid-type-form] "F-strings are not allowed in parameter annotations"
     c: f"int",
-    # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+    # error: [invalid-type-form] "F-strings are not allowed in parameter annotations"
     d: list[f"int"],
-    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
     e: b"int",
     f: "int",
     # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
     g: "in" "t",
     # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
     h: list["in" "t"],
-    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in type expressions"
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in parameter annotations"
     i: "\N{LATIN SMALL LETTER I}nt",
-    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in type expressions"
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in parameter annotations"
     j: "\x69nt",
     k: """int""",
-    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
     l: "b'int'",
-    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
     m: list[b"int"],
 ):  # fmt:skip
     reveal_type(a)  # revealed: Unknown

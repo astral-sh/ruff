@@ -745,7 +745,9 @@ impl SpecialFormType {
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
-            SpecialFormType::TypeQualifier(qualifier) => Err(qualifier.in_type_expression()),
+            SpecialFormType::TypeQualifier(qualifier) => {
+                Err(InvalidTypeExpression::TypeQualifier(qualifier))
+            }
         }
     }
 }
@@ -884,17 +886,12 @@ impl TypeQualifier {
         }
     }
 
-    const fn in_type_expression(self) -> InvalidTypeExpression<'static> {
+    /// Return `true` if this type qualifier requires exactly one argument
+    /// when used in a type expression.
+    pub(super) const fn requires_one_argument(self) -> bool {
         match self {
-            TypeQualifier::Final | TypeQualifier::ClassVar => {
-                InvalidTypeExpression::TypeQualifier(self)
-            }
-            TypeQualifier::ReadOnly
-            | TypeQualifier::NotRequired
-            | TypeQualifier::InitVar
-            | TypeQualifier::Required => {
-                InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
-            }
+            Self::Final | Self::ClassVar => false,
+            Self::Required | Self::NotRequired | Self::InitVar | Self::ReadOnly => true,
         }
     }
 }

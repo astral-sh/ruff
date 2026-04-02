@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
+use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
 
@@ -124,6 +125,7 @@ declare_lint! {
 /// Parses the given expression as a string annotation.
 pub(crate) fn parse_string_annotation(
     context: &InferContext,
+    inference_flags: InferenceFlags,
     string_expr: &ast::ExprStringLiteral,
 ) -> Option<Parsed<ModExpression>> {
     let file = context.file();
@@ -139,7 +141,10 @@ pub(crate) fn parse_string_annotation(
         if prefix.is_raw() {
             if let Some(builder) = context.report_lint(&RAW_STRING_TYPE_ANNOTATION, string_literal)
             {
-                builder.into_diagnostic("Raw string literals are not allowed in type expressions");
+                builder.into_diagnostic(format_args!(
+                    "Raw string literals are not allowed in {}s",
+                    inference_flags.type_expression_context()
+                ));
             }
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
@@ -166,7 +171,10 @@ pub(crate) fn parse_string_annotation(
         {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escape sequences.
-            builder.into_diagnostic("Escape characters are not allowed in type expressions");
+            builder.into_diagnostic(format_args!(
+                "Escape characters are not allowed in {}s",
+                inference_flags.type_expression_context()
+            ));
         }
     } else if let Some(builder) =
         context.report_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, string_expr)

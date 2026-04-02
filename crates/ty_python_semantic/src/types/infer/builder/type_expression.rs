@@ -1,6 +1,7 @@
 use itertools::Either;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::semantic_index::scope::ScopeKind;
@@ -26,6 +27,10 @@ use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic}
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    pub(super) const fn type_expression_context(&self) -> &'static str {
+        self.inference_flags.type_expression_context()
+    }
+
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let previous_deferred_state = self.deferred_state;
@@ -51,7 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
-    fn infer_type_expression_with_state(
+    pub(super) fn infer_type_expression_with_state(
         &mut self,
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,
@@ -64,7 +69,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn report_invalid_type_expression(
         &self,
-        expression: &ast::Expr,
+        expression: impl Ranged,
         message: impl std::fmt::Display,
     ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
@@ -74,25 +79,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
     }
 
+    pub(super) fn infer_name_or_attribute_type_expression(
+        &self,
+        ty: Type<'db>,
+        annotation: &ast::Expr,
+    ) -> Type<'db> {
+        if annotation.is_attribute_expr()
+            && let Type::TypeVar(tvar) = ty
+            && tvar.paramspec_attr(self.db()).is_some()
+        {
+            return ty;
+        }
+        let result_ty = ty
+            .default_specialize(self.db())
+            .in_type_expression(
+                self.db(),
+                self.scope(),
+                self.typevar_binding_context,
+                self.inference_flags,
+            )
+            .unwrap_or_else(|error| {
+                error.into_fallback_type(&self.context, annotation, self.inference_flags)
+            });
+        self.check_for_unbound_type_variable(annotation, result_ty)
+    }
+
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
-                    let ty = self
-                        .infer_name_expression(name)
-                        .default_specialize(self.db())
-                        .in_type_expression(
-                            self.db(),
-                            self.scope(),
-                            self.typevar_binding_context,
-                            self.inference_flags,
-                        )
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(&self.context, expression)
-                        });
-                    self.check_for_unbound_type_variable(expression, ty)
+                    let ty = self.infer_name_expression(name);
+                    self.infer_name_or_attribute_type_expression(ty, expression)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -103,18 +122,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(attribute_expression) => {
                 if is_dotted_name(expression) {
                     match attribute_expression.ctx {
-                        ast::ExprContext::Load => self
-                            .infer_attribute_expression(attribute_expression)
-                            .default_specialize(self.db())
-                            .in_type_expression(
-                                self.db(),
-                                self.scope(),
-                                self.typevar_binding_context,
-                                self.inference_flags,
-                            )
-                            .unwrap_or_else(|error| {
-                                error.into_fallback_type(&self.context, expression)
-                            }),
+                        ast::ExprContext::Load => {
+                            let ty = self.infer_attribute_expression(attribute_expression);
+                            self.infer_name_or_attribute_type_expression(ty, expression)
+                        }
                         ast::ExprContext::Invalid => Type::unknown(),
                         ast::ExprContext::Store | ast::ExprContext::Del => {
                             todo_type!("Attribute expression annotation in Store/Del context")
@@ -126,8 +137,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     self.report_invalid_type_expression(
                         expression,
-                        "Only simple names, dotted names and subscripts \
-                        can be used in type expressions",
+                        format_args!(
+                            "Only simple names, dotted names and subscripts \
+                            can be used in {}s",
+                            self.type_expression_context()
+                        ),
                     );
                     Type::unknown()
                 }
@@ -157,7 +171,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     self.report_invalid_type_expression(
                         expression,
-                        "Only simple names and dotted names can be subscripted in type expressions",
+                        format_args!(
+                            "Only simple names and dotted names can be subscripted in {}s",
+                            self.type_expression_context()
+                        ),
                     );
                     Type::unknown()
                 }
@@ -280,10 +297,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                                 &mut diagnostic,
                                             );
                                         } else if python_version < PythonVersion::PY314 {
-                                            diagnostic.info(
-                                                "All type expressions are evaluated at \
+                                            diagnostic.info(format_args!(
+                                                "All {}s are evaluated at \
                                                 runtime by default on Python <3.14",
-                                            );
+                                                self.type_expression_context()
+                                            ));
                                             add_inferred_python_version_hint_to_diagnostic(
                                                 self.db(),
                                                 &mut diagnostic,
@@ -333,7 +351,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::BytesLiteral(bytes) => {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
-                    "Bytes literals are not allowed in this context in a type expression",
+                    format_args!(
+                        "Bytes literals are not allowed in this context in a {}",
+                        self.type_expression_context()
+                    ),
                 ) {
                     if let Some(single_element) = bytes.as_single_part_bytestring()
                         && let Ok(valid_string) = String::from_utf8(single_element.value.to_vec())
@@ -353,7 +374,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
-                        "Int literals are not allowed in this context in a type expression"
+                        "Int literals are not allowed in this context in a {}",
+                        self.type_expression_context()
                     ),
                 ) {
                     if let Some(int) = int.as_i64() {
@@ -372,7 +394,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }) => {
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Float literals are not allowed in type expressions"),
+                    format_args!(
+                        "Float literals are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -383,7 +408,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }) => {
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Complex literals are not allowed in type expressions"),
+                    format_args!(
+                        "Complex literals are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -392,7 +420,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
-                        "Boolean literals are not allowed in this context in a type expression"
+                        "Boolean literals are not allowed in this context in a {}",
+                        self.type_expression_context()
                     ),
                 ) {
                     diagnostic.set_primary_message(format_args!(
@@ -413,7 +442,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
-                        "List literals are not allowed in this context in a type expression"
+                        "List literals are not allowed in this context in a {}",
+                        self.type_expression_context()
                     ),
                 ) && let [single_element] = &*list.elts
                 {
@@ -444,7 +474,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(mut diagnostic) = self.report_invalid_type_expression(
                         expression,
                         format_args!(
-                            "Tuple literals are not allowed in this context in a type expression"
+                            "Tuple literals are not allowed in this context in a {}",
+                            self.type_expression_context()
                         ),
                     ) {
                         let mut speculative = self.speculate();
@@ -477,7 +508,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Boolean operations are not allowed in type expressions"),
+                    format_args!(
+                        "Boolean operations are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -488,7 +522,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Named expressions are not allowed in type expressions"),
+                    format_args!(
+                        "Named expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -499,7 +536,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Unary operations are not allowed in type expressions"),
+                    format_args!(
+                        "Unary operations are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -510,7 +550,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`lambda` expressions are not allowed in type expressions"),
+                    format_args!(
+                        "`lambda` expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -521,7 +564,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`if` expressions are not allowed in type expressions"),
+                    format_args!(
+                        "`if` expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -532,7 +578,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
-                    format_args!("Dict literals are not allowed in type expressions"),
+                    format_args!(
+                        "Dict literals are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 ) && let [
                     ast::DictItem {
                         key: Some(key),
@@ -561,7 +610,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
-                    format_args!("Set literals are not allowed in type expressions"),
+                    format_args!(
+                        "Set literals are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 ) && let [single_element] = &*set.elts
                 {
                     let mut speculative_builder = self.speculate();
@@ -586,7 +638,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Dict comprehensions are not allowed in type expressions"),
+                    format_args!(
+                        "Dict comprehensions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -597,7 +652,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("List comprehensions are not allowed in type expressions"),
+                    format_args!(
+                        "List comprehensions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -608,7 +666,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Set comprehensions are not allowed in type expressions"),
+                    format_args!(
+                        "Set comprehensions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -619,7 +680,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Generator expressions are not allowed in type expressions"),
+                    format_args!(
+                        "Generator expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -630,7 +694,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`await` expressions are not allowed in type expressions"),
+                    format_args!(
+                        "`await` expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -641,7 +708,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`yield` expressions are not allowed in type expressions"),
+                    format_args!(
+                        "`yield` expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -652,7 +722,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`yield from` expressions are not allowed in type expressions"),
+                    format_args!(
+                        "`yield from` expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -663,7 +736,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Comparison expressions are not allowed in type expressions"),
+                    format_args!(
+                        "Comparison expressions are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -674,7 +750,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Function calls are not allowed in type expressions"),
+                    format_args!(
+                        "Function calls are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -685,7 +764,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    "F-strings are not allowed in type expressions",
+                    format_args!(
+                        "F-strings are not allowed in {}s",
+                        self.type_expression_context(),
+                    ),
                 );
                 Type::unknown()
             }
@@ -696,7 +778,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("T-strings are not allowed in type expressions"),
+                    format_args!(
+                        "T-strings are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -707,7 +792,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Slices are not allowed in type expressions"),
+                    format_args!(
+                        "Slices are not allowed in {}s",
+                        self.type_expression_context()
+                    ),
                 );
                 Type::unknown()
             }
@@ -725,7 +813,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::EllipsisLiteral(_) => {
                 self.report_invalid_type_expression(
                     expression,
-                    "`...` is not allowed in this context in a type expression",
+                    format_args!(
+                        "`...` is not allowed in this context in a {}",
+                        self.type_expression_context(),
+                    ),
                 );
                 Type::unknown()
             }
@@ -771,7 +862,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         string: &ast::ExprStringLiteral,
     ) -> Type<'db> {
-        match parse_string_annotation(&self.context, string) {
+        match parse_string_annotation(&self.context, self.inference_flags, string) {
             Some(parsed) => {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
@@ -1234,7 +1325,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`typing.Protocol` is not allowed in type expressions",
+                            "`typing.Protocol` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1245,7 +1337,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`typing.Generic` is not allowed in type expressions",
+                            "`typing.Generic` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1256,7 +1349,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`warnings.deprecated` is not allowed in type expressions",
+                            "`warnings.deprecated` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1267,7 +1361,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`dataclasses.Field` is not allowed in type expressions",
+                            "`dataclasses.Field` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1278,7 +1373,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.ConstraintSet` is not allowed in type expressions",
+                            "`ty_extensions.ConstraintSet` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1289,7 +1385,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.GenericContext` is not allowed in type expressions",
+                            "`ty_extensions.GenericContext` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1300,7 +1397,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.Specialization` is not allowed in type expressions",
+                            "`ty_extensions.Specialization` is not allowed in {}s",
+                            self.type_expression_context(),
                         ));
                     }
                     Type::unknown()
@@ -1514,8 +1612,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Invalid subscript of object of type `{}` in type expression",
-                        value_ty.display(self.db())
+                        "Invalid subscript of object of type `{}` in a {}",
+                        value_ty.display(self.db()),
+                        self.type_expression_context()
                     ));
                 }
                 Type::unknown()
@@ -1682,7 +1781,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
                 .inner_type()
                 .in_type_expression(self.db(), self.scope(), None, self.inference_flags)
-                .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript)),
+                .unwrap_or_else(|err| {
+                    err.into_fallback_type(&self.context, subscript, self.inference_flags)
+                }),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
@@ -1912,12 +2013,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_parameterized_legacy_typing_alias(subscript, alias)
             }
             SpecialFormType::TypeQualifier(qualifier) => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    let diag = builder.into_diagnostic(format_args!(
-                        "Type qualifier `{qualifier}` is not allowed in type expressions \
-                         (only in annotation expressions)",
-                    ));
-                    diagnostic::add_type_expression_reference_link(diag);
+                if self.inference_flags.intersects(
+                    InferenceFlags::IN_PARAMETER_ANNOTATION
+                        | InferenceFlags::IN_RETURN_TYPE
+                        | InferenceFlags::IN_TYPE_ALIAS,
+                ) {
+                    self.report_invalid_type_expression(
+                        subscript,
+                        format_args!(
+                            "Type qualifier `{qualifier}` is not allowed in {}s",
+                            self.inference_flags.type_expression_context(),
+                        ),
+                    );
+                } else {
+                    self.report_invalid_type_expression(
+                        subscript,
+                        format_args!(
+                            "Type qualifier `{qualifier}` is not allowed in type expressions \
+                            (only in annotation expressions)",
+                        ),
+                    );
                 }
                 self.infer_type_expression(arguments_slice)
             }
@@ -1981,7 +2096,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Concatenate => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                        "`typing.Concatenate` is not allowed in this context in a {}",
+                        self.type_expression_context()
                     ));
                     diag.info("`typing.Concatenate` is only valid:");
                     diag.info(" - as the first argument to `typing.Callable`");
@@ -2125,7 +2241,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "`{special_form}` is not allowed in type expressions",
+                        "`{special_form}` is not allowed in {}s",
+                        self.type_expression_context(),
                     ));
                 }
                 Type::unknown()
@@ -2331,7 +2448,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             ast::Expr::StringLiteral(string) => {
-                if let Some(parsed) = parse_string_annotation(&self.context, string) {
+                if let Some(parsed) =
+                    parse_string_annotation(&self.context, self.inference_flags, string)
+                {
                     self.string_annotations
                         .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                     let node_key = self.enclosing_node_key(string.into());
@@ -2448,7 +2567,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(ConcatenateTail::ParamSpec(typevar))
             }
             ast::Expr::StringLiteral(string) => {
-                let Some(parsed) = parse_string_annotation(&self.context, string) else {
+                let Some(parsed) =
+                    parse_string_annotation(&self.context, self.inference_flags, string)
+                else {
                     report_invalid_concatenate_last_arg(&self.context, expr, Type::unknown());
                     return None;
                 };
