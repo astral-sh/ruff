@@ -7,7 +7,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::{is_dotted_name, map_subscript};
+use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -676,19 +676,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
-            for (definition, ty_and_quals) in &self.declarations {
+            for (&definition, ty_and_quals) in &self.declarations {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
                         post_inference::function::check_function_definition(
                             &self.context,
-                            *definition,
+                            definition,
                             &|expr| self.file_expression_type(expr),
                         );
                         post_inference::overloaded_function::check_overloaded_function(
                             &self.context,
                             ty,
-                            *definition,
+                            definition,
                             self.scope.scope(self.db()).node(),
                             self.index,
                             &mut seen_overloaded_places,
@@ -709,6 +709,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.index,
                             &|expr| self.file_expression_type(expr),
                         );
+                    }
+                    DefinitionKind::AnnotatedAssignment(assignment) => {
+                        if let Some(diagnostics) =
+                            post_inference::pep_613_alias::check_pep_613_alias(
+                                assignment, definition, self,
+                            )
+                        {
+                            self.context.extend(&diagnostics);
+                        }
                     }
                     _ => {}
                 }
@@ -4002,85 +4011,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        /// Simple syntactic validation for the right-hand sides of PEP-613 type aliases.
-        ///
-        /// TODO: this is far from exhaustive and should be improved.
-        const fn alias_syntax_validation(expr: &ast::Expr) -> bool {
-            const fn inner(expr: &ast::Expr, allow_context_dependent: bool) -> bool {
-                match expr {
-                    ast::Expr::Name(_)
-                    | ast::Expr::StringLiteral(_)
-                    | ast::Expr::NoneLiteral(_) => true,
-                    ast::Expr::Attribute(ast::ExprAttribute {
-                        value,
-                        attr: _,
-                        node_index: _,
-                        range: _,
-                        ctx: _,
-                    }) => inner(value, allow_context_dependent),
-                    ast::Expr::Subscript(ast::ExprSubscript {
-                        value,
-                        slice,
-                        node_index: _,
-                        range: _,
-                        ctx: _,
-                    }) => {
-                        if !inner(value, allow_context_dependent) {
-                            return false;
-                        }
-                        match &**slice {
-                            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                match elts.as_slice() {
-                                    [first, ..] => inner(first, true),
-                                    _ => true,
-                                }
-                            }
-                            _ => inner(slice, true),
-                        }
-                    }
-                    ast::Expr::BinOp(ast::ExprBinOp {
-                        left,
-                        op,
-                        right,
-                        range: _,
-                        node_index: _,
-                    }) => {
-                        op.is_bit_or()
-                            && inner(left, allow_context_dependent)
-                            && inner(right, allow_context_dependent)
-                    }
-                    ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                        op,
-                        operand,
-                        range: _,
-                        node_index: _,
-                    }) => {
-                        allow_context_dependent
-                            && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
-                            && matches!(
-                                &**operand,
-                                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                                    value: ast::Number::Int(_),
-                                    ..
-                                })
-                            )
-                    }
-                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value,
-                        node_index: _,
-                        range: _,
-                    }) => allow_context_dependent && value.is_int(),
-                    ast::Expr::EllipsisLiteral(_)
-                    | ast::Expr::BytesLiteral(_)
-                    | ast::Expr::BooleanLiteral(_)
-                    | ast::Expr::Starred(_)
-                    | ast::Expr::List(_) => allow_context_dependent,
-                    _ => false,
-                }
-            }
-            inner(expr, false)
-        }
-
         let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
@@ -4131,22 +4061,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
-
-        if is_pep_613_type_alias
-            && let Some(value) = value
-            && !alias_syntax_validation(value)
-            && let Some(builder) = self.context.report_lint(
-                &INVALID_TYPE_FORM,
-                definition.full_range(self.db(), self.module()),
-            )
-        {
-            // TODO: better error message; full type-expression validation; etc.
-            let mut diagnostic = builder
-                .into_diagnostic("Invalid right-hand side for `typing.TypeAlias` assignment");
-            diagnostic.help(
-                "See https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
-            );
-        }
 
         if !declared.qualifiers.is_empty() {
             for qualifier in TypeQualifier::iter() {
@@ -4338,19 +4252,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
-                let is_invalid = matches!(
-                    self.expression_type(map_subscript(value)),
-                    Type::SpecialForm(SpecialFormType::TypeQualifier(_))
-                );
-
-                if is_invalid
-                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
-                {
-                    builder.into_diagnostic(
-                        "Type qualifiers are not allowed in type alias definitions",
-                    );
-                }
-
                 let inferred_ty =
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inferred_ty {
                         let identity = TypeVarIdentity::new(
