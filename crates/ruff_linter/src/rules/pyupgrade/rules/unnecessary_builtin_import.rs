@@ -10,11 +10,19 @@ use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
-/// Checks for unnecessary imports of builtins.
+/// Checks for imports of specific names from `builtins`, `io`, `six`,
+/// `six.moves`, or `six.moves.builtins` that are redundant on Python 3.
+///
+/// The rule is intentionally **narrow**: it follows pyupgrade’s historical
+/// coverage for Python 2/3 compatibility patterns (for example `six` or
+/// `python-future`-style shims), not every possible import of a builtin.
+/// Imports such as `from builtins import tuple` are out of scope and are
+/// **not** flagged. Relative imports are ignored so local modules named
+/// `builtins` are not affected.
 ///
 /// ## Why is this bad?
-/// Builtins are always available. Importing them is unnecessary and should be
-/// removed to avoid confusion.
+/// On Python 3-only code, these compatibility imports are unnecessary and can
+/// suggest that a Python 2 compatibility layer is still required.
 ///
 /// ## Example
 /// ```python
@@ -39,6 +47,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
+/// - [pyupgrade](https://github.com/asottile/pyupgrade)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct UnnecessaryBuiltinImport {
