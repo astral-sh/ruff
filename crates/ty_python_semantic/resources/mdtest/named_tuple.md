@@ -1038,10 +1038,7 @@ class User(NamedTuple):
     nickname: str
 
 class SuperUser(User):
-    # TODO: this should be an error because it implies that the `id` attribute on
-    # `SuperUser` is mutable, but the read-only `id` property from the superclass
-    # has not been overridden in the class body
-    id: int
+    id: int  # error: [invalid-property-override]
 
     # this is fine; overriding a read-only attribute with a mutable one
     # does not conflict with the Liskov Substitution Principle

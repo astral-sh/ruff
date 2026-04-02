@@ -4,7 +4,7 @@
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
 use bitflags::bitflags;
-use ruff_db::diagnostic::Annotation;
+use ruff_db::diagnostic::{Annotation, Span};
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
@@ -30,8 +30,8 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
-            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_PROPERTY_OVERRIDE,
+            OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
             report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
@@ -325,6 +325,44 @@ fn check_class_declaration<'db>(
 
             subclass_overrides_superclass_declaration = true;
 
+            if configuration.check_property_overrides()
+                && !liskov_diagnostic_emitted
+                && let Some(superclass_own_type) = superclass
+                    .own_class_member(db, None, &member.name)
+                    .ignore_possibly_undefined()
+                && let Type::PropertyInstance(property) = superclass_own_type
+                && property.setter(db).is_none()
+                && let DefinitionKind::AnnotatedAssignment(annotated_assignment) =
+                    first_reachable_definition.kind(db)
+                && annotated_assignment.value(context.module()).is_none()
+                && !class
+                    .own_class_member(db, None, &member.name)
+                    .qualifiers()
+                    .contains(TypeQualifiers::CLASS_VAR)
+                && let Some(builder) = context.report_lint(
+                    &INVALID_PROPERTY_OVERRIDE,
+                    first_reachable_definition.focus_range(db, context.module()),
+                )
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Mutable attribute `{}` cannot override read-only property on superclass `{}`",
+                    &member.name,
+                    superclass.name(db)
+                ));
+                if let Some(definition) = superclass_own_type.definition(db) {
+                    if let Some(file_range) = definition.focus_range(db) {
+                        diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                            format_args!(
+                                "Property `{}.{}` defined here with no setter",
+                                superclass.name(db),
+                                &member.name
+                            ),
+                        ));
+                    }
+                }
+                liskov_diagnostic_emitted = true;
+            }
+
             // Record the first superclass that defines this method as the "immediate parent method"
             if immediate_parent_method.is_none() {
                 immediate_parent_method = Some((superclass, superclass_type));
@@ -534,6 +572,7 @@ bitflags! {
         const INVALID_DATACLASS = 1 << 4;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
         const INVALID_ENUM_VALUE = 1 << 6;
+        const PROPERTY_OVERRIDE = 1 << 7;
     }
 }
 
@@ -546,6 +585,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
 
         if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_METHODS;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_PROPERTY_OVERRIDE)) {
+            config |= OverrideRulesConfig::PROPERTY_OVERRIDE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
@@ -577,6 +619,10 @@ impl OverrideRulesConfig {
 
     const fn check_method_liskov_violations(self) -> bool {
         self.contains(OverrideRulesConfig::LISKOV_METHODS)
+    }
+
+    const fn check_property_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::PROPERTY_OVERRIDE)
     }
 
     const fn check_final_method_overridden(self) -> bool {

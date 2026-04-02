@@ -1245,7 +1245,7 @@ class Base(ABC):
 
 @final
 class BadChild(Base):  # error: [abstract-method-in-final-class]
-    f: int
+    f: int  # error: [invalid-property-override]
 ```
 
 But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
