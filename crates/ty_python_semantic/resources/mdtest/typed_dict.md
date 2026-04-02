@@ -2447,10 +2447,10 @@ TD7 = TypedDict("TD7", {}, extra_items=InitVar[int])  # error: [invalid-type-for
 TD8 = TypedDict("TD8", {}, extra_items=Final[int])  # error: [invalid-type-form]
 
 class TD9(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
-class TD10(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
-class TD11(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
-class TD12(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
-class TD13(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD10(TypedDict("TD10", {}, extra_items=NotRequired[int])): ...  # error: [invalid-type-form]
+class TD11(TypedDict("TD11", {}, extra_items=ClassVar[int])): ...  # error: [invalid-type-form]
+class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [invalid-type-form]
+class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
 ```
 
 ## Function syntax with forward references
