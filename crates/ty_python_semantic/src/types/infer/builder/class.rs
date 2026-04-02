@@ -9,6 +9,7 @@ use crate::{
             TypeInferenceBuilder,
             builder::{DeclaredAndInferredType, DeferredExpressionState},
         },
+        infer_definition_types,
         signatures::ParameterForm,
         special_form::TypeQualifier,
     },
@@ -219,7 +220,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             for keyword in class_node.keywords() {
-                self.infer_expression(&keyword.value, TypeContext::default());
+                if keyword.arg.as_deref() != Some("extra_items") {
+                    self.infer_expression(&keyword.value, TypeContext::default());
+                }
             }
             self.deferred_state = previous_deferred_state;
 
@@ -229,6 +232,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .bases()
                     .iter()
                     .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
+                || class_node
+                    .arguments
+                    .as_deref()
+                    .and_then(|args| args.find_keyword("extra_items"))
+                    .is_some()
             {
                 self.deferred.insert(definition);
             } else {
@@ -260,5 +268,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
         self.typevar_binding_context = previous_typevar_binding_context;
+
+        if let Some(arguments) = class.arguments.as_deref()
+            && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
+        {
+            let class_type = infer_definition_types(self.db(), definition).binding_type(definition);
+            if let Type::ClassLiteral(class_literal) = class_type
+                && class_literal.is_typed_dict(self.db())
+            {
+                self.infer_extra_items_kwarg(&extra_items_keyword.value);
+            } else if self.in_stub() {
+                self.infer_expression_with_state(
+                    &extra_items_keyword.value,
+                    TypeContext::default(),
+                    DeferredExpressionState::Deferred,
+                );
+            } else {
+                self.infer_expression(&extra_items_keyword.value, TypeContext::default());
+            }
+        }
     }
 }
