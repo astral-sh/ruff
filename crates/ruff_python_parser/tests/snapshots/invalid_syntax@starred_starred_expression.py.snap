@@ -7,7 +7,7 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..13,
+        range: 0..26,
         body: [
             Expr(
                 StmtExpr {
@@ -58,6 +58,55 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 13..25,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 13..25,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 13..18,
+                                    id: Name("print"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 18..25,
+                                node_index: NodeIndex(None),
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 19..24,
+                                            value: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 21..24,
+                                                    value: List(
+                                                        ExprList {
+                                                            node_index: NodeIndex(None),
+                                                            range: 22..24,
+                                                            elts: [],
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -68,4 +117,13 @@ Module(
 1 | print(*
 2 | *[])
   | ^^^ Syntax Error: Starred expression cannot be used here
+3 | print(* *[])
+  |
+
+
+  |
+1 | print(*
+2 | *[])
+3 | print(* *[])
+  |         ^^^ Syntax Error: Starred expression cannot be used here
   |

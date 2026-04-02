@@ -2550,6 +2550,7 @@ impl<'src> Parser<'src> {
                     // test_err starred_starred_expression
                     // print(*
                     // *[])
+                    // print(* *[])
                     context.disallow_starred_expressions(),
                 ),
             StarredExpressionPrecedence::BitwiseOr => {
