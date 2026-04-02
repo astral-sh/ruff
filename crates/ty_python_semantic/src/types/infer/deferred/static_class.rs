@@ -19,7 +19,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, TypeContext,
+        StaticClassLiteral, Type,
         call::{Argument, CallError, CallErrorKind},
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
@@ -71,7 +71,6 @@ pub(crate) fn check_static_class_definitions<'db>(
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-    infer_expression_with_context: &impl Fn(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -712,7 +711,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         } else {
-            let mut call_args: CallArguments = args
+            let call_args: CallArguments = args
                 .keywords
                 .iter()
                 .filter_map(|keyword| match keyword.arg.as_ref() {
@@ -740,30 +739,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
-                // Re-infer keyword arguments with type context from corresponding `__init_subclass__` parameters.
-                for binding in init_subclass.bindings(db).iter_flat() {
-                    for overload in binding.overloads() {
-                        let parameters = overload.signature.parameters();
-                        for (keyword, (argument, argument_types)) in args
-                            .keywords
-                            .iter()
-                            .filter(|kw| kw.arg.as_ref().is_some_and(|name| name != "metaclass"))
-                            .zip(call_args.iter_mut())
-                        {
-                            let Argument::Keyword(name) = argument else {
-                                continue;
-                            };
-                            let Some((_, param)) = parameters.keyword_by_name(name) else {
-                                continue;
-                            };
-                            let param_ty = param.annotated_type();
-                            let tcx = TypeContext::new(Some(param_ty));
-                            let inferred = infer_expression_with_context(&keyword.value, tcx);
-                            argument_types.insert(param_ty, inferred);
-                        }
-                    }
-                }
-
                 let call_args = call_args.with_self(Some(Type::from(class)));
                 if let Err(CallError(CallErrorKind::BindingError, bindings)) =
                     init_subclass.try_call(db, &call_args)

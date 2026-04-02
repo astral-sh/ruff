@@ -706,10 +706,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             class_node.node(self.module()),
                             self.index,
                             &|expr| self.file_expression_type(expr),
-                            &|expr, tcx| {
-                                let mut speculative = self.speculate();
-                                speculative.infer_expression(expr, tcx)
-                            },
                         );
                     }
                     _ => {}
