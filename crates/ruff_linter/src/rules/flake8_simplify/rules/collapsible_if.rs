@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability::{Safe, Unsafe};
 use std::borrow::Cow;
 
 use anyhow::{Result, bail};
@@ -18,6 +19,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::preview::is_collapsible_if_fix_safe_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -139,7 +141,14 @@ pub(crate) fn nested_if_statements(
                             checker.settings().tab_size,
                         )
                     }) {
-                        Ok(Some(Fix::safe_edit(edit)))
+                        Ok(Some(Fix::applicable_edit(
+                            edit,
+                            if is_collapsible_if_fix_safe_enabled(checker.settings()) {
+                                Safe
+                            } else {
+                                Unsafe
+                            },
+                        )))
                     } else {
                         Ok(None)
                     }
