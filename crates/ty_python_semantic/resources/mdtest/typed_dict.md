@@ -4264,7 +4264,8 @@ e: MovieFunctional = {"name": "Blade Runner", "year": 1982}  # error: [invalid-k
 always implicitly non-required.
 
 ```py
-from typing_extensions import TypedDict, ReadOnly, Required, NotRequired
+from typing_extensions import TypedDict, ReadOnly, Required, NotRequired, ClassVar, Final
+from dataclasses import InitVar
 
 # OK
 class A(TypedDict, extra_items=int):
@@ -4274,12 +4275,24 @@ class A(TypedDict, extra_items=int):
 class B(TypedDict, extra_items=ReadOnly[int]):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not valid in a TypedDict `extra_items` argument"
 class C(TypedDict, extra_items=Required[int]):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not valid in a TypedDict `extra_items` argument"
 class D(TypedDict, extra_items=NotRequired[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=ClassVar[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=Final[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=InitVar[int]):
     name: str
 ```
 
@@ -4289,6 +4302,62 @@ It is an error to specify both `closed` and `extra_items`:
 # TODO: should be error: [invalid-typed-dict-header]
 class E(TypedDict, closed=True, extra_items=int):
     name: str
+```
+
+### Forward references in `extra_items`
+
+Stringified forward references are understood:
+
+`a.py`:
+
+```py
+from typing import TypedDict
+
+class F(TypedDict, extra_items="F | None"): ...
+```
+
+While invalid syntax in forward annotations is rejected:
+
+`b.py`:
+
+```py
+from typing import TypedDict
+
+# error: [invalid-syntax-in-forward-annotation]
+class G(TypedDict, extra_items="not a type expression"): ...
+```
+
+In non-stub files, forward references in `extra_items` must be stringified:
+
+`c.py`:
+
+```py
+from typing import TypedDict
+
+# error: [unresolved-reference] "Name `H` used when not defined"
+class H(TypedDict, extra_items=H | None): ...
+```
+
+but stringification is unnecessary in stubs:
+
+`stub.pyi`:
+
+```pyi
+from typing import TypedDict
+
+class I(TypedDict, extra_items=I | None): ...
+```
+
+The `extra_items` keyword is not parsed as an annotation expression for non-TypedDict classes:
+
+`d.py`:
+
+```py
+class TypedDict:  # not typing.TypedDict!
+    def __init_subclass__(cls, extra_items: int): ...
+
+class Foo(TypedDict, extra_items=42): ...  # fine
+class Bar(TypedDict, extra_items=int): ...  # error: [invalid-argument-type]
 ```
 
 ### Writing to an undeclared literal key of an `extra_items` TypedDict is allowed, if the type is assignable

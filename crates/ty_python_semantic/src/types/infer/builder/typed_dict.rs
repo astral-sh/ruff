@@ -11,6 +11,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
+use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{TypedDictSchema, functional_typed_dict_field};
 use crate::types::{IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext};
@@ -355,8 +356,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation
     }
 
-    fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
-        let annotation = self.infer_annotation_expression(value, self.deferred_state);
+    pub(super) fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
+        let state = if self.in_stub() {
+            DeferredExpressionState::Deferred
+        } else {
+            self.deferred_state
+        };
+        let annotation = self.infer_annotation_expression(value, state);
         for qualifier in TypeQualifier::iter() {
             if qualifier != TypeQualifier::ReadOnly
                 && annotation
