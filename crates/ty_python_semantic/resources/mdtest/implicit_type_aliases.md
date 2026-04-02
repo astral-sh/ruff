@@ -783,7 +783,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
