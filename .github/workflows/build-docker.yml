@@ -31,7 +31,7 @@ jobs:
     name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
     runs-on: ubuntu-latest
     environment:
-      name: release
+      name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}
     strategy:
       fail-fast: false
       matrix:
