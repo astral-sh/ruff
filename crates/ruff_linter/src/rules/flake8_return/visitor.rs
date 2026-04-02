@@ -28,6 +28,8 @@ pub(super) struct Stack<'data> {
     /// of `foo()` to an `int`. Removing the `x = foo()` statement would
     /// change the return type of the function.
     pub(super) annotations: FxHashSet<&'data str>,
+    /// The `try/except/else` statements (without `finally`) in the current function
+    pub(super) try_elses: Vec<&'data ast::StmtTry>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
@@ -166,6 +168,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
             }) => {
                 if let Some(first) = elif_else_clauses.first() {
                     self.stack.elifs_elses.push((body, first));
+                }
+            }
+            Stmt::Try(stmt_try) => {
+                // Collect try/except/else statements where `else` is non-empty
+                // and `finally` is empty (presence of `finally` changes execution
+                // order, making the `else` semantically significant)
+                if !stmt_try.orelse.is_empty() && stmt_try.finalbody.is_empty() {
+                    self.stack.try_elses.push(stmt_try);
                 }
             }
             _ => {}

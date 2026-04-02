@@ -1,0 +1,73 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 3
+
+--- Added ---
+RET506 [*] Unnecessary `else` after `raise` statement
+   --> RET506.py:123:5
+    |
+121 |     except Exception:
+122 |         raise ValueError
+123 |     else:
+    |     ^^^^
+124 |         raise TypeError
+    |
+help: Remove unnecessary `else`
+120 |         foo()
+121 |     except Exception:
+122 |         raise ValueError
+    -     else:
+    -         raise TypeError
+123 +     raise TypeError
+124 | 
+125 | 
+126 | def try_except_else_raise_multiple_handlers():
+
+
+RET506 [*] Unnecessary `else` after `raise` statement
+   --> RET506.py:134:5
+    |
+132 |     except TypeError:
+133 |         raise RuntimeError
+134 |     else:
+    |     ^^^^
+135 |         raise RuntimeError
+    |
+help: Remove unnecessary `else`
+131 |         raise RuntimeError
+132 |     except TypeError:
+133 |         raise RuntimeError
+    -     else:
+    -         raise RuntimeError
+134 +     raise RuntimeError
+135 | 
+136 | 
+137 | def try_except_star_else_raise():
+
+
+RET506 [*] Unnecessary `else` after `raise` statement
+   --> RET506.py:145:5
+    |
+143 |     except* TypeError:
+144 |         raise RuntimeError
+145 |     else:
+    |     ^^^^
+146 |         raise RuntimeError
+    |
+help: Remove unnecessary `else`
+142 |         raise RuntimeError
+143 |     except* TypeError:
+144 |         raise RuntimeError
+    -     else:
+    -         raise RuntimeError
+145 +     raise RuntimeError
+146 | 
+147 | 
+148 | ###

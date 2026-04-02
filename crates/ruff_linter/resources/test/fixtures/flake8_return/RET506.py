@@ -110,3 +110,62 @@ def bar3(x, y, z):
     else:
         raise Exception(z)
     raise Exception(None)
+
+
+###
+# Errors (try/except/else)
+###
+def try_except_else_raise():
+    try:
+        foo()
+    except Exception:
+        raise ValueError
+    else:
+        raise TypeError
+
+
+def try_except_else_raise_multiple_handlers():
+    try:
+        foo()
+    except ValueError:
+        raise RuntimeError
+    except TypeError:
+        raise RuntimeError
+    else:
+        raise RuntimeError
+
+
+def try_except_star_else_raise():
+    try:
+        foo()
+    except* ValueError:
+        raise RuntimeError
+    except* TypeError:
+        raise RuntimeError
+    else:
+        raise RuntimeError
+
+
+###
+# Non-errors (try/except/else)
+###
+def try_except_else_finally_raise():
+    try:
+        foo()
+    except Exception:
+        raise ValueError
+    else:
+        raise TypeError
+    finally:
+        cleanup()
+
+
+def try_except_else_partial_raise():
+    try:
+        foo()
+    except ValueError:
+        raise RuntimeError
+    except TypeError:
+        pass
+    else:
+        raise RuntimeError

@@ -337,3 +337,8 @@ pub const fn is_warning_severity_enabled(preview: PreviewMode) -> bool {
 pub(crate) const fn is_trailing_pragma_in_line_length_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
+
+// <https://github.com/astral-sh/ruff/pull/24239>
+pub(crate) const fn is_superfluous_try_else_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+RET507 [*] Unnecessary `else` after `continue` statement
+   --> RET507.py:118:9
+    |
+116 |         except Exception:
+117 |             continue
+118 |         else:
+    |         ^^^^
+119 |             x = 1
+    |
+help: Remove unnecessary `else`
+115 |             foo()
+116 |         except Exception:
+117 |             continue
+    -         else:
+    -             x = 1
+118 +         x = 1
+119 | 
+120 | 
+121 | def try_except_else_continue_multiple_handlers():
+
+
+RET507 [*] Unnecessary `else` after `continue` statement
+   --> RET507.py:130:9
+    |
+128 |         except TypeError:
+129 |             continue
+130 |         else:
+    |         ^^^^
+131 |             x = 1
+    |
+help: Remove unnecessary `else`
+127 |             continue
+128 |         except TypeError:
+129 |             continue
+    -         else:
+    -             x = 1
+130 +         x = 1
+131 | 
+132 | 
+133 | ###

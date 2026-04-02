@@ -104,3 +104,55 @@ def bar3(x, y, z):
         else:
             return z
         return None
+
+
+###
+# Errors (try/except/else)
+###
+def try_except_else_continue():
+    for i in range(10):
+        try:
+            foo()
+        except Exception:
+            continue
+        else:
+            x = 1
+
+
+def try_except_else_continue_multiple_handlers():
+    for i in range(10):
+        try:
+            foo()
+        except ValueError:
+            continue
+        except TypeError:
+            continue
+        else:
+            x = 1
+
+
+###
+# Non-errors (try/except/else)
+###
+def try_except_else_finally_continue():
+    for i in range(10):
+        try:
+            foo()
+        except Exception:
+            continue
+        else:
+            x = 1
+        finally:
+            cleanup()
+
+
+def try_except_else_partial_continue():
+    for i in range(10):
+        try:
+            foo()
+        except ValueError:
+            continue
+        except TypeError:
+            pass
+        else:
+            x = 1

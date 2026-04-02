@@ -4,6 +4,7 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
+use ruff_python_ast::stmt_try::try_else_range;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
@@ -22,6 +23,7 @@ use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
+use crate::preview::is_superfluous_try_else_enabled;
 use crate::rules::flake8_return::branch::Branch;
 use crate::rules::flake8_return::helpers::result_exists;
 use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
@@ -198,7 +200,7 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 
 /// ## What it does
 /// Checks for `else` statements with a `return` statement in the preceding
-/// `if` block.
+/// `if` block or in all `except` handlers of a `try` block.
 ///
 /// ## Why is this bad?
 /// The `else` statement is not needed as the `return` statement will always
@@ -243,7 +245,7 @@ impl Violation for SuperfluousElseReturn {
 
 /// ## What it does
 /// Checks for `else` statements with a `raise` statement in the preceding `if`
-/// block.
+/// block or in all `except` handlers of a `try` block.
 ///
 /// ## Why is this bad?
 /// The `else` statement is not needed as the `raise` statement will always
@@ -288,7 +290,7 @@ impl Violation for SuperfluousElseRaise {
 
 /// ## What it does
 /// Checks for `else` statements with a `continue` statement in the preceding
-/// `if` block.
+/// `if` block or in all `except` handlers of a `try` block.
 ///
 /// ## Why is this bad?
 /// The `else` statement is not needed, as the `continue` statement will always
@@ -335,7 +337,7 @@ impl Violation for SuperfluousElseContinue {
 
 /// ## What it does
 /// Checks for `else` statements with a `break` statement in the preceding `if`
-/// block.
+/// block or in all `except` handlers of a `try` block.
 ///
 /// ## Why is this bad?
 /// The `else` statement is not needed, as the `break` statement will always
@@ -680,8 +682,11 @@ fn superfluous_else_node(
     } else {
         Branch::Else
     };
-    let range = elif_else_range(elif_else, checker.locator().contents())
-        .unwrap_or_else(|| elif_else.range());
+
+    let Some(range) = elif_else_range(elif_else, checker.locator().contents()) else {
+        return false;
+    };
+
     for child in if_elif_body {
         let diagnostic = if child.is_return_stmt() {
             checker.report_diagnostic_if_enabled(SuperfluousElseReturn { branch }, range)
@@ -706,6 +711,68 @@ fn superfluous_else_node(
 fn superfluous_elif_else(checker: &Checker, stack: &Stack) {
     for (if_elif_body, elif_else) in &stack.elifs_elses {
         superfluous_else_node(checker, if_elif_body, elif_else);
+    }
+}
+
+/// RET505, RET506, RET507, RET508 for try/except/else
+fn superfluous_try_else(checker: &Checker, stack: &Stack) {
+    for stmt_try in &stack.try_elses {
+        // For `except*` handlers, only `raise` is a valid exit statement
+        // (`return`/`break`/`continue` are syntax errors in `except*` blocks),
+        // so this check naturally handles both `except` and `except*`
+        let all_handlers_exit = stmt_try.handlers.iter().all(|handler| {
+            let ast::ExceptHandler::ExceptHandler(handler) = handler;
+            handler.body.last().is_some_and(|last| {
+                last.is_return_stmt()
+                    || last.is_raise_stmt()
+                    || last.is_break_stmt()
+                    || last.is_continue_stmt()
+            })
+        });
+
+        if !all_handlers_exit || stmt_try.handlers.is_empty() {
+            continue;
+        }
+
+        // Use the first handler's exit type for the diagnostic, consistent
+        // with how `superfluous_else_node` works
+        let Some(ast::ExceptHandler::ExceptHandler(first_handler)) = stmt_try.handlers.first()
+        else {
+            continue;
+        };
+
+        let Some(last_stmt) = first_handler.body.last() else {
+            continue;
+        };
+
+        let Some(else_range) = try_else_range(stmt_try, checker.locator().contents()) else {
+            continue;
+        };
+
+        let branch = Branch::Else;
+
+        let diagnostic = if last_stmt.is_return_stmt() {
+            checker.report_diagnostic_if_enabled(SuperfluousElseReturn { branch }, else_range)
+        } else if last_stmt.is_raise_stmt() {
+            checker.report_diagnostic_if_enabled(SuperfluousElseRaise { branch }, else_range)
+        } else if last_stmt.is_continue_stmt() {
+            checker.report_diagnostic_if_enabled(SuperfluousElseContinue { branch }, else_range)
+        } else if last_stmt.is_break_stmt() {
+            checker.report_diagnostic_if_enabled(SuperfluousElseBreak { branch }, else_range)
+        } else {
+            continue;
+        };
+
+        if let Some(mut d) = diagnostic {
+            d.try_set_fix(|| {
+                let orelse_end = stmt_try
+                    .orelse
+                    .last()
+                    .map(Ranged::end)
+                    .unwrap_or(else_range.end());
+                remove_else_clause(checker, else_range.start(), &stmt_try.orelse, orelse_end)
+            });
+        }
     }
 }
 
@@ -767,6 +834,9 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         Rule::SuperfluousElseBreak,
     ]) {
         superfluous_elif_else(checker, &stack);
+        if is_superfluous_try_else_enabled(checker.settings()) {
+            superfluous_try_else(checker, &stack);
+        }
     }
 
     // Skip any functions without return statements.
@@ -792,12 +862,8 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     }
 }
 
-/// Generate a [`Fix`] to remove an `else` or `elif` clause.
+/// Generate a [`Fix`] to remove an `else` or `elif` clause from an `if` statement
 fn remove_else(checker: &Checker, elif_else: &ElifElseClause) -> Result<Fix> {
-    let locator = checker.locator();
-    let indexer = checker.indexer();
-    let stylist = checker.stylist();
-
     if elif_else.test.is_some() {
         // Ex) `elif` -> `if`
         Ok(Fix::safe_edit(Edit::deletion(
@@ -805,68 +871,82 @@ fn remove_else(checker: &Checker, elif_else: &ElifElseClause) -> Result<Fix> {
             elif_else.start() + TextSize::from(2),
         )))
     } else {
-        // the start of the line where the `else`` is
-        let else_line_start = locator.line_start(elif_else.start());
-
-        // making a tokenizer to find the Colon for the `else`, not always on the same line!
-        let mut else_line_tokenizer =
-            SimpleTokenizer::starts_at(elif_else.start(), locator.contents());
-
-        // find the Colon for the `else`
-        let Some(else_colon) =
-            else_line_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
-        else {
-            return Err(anyhow::anyhow!("Cannot find `:` in `else` statement"));
-        };
-
-        // get the indentation of the `else`, since that is the indent level we want to end with
-        let Some(desired_indentation) = indentation(locator.contents(), elif_else) else {
-            return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
-        };
-
-        // If the statement is on the same line as the `else`, just remove the `else: `.
-        // Ex) `else: return True` -> `return True`
-        if let Some(first) = elif_else.body.first() {
-            if indexer.preceded_by_multi_statement_line(first, locator.contents()) {
-                return Ok(Fix::safe_edit(Edit::deletion(
-                    elif_else.start(),
-                    first.start(),
-                )));
-            }
-        }
-
-        // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
-        // so here we get the last position of the line the Colon is on
-        let else_colon_end = locator.full_line_end(else_colon.end());
-
-        // if there is a comment on the same line as the Colon, let's keep it
-        // and give it the proper indentation once we unindent it
-        let else_comment_after_colon = else_line_tokenizer
-            .find(|token| token.kind.is_comment())
-            .and_then(|token| {
-                if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
-                    return Some(format!(
-                        "{desired_indentation}{}{}",
-                        locator.slice(token),
-                        stylist.line_ending().as_str(),
-                    ));
-                }
-                None
-            })
-            .unwrap_or(String::new());
-
-        let indented = adjust_indentation(
-            TextRange::new(else_colon_end, elif_else.end()),
-            desired_indentation,
-            locator,
-            indexer,
-            stylist,
-        )?;
-
-        Ok(Fix::safe_edit(Edit::replacement(
-            format!("{else_comment_after_colon}{indented}"),
-            else_line_start,
-            elif_else.end(),
-        )))
+        remove_else_clause(checker, elif_else.start(), &elif_else.body, elif_else.end())
     }
+}
+
+/// Generate a [`Fix`] to remove an `else:` clause, dedenting its body
+///
+/// Shared by `remove_else` (for if/elif/else) and `superfluous_try_else`
+/// (for try/except/else)
+fn remove_else_clause(
+    checker: &Checker,
+    else_start: TextSize,
+    body: &[Stmt],
+    body_end: TextSize,
+) -> Result<Fix> {
+    let locator = checker.locator();
+    let indexer = checker.indexer();
+    let stylist = checker.stylist();
+
+    // the start of the line where the `else` is
+    let else_line_start = locator.line_start(else_start);
+
+    // making a tokenizer to find the Colon for the `else`, not always on the same line!
+    let mut else_line_tokenizer = SimpleTokenizer::starts_at(else_start, locator.contents());
+
+    // find the Colon for the `else`
+    let Some(else_colon) = else_line_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
+    else {
+        return Err(anyhow::anyhow!("Cannot find `:` in `else` statement"));
+    };
+
+    // get the indentation of the `else`, since that is the indent level we want to end with
+    let Some(desired_indentation) =
+        indentation(locator.contents(), &TextRange::new(else_start, body_end))
+    else {
+        return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
+    };
+
+    // If the statement is on the same line as the `else`, just remove the `else: `
+    // Ex) `else: return True` -> `return True`
+    if let Some(first) = body.first() {
+        if indexer.preceded_by_multi_statement_line(first, locator.contents()) {
+            return Ok(Fix::safe_edit(Edit::deletion(else_start, first.start())));
+        }
+    }
+
+    // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
+    // so here we get the last position of the line the Colon is on
+    let else_colon_end = locator.full_line_end(else_colon.end());
+
+    // if there is a comment on the same line as the Colon, let's keep it
+    // and give it the proper indentation once we unindent it
+    let else_comment_after_colon = else_line_tokenizer
+        .find(|token| token.kind.is_comment())
+        .and_then(|token| {
+            if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
+                return Some(format!(
+                    "{desired_indentation}{}{}",
+                    locator.slice(token),
+                    stylist.line_ending().as_str(),
+                ));
+            }
+            None
+        })
+        .unwrap_or_default();
+
+    let indented = adjust_indentation(
+        TextRange::new(else_colon_end, body_end),
+        desired_indentation,
+        locator,
+        indexer,
+        stylist,
+    )?;
+
+    Ok(Fix::safe_edit(Edit::replacement(
+        format!("{else_comment_after_colon}{indented}"),
+        else_line_start,
+        body_end,
+    )))
 }

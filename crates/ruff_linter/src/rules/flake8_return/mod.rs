@@ -14,8 +14,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_diagnostics;
+    use crate::assert_diagnostics_diff;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryReturnNone, Path::new("RET501.py"))]
@@ -33,6 +35,28 @@ mod tests {
             &LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SuperfluousElseReturn, Path::new("RET505.py"))]
+    #[test_case(Rule::SuperfluousElseRaise, Path::new("RET506.py"))]
+    #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
+    #[test_case(Rule::SuperfluousElseBreak, Path::new("RET508.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_return").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
         Ok(())
     }
 }

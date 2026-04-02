@@ -28,6 +28,7 @@ pub mod relocate;
 pub mod script;
 pub mod statement_visitor;
 pub mod stmt_if;
+pub mod stmt_try;
 pub mod str;
 pub mod str_prefix;
 pub mod token;
