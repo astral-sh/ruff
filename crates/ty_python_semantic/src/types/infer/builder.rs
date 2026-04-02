@@ -4199,22 +4199,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
 
                 match class_kind {
-                    Some(CodeGeneratorKind::TypedDict) => match qualifier {
-                        TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => {
-                            let Some(builder) =
+                    Some(CodeGeneratorKind::TypedDict) => {
+                        if !qualifier.is_valid_in_typeddict_field()
+                            && let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                            else {
-                                continue;
-                            };
+                        {
                             builder.into_diagnostic(format_args!(
                                 "`{name}` is not allowed in TypedDict fields",
                                 name = qualifier.name()
                             ));
                         }
-                        TypeQualifier::NotRequired
-                        | TypeQualifier::ReadOnly
-                        | TypeQualifier::Required => {}
-                    },
+                    }
                     Some(CodeGeneratorKind::DataclassLike(_)) => match qualifier {
                         TypeQualifier::NotRequired
                         | TypeQualifier::ReadOnly
