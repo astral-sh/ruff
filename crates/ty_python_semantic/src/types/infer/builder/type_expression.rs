@@ -79,29 +79,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
     }
 
+    pub(super) fn infer_name_or_attribute_type_expression(
+        &self,
+        ty: Type<'db>,
+        annotation: &ast::Expr,
+    ) -> Type<'db> {
+        if annotation.is_attribute_expr()
+            && let Type::TypeVar(tvar) = ty
+            && tvar.paramspec_attr(self.db()).is_some()
+        {
+            return ty;
+        }
+        let result_ty = ty
+            .default_specialize(self.db())
+            .in_type_expression(
+                self.db(),
+                self.scope(),
+                self.typevar_binding_context,
+                self.inference_flags,
+            )
+            .unwrap_or_else(|error| {
+                error.into_fallback_type(&self.context, annotation, self.inference_flags)
+            });
+        self.check_for_unbound_type_variable(annotation, result_ty)
+    }
+
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
-                    let ty = self
-                        .infer_name_expression(name)
-                        .default_specialize(self.db())
-                        .in_type_expression(
-                            self.db(),
-                            self.scope(),
-                            self.typevar_binding_context,
-                            self.inference_flags,
-                        )
-                        .unwrap_or_else(|error| {
-                            error.into_fallback_type(
-                                &self.context,
-                                expression,
-                                self.inference_flags,
-                            )
-                        });
-                    self.check_for_unbound_type_variable(expression, ty)
+                    let ty = self.infer_name_expression(name);
+                    self.infer_name_or_attribute_type_expression(ty, expression)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -114,27 +124,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     match attribute_expression.ctx {
                         ast::ExprContext::Load => {
                             let ty = self.infer_attribute_expression(attribute_expression);
-
-                            if let Type::TypeVar(tvar) = ty
-                                && tvar.paramspec_attr(self.db()).is_some()
-                            {
-                                ty
-                            } else {
-                                ty.default_specialize(self.db())
-                                    .in_type_expression(
-                                        self.db(),
-                                        self.scope(),
-                                        self.typevar_binding_context,
-                                        self.inference_flags,
-                                    )
-                                    .unwrap_or_else(|error| {
-                                        error.into_fallback_type(
-                                            &self.context,
-                                            expression,
-                                            self.inference_flags,
-                                        )
-                                    })
-                            }
+                            self.infer_name_or_attribute_type_expression(ty, expression)
                         }
                         ast::ExprContext::Invalid => Type::unknown(),
                         ast::ExprContext::Store | ast::ExprContext::Del => {
