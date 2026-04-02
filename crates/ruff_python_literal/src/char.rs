@@ -14,13 +14,13 @@ pub fn is_printable(c: char) -> bool {
 
     !matches!(
         cat,
-        GeneralCategory::SpaceSeparator
-            | GeneralCategory::LineSeparator
-            | GeneralCategory::ParagraphSeparator
-            | GeneralCategory::Control
+        GeneralCategory::Control
             | GeneralCategory::Format
             | GeneralCategory::Surrogate
             | GeneralCategory::PrivateUse
             | GeneralCategory::Unassigned
+            | GeneralCategory::LineSeparator
+            | GeneralCategory::ParagraphSeparator
+            | GeneralCategory::SpaceSeparator
     )
 }
