@@ -420,6 +420,15 @@ def _(
     return x
 ```
 
+### Dict-literal or set-literal when you meant to use `dict[]`/`set[]`
+
+```py
+def _(
+    x: {int: str},  # error: [invalid-type-form]
+    y: {str},  # error: [invalid-type-form]
+): ...
+```
+
 ### Special-cased diagnostic for `callable` used in a type expression
 
 ```py
@@ -427,4 +436,19 @@ def _(
 # error: [invalid-type-form]
 def decorator(fn: callable) -> callable:
     return fn
+```
+
+### AST nodes that are only valid inside `Literal`
+
+```py
+def bad(
+    # error: [invalid-type-form]
+    a: 42,
+    # error: [invalid-type-form]
+    b: b"42",
+    # error: [invalid-type-form]
+    c: True,
+    # error: [invalid-syntax-in-forward-annotation]
+    d: "invalid syntax",
+): ...
 ```

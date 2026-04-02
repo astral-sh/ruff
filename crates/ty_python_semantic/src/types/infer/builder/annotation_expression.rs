@@ -7,9 +7,7 @@ use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
 use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::nearest_enclosing_class;
-use crate::types::string_annotation::{
-    BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
-};
+use crate::types::string_annotation::parse_string_annotation;
 use crate::types::{
     SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifier, TypeQualifiers, todo_type,
 };
@@ -160,34 +158,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let annotation_ty = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
-
-            // Annotation expressions also get special handling for `*args` and `**kwargs`.
-            ast::Expr::Starred(starred) => TypeAndQualifiers::declared(
-                self.infer_starred_expression(starred, TypeContext::default()),
-            ),
-
-            ast::Expr::BytesLiteral(bytes) => {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&BYTE_STRING_TYPE_ANNOTATION, bytes)
-                {
-                    builder.into_diagnostic("Type expressions cannot use bytes literal");
-                }
-                if !self.in_string_annotation() {
-                    self.infer_bytes_literal_expression(bytes);
-                }
-                TypeAndQualifiers::declared(Type::unknown())
-            }
-
-            ast::Expr::FString(fstring) => {
-                if let Some(builder) = self.context.report_lint(&FSTRING_TYPE_ANNOTATION, fstring) {
-                    builder.into_diagnostic("Type expressions cannot use f-strings");
-                }
-                if !self.in_string_annotation() {
-                    self.infer_fstring_expression(fstring);
-                }
-                TypeAndQualifiers::declared(Type::unknown())
-            }
 
             ast::Expr::Attribute(attribute) => {
                 if !is_dotted_name(annotation) {
@@ -357,8 +327,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            // All other annotation expressions are (possibly) valid type expressions, so handle
-            // them there instead.
+            // Fallback to `infer_type_expression_no_store` for everything else
             type_expr => {
                 TypeAndQualifiers::declared(self.infer_type_expression_no_store(type_expr))
             }

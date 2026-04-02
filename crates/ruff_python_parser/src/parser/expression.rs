@@ -2545,9 +2545,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Star);
 
         let parsed_expr = match context.starred_expression_precedence() {
-            StarredExpressionPrecedence::Conditional => {
-                self.parse_conditional_expression_or_higher_impl(context)
-            }
+            StarredExpressionPrecedence::Conditional => self
+                .parse_conditional_expression_or_higher_impl(
+                    // test_err starred_starred_expression
+                    // print(*
+                    // *[])
+                    // print(* *[])
+                    context.disallow_starred_expressions(),
+                ),
             StarredExpressionPrecedence::BitwiseOr => {
                 self.parse_expression_with_bitwise_or_precedence()
             }
@@ -2997,6 +3002,11 @@ impl ExpressionContext {
     /// expression.
     pub(super) fn yield_or_starred_bitwise_or() -> Self {
         ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
+    }
+
+    pub(super) fn disallow_starred_expressions(self) -> Self {
+        let flags = self.0 & !ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
+        ExpressionContext(flags)
     }
 
     /// Returns a new [`ExpressionContext`] which allows starred expression with the given

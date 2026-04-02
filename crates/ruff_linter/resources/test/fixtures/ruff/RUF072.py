@@ -170,3 +170,10 @@ try:
     foo()
 finally:  # comment
     pass
+
+# Bare try finally with line starting with a formfeed
+try:
+    1
+    2
+finally:
+    pass

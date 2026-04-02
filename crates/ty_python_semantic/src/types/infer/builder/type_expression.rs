@@ -330,29 +330,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::unknown` in these cases.
             // =====================================================================================
-
-            // TODO: add a subdiagnostic linking to type-expression grammar
-            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
-            ast::Expr::BytesLiteral(_) => {
-                self.report_invalid_type_expression(
+            ast::Expr::BytesLiteral(bytes) => {
+                if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
-                    format_args!(
-                        "Bytes literals are not allowed in this context in a type expression"
-                    ),
-                );
+                    "Bytes literals are not allowed in this context in a type expression",
+                ) {
+                    if let Some(single_element) = bytes.as_single_part_bytestring()
+                        && let Ok(valid_string) = String::from_utf8(single_element.value.to_vec())
+                    {
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `typing.Literal[b\"{valid_string}\"]`?"
+                        ));
+                    }
+                }
                 Type::unknown()
             }
 
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(_),
+                value: ast::Number::Int(int),
                 ..
             }) => {
-                self.report_invalid_type_expression(
+                if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
                         "Int literals are not allowed in this context in a type expression"
                     ),
-                );
+                ) {
+                    if let Some(int) = int.as_i64() {
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `typing.Literal[{int}]`?"
+                        ));
+                    }
+                }
 
                 Type::unknown()
             }
@@ -379,13 +388,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::Expr::BooleanLiteral(_) => {
-                self.report_invalid_type_expression(
+            ast::Expr::BooleanLiteral(bool_value) => {
+                if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
                         "Boolean literals are not allowed in this context in a type expression"
                     ),
-                );
+                ) {
+                    diagnostic.set_primary_message(format_args!(
+                        "Did you mean `typing.Literal[{}]`?",
+                        if bool_value.value { "True" } else { "False" }
+                    ));
+                }
                 Type::unknown()
             }
 
@@ -516,10 +530,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !self.in_string_annotation() {
                     self.infer_dict_expression(dict, TypeContext::default());
                 }
-                self.report_invalid_type_expression(
+                if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!("Dict literals are not allowed in type expressions"),
-                );
+                ) && let [
+                    ast::DictItem {
+                        key: Some(key),
+                        value,
+                    },
+                ] = &*dict.items
+                {
+                    let mut speculative = self.speculate();
+                    let key_type = speculative.infer_type_expression(key);
+                    let value_type = speculative.infer_type_expression(value);
+                    if key_type.is_hintable(self.db()) && value_type.is_hintable(self.db()) {
+                        let hinted_type = KnownClass::Dict
+                            .to_specialized_instance(self.db(), &[key_type, value_type]);
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `{}`?",
+                            hinted_type.display(self.db()),
+                        ));
+                    }
+                }
                 Type::unknown()
             }
 
@@ -527,10 +559,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !self.in_string_annotation() {
                     self.infer_set_expression(set, TypeContext::default());
                 }
-                self.report_invalid_type_expression(
+                if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!("Set literals are not allowed in type expressions"),
-                );
+                ) && let [single_element] = &*set.elts
+                {
+                    let mut speculative_builder = self.speculate();
+                    let inner_type = speculative_builder.infer_type_expression(single_element);
+
+                    if inner_type.is_hintable(self.db()) {
+                        let hinted_type =
+                            KnownClass::Set.to_specialized_instance(self.db(), &[inner_type]);
+
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `{}`?",
+                            hinted_type.display(self.db()),
+                        ));
+                    }
+                }
                 Type::unknown()
             }
 
@@ -639,7 +685,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("F-strings are not allowed in type expressions"),
+                    "F-strings are not allowed in type expressions",
                 );
                 Type::unknown()
             }
