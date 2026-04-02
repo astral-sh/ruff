@@ -328,131 +328,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.is_always_satisfied(db, self.builder)
     }
 
-    /// Returns whether this constraint set contains any cycles between typevars. If it does, then
-    /// we cannot create a specialization from this constraint set.
-    ///
-    /// We have restrictions in place that ensure that there are no cycles in the _lower and upper
-    /// bounds_ of each constraint, but it's still possible for a constraint to _mention_ another
-    /// typevar without _constraining_ it. For instance, `(T ≤ int) ∧ (U ≤ list[T])` is a valid
-    /// constraint set, which we can create a specialization from (`T = int, U = list[int]`). But
-    /// `(T ≤ list[U]) ∧ (U ≤ list[T])` does not violate our lower/upper bounds restrictions, since
-    /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
-    /// since we would endlessly substitute until we stack overflow.
-    pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
-        self.is_cyclic_impl(db, None)
-    }
-
-    fn is_cyclic_impl(self, db: &'db dyn Db, inferable: Option<InferableTypeVars<'db>>) -> bool {
-        #[derive(Default)]
-        struct CollectReachability<'db> {
-            reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectReachability<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                true
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.reachable_typevars
-                    .borrow_mut()
-                    .insert(bound_typevar.identity(db));
-                walk_bound_type_var_type(db, bound_typevar, self);
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                // Override the default `walk_generic_alias` to skip walking the generic
-                // context. The generic context contains the typevar *definitions* for the
-                // specialization (the mapping keys), but those typevars are bound — they
-                // are not free occurrences in the type. Walking them here would cause false
-                // cycles: e.g. the constraint `list[int] ≤ _T@list` would appear cyclic
-                // because `_T@list` is found in the generic context of `list[int]`, even
-                // though `_T` is bound to `int` in that specialization.
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        fn visit_dfs<'db>(
-            reachable_typevars: &mut FxHashMap<
-                BoundTypeVarIdentity<'db>,
-                FxHashSet<BoundTypeVarIdentity<'db>>,
-            >,
-            discovered: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
-            bound_typevar: BoundTypeVarIdentity<'db>,
-        ) -> bool {
-            discovered.insert(bound_typevar);
-            let outgoing = reachable_typevars
-                .remove(&bound_typevar)
-                .expect("should not visit typevar twice in DFS");
-            for outgoing in outgoing {
-                if discovered.contains(&outgoing) {
-                    return true;
-                }
-                if reachable_typevars.contains_key(&outgoing) {
-                    if visit_dfs(reachable_typevars, discovered, outgoing) {
-                        return true;
-                    }
-                }
-            }
-            discovered.remove(&bound_typevar);
-            false
-        }
-
-        // First find all of the typevars that each constraint directly mentions. When `inferable`
-        // is provided, only include inferable typevars as sources and targets in the graph.
-        let mut reachable_typevars: FxHashMap<
-            BoundTypeVarIdentity<'db>,
-            FxHashSet<BoundTypeVarIdentity<'db>>,
-        > = FxHashMap::default();
-        self.node
-            .for_each_constraint(self.builder, &mut |constraint, _| {
-                let constraint = self.builder.constraint_data(constraint);
-                let identity = constraint.typevar.identity(db);
-                if inferable.is_some_and(|inferable| !identity.is_inferable(db, inferable)) {
-                    return;
-                }
-                let visitor = CollectReachability::default();
-                visitor.visit_type(db, constraint.lower);
-                visitor.visit_type(db, constraint.upper);
-                let reachable = visitor.reachable_typevars.into_inner();
-                let entry = reachable_typevars.entry(identity).or_default();
-                if let Some(inferable) = inferable {
-                    entry.extend(
-                        reachable
-                            .into_iter()
-                            .filter(|tv| tv.is_inferable(db, inferable)),
-                    );
-                } else {
-                    entry.extend(reachable);
-                }
-            });
-
-        // Then perform a depth-first search to see if there are any cycles.
-        let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
-        while let Some(bound_typevar) = reachable_typevars.keys().copied().next() {
-            if !discovered.contains(&bound_typevar) {
-                let cycle_found =
-                    visit_dfs(&mut reachable_typevars, &mut discovered, bound_typevar);
-                if cycle_found {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
@@ -630,13 +505,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
         self.verify_builder(builder);
-
-        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
-        // mappings for it.
-        if self.is_cyclic(db) {
-            return Solutions::Unsatisfiable;
-        }
-
         self.node.solutions(db, builder)
     }
 
@@ -665,11 +533,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<Vec<Solution<'db>>> {
         self.verify_builder(builder);
-
-        if self.is_cyclic(db) {
-            return Solutions::Unsatisfiable;
-        }
-
         self.node.solutions_with(db, builder, choose)
     }
 
