@@ -2547,6 +2547,9 @@ impl<'src> Parser<'src> {
         let parsed_expr = match context.starred_expression_precedence() {
             StarredExpressionPrecedence::Conditional => self
                 .parse_conditional_expression_or_higher_impl(
+                    // test_err starred_starred_expression
+                    // print(*
+                    // *[])
                     context.disallow_starred_expressions(),
                 ),
             StarredExpressionPrecedence::BitwiseOr => {

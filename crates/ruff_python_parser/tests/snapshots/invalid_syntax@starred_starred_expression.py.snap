@@ -1,0 +1,71 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..13,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..12,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 0..12,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 0..5,
+                                    id: Name("print"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 5..12,
+                                node_index: NodeIndex(None),
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            node_index: NodeIndex(None),
+                                            range: 6..11,
+                                            value: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 8..11,
+                                                    value: List(
+                                                        ExprList {
+                                                            node_index: NodeIndex(None),
+                                                            range: 9..11,
+                                                            elts: [],
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | print(*
+2 | *[])
+  | ^^^ Syntax Error: Starred expression cannot be used here
+  |
