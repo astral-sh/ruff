@@ -2320,6 +2320,32 @@ static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
 ```
 
+### Validation of generic `TypedDict`s
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class L[T](TypedDict):
+    value: T
+
+class R[T](TypedDict):
+    value: T
+
+class Merge(L[int], R[int]): ...
+class MergeGeneric[T](L[T], R[T]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `str` is incompatible with `int`"
+class BadMerge(L[int], R[str]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `T@BadMergeGeneric` is incompatible with `int`"
+class BadMergeGeneric[T](L[int], R[T]): ...
+```
+
 ## Recursive `TypedDict`
 
 `TypedDict`s can also be recursive, allowing for nested structures:
