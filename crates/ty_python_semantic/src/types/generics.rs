@@ -929,24 +929,25 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db) else {
-                continue;
-            };
-
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let specialization = ApplySpecialization::Partial {
-                generic_context: self,
-                types: &expanded[0..idx],
-                skip: None,
-            };
-            let default = default.apply_type_mapping(
-                db,
-                &TypeMapping::ApplySpecialization(specialization),
-                TypeContext::default(),
-            );
-            expanded[idx] = default;
+            if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to _earlier_ typevars in their defaults.
+                // (This is statically enforced for PEP-695 contexts, and is explicitly called out
+                // as a requirement for legacy contexts.)
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &expanded[0..idx],
+                    skip: None,
+                };
+                let default = default.apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                );
+                expanded[idx] = default;
+            } else if let Some(upper_bound) = typevar.typevar(db).upper_bound(db) {
+                expanded[idx] =
+                    IntersectionType::from_two_elements(db, upper_bound, Type::unknown());
+            }
         }
 
         expanded.into_boxed_slice()
