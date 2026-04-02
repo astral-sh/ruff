@@ -2106,65 +2106,115 @@ bad_child2 = Child(b="test")
 Overriding an inherited `TypedDict` field must preserve the compatibility rules from the typing
 spec. We reject both direct overwrites and incompatible merges from multiple bases.
 
+Mutable fields are invariant, so they cannot be overwritten with a different type, even if the new
+type is a subtype of the old one:
+
 ```py
-from typing import Collection, TypedDict
+from typing import TypedDict
 from typing_extensions import NotRequired, ReadOnly, Required
 
-class Movie(TypedDict):
-    name: str
+class Base(TypedDict):
+    value: int
 
-class BadMovie(Movie):
-    # error: [invalid-typed-dict-field]
-    name: int
+class BadSubtype(Base):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
 
-FunctionalMovie = TypedDict("FunctionalMovie", {"name": str})
+FunctionalBase = TypedDict("FunctionalBase", {"value": int})
 
-class BadFunctionalMovie(FunctionalMovie):
-    # error: [invalid-typed-dict-field]
-    name: int
+class BadFunctionalSubtype(FunctionalBase):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
 
 class L(TypedDict):
     value: int
 
 class R(TypedDict):
-    value: str
+    value: bool
 
-class BadMerge(L, R):  # error: [invalid-typed-dict-field]
+class BadMerge(L, R):  # error: [invalid-typed-dict-field] "Inherited mutable field type `bool` is incompatible with `int`"
     pass
 
-class NamedDict(TypedDict):
-    name: ReadOnly[str]
+class R2(TypedDict):
+    value: int
+    other: str
 
-class Album(NamedDict):
-    name: str
-    year: int
+class GoodMerge(L, R2):
+    pass
+```
 
-album: Album = {"name": "Flood", "year": 1990}
-album["name"] = "Dark Side Of The Moon"
+Read-only fields, on the other hand, can be overwritten with a compatible read-only type (a
+subtype):
 
-class AlbumCollection(TypedDict):
-    albums: ReadOnly[Collection[Album]]
+```py
+class ReadOnlyBase(TypedDict):
+    value: ReadOnly[int]
 
-class RecordShop(AlbumCollection):
-    albums: ReadOnly[list[Album]]
+class ReadOnlySubtype(ReadOnlyBase):
+    value: ReadOnly[bool]
 
+class BadReadOnlySubtype(ReadOnlyBase):
+    # error: [invalid-typed-dict-field] "Inherited read-only field type `int` is not assignable from `object`"
+    value: ReadOnly[object]
+```
+
+Read-only fields can be made mutable in a subtype, but not the other way around:
+
+```py
+named_dict: ReadOnlyBase = {"value": 1}
+named_dict["value"] = 2  # error: [invalid-assignment]
+
+class MutableSubtype(ReadOnlyBase):
+    value: int
+
+album: MutableSubtype = {"value": 1}
+album["value"] = 2  # no error here
+
+class MutableBase(TypedDict):
+    value: int
+
+class BadReadOnlySubtype(MutableBase):
+    # error: [invalid-typed-dict-field] "Mutable inherited fields cannot be redeclared as read-only"
+    value: ReadOnly[int]
+```
+
+Read-only, non-required fields can be made required in a subtype, but not the other way around:
+
+```py
 class OptionalName(TypedDict):
     name: ReadOnly[NotRequired[str]]
+
+optional_name: OptionalName = {}
 
 class RequiredName(OptionalName):
     name: ReadOnly[Required[str]]
 
 required_name: RequiredName = {"name": "Flood"}
+bad_required_name: RequiredName = {}  # error: [missing-typed-dict-key]
 
-class MutableBase(TypedDict):
+class RequiredName(TypedDict):
+    name: ReadOnly[Required[str]]
+
+class BadOptionalName(RequiredName):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
+    name: ReadOnly[NotRequired[str]]
+```
+
+This is not allowed for mutable fields, however (in either direction):
+
+```py
+class MutableNotRequired(TypedDict):
+    value: NotRequired[int]
+
+class BadNonRequiredSubtype(MutableNotRequired):
+    # error: [invalid-typed-dict-field] "Mutable inherited `NotRequired` fields cannot be redeclared as required"
     value: Required[int]
 
-class BadReadOnly(MutableBase):
-    # error: [invalid-typed-dict-field]
-    value: ReadOnly[int]
+class MutableRequired(TypedDict):
+    value: Required[int]
 
-class BadOptional(MutableBase):
-    # error: [invalid-typed-dict-field]
+class BadRequiredSubtype(MutableRequired):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
     value: NotRequired[int]
 ```
 
