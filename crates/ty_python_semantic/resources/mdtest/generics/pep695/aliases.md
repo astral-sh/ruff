@@ -105,11 +105,11 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
-# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias values"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):

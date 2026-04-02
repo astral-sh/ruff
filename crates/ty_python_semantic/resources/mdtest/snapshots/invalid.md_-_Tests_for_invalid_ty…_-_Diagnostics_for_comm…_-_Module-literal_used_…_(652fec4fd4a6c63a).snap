@@ -35,7 +35,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
 # Diagnostics
 
 ```
-error[invalid-type-form]: Module `datetime` is not valid in a type expression
+error[invalid-type-form]: Module `datetime` is not valid in a parameter annotation
  --> src/foo.py:3:10
   |
 1 | import datetime
@@ -53,7 +53,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[invalid-type-form]: Module `PIL.Image` is not valid in a type expression
+error[invalid-type-form]: Module `PIL.Image` is not valid in a parameter annotation
  --> src/bar.py:3:10
   |
 1 | from PIL import Image

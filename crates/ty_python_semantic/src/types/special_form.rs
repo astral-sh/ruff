@@ -745,7 +745,9 @@ impl SpecialFormType {
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
-            SpecialFormType::TypeQualifier(qualifier) => Err(qualifier.in_type_expression()),
+            SpecialFormType::TypeQualifier(qualifier) => {
+                Err(InvalidTypeExpression::TypeQualifier(qualifier))
+            }
         }
     }
 }
@@ -811,7 +813,7 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumIter)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,
@@ -855,7 +857,7 @@ impl TypeQualifier {
         }
     }
 
-    const fn name(self) -> &'static str {
+    pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::ReadOnly => "ReadOnly",
             Self::Final => "Final",
@@ -884,17 +886,22 @@ impl TypeQualifier {
         }
     }
 
-    const fn in_type_expression(self) -> InvalidTypeExpression<'static> {
+    /// Return `true` if this type qualifier requires exactly one argument
+    /// when used in a type expression.
+    pub(super) const fn requires_one_argument(self) -> bool {
         match self {
-            TypeQualifier::Final | TypeQualifier::ClassVar => {
-                InvalidTypeExpression::TypeQualifier(self)
-            }
+            Self::Final | Self::ClassVar => false,
+            Self::Required | Self::NotRequired | Self::InitVar | Self::ReadOnly => true,
+        }
+    }
+    pub(crate) const fn is_valid_for_non_name_targets(self) -> bool {
+        match self {
             TypeQualifier::ReadOnly
+            | TypeQualifier::Required
             | TypeQualifier::NotRequired
-            | TypeQualifier::InitVar
-            | TypeQualifier::Required => {
-                InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
-            }
+            | TypeQualifier::ClassVar
+            | TypeQualifier::InitVar => false,
+            TypeQualifier::Final => true,
         }
     }
 }

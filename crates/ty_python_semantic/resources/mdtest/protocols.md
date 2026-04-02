@@ -260,8 +260,8 @@ And it is also an error to use `Protocol` in type expressions:
 # fmt: off
 
 def f(
-    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
-    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
+    x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
+    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in parameter annotations"
 ):
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: type[Unknown]
