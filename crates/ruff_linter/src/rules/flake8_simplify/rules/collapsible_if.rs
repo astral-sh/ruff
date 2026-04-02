@@ -121,8 +121,8 @@ pub(crate) fn nested_if_statements(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
-    // The fixer preserves comments in the nested body, but removes comments between
-    // the outer and inner if statements.
+    // We skip the fix if there are comments between the outer and inner if
+    // statements.
     if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
         nested_if.body()[0].start(),
@@ -139,7 +139,7 @@ pub(crate) fn nested_if_statements(
                             checker.settings().tab_size,
                         )
                     }) {
-                        Ok(Some(Fix::unsafe_edit(edit)))
+                        Ok(Some(Fix::safe_edit(edit)))
                     } else {
                         Ok(None)
                     }
