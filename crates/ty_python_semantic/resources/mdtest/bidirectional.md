@@ -133,6 +133,8 @@ reveal_type(d4_invalid_dict)  # revealed: TD
 d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 
+d6_dict: TD = {"x": 1} | {"x": 2}
+
 def return_literal() -> TD:
     return {"x": 1}
 

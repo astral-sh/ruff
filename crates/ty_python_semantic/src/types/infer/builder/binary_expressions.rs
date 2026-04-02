@@ -138,7 +138,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // so we can use bidirectional inference on the literal before calling the synthesized
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
-            let right_ty = self.infer_expression(right, TypeContext::default());
+            let right_ty = self.infer_expression(right, operand_tcx(right));
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
