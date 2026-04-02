@@ -2,8 +2,8 @@ use ruff_db::system::SystemPath;
 
 use crate::glob::include::MatchFile;
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
+pub(crate) use expand::expand_globs_to_directories;
 pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
-pub(crate) use expand::{expand_glob_to_directories, has_glob_metachar};
 pub(crate) use portable::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -11,8 +11,8 @@ pub(crate) use portable::{
 use crate::metadata::options::DEFAULT_SRC_EXCLUDES;
 
 mod exclude;
-mod include;
 mod expand;
+mod include;
 mod portable;
 
 /// Path filtering based on an exclude and include glob pattern set.
