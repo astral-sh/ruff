@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311.py
 ---
 ## AST
 
@@ -8,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..549,
+        range: 0..562,
         body: [
             Expr(
                 StmtExpr {
@@ -606,33 +605,81 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 336..359,
+                    range: 336..348,
                     value: FString(
                         ExprFString {
                             node_index: NodeIndex(None),
-                            range: 336..359,
+                            range: 336..348,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
-                                            range: 336..359,
+                                            range: 336..348,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 338..347,
+                                                        node_index: NodeIndex(None),
+                                                        expression: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 344..345,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 349..372,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 349..372,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 349..372,
                                             node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
-                                                        range: 338..343,
+                                                        range: 351..356,
                                                         node_index: NodeIndex(None),
                                                         value: "test ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 343..353,
+                                                        range: 356..366,
                                                         node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
                                                                 node_index: NodeIndex(None),
-                                                                range: 344..345,
+                                                                range: 357..358,
                                                                 id: Name("a"),
                                                                 ctx: Load,
                                                             },
@@ -644,7 +691,7 @@ Module(
                                                 ),
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
-                                                        range: 353..358,
+                                                        range: 366..371,
                                                         node_index: NodeIndex(None),
                                                         value: " more",
                                                     },
@@ -667,41 +714,41 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 403..422,
+                    range: 416..435,
                     value: FString(
                         ExprFString {
                             node_index: NodeIndex(None),
-                            range: 403..422,
+                            range: 416..435,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
-                                            range: 403..422,
+                                            range: 416..435,
                                             node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 407..419,
+                                                        range: 420..432,
                                                         node_index: NodeIndex(None),
                                                         expression: FString(
                                                             ExprFString {
                                                                 node_index: NodeIndex(None),
-                                                                range: 408..418,
+                                                                range: 421..431,
                                                                 value: FStringValue {
                                                                     inner: Single(
                                                                         FString(
                                                                             FString {
-                                                                                range: 408..418,
+                                                                                range: 421..431,
                                                                                 node_index: NodeIndex(None),
                                                                                 elements: [
                                                                                     Interpolation(
                                                                                         InterpolatedElement {
-                                                                                            range: 412..415,
+                                                                                            range: 425..428,
                                                                                             node_index: NodeIndex(None),
                                                                                             expression: Name(
                                                                                                 ExprName {
                                                                                                     node_index: NodeIndex(None),
-                                                                                                    range: 413..414,
+                                                                                                    range: 426..427,
                                                                                                     id: Name("x"),
                                                                                                     ctx: Load,
                                                                                                 },
@@ -747,38 +794,38 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 468..502,
+                    range: 481..515,
                     value: FString(
                         ExprFString {
                             node_index: NodeIndex(None),
-                            range: 468..502,
+                            range: 481..515,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
-                                            range: 468..502,
+                                            range: 481..515,
                                             node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 470..501,
+                                                        range: 483..514,
                                                         node_index: NodeIndex(None),
                                                         expression: Call(
                                                             ExprCall {
                                                                 node_index: NodeIndex(None),
-                                                                range: 471..500,
+                                                                range: 484..513,
                                                                 func: Attribute(
                                                                     ExprAttribute {
                                                                         node_index: NodeIndex(None),
-                                                                        range: 471..480,
+                                                                        range: 484..493,
                                                                         value: StringLiteral(
                                                                             ExprStringLiteral {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 471..475,
+                                                                                range: 484..488,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
-                                                                                            range: 471..475,
+                                                                                            range: 484..488,
                                                                                             node_index: NodeIndex(None),
                                                                                             value: "\n",
                                                                                             flags: StringLiteralFlags {
@@ -794,29 +841,29 @@ Module(
                                                                         ),
                                                                         attr: Identifier {
                                                                             id: Name("join"),
-                                                                            range: 476..480,
+                                                                            range: 489..493,
                                                                             node_index: NodeIndex(None),
                                                                         },
                                                                         ctx: Load,
                                                                     },
                                                                 ),
                                                                 arguments: Arguments {
-                                                                    range: 480..500,
+                                                                    range: 493..513,
                                                                     node_index: NodeIndex(None),
                                                                     args: [
                                                                         List(
                                                                             ExprList {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 481..499,
+                                                                                range: 494..512,
                                                                                 elts: [
                                                                                     StringLiteral(
                                                                                         ExprStringLiteral {
                                                                                             node_index: NodeIndex(None),
-                                                                                            range: 482..486,
+                                                                                            range: 495..499,
                                                                                             value: StringLiteralValue {
                                                                                                 inner: Single(
                                                                                                     StringLiteral {
-                                                                                                        range: 482..486,
+                                                                                                        range: 495..499,
                                                                                                         node_index: NodeIndex(None),
                                                                                                         value: "\t",
                                                                                                         flags: StringLiteralFlags {
@@ -833,11 +880,11 @@ Module(
                                                                                     StringLiteral(
                                                                                         ExprStringLiteral {
                                                                                             node_index: NodeIndex(None),
-                                                                                            range: 488..492,
+                                                                                            range: 501..505,
                                                                                             value: StringLiteralValue {
                                                                                                 inner: Single(
                                                                                                     StringLiteral {
-                                                                                                        range: 488..492,
+                                                                                                        range: 501..505,
                                                                                                         node_index: NodeIndex(None),
                                                                                                         value: "\u{b}",
                                                                                                         flags: StringLiteralFlags {
@@ -854,11 +901,11 @@ Module(
                                                                                     StringLiteral(
                                                                                         ExprStringLiteral {
                                                                                             node_index: NodeIndex(None),
-                                                                                            range: 494..498,
+                                                                                            range: 507..511,
                                                                                             value: StringLiteralValue {
                                                                                                 inner: Single(
                                                                                                     StringLiteral {
-                                                                                                        range: 494..498,
+                                                                                                        range: 507..511,
                                                                                                         node_index: NodeIndex(None),
                                                                                                         value: "\r",
                                                                                                         flags: StringLiteralFlags {
@@ -942,7 +989,7 @@ Module(
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |                 ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-9 | f"test {a \
+9 | f"{
   |
 
 
@@ -952,7 +999,7 @@ Module(
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |              ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-9 | f"test {a \
+9 | f"{
   |
 
 
@@ -962,7 +1009,7 @@ Module(
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |           ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-9 | f"test {a \
+9 | f"{
   |
 
 
@@ -972,7 +1019,7 @@ Module(
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |        ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-9 | f"test {a \
+9 | f"{
   |
 
 
@@ -982,7 +1029,7 @@ Module(
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |     ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-9 | f"test {a \
+9 | f"{
   |
 
 
@@ -991,57 +1038,67 @@ Module(
  7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
  8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
    |         ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
- 9 | f"test {a \
-10 |     } more"                        # line continuation
+ 9 | f"{
+10 |     1
    |
 
 
    |
  7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
  8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
- 9 | f"test {a \
+ 9 | f"{
+   |   ^ Syntax Error: Cannot use line breaks in non-triple-quoted f-string replacement fields on Python 3.11 (syntax was added in Python 3.12)
+10 |     1
+11 | }"
+   |
+
+
+   |
+10 |     1
+11 | }"
+12 | f"test {a \
    |           ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
    |
 
 
    |
- 9 | f"test {a \
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"test {a \
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
    |       ^^^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
-12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |
 
 
    |
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
-12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |     ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |
 
 
    |
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
-12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |
 
 
    |
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
-12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                      ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |
 
 
    |
-10 |     } more"                        # line continuation
-11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
-12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+13 |     } more"                        # line continuation
+14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                            ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |

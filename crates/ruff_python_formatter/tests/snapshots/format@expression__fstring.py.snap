@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/fstring.py
 ---
 ## Input
 ```python
@@ -2434,5 +2433,29 @@ error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python
 178 | f"foo {"'bar'"}"
     |        ^
 179 | f"foo {'"bar"'}"
+    |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot use line breaks in non-triple-quoted f-string replacement fields on Python 3.10 (syntax was added in Python 3.12)
+   --> fstring.py:572:8
+    |
+570 |         ttttteeeeeeeeest,
+571 |     ]
+572 | } more {
+    |        ^
+573 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+574 | }":
+    |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot use line breaks in non-triple-quoted f-string replacement fields on Python 3.10 (syntax was added in Python 3.12)
+   --> fstring.py:581:8
+    |
+579 |         ttttteeeeeeeeest,
+580 |     ]
+581 | } more {
+    |        ^
+582 |     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+583 | }":
     |
 warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.

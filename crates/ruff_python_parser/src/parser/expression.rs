@@ -21,10 +21,7 @@ use crate::string::{
 };
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
-use crate::{
-    InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,
-    UnsupportedSyntaxErrorKind,
-};
+use crate::{InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -1562,18 +1559,6 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
-    fn check_fstring_comments(&mut self, range: TextRange) {
-        self.unsupported_syntax_errors
-            .extend(self.tokens.in_range(range).iter().filter_map(|token| {
-                token.kind().is_comment().then_some(UnsupportedSyntaxError {
-                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                    range: token.range(),
-                    target_version: self.options.target_version,
-                })
-            }));
-    }
-
     /// Parses a list of f/t-string elements.
     ///
     /// # Panics
@@ -1852,6 +1837,9 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
         // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"{
+        //     1
+        // }"
         // f"test {a \
         //     } more"                        # line continuation
 
@@ -1873,6 +1861,9 @@ impl<'src> Parser<'src> {
         // f'outer {x:{"# not a comment"} }'
         // f"""{f'''{f'{"# not a comment"}'}'''}"""
         // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"""{
+        //     1
+        // }"""
         // f"escape outside of \t {expr}\n"
         // f"test\"abcd"
         // f"{1:\x64}"  # escapes are valid in the format spec
@@ -1887,6 +1878,9 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
         // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"{
+        //     1
+        // }"
         // f"test {a \
         //     } more"                        # line continuation
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
@@ -1918,13 +1912,37 @@ impl<'src> Parser<'src> {
                 .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
                 .unwrap_or(range);
 
+            let source = self.source[range].as_bytes();
+            let has_line_break =
+                !flags.is_triple_quoted() && memchr::memchr2(b'\n', b'\r', source).is_some();
+            let backslash_ranges = memchr::memchr_iter(b'\\', source)
+                .map(|slash_position| {
+                    let slash_position = TextSize::try_from(slash_position).unwrap();
+                    TextRange::at(range.start() + slash_position, '\\'.text_len())
+                })
+                .collect::<Vec<_>>();
+            let comment_ranges = self
+                .tokens
+                .in_range(range)
+                .iter()
+                .filter_map(|token| token.kind().is_comment().then_some(token.range()))
+                .collect::<Vec<_>>();
+
+            // Before Python 3.12, replacement fields could only span physical lines when the
+            // outer f-string was triple-quoted.
+            if has_line_break && backslash_ranges.is_empty() && comment_ranges.is_empty() {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak),
+                    TextRange::at(range.start(), '{'.text_len()),
+                );
+            }
+
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
-            for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
-                let slash_position = TextSize::try_from(slash_position).unwrap();
+            for backslash_range in backslash_ranges {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                    TextRange::at(range.start() + slash_position, '\\'.text_len()),
+                    backslash_range,
                 );
             }
 
@@ -1938,7 +1956,12 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            self.check_fstring_comments(range);
+            for comment_range in comment_ranges {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    comment_range,
+                );
+            }
         }
 
         ast::InterpolatedElement {
