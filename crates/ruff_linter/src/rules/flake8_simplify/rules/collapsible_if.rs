@@ -43,6 +43,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// if foo and bar:
 ///     ...
 /// ```
+/// ## Preview and Fix Safety
+/// When [preview] is enabled, the fix for this rule is considered
+/// as safe. When [preview] is not enabled, the fix is always
+/// considered unsafe.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## Options
 ///
