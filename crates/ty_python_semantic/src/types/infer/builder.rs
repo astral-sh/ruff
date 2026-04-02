@@ -21,7 +21,6 @@ use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
 
-use super::deferred;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
     FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
@@ -130,6 +129,7 @@ mod function;
 mod imports;
 mod named_tuple;
 mod paramspec_validation;
+mod post_inference;
 mod subscript;
 mod type_expression;
 mod typed_dict;
@@ -263,7 +263,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A set of functions that have been defined **and** called in this region.
     ///
     /// This is a set because the same function could be called multiple times in the same region.
-    /// This is mainly used in [`deferred::overloaded_function::check_overloaded_function`] to
+    /// This is mainly used in [`post_inference::overloaded_function::check_overloaded_function`] to
     /// check an overloaded function that is shadowed by a function with the same name in this
     /// scope but has been called before. For example:
     ///
@@ -680,12 +680,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
-                        deferred::function::check_function_definition(
+                        post_inference::function::check_function_definition(
                             &self.context,
                             *definition,
                             &|expr| self.file_expression_type(expr),
                         );
-                        deferred::overloaded_function::check_overloaded_function(
+                        post_inference::overloaded_function::check_overloaded_function(
                             &self.context,
                             ty,
                             *definition,
@@ -694,7 +694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &mut seen_overloaded_places,
                             &mut seen_public_functions,
                         );
-                        deferred::typeguard::check_type_guard_definition(
+                        post_inference::typeguard::check_type_guard_definition(
                             &self.context,
                             ty,
                             function.node(self.module()),
@@ -702,7 +702,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     DefinitionKind::Class(class_node) => {
-                        deferred::static_class::check_static_class_definitions(
+                        post_inference::static_class::check_static_class_definitions(
                             &self.context,
                             ty,
                             class_node.node(self.module()),
@@ -715,11 +715,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             for definition in &deferred_definitions {
-                deferred::dynamic_class::check_dynamic_class_definition(&self.context, *definition);
+                post_inference::dynamic_class::check_dynamic_class_definition(
+                    &self.context,
+                    *definition,
+                );
             }
 
             for function in &self.called_functions {
-                deferred::overloaded_function::check_overloaded_function(
+                post_inference::overloaded_function::check_overloaded_function(
                     &self.context,
                     Type::FunctionLiteral(*function),
                     function.definition(self.db()),
@@ -730,7 +733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
-            deferred::final_variable::check_final_without_value(&self.context, self.index);
+            post_inference::final_variable::check_final_without_value(&self.context, self.index);
         }
     }
 
@@ -1449,7 +1452,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
-            deferred::type_param_validation::check_no_default_after_typevar_tuple_pep695(
+            post_inference::type_param_validation::check_no_default_after_typevar_tuple_pep695(
                 &self.context,
                 type_params,
             );
