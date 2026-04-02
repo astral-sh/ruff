@@ -203,6 +203,11 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 /// # Panics
 /// If the first line is indented by less than the provided indent.
 pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
+    // The caller may provide an `indent` from source code by taking
+    // a range of text beginning with the start of a line. In Python,
+    // while a line may begin with form feeds, these do not contribute
+    // to the indentation. So we strip those here.
+    let indent = indent.trim_start_matches('\x0C');
     // Look at the indentation of the first non-empty line, to determine the "baseline" indentation.
     let mut first_comment_indent = None;
     let existing_indent_len = text
