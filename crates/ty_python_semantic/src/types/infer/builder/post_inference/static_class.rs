@@ -42,7 +42,7 @@ use crate::{
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
         generics::enclosing_generic_contexts,
-        infer::deferred::typed_dict::validate_typed_dict_class,
+        infer::builder::post_inference::typed_dict::validate_typed_dict_class,
         infer_definition_types,
         mro::StaticMroErrorKind,
         overrides,
