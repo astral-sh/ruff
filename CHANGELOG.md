@@ -7,27 +7,27 @@ Released on 2026-04-02.
 ### Preview features
 
 - \[`pyflakes`\] Flag annotated variable redeclarations as `F811` in preview mode ([#24244](https://github.com/astral-sh/ruff/pull/24244))
-- `RUF067`: Allow dunder-named assignments in non-strict mode ([#24089](https://github.com/astral-sh/ruff/pull/24089))
+- \[`ruff`\] Allow dunder-named assignments in non-strict mode for `RUF067` ([#24089](https://github.com/astral-sh/ruff/pull/24089))
 
 ### Bug fixes
 
-- Avoid re-using symbol in RUF024 fix ([#24316](https://github.com/astral-sh/ruff/pull/24316))
-- Disallow starred expressions as values of starred expressions ([#24280](https://github.com/astral-sh/ruff/pull/24280))
-- Fix UP008 nested class matching ([#24273](https://github.com/astral-sh/ruff/pull/24273))
-- Fix W391 fixes for consecutive empty notebook cells ([#24236](https://github.com/astral-sh/ruff/pull/24236))
-- Ignore pre-initialization references in SIM113 ([#24235](https://github.com/astral-sh/ruff/pull/24235))
-- Parenthesize expression in RUF050 fix ([#24234](https://github.com/astral-sh/ruff/pull/24234))
 - \[`flake8-errmsg`\] Avoid shadowing existing `msg` in fix for `EM101` ([#24363](https://github.com/astral-sh/ruff/pull/24363))
+- \[`flake8-simplify`\] Ignore pre-initialization references in `SIM113` ([#24235](https://github.com/astral-sh/ruff/pull/24235))
+- \[`pycodestyle`\] Fix `W391` fixes for consecutive empty notebook cells ([#24236](https://github.com/astral-sh/ruff/pull/24236))
+- \[`pyupgrade`\] Fix `UP008` nested class matching ([#24273](https://github.com/astral-sh/ruff/pull/24273))
 - \[`pyupgrade`\] Ignore strings with string-only escapes (`UP012`) ([#16058](https://github.com/astral-sh/ruff/pull/16058))
-- [ty] Include keyword-prefixed symbols in completions for attributes ([#24232](https://github.com/astral-sh/ruff/pull/24232))
-- `RUF072`: skip formfeeds on dedent ([#24308](https://github.com/astral-sh/ruff/pull/24308))
+- \[`ruff`\] `RUF072`: skip formfeeds on dedent ([#24308](https://github.com/astral-sh/ruff/pull/24308))
+- \[`ruff`\] Avoid re-using symbol in `RUF024` fix ([#24316](https://github.com/astral-sh/ruff/pull/24316))
+- \[`ruff`\] Parenthesize expression in `RUF050` fix ([#24234](https://github.com/astral-sh/ruff/pull/24234))
+- Disallow starred expressions as values of starred expressions ([#24280](https://github.com/astral-sh/ruff/pull/24280))
 
 ### Rule changes
 
-- Avoid rendering fix lines with trailing whitespace after `|` ([#24343](https://github.com/astral-sh/ruff/pull/24343))
-- Extend F507 to flag %-format strings with zero placeholders ([#24215](https://github.com/astral-sh/ruff/pull/24215))
-- Fix UP008 callable scope handling to support lambdas ([#24274](https://github.com/astral-sh/ruff/pull/24274))
-- `RUF010`: Mark fix as unsafe when it deletes a comment ([#24270](https://github.com/astral-sh/ruff/pull/24270))
+- \[`flake8-simplify`\] Suppress `SIM105` for `except*` before Python 3.12 ([#23869](https://github.com/astral-sh/ruff/pull/23869))
+- \[`pyflakes`\] Extend `F507` to flag `%`-format strings with zero placeholders ([#24215](https://github.com/astral-sh/ruff/pull/24215))
+- \[`pyupgrade`\] `UP018` should detect more unnecessarily wrapped literals (UP018) ([#24093](https://github.com/astral-sh/ruff/pull/24093))
+- \[`pyupgrade`\] Fix `UP008` callable scope handling to support lambdas ([#24274](https://github.com/astral-sh/ruff/pull/24274))
+- \[`ruff`\] `RUF010`: Mark fix as unsafe when it deletes a comment ([#24270](https://github.com/astral-sh/ruff/pull/24270))
 
 ### Formatter
 
@@ -35,21 +35,12 @@ Released on 2026-04-02.
 
 ### Documentation
 
-- [flake8-bugbear] Clarify RUF071 fix safety for non-path string comparisons ([#24149](https://github.com/astral-sh/ruff/pull/24149))
-- [flake8-type-checking] Clarify import cycle wording for TC001/TC002/TC003 ([#24322](https://github.com/astral-sh/ruff/pull/24322))
+- \[`flake8-bugbear`\] Clarify RUF071 fix safety for non-path string comparisons ([#24149](https://github.com/astral-sh/ruff/pull/24149))
+- \[`flake8-type-checking`\] Clarify import cycle wording for `TC001`/`TC002`/`TC003` ([#24322](https://github.com/astral-sh/ruff/pull/24322))
 
 ### Other changes
 
-- Add a "release-gate" step to the release workflow ([#24365](https://github.com/astral-sh/ruff/pull/24365))
-- Fetch the cargo-dist binary directly instead of using the installer ([#24258](https://github.com/astral-sh/ruff/pull/24258))
-- Only run the release-gate on workflow dispatch ([#24366](https://github.com/astral-sh/ruff/pull/24366))
-- Publish playgrounds using the `release-playground` environment ([#24223](https://github.com/astral-sh/ruff/pull/24223))
-- Update astral-sh/setup-uv action to v8 ([#24294](https://github.com/astral-sh/ruff/pull/24294))
-- Update dependency mkdocs-material to v9.7.6 ([#24285](https://github.com/astral-sh/ruff/pull/24285))
-- Use the `release` environment in `publish-versions` and `publish-wasm` ([#24218](https://github.com/astral-sh/ruff/pull/24218))
-- \[`flake8-simplify`\] Suppress `SIM105` for `except*` before Python 3.12 ([#23869](https://github.com/astral-sh/ruff/pull/23869))
-- \[`pyupgrade`\] UP018 should detect more unnecessarily wrapped literals (UP018) ([#24093](https://github.com/astral-sh/ruff/pull/24093))
-- publish installers to `/installers/ruff/latest` on the mirror ([#24247](https://github.com/astral-sh/ruff/pull/24247))
+- Avoid rendering fix lines with trailing whitespace after `|` ([#24343](https://github.com/astral-sh/ruff/pull/24343))
 
 ### Contributors
 
