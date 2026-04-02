@@ -477,9 +477,16 @@ fn ensure_unchanged_ast(
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
 
+    // Sort the errors by location to ensure the snapshot output is stable.
+    let mut formatted_unsupported_syntax_errors = formatted_unsupported_syntax_errors
+        .into_values()
+        .collect::<Vec<_>>();
+    formatted_unsupported_syntax_errors
+        .sort_by_key(|error| (error.range().start(), error.range().end()));
+
     let file = SourceFileBuilder::new(input_path.file_name().unwrap(), formatted_code).finish();
     let diagnostics = formatted_unsupported_syntax_errors
-        .values()
+        .iter()
         .map(|error| {
             let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
             let span = Span::from(file.clone()).with_range(error.range());
