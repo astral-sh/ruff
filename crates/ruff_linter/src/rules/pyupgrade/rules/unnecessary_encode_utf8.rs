@@ -327,7 +327,7 @@ fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locat
                     (true, true) => format!("{escaped}{second}{third}"),
                 };
 
-                if octal_codepoint.parse::<u8>().is_err() {
+                if u8::from_str_radix(&octal_codepoint, 8).is_err() {
                     return true;
                 }
 
