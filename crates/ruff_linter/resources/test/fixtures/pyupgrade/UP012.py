@@ -129,3 +129,9 @@ x: '"foo".encode("utf-8")'
 
 "\
 " "\u0001".encode()
+
+# Regression https://github.com/astral-sh/ruff/issues/24389
+# (Should not panic)
+IMR_HEADER = "$IMURAW\0".encode("ascii")
+# No error
+"\000\N{DIGIT ONE}".encode()
