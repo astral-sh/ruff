@@ -2,6 +2,7 @@ use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
+    extract_new_class_explicit_bases,
 };
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;

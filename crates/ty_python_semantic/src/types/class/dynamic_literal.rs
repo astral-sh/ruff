@@ -110,6 +110,40 @@ pub enum DynamicClassAnchor<'db> {
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
+/// Extract the explicit bases from a `types.new_class()` `bases` argument.
+///
+/// This helper accepts tuple and list literals directly so we preserve precise base types for the
+/// common cases, and otherwise falls back to a fixed-length iterable extraction when the argument's
+/// inferred type provides one.
+pub(crate) fn extract_new_class_explicit_bases<'db>(
+    db: &'db dyn Db,
+    bases_arg: &ast::Expr,
+    bases_type: Type<'db>,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    match bases_arg {
+        ast::Expr::Tuple(tuple) => Some(
+            tuple
+                .elts
+                .iter()
+                .map(&mut expression_type)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        ),
+        ast::Expr::List(list) => Some(
+            list.elts
+                .iter()
+                .map(expression_type)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        ),
+        _ => bases_type.try_iterate(db).ok().and_then(|spec| {
+            spec.as_fixed_length()
+                .map(|tuple| tuple.all_elements().into())
+        }),
+    }
+}
+
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
     /// Returns the definition where this class is created, if it was assigned to a variable.
@@ -177,31 +211,11 @@ impl<'db> DynamicClassLiteral<'db> {
                 .is_some_and(|function| function.is_known(db, KnownFunction::NewClass));
 
             if is_new_class {
-                return match bases_arg {
-                    ast::Expr::Tuple(tuple) => tuple
-                        .elts
-                        .iter()
-                        .map(|elt| definition_expression_type(db, definition, elt))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
-                    ast::Expr::List(list) => list
-                        .elts
-                        .iter()
-                        .map(|elt| definition_expression_type(db, definition, elt))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
-                    _ => {
-                        let bases_type = definition_expression_type(db, definition, bases_arg);
-                        bases_type
-                            .try_iterate(db)
-                            .ok()
-                            .and_then(|spec| {
-                                spec.as_fixed_length()
-                                    .map(|tuple| tuple.all_elements().into())
-                            })
-                            .unwrap_or_else(|| Box::from([Type::unknown()]))
-                    }
-                };
+                let bases_type = definition_expression_type(db, definition, bases_arg);
+                return extract_new_class_explicit_bases(db, bases_arg, bases_type, |expr| {
+                    definition_expression_type(db, definition, expr)
+                })
+                .unwrap_or_else(|| Box::from([Type::unknown()]));
             }
 
             // Use `definition_expression_type` for deferred inference support.
