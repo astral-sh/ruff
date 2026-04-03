@@ -490,10 +490,12 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
             }
-            "async_timeout" if self.version >= PythonVersion::PY311 => {
-                if let Some(operation) = self.try_replace(ASYNC_TIMEOUT_TO_ASYNCIO_311, "asyncio") {
-                    operations.push(operation);
-                }
+            "async_timeout"
+                if self.version >= PythonVersion::PY311
+                    && let Some(operation) =
+                        self.try_replace(ASYNC_TIMEOUT_TO_ASYNCIO_311, "asyncio") =>
+            {
+                operations.push(operation);
             }
             "pipes" => {
                 if let Some(operation) = self.try_replace(PIPES_TO_SHLEX, "shlex") {
