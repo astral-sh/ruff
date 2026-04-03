@@ -389,7 +389,6 @@ pub fn discover_src_layout_roots(
 
     let src = project_dir.join("src");
     if system.is_directory(&src) && !is_package(&src) {
-        tracing::debug!("Including `./src` as source root for `{project_dir}`");
         roots.push(src);
     }
 
@@ -399,14 +398,12 @@ pub fn discover_src_layout_roots(
             && !is_package(&project_name_dir)
             && !roots.contains(&project_name_dir)
         {
-            tracing::debug!("Including `./{name}` as source root for `{project_dir}`");
             roots.push(project_name_dir);
         }
     }
 
     let python = project_dir.join("python");
     if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
-        tracing::debug!("Including `./python` as source root for `{project_dir}`");
         roots.push(python);
     }
 
@@ -470,18 +467,13 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         // not let something cursed and spooky happen, ok? d
         let has_project_config = system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"));
-        if isnt_regular_package || has_project_config {
-            // When a project config is found, also add src-layout heuristic directories
-            // (src/, python/) so imports can resolve against them.
-            if has_project_config {
-                for root in discover_src_layout_roots(system, &candidate_path, None) {
-                    if root != candidate_path {
-                        if let Ok(sp) = SearchPath::first_party(system, root) {
-                            search_paths.push(sp);
-                        }
-                    }
+        if has_project_config {
+            for root in discover_src_layout_roots(system, &candidate_path, None) {
+                if let Ok(sp) = SearchPath::first_party(system, root) {
+                    search_paths.push(sp);
                 }
             }
+        } else if isnt_regular_package {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             search_paths.push(search_path);
         }
@@ -547,12 +539,13 @@ fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         {
             // If the importing file is under a src-layout subdirectory, prefer that
             // so module names don't include the subdirectory prefix (e.g. `src.foo`).
+            // `discover_src_layout_roots` returns subdirs first, then the project dir,
+            // so the first match that contains the importing file wins.
             for root in discover_src_layout_roots(system, &candidate_path, None) {
-                if root != candidate_path && importing_path.starts_with(&root) {
+                if importing_path.starts_with(&root) {
                     return SearchPath::first_party(system, root).ok();
                 }
             }
-            return SearchPath::first_party(system, candidate_path).ok();
         }
     }
 

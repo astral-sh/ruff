@@ -308,7 +308,13 @@ impl Options {
                 .map(|root| root.absolute(project_root, system))
                 .collect()
         } else {
-            discover_src_layout_roots(system, project_root, Some(project_name))
+            let roots = discover_src_layout_roots(system, project_root, Some(project_name));
+            for root in &roots {
+                if root.as_path() != project_root {
+                    tracing::debug!("Including `{root}` as source root for `{project_root}`");
+                }
+            }
+            roots
         };
 
         // collect the existing site packages
