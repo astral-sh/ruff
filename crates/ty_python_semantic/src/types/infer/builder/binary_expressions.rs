@@ -40,11 +40,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             node_index: _,
         } = binary;
 
-        let (left_ty, right_ty) = match self.infer_binary_expression_operand_types(left, *op, right)
-        {
-            BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
-            BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
-        };
+        let (left_ty, right_ty) =
+            match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
+                BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
+                BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
+            };
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
@@ -108,12 +108,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         left: &ast::Expr,
         op: ast::Operator,
         right: &ast::Expr,
+        tcx: TypeContext<'db>,
     ) -> BinaryExpressionOperandTypes<'db> {
+        // As a special case, pass `tcx` to binary operands that are collection literals/displays.
+        // Note that it's not correct to pass it to all binary operands, for example:
+        // ```
+        // x: list[str] = ["x"] * 3
+        // ```
+        // It doesn't make sense to pass the list type context to the `3` expression. It wouldn't
+        // have any effect in this case, but it could in more complicated cases.
+        // TODO: When we support passing `tcx` through generic method calls, we can remove this
+        // special case and handle the relevant dunder method instead.
+        let operand_tcx = |expr: &ast::Expr| -> TypeContext<'db> {
+            match expr {
+                ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_) => tcx,
+                // Also pass `tcx` to nested binary expressions.
+                ast::Expr::BinOp(_) => tcx,
+                _ => TypeContext::default(),
+            }
+        };
+
         // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
         // so we can use bidirectional inference on the literal before calling the synthesized
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
-            let right_ty = self.infer_expression(right, TypeContext::default());
+            let right_ty = self.infer_expression(right, operand_tcx(right));
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
@@ -128,12 +153,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // If the TypedDict update path rejects the literal, fall back to ordinary inference
             // even though that means re-inferring the literal without TypedDict context.
             return BinaryExpressionOperandTypes::Inferred(
-                self.infer_expression(left, TypeContext::default()),
+                self.infer_expression(left, operand_tcx(left)),
                 right_ty,
             );
         }
 
-        let left_ty = self.infer_expression(left, TypeContext::default());
+        let left_ty = self.infer_expression(left, operand_tcx(left));
         if op == ast::Operator::BitOr
             && let Type::TypedDict(typed_dict) = left_ty
             && matches!(right, ast::Expr::Dict(_))
@@ -149,7 +174,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         BinaryExpressionOperandTypes::Inferred(
             left_ty,
-            self.infer_expression(right, TypeContext::default()),
+            self.infer_expression(right, operand_tcx(right)),
         )
     }
 

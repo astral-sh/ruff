@@ -2308,11 +2308,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             // for negative and positive numbers
-            ast::Expr::UnaryOp(u)
-                if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                    && u.operand.is_number_literal_expr() =>
+            ast::Expr::UnaryOp(unary @ ast::ExprUnaryOp { op, operand, .. })
+                if matches!(op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                    && matches!(
+                        &**operand,
+                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(_),
+                            ..
+                        })
+                    ) =>
             {
-                let ty = self.infer_unary_expression(u);
+                let ty = self.infer_unary_expression(unary);
                 self.store_expression_type(parameters, ty);
                 ty
             }

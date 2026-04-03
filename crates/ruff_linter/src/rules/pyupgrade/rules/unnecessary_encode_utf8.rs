@@ -327,11 +327,13 @@ fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locat
                     (true, true) => format!("{escaped}{second}{third}"),
                 };
 
-                if octal_codepoint.parse::<u8>().is_err() {
+                if u8::from_str_radix(&octal_codepoint, 8).is_err() {
                     return true;
                 }
 
-                cursor.skip_bytes(octal_codepoint.len());
+                // Cursor is currently at first octal digit, so we just
+                // skip the remaining.
+                cursor.skip_bytes(octal_codepoint.len().saturating_sub(1));
             }
             _ => {}
         }

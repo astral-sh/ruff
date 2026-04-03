@@ -43,11 +43,56 @@ def f[T](x: T, cond: bool) -> T | list[T]:
 
 l5: int | list[int] = f(1, True)
 
-a: list[int] = [1, 2, *(3, 4, 5)]
-reveal_type(a)  # revealed: list[int]
+x: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(x)  # revealed: list[int]
 
-b: list[list[int]] = [[1], [2], *([3], [4])]
-reveal_type(b)  # revealed: list[list[int]]
+x: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(x)  # revealed: list[list[int]]
+
+x: list[list[int | str]] = [[1], [2]] * 3
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[list[int | str]] = 3 * ([[1]] + [[2]])
+reveal_type(x)  # revealed: list[list[int | str]]
+
+x: list[int | str] = 3 * ["x" for _ in range(3)]
+reveal_type(x)  # revealed: list[int | str]
+
+# Tuple elements are inferred individually, but type context can prevent e.g. `int` widening.
+x: tuple[list[Literal[1]]] = (list1(1),)
+reveal_type(x)  # revealed: tuple[list[Literal[1]]]
+
+x: tuple[list[Literal[1]], ...] = (list1(1),) * 3
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: tuple[list[Literal[1]], ...] = 3 * ((list1(1),) + (list1(1),))
+reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
+
+x: set[int | str] = {1, 2} | {3, 4}
+reveal_type(x)  # revealed: set[int | str]
+
+x: set[int | str] = {42 for _ in range(3)}
+reveal_type(x)  # revealed: set[int | str]
+
+x: dict[int | str, int | str] = {1: 2} | {3: 4}
+reveal_type(x)  # revealed: dict[int | str, int | str]
+
+x: dict[int | str, int | str] = {str(i): i for i in range(3)}
+reveal_type(x)  # revealed: dict[int | str, int | str]
+
+# TODO: We currently eagerly pass type context to collection literals on either side of a binary
+# operator. That makes the cases above work, but it's not generally sound. For example, it gives the
+# wrong result in this case.
+class X:
+    def __add__(self, _: list[int]) -> list[int | str]:
+        return []
+
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `X` and `list[int | str]`"
+x: list[int | str] = X() + [1]
+
+# TODO: We also don't yet support generic function calls like this.
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[int | str]`"
+x: list[int | str] = list1(42) * 3
 ```
 
 `typed_dict.py`:
@@ -87,6 +132,8 @@ reveal_type(d4_invalid_dict)  # revealed: TD
 # special-case this pattern to match the behavior of `d5_literal`.
 d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+
+d6_dict: TD = {"x": 1} | {"x": 2}
 
 def return_literal() -> TD:
     return {"x": 1}
