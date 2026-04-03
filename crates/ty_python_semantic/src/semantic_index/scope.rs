@@ -3,14 +3,13 @@ use std::ops::Range;
 use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     Db,
     ast_node_ref::AstNodeRef,
     node_key::NodeKey,
-    semantic_index::{
-        SemanticIndex, reachability_constraints::ScopedReachabilityConstraintId, semantic_index,
-    },
+    semantic_index::{SemanticIndex, semantic_index},
     types::{GenericContext, binding_type, infer_definition_types},
 };
 
@@ -112,9 +111,6 @@ pub(crate) struct Scope {
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
 
-    /// The constraint that determines the reachability of this scope.
-    reachability: ScopedReachabilityConstraintId,
-
     /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
     in_type_checking_block: bool,
 }
@@ -124,14 +120,12 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
         in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
-            reachability,
             in_type_checking_block,
         }
     }
@@ -162,10 +156,6 @@ impl Scope {
 
     pub(crate) fn is_eager(&self) -> bool {
         self.kind().is_eager()
-    }
-
-    pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
-        self.reachability
     }
 
     pub(crate) fn in_type_checking_block(&self) -> bool {
@@ -492,6 +482,33 @@ impl NodeWithScopeKind {
             Self::SetComprehension(comp) => Some(comp.index()),
             Self::DictComprehension(comp) => Some(comp.index()),
             Self::GeneratorExpression(generator) => Some(generator.index()),
+        }
+    }
+
+    pub(crate) fn range(&self, module: &ParsedModuleRef) -> Option<TextRange> {
+        match self {
+            Self::Module => None,
+            Self::Class(class) => Some(class.node(module).range()),
+            Self::ClassTypeParameters(class) => {
+                class.node(module).type_params.as_deref().map(Ranged::range)
+            }
+            Self::Function(function) => Some(function.node(module).range()),
+            Self::FunctionTypeParameters(function) => function
+                .node(module)
+                .type_params
+                .as_deref()
+                .map(Ranged::range),
+            Self::TypeAlias(type_alias) => Some(type_alias.node(module).range()),
+            Self::TypeAliasTypeParameters(type_alias) => type_alias
+                .node(module)
+                .type_params
+                .as_deref()
+                .map(Ranged::range),
+            Self::Lambda(lambda) => Some(lambda.node(module).range()),
+            Self::ListComprehension(comp) => Some(comp.node(module).range()),
+            Self::SetComprehension(comp) => Some(comp.node(module).range()),
+            Self::DictComprehension(comp) => Some(comp.node(module).range()),
+            Self::GeneratorExpression(generator) => Some(generator.node(module).range()),
         }
     }
 }
