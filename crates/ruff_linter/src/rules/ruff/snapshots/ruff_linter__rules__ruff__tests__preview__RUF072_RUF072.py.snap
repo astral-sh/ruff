@@ -349,3 +349,25 @@ help: Remove the `finally` clause
     -     pass
 175 + 1
 176 + 2
+177 |
+178 |
+179 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:186:1
+    |
+184 |   try:
+185 |       1
+186 | / finally:
+187 | |     pass
+    | |________^
+    |
+help: Remove the `finally` clause
+181 |
+182 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+183 | # (`try` is preceded by a form feed below)
+    - try:
+    -     1
+    - finally:
+    -     pass
+184 + 1

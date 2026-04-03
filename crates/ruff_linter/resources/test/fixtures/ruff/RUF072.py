@@ -177,3 +177,11 @@ try:
     2
 finally:
     pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/24373
+# (`try` is preceded by a form feed below)
+try:
+    1
+finally:
+    pass
