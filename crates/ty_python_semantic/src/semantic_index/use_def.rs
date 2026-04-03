@@ -335,7 +335,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, BasicBlock)>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -391,6 +391,12 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// This is used by [`UseDefMap::can_implicitly_return_none`].
     end_of_scope_reachability: ScopedReachabilityConstraintId,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct BasicBlock {
+    reachability: ScopedReachabilityConstraintId,
+    in_type_checking_block: bool,
 }
 
 pub(crate) enum ApplicableConstraints<'map, 'db> {
@@ -501,8 +507,18 @@ impl<'db> UseDefMap<'db> {
         !self
             .range_reachability
             .iter()
-            .any(|&(entry_range, constraint)| {
-                entry_range.contains_range(range) && !self.is_reachable(db, constraint)
+            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
+            .any(|&(entry_range, BasicBlock { reachability, .. })| {
+                entry_range.contains_range(range) && !self.is_reachable(db, reachability)
+            })
+    }
+
+    pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
+        self.range_reachability
+            .iter()
+            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
+            .any(|&(entry_range, block)| {
+                block.in_type_checking_block && entry_range.contains_range(range)
             })
     }
 
@@ -935,7 +951,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
-    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, BasicBlock)>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
@@ -1441,17 +1457,26 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_definition_ids_used(binding_definition_ids.into_iter());
     }
 
-    pub(super) fn record_range_reachability(&mut self, range: TextRange) {
+    pub(super) fn record_range_reachability(
+        &mut self,
+        range: TextRange,
+        is_type_checking_block: bool,
+    ) {
+        let this_basic_block = BasicBlock {
+            reachability: self.reachability,
+            in_type_checking_block: is_type_checking_block,
+        };
+
         // If the last entry has the same reachability constraint, extend it
         // to cover this range too, collapsing consecutive statements in the
         // same basic block into a single entry.
-        if let Some((last_range, last_reachability)) = self.range_reachability.last_mut()
-            && *last_reachability == self.reachability
+        if let Some((last_range, last_basic_block)) = self.range_reachability.last_mut()
+            && *last_basic_block == this_basic_block
         {
             *last_range = last_range.cover(range);
             return;
         }
-        self.range_reachability.push((range, self.reachability));
+        self.range_reachability.push((range, this_basic_block));
     }
 
     pub(super) fn snapshot_enclosing_state(
@@ -1702,8 +1727,8 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for &(_, constraint) in &self.range_reachability {
-            self.reachability_constraints.mark_used(constraint);
+        for &(_, BasicBlock { reachability, .. }) in &self.range_reachability {
+            self.reachability_constraints.mark_used(reachability);
         }
         for symbol_state in &mut self.symbol_states {
             symbol_state.finish(&mut self.reachability_constraints);
