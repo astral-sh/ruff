@@ -1789,20 +1789,10 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut converter = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
-                    if self
-                        .dataclass_params(db)
-                        .map(|params| params.field_specifiers(db).is_empty())
-                        .unwrap_or(false)
-                    {
-                        // This happens when constructing a `dataclass` with a `dataclass_transform`
-                        // without defining the `field_specifiers`, meaning it should ignore
-                        // `dataclasses.field` and `dataclasses.Field`.
-                    } else {
-                        init = field.init(db);
-                        kw_only = field.kw_only(db);
-                        alias = field.alias(db);
-                        converter = field.converter(db);
-                    }
+                    init = field.init(db);
+                    kw_only = field.kw_only(db);
+                    alias = field.alias(db);
+                    converter = field.converter(db);
                 }
 
                 let kind = match field_policy {
