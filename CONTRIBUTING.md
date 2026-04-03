@@ -265,6 +265,46 @@ Once you've completed the code for the rule itself, you can define tests with th
 
 1. Run `cargo test` again to ensure that your test passes.
 
+### Example: Adding an auto-fix
+
+Sometimes a lint violation has a natural fix in the form of an edit to the
+source code. To surface this suggestion to the user, you will need to attach
+a `Fix` to the diagnostic using one of the helper methods on `DiagnosticGuard` found in `crates/ruff_linter/src/checkers/ast/mod.rs` (e.g. `set_fix`).
+
+You will also need to decide when to offer this fix
+and whether it is safe or unsafe. Please refer to the documentation on
+[fix safety](https://docs.astral.sh/ruff/linter/#fix-safety) to determine
+whether to offer a safe or unsafe fix. If a fix is (sometimes) unsafe,
+update the rule's documentation with an explanation under the heading
+`## Fix safety`.
+
+Often the nontrivial work lies in generating
+the new source code in the form of an `Edit`.
+There are three main ways to do this:
+
+1. **AST-based edits**. Here we construct the AST node that we wish
+    the new source code to parse to, and then generate the text using a method on
+    `checker.generator()`. The benefit of such edits is that they should essentially
+    never introduce syntax errors and they will have predictable formatting. On the
+    other hand, it can be cumbersome to build an AST node by hand, and one has less
+    fine-grained control over comments.
+1. **CST-based edits**. This is similar to
+    the above except that one leverages LibCST to first parse the source
+    into a concrete syntax tree and then modifies it as needed. This
+    retains more of the formatting of the original source while retaining
+    the other benefits of AST-based edits. However, it introduces
+    overhead.
+1. **Text-based edits**. Here we directly construct the replacement
+    text as a string. This gives you the most control over what the
+    edit will look like, and is often more performant. However,
+    it can be much more difficult to ensure that the fix does not
+    introduce syntax errors, especially on unusual source code.
+    If you adopt this approach, be sure to add even more test fixtures
+    than usual.
+
+You can find helpers for common edits in `crates/ruff_linter/src/fix/edits.rs`
+and `crates/ruff_linter/src/fix/codemods.rs`.
+
 ### Example: Adding a new configuration option
 
 Ruff's user-facing settings live in a few different places.
