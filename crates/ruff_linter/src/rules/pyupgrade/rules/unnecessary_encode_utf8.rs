@@ -331,7 +331,9 @@ fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locat
                     return true;
                 }
 
-                cursor.skip_bytes(octal_codepoint.len());
+                // Cursor is currently at first octal digit, so we just
+                // skip the remaining.
+                cursor.skip_bytes(octal_codepoint.len().saturating_sub(1));
             }
             _ => {}
         }
