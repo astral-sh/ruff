@@ -3314,6 +3314,46 @@ def f(c: C[int]) -> None:
     takes_c(c)
 ```
 
+### Recursive generic protocols with multiple growing self-type wrappers
+
+This regression test covers <https://github.com/astral-sh/ty/issues/3208>. Unlike issue #1736, the
+recursion alternates between different wrappers rather than repeating the same one, so we still need
+specialization-time recursion guards to stop growth like `Factory[Tagged[Wrapped[Tagged[...]]]]`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Base[I, O]:
+    def run(self, input: I) -> O:
+        raise NotImplementedError
+
+class Impl[I, O](Base[I, O]):
+    def run(self, input: I) -> O:
+        raise NotImplementedError
+
+class Tagged[T]: ...
+class Wrapped[T]: ...
+
+class Factory[I, O](Protocol):
+    def create(self) -> Base[I, O]: ...
+    def tag(self) -> "Factory[Tagged[I], O]":
+        return TaggedFactory(self)
+
+    def wrap(self) -> "Factory[Wrapped[I], O]": ...
+
+class TaggedFactory[I, O](Factory[Tagged[I], O]):
+    def __init__(self, inner: Factory[I, O]):
+        pass
+
+    def create(self) -> Impl[Tagged[I], O]:
+        raise NotImplementedError
+```
+
 ### Recursive legacy generic protocol
 
 ```py

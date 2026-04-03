@@ -23,7 +23,8 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, ProtocolRelationVisitor,
+    TypeRelationChecker,
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
@@ -498,11 +499,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
+            self.with_protocol_recursion_guard(db, ty, protocol, || {
+                self.check_protocol_interface_pair(
+                    db,
+                    source_protocol.interface(db),
+                    protocol.interface(db),
+                )
+            })
         } else {
             protocol
                 .inner
@@ -720,12 +723,14 @@ impl<'db> ProtocolInstanceType<'db> {
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
             let materialization_visitor = ApplyTypeMappingVisitor::default();
+            let protocol_relation_visitor = ProtocolRelationVisitor::default(&constraints);
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
                 &relation_visitor,
                 &disjointness_visitor,
                 &materialization_visitor,
+                &protocol_relation_visitor,
             );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
