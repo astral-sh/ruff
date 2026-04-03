@@ -105,6 +105,7 @@ fn is_relevant_module(module: &str) -> bool {
     matches!(
         module,
         "collections"
+            | "async_timeout"
             | "pipes"
             | "mypy_extensions"
             | "typing_extensions"
@@ -346,6 +347,7 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
 ];
 
 const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
+const ASYNC_TIMEOUT_TO_ASYNCIO_311: &[&str] = &["timeout", "timeout_at"];
 
 // Python 3.12+
 
@@ -485,6 +487,11 @@ impl<'a> ImportReplacer<'a> {
         match self.module {
             "collections" => {
                 if let Some(operation) = self.try_replace(COLLECTIONS_TO_ABC, "collections.abc") {
+                    operations.push(operation);
+                }
+            }
+            "async_timeout" if self.version >= PythonVersion::PY311 => {
+                if let Some(operation) = self.try_replace(ASYNC_TIMEOUT_TO_ASYNCIO_311, "asyncio") {
                     operations.push(operation);
                 }
             }

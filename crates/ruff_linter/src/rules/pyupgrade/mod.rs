@@ -424,6 +424,33 @@ mod tests {
     }
 
     #[test]
+    fn deprecated_import_async_timeout_py311() -> Result<()> {
+        let snapshot = "UP035_async_timeout_py311";
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP035.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..settings::LinterSettings::for_rule(Rule::DeprecatedImport)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn deprecated_import_async_timeout_not_applied_py310() -> Result<()> {
+        let diagnostics = test_snippet(
+            "from async_timeout import timeout, timeout_at",
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY310.into(),
+                ..settings::LinterSettings::for_rule(Rule::DeprecatedImport)
+            },
+        );
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn i002_conflict() {
         let diagnostics = test_snippet(
             "from pipes import quote, Template",

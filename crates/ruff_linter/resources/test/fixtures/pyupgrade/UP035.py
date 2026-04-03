@@ -113,6 +113,21 @@ from typing_extensions import deprecated
 # UP035 on py313+ only
 from typing_extensions import get_type_hints
 
+# UP035 on py311+ only
+from async_timeout import timeout
+
+# UP035 on py311+ only
+from async_timeout import timeout_at
+
+# UP035 on py311+ only
+from async_timeout import timeout, timeout_at
+
+# UP035 on py311+ only
+from async_timeout import timeout as t
+
+# UP035 on py311+ only
+from async_timeout import timeout, wait_for
+
 # https://github.com/astral-sh/ruff/issues/15780
 from typing_extensions import is_typeddict
 # https://github.com/astral-sh/ruff/pull/15800#pullrequestreview-2580704217
