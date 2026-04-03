@@ -335,6 +335,8 @@ pub enum KnownModule {
     TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
+    #[strum(serialize = "unittest.case")]
+    UnittestCase,
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
     Uuid,
@@ -389,6 +391,7 @@ impl KnownModule {
             Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
+            Self::UnittestCase => "unittest.case",
             Self::UnittestMock => "unittest.mock",
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
