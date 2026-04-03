@@ -879,6 +879,11 @@ def sink(x: object) -> None: ...
 def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
     if isinstance(value, dict):
         sink(value.items())
+        value.clear()
+
+def narrow_dict_items(value: dict[str, Any] | Iterable[tuple[str, Any]]) -> None:
+    if isinstance(value, dict):
+        value.clear()
 
 def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
     if isinstance(choices, dict):

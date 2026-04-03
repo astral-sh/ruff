@@ -145,6 +145,7 @@ impl ClassInfoConstraintFunction {
     fn generate_constraint<'db>(
         self,
         db: &'db dyn Db,
+        subject_ty: Type<'db>,
         classinfo: Type<'db>,
         is_positive: bool,
     ) -> Option<Type<'db>> {
@@ -152,9 +153,13 @@ impl ClassInfoConstraintFunction {
             ClassInfoConstraintFunction::IsInstance => {
                 let constraint = Type::instance(db, class.top_materialization(db));
                 if class_literal_matches_typed_dict_runtime_supertype(db, class) {
+                    let typed_dict_fallback = IntersectionBuilder::new(db)
+                        .add_positive(typed_dict_fallback_portion(db, subject_ty))
+                        .add_positive(Type::TypedDictTop)
+                        .build();
                     UnionBuilder::new(db)
                         .add(constraint)
-                        .add(Type::TypedDictTop)
+                        .add(typed_dict_fallback)
                         .build()
                 } else {
                     constraint
@@ -167,7 +172,7 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => {
-                self.generate_constraint(db, alias.value_type(db), is_positive)
+                self.generate_constraint(db, subject_ty, alias.value_type(db), is_positive)
             }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -201,6 +206,7 @@ impl ClassInfoConstraintFunction {
                     for element in intersection.positive(db) {
                         builder = builder.add_positive(self.generate_constraint(
                             db,
+                            subject_ty,
                             *element,
                             is_positive,
                         )?);
@@ -212,16 +218,15 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint(db, *element, is_positive)
+                self.generate_constraint(db, subject_ty, *element, is_positive)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, bound, is_positive)
+                        self.generate_constraint(db, subject_ty, bound, is_positive)
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, constraints.as_type(db), is_positive)
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => self
+                        .generate_constraint(db, subject_ty, constraints.as_type(db), is_positive),
                 }
             }
 
@@ -232,9 +237,9 @@ impl ClassInfoConstraintFunction {
             Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
                 UnionType::try_from_elements(
                     db,
-                    tuple
-                        .iter_all_elements()
-                        .map(|element| self.generate_constraint(db, element, is_positive)),
+                    tuple.iter_all_elements().map(|element| {
+                        self.generate_constraint(db, subject_ty, element, is_positive)
+                    }),
                 )
             }),
 
@@ -249,11 +254,12 @@ impl ClassInfoConstraintFunction {
                         if element.is_none(db) {
                             self.generate_constraint(
                                 db,
+                                subject_ty,
                                 KnownClass::NoneType.to_class_literal(db),
                                 is_positive,
                             )
                         } else {
-                            self.generate_constraint(db, element, is_positive)
+                            self.generate_constraint(db, subject_ty, element, is_positive)
                         }
                     }),
                 )
@@ -262,17 +268,22 @@ impl ClassInfoConstraintFunction {
             Type::SpecialForm(form) => match form {
                 SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
                     db,
+                    subject_ty,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
+                    subject_ty,
                     KnownClass::Tuple.to_class_literal(db),
                     is_positive,
                 ),
-                SpecialFormType::Type => {
-                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db), is_positive)
-                }
+                SpecialFormType::Type => self.generate_constraint(
+                    db,
+                    subject_ty,
+                    KnownClass::Type.to_class_literal(db),
+                    is_positive,
+                ),
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
@@ -364,6 +375,56 @@ impl<'db> Conjunctions<'db> {
             intersection = intersection.add_positive(conjunct);
         }
         intersection.build()
+    }
+}
+
+/// Return the portion of a subject type that should preserve the `Top[TypedDict]` fallback arm
+/// for dict-like `isinstance()` narrowing.
+///
+/// This keeps explicit `TypedDict` content and gradual/top-like sources such as `object`,
+/// `Any`/`Unknown`, and unconstrained type variables, while excluding ordinary structural
+/// types like `Mapping` that should not retain a `TypedDict` possibility.
+fn typed_dict_fallback_portion<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    let ty = ty.resolve_type_alias(db);
+
+    match ty {
+        Type::Union(union) => union.map(db, |element| typed_dict_fallback_portion(db, *element)),
+        Type::Intersection(intersection)
+            if intersection
+                .positive(db)
+                .iter()
+                .all(|element| preserves_typed_dict_fallback(db, *element)) =>
+        {
+            ty
+        }
+        _ if preserves_typed_dict_fallback(db, ty) => ty,
+        _ => Type::Never,
+    }
+}
+
+/// Return `true` if this type should keep participating in the `Top[TypedDict]` fallback arm
+/// produced by dict-like `isinstance()` narrowing.
+///
+/// The intent is to preserve the fallback only for types where it still models a real
+/// possibility after narrowing, and to reject interface-only types like `Mapping` or
+/// `Iterable` that would otherwise create impossible `... & Top[TypedDict]` intersections.
+fn preserves_typed_dict_fallback<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Dynamic(_) | Type::Divergent(_) | Type::TypedDict(_) | Type::TypedDictTop => true,
+        Type::NominalInstance(instance) => instance.is_object(),
+        Type::TypeVar(bound_typevar) => bound_typevar
+            .typevar(db)
+            .bound_or_constraints(db)
+            .is_none_or(|bound_or_constraints| match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    preserves_typed_dict_fallback(db, bound)
+                }
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| preserves_typed_dict_fallback(db, *constraint)),
+            }),
+        _ => false,
     }
 }
 
@@ -1611,10 +1672,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
 
                 let function = function.into_classinfo_constraint_function()?;
+                let first_arg_ty = inference.expression_type(first_arg_node);
 
                 function
                     .generate_constraint(
                         self.db,
+                        first_arg_ty,
                         inference.expression_type(second_arg),
                         is_positive,
                     )
@@ -1750,6 +1813,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let mapping_type = ClassInfoConstraintFunction::IsInstance
             .generate_constraint(
                 self.db,
+                Type::object(),
                 KnownClass::Mapping.to_class_literal(self.db),
                 is_positive,
             )?
