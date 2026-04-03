@@ -13,28 +13,29 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/function
 ## mdtest_snippet.py
 
 ```
-1 | from typing_extensions import reveal_type
-2 | 
-3 | def f[T: int](x: T) -> T:
-4 |     return x
-5 | 
-6 | reveal_type(f(1))  # revealed: Literal[1]
-7 | reveal_type(f(True))  # revealed: Literal[True]
-8 | # error: [invalid-argument-type]
-9 | reveal_type(f("string"))  # revealed: Unknown
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def f[T: int](x: T) -> T:
+ 4 |     return x
+ 5 | 
+ 6 | reveal_type(f(1))  # revealed: Literal[1]
+ 7 | reveal_type(f(True))  # revealed: Literal[True]
+ 8 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int & Unknown`, found `Literal["string"]`"
+ 9 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`"
+10 | reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 # Diagnostics
 
 ```
 error[invalid-argument-type]: Argument to function `f` is incorrect
- --> src/mdtest_snippet.py:9:15
-  |
-7 | reveal_type(f(True))  # revealed: Literal[True]
-8 | # error: [invalid-argument-type]
-9 | reveal_type(f("string"))  # revealed: Unknown
-  |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
-  |
+  --> src/mdtest_snippet.py:10:15
+   |
+ 8 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int & Unknown`, found `Literal["string"]`"
+ 9 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal["string"]` does not satisfy upper boun…
+10 | reveal_type(f("string"))  # revealed: int & Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:7
   |
@@ -42,6 +43,28 @@ info: Type variable defined here
 2 |
 3 | def f[T: int](x: T) -> T:
   |       ^^^^^^
+4 |     return x
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:10:15
+   |
+ 8 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int & Unknown`, found `Literal["string"]`"
+ 9 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal["string"]` does not satisfy upper boun…
+10 | reveal_type(f("string"))  # revealed: int & Unknown
+   |               ^^^^^^^^ Expected `int & Unknown`, found `Literal["string"]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | def f[T: int](x: T) -> T:
+  |     ^         ---- Parameter declared here
 4 |     return x
   |
 info: rule `invalid-argument-type` is enabled by default

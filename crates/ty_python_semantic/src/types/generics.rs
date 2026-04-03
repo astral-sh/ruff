@@ -22,7 +22,9 @@ use crate::types::relation::{
 };
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::type_alias::{
+    TypeAliasType, walk_manual_pep_695_type_alias, walk_pep_695_type_alias,
+};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
@@ -31,8 +33,8 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    MaterializationKind, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 
@@ -306,6 +308,7 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -754,6 +757,21 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
+    #[salsa::tracked(
+        cycle_initial=|db, id, self_: GenericContext<'db>, _| {
+            Specialization::new(
+                db,
+                self_,
+                vec![Type::divergent(id); self_.len(db)].into_boxed_slice(),
+                None,
+                None
+            )
+        },
+        cycle_fn=|db, cycle, previous: &Specialization<'db>, current: Specialization<'db>, _, _| {
+            current.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn default_specialization(
         self,
         db: &'db dyn Db,
@@ -929,24 +947,28 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db) else {
-                continue;
-            };
+            if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to _earlier_ typevars in their defaults.
+                // (This is statically enforced for PEP-695 contexts, and is explicitly called out
+                // as a requirement for legacy contexts.)
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &expanded[0..idx],
+                    skip: None,
+                };
+                let default = default.apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                );
+                expanded[idx] = default;
+            }
 
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let specialization = ApplySpecialization::Partial {
-                generic_context: self,
-                types: &expanded[0..idx],
-                skip: None,
-            };
-            let default = default.apply_type_mapping(
-                db,
-                &TypeMapping::ApplySpecialization(specialization),
-                TypeContext::default(),
-            );
-            expanded[idx] = default;
+            if let Some(upper_bound) = typevar.typevar(db).upper_bound(db) {
+                expanded[idx] =
+                    IntersectionType::from_two_elements(db, upper_bound, Type::unknown());
+                continue;
+            }
         }
 
         expanded.into_boxed_slice()
@@ -1135,6 +1157,26 @@ impl<'db> Specialization<'db> {
         } else {
             self
         }
+    }
+
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        Self::new(
+            db,
+            self.generic_context(db),
+            self.types(db)
+                .iter()
+                .zip(previous.types(db))
+                .map(|(&this, &prev)| {
+                    if this.is_nominal_instance() {
+                        this
+                    } else {
+                        this.cycle_normalized(db, prev, cycle)
+                    }
+                })
+                .collect::<Box<_>>(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 
     /// Combines two specializations of the same generic context. If either specialization maps a

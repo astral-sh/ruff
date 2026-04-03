@@ -217,7 +217,7 @@ class GenericBase(Generic[B1, B2]):
 
 # revealed: <class 'GenericBase'>
 reveal_type(GenericBase)
-# revealed: (<class 'GenericBase[Unknown, Unknown]'>, typing.Generic, <class 'object'>)
+# revealed: (<class 'GenericBase[Foo & Unknown, Bar & Unknown]'>, typing.Generic, <class 'object'>)
 reveal_mro(GenericBase)
 # revealed: (<class 'GenericBase[Foo, Bar]'>, typing.Generic, <class 'object'>)
 reveal_mro(GenericBase["Foo", "Bar"])
