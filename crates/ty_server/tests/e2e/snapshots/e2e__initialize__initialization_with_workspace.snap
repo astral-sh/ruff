@@ -48,6 +48,9 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "codeLensProvider": {
+      "resolveProvider": false
+    },
     "renameProvider": {
       "prepareProvider": true
     },
@@ -55,7 +58,8 @@ expression: initialization_result
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [
-        "ty.printDebugInformation"
+        "ty.printDebugInformation",
+        "ty.runTest"
       ],
       "workDoneProgress": false
     },
