@@ -2,7 +2,7 @@ use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
@@ -474,17 +474,23 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
-    pub(crate) fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
+    pub(crate) fn is_scope_reachable(
+        &self,
+        db: &'db dyn Db,
+        scope_id: FileScopeId,
+        module: &ParsedModuleRef,
+    ) -> bool {
         self.parent_scope_id(scope_id)
             .is_none_or(|parent_scope_id| {
-                if !self.is_scope_reachable(db, parent_scope_id) {
+                if !self.is_scope_reachable(db, parent_scope_id, module) {
                     return false;
                 }
 
                 let parent_use_def = self.use_def_map(parent_scope_id);
-                let reachability = self.scope(scope_id).reachability();
-
-                parent_use_def.is_reachable(db, reachability)
+                let Some(scope_range) = self.scope(scope_id).node().range(module) else {
+                    return true;
+                };
+                parent_use_def.is_range_reachable(db, scope_range)
             })
     }
 
@@ -495,8 +501,9 @@ impl<'db> SemanticIndex<'db> {
         db: &'db dyn crate::Db,
         scope_id: FileScopeId,
         range: TextRange,
+        module: &ParsedModuleRef,
     ) -> bool {
-        self.is_scope_reachable(db, scope_id)
+        self.is_scope_reachable(db, scope_id, module)
             && self.use_def_map(scope_id).is_range_reachable(db, range)
     }
 

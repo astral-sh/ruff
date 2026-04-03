@@ -87,6 +87,7 @@ struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
+    reachability: ScopedReachabilityConstraintId,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -323,7 +324,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             parent,
             node_with_kind,
             children_start..children_start,
-            reachability,
             self.in_type_checking_block,
         );
         let is_class_scope = scope.kind().is_class();
@@ -346,6 +346,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
+            reachability,
         });
     }
 
@@ -644,11 +645,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn pop_scope(&mut self) -> FileScopeId {
+    fn pop_scope(&mut self) -> (FileScopeId, ScopedReachabilityConstraintId) {
         self.try_node_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
+            reachability: popped_scope_reachability,
             ..
         } = self
             .scope_stack
@@ -666,7 +668,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_lazy_snapshots(popped_scope_id);
         }
 
-        popped_scope_id
+        (popped_scope_id, popped_scope_reachability)
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {
@@ -1736,7 +1738,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.visit_body(self.module.suite());
 
         // Pop the root scope
-        self.pop_scope();
+        let (_, reachability) = self.pop_scope();
         self.mark_captured_bindings_used();
         self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
@@ -1747,7 +1749,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if let Some(parent) = scope.parent() {
                 self.use_def_maps[parent]
                     .reachability_constraints
-                    .mark_used(scope.reachability());
+                    .mark_used(reachability);
             }
         }
 
@@ -1860,7 +1862,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.visit_body(body);
 
                         builder.current_first_parameter_name = first_parameter_name;
-                        builder.pop_scope()
+                        builder.pop_scope().0
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
@@ -1904,7 +1906,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
 
-                        builder.pop_scope()
+                        builder.pop_scope().0
                     },
                 );
 
@@ -1929,7 +1931,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
                         builder.visit_expr(&type_alias.value);
-                        builder.pop_scope()
+                        builder.pop_scope().0
                     },
                 );
             }
