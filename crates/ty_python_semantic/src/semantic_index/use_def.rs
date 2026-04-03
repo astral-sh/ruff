@@ -501,6 +501,7 @@ impl<'db> UseDefMap<'db> {
         !self
             .range_reachability
             .iter()
+            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
             .any(|&(entry_range, constraint)| {
                 entry_range.contains_range(range) && !self.is_reachable(db, constraint)
             })
