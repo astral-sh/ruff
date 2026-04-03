@@ -78,14 +78,14 @@ class Base: ...
 types.new_class(123, (Base,))
 ```
 
-### Non-tuple bases
+### Non-iterable bases
 
 ```py
 import types
 
 class Base: ...
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `types.new_class()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `types.new_class()`: Expected `Iterable[object]`, found `<class 'Base'>`"
 types.new_class("Foo", Base)
 ```
 
@@ -108,6 +108,33 @@ import types
 types.new_class()
 ```
 
+### Invalid `kwds`
+
+```py
+import types
+
+# error: [invalid-argument-type]
+types.new_class("Foo", (), 1)
+```
+
+### Invalid `exec_body`
+
+```py
+import types
+
+# error: [invalid-argument-type]
+types.new_class("Foo", (), None, 1)
+```
+
+### Too many positional arguments
+
+```py
+import types
+
+# error: [too-many-positional-arguments]
+types.new_class("Foo", (), None, None, 1)
+```
+
 ### Duplicate bases
 
 ```py
@@ -123,6 +150,24 @@ types.new_class("Dup", (Base, Base))
 
 `types.new_class()` properly handles `__mro_entries__` and metaclasses, so it supports bases that
 `type()` does not.
+
+### Iterable bases
+
+Any iterable of bases is accepted. When the iterable is a list literal, we should still preserve the
+real base-class information:
+
+```py
+import types
+
+class Base:
+    base_attr: int = 1
+
+FromList = types.new_class("FromList", [Base])
+reveal_type(FromList().base_attr)  # revealed: int
+
+FromKeywordList = types.new_class("FromKeywordList", bases=[Base])
+reveal_type(FromKeywordList().base_attr)  # revealed: int
+```
 
 ### Enum bases
 

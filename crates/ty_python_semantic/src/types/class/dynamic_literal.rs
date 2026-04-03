@@ -15,6 +15,7 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
         definition_expression_type,
+        function::KnownFunction,
         member::Member,
         mro::{DynamicMroError, Mro, MroIterator},
     },
@@ -137,9 +138,9 @@ impl<'db> DynamicClassLiteral<'db> {
     /// class being defined.
     ///
     /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
-    /// or if the bases argument is not a tuple.
+    /// or if the bases argument cannot be extracted precisely.
     ///
-    /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
+    /// Returns `[Unknown]` if the bases iterable is variable-length.
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
@@ -170,6 +171,38 @@ impl<'db> DynamicClassLiteral<'db> {
             let Some(bases_arg) = bases_arg else {
                 return Box::default();
             };
+
+            let is_new_class = definition_expression_type(db, definition, call_expr.func.as_ref())
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::NewClass));
+
+            if is_new_class {
+                return match bases_arg {
+                    ast::Expr::Tuple(tuple) => tuple
+                        .elts
+                        .iter()
+                        .map(|elt| definition_expression_type(db, definition, elt))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    ast::Expr::List(list) => list
+                        .elts
+                        .iter()
+                        .map(|elt| definition_expression_type(db, definition, elt))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    _ => {
+                        let bases_type = definition_expression_type(db, definition, bases_arg);
+                        bases_type
+                            .try_iterate(db)
+                            .ok()
+                            .and_then(|spec| {
+                                spec.as_fixed_length()
+                                    .map(|tuple| tuple.all_elements().into())
+                            })
+                            .unwrap_or_else(|| Box::from([Type::unknown()]))
+                    }
+                };
+            }
 
             // Use `definition_expression_type` for deferred inference support.
             let bases_type = definition_expression_type(db, definition, bases_arg);

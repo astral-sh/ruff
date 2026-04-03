@@ -3810,24 +3810,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Extract name argument (first positional, or `name=` keyword).
-        let (name_node, name_type) = if let Some(first_arg) = args.first() {
-            let ty = self.infer_expression(first_arg, TypeContext::default());
-            (Some(first_arg), ty)
-        } else {
-            // Infer and retrieve the `name=` keyword value.
-            let found = keywords
+        // Find the arguments we treat specially while preserving normal call-binding diagnostics.
+        let name_node = args.first().or_else(|| {
+            keywords
                 .iter()
                 .find(|kw| kw.arg.as_deref() == Some("name"))
-                .map(|kw| {
-                    let ty = self.infer_expression(&kw.value, TypeContext::default());
-                    (&kw.value, ty)
-                });
-            match found {
-                Some((node, ty)) => (Some(node), ty),
-                None => (None, Type::unknown()),
-            }
-        };
+                .map(|kw| &kw.value)
+        });
+        let bases_arg = args.get(1).or_else(|| {
+            keywords
+                .iter()
+                .find(|kw| kw.arg.as_deref() == Some("bases"))
+                .map(|kw| &kw.value)
+        });
+
+        self.validate_new_class_call_arguments(call_expr, name_node, bases_arg, definition);
+
+        let name_type = name_node
+            .map(|node| self.expression_type(node))
+            .unwrap_or_else(Type::unknown);
 
         let name = if let Some(literal) = name_type.as_string_literal() {
             ast::name::Name::new(literal.value(db))
@@ -3847,33 +3848,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::name::Name::new_static("<unknown>")
         };
 
-        // Infer remaining positional args and keywords (excluding `bases`, which may be
-        // deferred, and `name`, which was already inferred above when passed as a keyword).
-        for arg in args.iter().skip(2) {
-            self.infer_expression(arg, TypeContext::default());
-        }
-        for keyword in keywords {
-            let is_bases = keyword.arg.as_deref() == Some("bases");
-            let is_name_keyword = no_positional_args && keyword.arg.as_deref() == Some("name");
-            if !is_bases && !is_name_keyword {
-                self.infer_expression(&keyword.value, TypeContext::default());
-            }
-        }
-
-        // Find the bases argument: second positional, or `bases=` keyword.
-        let bases_arg: Option<&ast::Expr> = args.get(1).or_else(|| {
-            keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("bases"))
-                .map(|kw| &kw.value)
-        });
-
         // For assigned `new_class()` calls, bases inference is deferred to handle forward
         // references and recursive references, matching the `type()` pattern. For dangling
         // calls, infer and extract bases eagerly (they'll be stored in the anchor).
         let explicit_bases: Option<Box<[Type<'db>]>> = if definition.is_none() {
             if let Some(bases_arg) = bases_arg {
-                let bases_type = self.infer_expression(bases_arg, TypeContext::default());
+                let bases_type = self.expression_type(bases_arg);
                 self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::NewClass)
             } else {
                 Some(Box::from([]))
@@ -3973,9 +3953,103 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
     }
 
+    /// Preserve normal call-binding diagnostics for `types.new_class()` while still allowing
+    /// special inference of the name and bases arguments.
+    fn validate_new_class_call_arguments(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        name_node: Option<&ast::Expr>,
+        bases_arg: Option<&ast::Expr>,
+        definition: Option<Definition<'db>>,
+    ) {
+        let db = self.db();
+        let callable_type = self.expression_type(call_expr.func.as_ref());
+        let iterable_object = KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
+
+        let mut call_arguments = CallArguments::from_arguments(
+            &call_expr.arguments,
+            |arg_or_keyword, splatted_value| {
+                let ty = self.infer_expression(splatted_value, TypeContext::default());
+                if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
+                    && argument.is_starred_expr()
+                {
+                    self.store_expression_type(argument, ty);
+                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
+                    return ty;
+                }
+
+                ty
+            },
+        );
+
+        // Validate that starred arguments are iterable.
+        for arg in &call_expr.arguments.args {
+            if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
+                let iterable_type = self.expression_type(value);
+                if let Err(err) = iterable_type.try_iterate(db) {
+                    err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                }
+            }
+        }
+
+        // Validate that double-starred keyword arguments are mappings.
+        for keyword in call_expr
+            .arguments
+            .keywords
+            .iter()
+            .filter(|kw| kw.arg.is_none())
+        {
+            let mapping_type = self.expression_type(&keyword.value);
+
+            if mapping_type.as_paramspec_typevar(db).is_some()
+                || mapping_type.unpack_keys_and_items(db).is_some()
+            {
+                continue;
+            }
+
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
+            else {
+                continue;
+            };
+
+            builder
+                .into_diagnostic("Argument expression after ** must be a mapping type")
+                .set_primary_message(format_args!("Found `{}`", mapping_type.display(db)));
+        }
+
+        let mut bindings = callable_type
+            .bindings(db)
+            .match_parameters(db, &call_arguments);
+        let bindings_result = self.infer_and_check_argument_types(
+            ArgumentsIter::from_ast(&call_expr.arguments),
+            &mut call_arguments,
+            &mut |builder, (_, expr, tcx)| {
+                if name_node.is_some_and(|name| std::ptr::eq(expr, name)) {
+                    let _ = builder.infer_expression(expr, tcx);
+                    KnownClass::Str.to_instance(builder.db())
+                } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {
+                    if definition.is_none() {
+                        let _ = builder.infer_expression(expr, tcx);
+                    }
+                    iterable_object
+                } else {
+                    builder.infer_expression(expr, tcx)
+                }
+            },
+            &mut bindings,
+            TypeContext::default(),
+        );
+
+        if bindings_result.is_err() {
+            bindings.report_diagnostics(&self.context, call_expr.into());
+        }
+    }
+
     /// Extract base classes from the bases argument of a `type()` or `types.new_class()` call.
     ///
-    /// Emits a diagnostic if `bases_type` is not a valid tuple type.
+    /// Emits a diagnostic if `bases_type` is not a valid bases iterable for the given kind.
     ///
     /// Returns `None` if the bases cannot be extracted.
     fn extract_explicit_bases(
@@ -3986,26 +4060,69 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Box<[Type<'db>]>> {
         let db = self.db();
         let fn_name = kind.function_name();
-        // Check if bases_type is a tuple; emit diagnostic if not.
-        if bases_type.tuple_instance_spec(db).is_none()
-            && !bases_type.is_assignable_to(
-                db,
-                Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db)),
-            )
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
-            ));
-            diagnostic.set_primary_message(format_args!(
-                "Expected `tuple[type, ...]`, found `{}`",
-                bases_type.display(db)
-            ));
+        match kind {
+            DynamicClassKind::TypeCall => {
+                if bases_type.tuple_instance_spec(db).is_none()
+                    && !bases_type.is_assignable_to(
+                        db,
+                        Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db)),
+                    )
+                    && let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
+                    ));
+                    diagnostic.set_primary_message(format_args!(
+                        "Expected `tuple[type, ...]`, found `{}`",
+                        bases_type.display(db)
+                    ));
+                }
+
+                bases_type
+                    .fixed_tuple_elements(db)
+                    .map(Cow::into_owned)
+                    .map(Into::into)
+            }
+            DynamicClassKind::NewClass => {
+                let iterable_object =
+                    KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
+                if !bases_type.is_assignable_to(db, iterable_object)
+                    && let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
+                    ));
+                    diagnostic.set_primary_message(format_args!(
+                        "Expected `Iterable[object]`, found `{}`",
+                        bases_type.display(db)
+                    ));
+                }
+
+                match bases_node {
+                    ast::Expr::Tuple(tuple) => Some(
+                        tuple
+                            .elts
+                            .iter()
+                            .map(|elt| self.expression_type(elt))
+                            .collect::<Vec<_>>()
+                            .into_boxed_slice(),
+                    ),
+                    ast::Expr::List(list) => Some(
+                        list.elts
+                            .iter()
+                            .map(|elt| self.expression_type(elt))
+                            .collect::<Vec<_>>()
+                            .into_boxed_slice(),
+                    ),
+                    _ => bases_type.try_iterate(db).ok().and_then(|spec| {
+                        spec.as_fixed_length()
+                            .map(|tuple| tuple.all_elements().into())
+                    }),
+                }
+            }
         }
-        bases_type
-            .fixed_tuple_elements(db)
-            .map(Cow::into_owned)
-            .map(Into::into)
     }
 
     /// Validate base classes from the second argument of a `type()` or `types.new_class()` call.
