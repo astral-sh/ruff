@@ -25,6 +25,11 @@ All ancestor directories that *do not* contain an `__init__.py(i)` are valid abs
 search-paths. Additionally, when a `pyproject.toml` or `ty.toml` is found, any src-layout heuristic
 subdirectories (`src/`, `python/`) are also added as search-paths.
 
+The src-layout heuristics in desperate resolution only apply when the top-level project's source
+roots were auto-detected (i.e. `src.root` / `environment.root` is not explicitly configured). When
+the user has explicitly set source roots, desperate resolution still uses ancestor directories with
+config files as search-paths, but does not probe for src-layout subdirectories.
+
 (Distracting detail: to ensure relative desperate search-paths are always valid absolute desperate
 search-paths, a directory that contains an `__init__.py(i)` *and* either a `pyproject.toml` or
 `ty.toml` is also a valid absolute search-path, but this shouldn't matter in practice, as you do not
@@ -808,4 +813,50 @@ import mypkg
 
 reveal_type(x)  # revealed: str
 reveal_type(mypkg.x)  # revealed: str
+```
+
+### `src`-layout heuristics suppressed by explicit `environment.root`
+
+When `environment.root` is explicitly configured, desperate resolution should not apply src-layout
+heuristics to discovered sub-projects. The project directory itself is still added as a desperate
+search-path, but `src/` subdirectories are not probed.
+
+In this case the project explicitly sets `root = ["."]`, so `proj/src/` is not auto-discovered. The
+test file in `proj/tests/` cannot resolve `foo` from `proj/src/foo/` via desperate resolution, but
+can still resolve `main` from `proj/main.py` (since `proj/` is added as a search-path).
+
+```toml
+[environment]
+root = ["."]
+```
+
+`proj/pyproject.toml`:
+
+```text
+name = "proj"
+version = "0.1.0"
+```
+
+`proj/src/foo/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`proj/main.py`:
+
+```py
+z: int = 42
+```
+
+`proj/tests/test_foo.py`:
+
+```py
+# error: [unresolved-import]
+from foo import x
+
+import main
+
+reveal_type(x)  # revealed: Unknown
+reveal_type(main.z)  # revealed: int
 ```

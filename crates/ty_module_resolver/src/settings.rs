@@ -32,6 +32,12 @@ pub struct SearchPathSettings {
     /// We should ideally only ever use this for things like goto-definition,
     /// where typeshed isn't the right answer.
     pub real_stdlib_path: Option<SystemPathBuf>,
+
+    /// Whether the user explicitly configured first-party source roots
+    /// (via `src.root` or `environment.root`).
+    /// When `true`, desperate resolution skips src-layout heuristics for
+    /// discovered sub-projects; when `false`, it applies them.
+    pub has_explicit_roots: bool,
 }
 
 impl SearchPathSettings {
@@ -49,6 +55,7 @@ impl SearchPathSettings {
             custom_typeshed: None,
             site_packages_paths: vec![],
             real_stdlib_path: None,
+            has_explicit_roots: false,
         }
     }
 

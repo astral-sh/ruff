@@ -445,6 +445,22 @@ fn run_test(
         })
         .collect();
 
+    let explicit_roots = configuration.root();
+    let src_roots = if let Some(roots) = explicit_roots {
+        roots
+            .iter()
+            .map(|path| {
+                if path.is_absolute() {
+                    path.clone()
+                } else {
+                    src_path.join(path)
+                }
+            })
+            .collect()
+    } else {
+        vec![src_path]
+    };
+
     let settings = ProgramSettings {
         python_version: PythonVersionWithSource {
             version: python_version,
@@ -454,11 +470,12 @@ fn run_test(
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
-            src_roots: vec![src_path],
+            src_roots,
             extra_paths,
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
+            has_explicit_roots: explicit_roots.is_some(),
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Failed to resolve search path settings"),

@@ -298,11 +298,12 @@ impl Options {
         let src = self.src.or_default();
 
         #[allow(deprecated)]
-        let src_roots = if let Some(roots) = environment
+        let explicit_roots = environment
             .root
             .as_deref()
-            .or_else(|| Some(std::slice::from_ref(src.root.as_ref()?)))
-        {
+            .or_else(|| Some(std::slice::from_ref(src.root.as_ref()?)));
+
+        let src_roots = if let Some(roots) = explicit_roots {
             roots
                 .iter()
                 .map(|root| root.absolute(project_root, system))
@@ -310,9 +311,7 @@ impl Options {
         } else {
             let roots = discover_src_layout_roots(system, project_root, Some(project_name));
             for root in &roots {
-                if root.as_path() != project_root {
-                    tracing::debug!("Including `{root}` as source root for `{project_root}`");
-                }
+                tracing::debug!("Including `{root}` as source root for `{project_root}`");
             }
             roots
         };
@@ -369,6 +368,7 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
+            has_explicit_roots: explicit_roots.is_some(),
         };
 
         settings.to_search_paths(system, vendored, strategy)

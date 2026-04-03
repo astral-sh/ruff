@@ -61,6 +61,10 @@ impl MarkdownTestConfig {
         self.environment.as_ref()?.extra_paths.as_deref()
     }
 
+    pub(crate) fn root(&self) -> Option<&[SystemPathBuf]> {
+        self.environment.as_ref()?.root.as_deref()
+    }
+
     pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
     }
@@ -94,6 +98,11 @@ pub(crate) struct Environment {
 
     /// Path to a custom typeshed directory.
     pub(crate) typeshed: Option<SystemPathBuf>,
+
+    /// Explicit source roots for the project.
+    ///
+    /// When set, src-layout heuristics in desperate resolution are suppressed.
+    pub(crate) root: Option<Vec<SystemPathBuf>>,
 
     /// Additional search paths to consider when resolving modules.
     pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,

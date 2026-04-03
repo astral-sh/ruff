@@ -468,9 +468,15 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         let has_project_config = system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"));
         if has_project_config {
-            for root in discover_src_layout_roots(system, &candidate_path, None) {
-                if let Ok(sp) = SearchPath::first_party(system, root) {
+            if db.search_paths().has_explicit_roots() {
+                if let Ok(sp) = SearchPath::first_party(system, candidate_path.clone()) {
                     search_paths.push(sp);
+                }
+            } else {
+                for root in discover_src_layout_roots(system, &candidate_path, None) {
+                    if let Ok(sp) = SearchPath::first_party(system, root) {
+                        search_paths.push(sp);
+                    }
                 }
             }
         } else if isnt_regular_package {
@@ -537,6 +543,9 @@ fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
         if system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"))
         {
+            if db.search_paths().has_explicit_roots() {
+                return SearchPath::first_party(system, candidate_path).ok();
+            }
             // If the importing file is under a src-layout subdirectory, prefer that
             // so module names don't include the subdirectory prefix (e.g. `src.foo`).
             // `discover_src_layout_roots` returns subdirs first, then the project dir,
@@ -576,6 +585,12 @@ pub struct SearchPaths {
     site_packages: Vec<SearchPath>,
 
     typeshed_versions: TypeshedVersions,
+
+    /// Whether the user explicitly configured first-party source roots
+    /// (via `src.root` or `environment.root`).
+    /// When `true`, desperate resolution skips src-layout heuristics for
+    /// discovered sub-projects; when `false`, it applies them.
+    has_explicit_roots: bool,
 }
 
 impl SearchPaths {
@@ -603,6 +618,7 @@ impl SearchPaths {
             custom_typeshed: typeshed,
             site_packages_paths,
             real_stdlib_path,
+            has_explicit_roots,
         } = settings;
 
         let mut static_paths = vec![];
@@ -743,6 +759,7 @@ impl SearchPaths {
             real_stdlib_path,
             site_packages,
             typeshed_versions,
+            has_explicit_roots: *has_explicit_roots,
         })
     }
 
@@ -756,6 +773,7 @@ impl SearchPaths {
             real_stdlib_path: None,
             site_packages: vec![],
             typeshed_versions: vendored_typeshed_versions(vendored),
+            has_explicit_roots: false,
         }
     }
 
@@ -774,6 +792,10 @@ impl SearchPaths {
                 }
             }
         }
+    }
+
+    pub fn has_explicit_roots(&self) -> bool {
+        self.has_explicit_roots
     }
 
     pub(super) fn iter<'a>(
@@ -832,6 +854,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         stdlib_path,
         site_packages,
         typeshed_versions: _,
+        has_explicit_roots: _,
         real_stdlib_path,
     } = db.search_paths();
 
