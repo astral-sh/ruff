@@ -3285,6 +3285,10 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(db, name, policy)
             }
 
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .member_lookup_with_policy(db, name, policy),
+
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
@@ -3292,10 +3296,6 @@ impl<'db> Type<'db> {
                 InstanceFallbackShadowsNonDataDescriptor::No,
                 policy,
             ),
-
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
 
             Type::LiteralValue(literal)
                 if literal.as_enum().is_some()
