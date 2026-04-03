@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -5056,8 +5056,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or(InferableTypeVars::None);
 
                 !overload
-                    .constructor_instance_type
-                    .unwrap_or(overload.signature.return_ty)
+                    .return_ty
                     .when_assignable_to(db, narrowed_ty, &constraints, inferable)
                     .is_never_satisfied(db)
             }) {
@@ -5170,6 +5169,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bindings: &'bindings Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        fn add_overloads_from_binding<'a, 'db>(
+            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
+            binding: &'a CallableBinding<'db>,
+        ) {
+            match binding.matching_overload_index() {
+                MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
+                    overloads_with_binding.extend(
+                        binding
+                            .matching_overloads()
+                            .map(|(_, overload)| (overload, binding)),
+                    );
+                }
+
+                // If there is a single overload that does not match, we still infer the argument
+                // types for better diagnostics.
+                MatchingOverloadIndex::None => {
+                    if let [overload] = binding.overloads() {
+                        overloads_with_binding.push((overload, binding));
+                    }
+                }
+            }
+        }
+
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
@@ -5181,28 +5203,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast_arguments
         );
 
-        let overloads_with_binding = bindings
-            .iter_flat()
-            .filter_map(|binding| {
-                match binding.matching_overload_index() {
-                    MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                        let overloads = binding
-                            .matching_overloads()
-                            .map(move |(_, overload)| (overload, binding));
+        let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
-                        Some(Either::Right(overloads))
-                    }
-
-                    // If there is a single overload that does not match, we still infer the argument
-                    // types for better diagnostics.
-                    MatchingOverloadIndex::None => match binding.overloads() {
-                        [overload] => Some(Either::Left(std::iter::once((overload, binding)))),
-                        _ => None,
-                    },
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+        for binding in bindings.iter_type_context_callables() {
+            add_overloads_from_binding(&mut overloads_with_binding, binding);
+        }
 
         for (argument_index, (_, argument_types), argument_form, ast_argument) in iter {
             let ast_argument = match ast_argument {
@@ -5262,7 +5267,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut tcx_mappings = FxHashMap::default();
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let return_ty = overload
-                            .constructor_instance_type
+                            .normalized_constructor_return(db)
                             .unwrap_or(overload.signature.return_ty);
                         let set = return_ty.when_constraint_set_assignable_to(
                             db,

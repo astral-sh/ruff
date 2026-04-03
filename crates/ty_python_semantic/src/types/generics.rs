@@ -1147,8 +1147,9 @@ impl<'db> Specialization<'db> {
         assert_eq!(other.generic_context(db), generic_context);
         // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
         // confusing/wrong results in cases where there was a mapping found for a typevar, and it
-        // was of type Unknown. We should probably add a bitset or similar to Specialization that
-        // explicitly tells us which typevars are mapped.
+        // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
+        // may fail to specialize, but not end up as `Unknown`. We should add a bitset or similar
+        // to Specialization that explicitly tells us which typevars are mapped.
         let types: Box<[_]> = self
             .types(db)
             .iter()

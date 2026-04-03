@@ -48,6 +48,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
+use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -3896,6 +3897,7 @@ impl<'db> Type<'db> {
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
                 SubclassOfInner::TypeVar(tvar) => {
+                    let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
                         None => KnownClass::Type.to_instance(db).bindings(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -3911,7 +3913,22 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    bindings.with_constructor_instance_type(Type::TypeVar(tvar))
+                    // TODO We would ideally be able to just do `into_constructor_bindings` in the
+                    // no-bounds/constraints case above (where we get back the bindings for
+                    // `Type.__call__`), and just do `with_constructed_instance_type` in the
+                    // bound/constrained cases, where we should get back constructor bindings (or
+                    // if we don't, we probably shouldn't return `T` from the call?). But currently
+                    // we can't because we special-case some built-in types to return regular
+                    // (not constructor) bindings from `constructor_bindings()`.
+                    bindings
+                        // `into_constructor_bindings` is a no-op for already-constructor bindings,
+                        // so we are just setting the `MetaclassCall` type for `Type.__call__`, or
+                        // the special-cased builtin classes that return regular bindings.
+                        .into_constructor_bindings(
+                            constructor_instance_type,
+                            ConstructorCallableKind::MetaclassCall,
+                        )
+                        .with_constructed_instance_type(db, constructor_instance_type)
                 }
             },
 
@@ -4383,6 +4400,19 @@ impl<'db> Type<'db> {
             owner: Type<'db>,
             place: Place<'db>,
         ) -> Option<(Type<'db>, Definedness)> {
+            // If `__new__` itself resolved to `Any`, treat it as absent rather than as a real
+            // constructor override. This preserves the known nominal constructor result for
+            // subclasses of `Any` while still allowing explicitly typed `__new__` callables
+            // returning `Any` to keep their annotated behavior.
+            if matches!(
+                place,
+                Place::Defined(DefinedPlace {
+                    ty: Type::Dynamic(DynamicType::Any),
+                    ..
+                })
+            ) {
+                return None;
+            }
             match place.try_call_dunder_get(db, owner) {
                 Place::Defined(DefinedPlace {
                     ty: callable,
@@ -4482,62 +4512,42 @@ impl<'db> Type<'db> {
             _ => self,
         };
 
-        // As of now we do not model custom `__call__` on meta-classes, so the code below
-        // only deals with interplay between `__new__` and `__init__` methods.
-        // The logic is roughly as follows:
-        // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
-        //    present), we validate the constructor arguments against it. We then validate `__init__`,
-        //    but only if it is defined somewhere except `object`. This is because `object.__init__`
-        //    allows arbitrary arguments if and only if `__new__` is defined, but typeshed
-        //    defines `__init__` for `object` with no arguments.
-        // 2. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
-        //    the way to `object` (single `self` argument call). This time it is correct to
-        //    fallback to `object.__init__`, since it will indeed check that no arguments are
-        //    passed.
-        //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
-
-        // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
-        // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
-        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on
-        // `object` we would inadvertently unhide `__new__` on `type`, which is not what we want.
-        // An alternative might be to not skip `object.__new__` but instead mark it such that it's
-        // easy to check if that's the one we found?
-        // Note that `__new__` is a static method, so we must bind the `cls` argument when forming
-        // constructor-call bindings.
-        let new_method = self_type.lookup_dunder_new(db);
+        // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
+        // We preserve its full overload set here and defer constructor branching decisions
+        // until call-time overload resolution.
+        let metaclass_dunder_call = self_type.member_lookup_with_policy(
+            db,
+            "__call__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        );
 
         let Some(constructor_instance_ty) = self_type.to_instance(db) else {
             return fallback_bindings();
         };
 
-        // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
-        // specialized) so the instance retains inferable class typevars during constructor checking.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let Some(lookup_init_ty) = self_type.to_instance(db) else {
-            return fallback_bindings();
-        };
+        let new_method = self_type.lookup_dunder_new(db);
 
-        // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
-        // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
-        let init_method_no_object = lookup_init_ty.member_lookup_with_policy(
+        let init_method_no_object = constructor_instance_ty.member_lookup_with_policy(
             db,
             "__init__".into(),
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
 
-        let mut missing_init_bindings = None;
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
             Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
-                        bind_constructor_new(db, new_callable.bindings(db), self_type);
+                        bind_constructor_new(db, new_callable.bindings(db), self_type)
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::New,
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
-                    (Some((bindings, new_callable)), true)
+                    (Some(bindings), true)
                 }
                 None => (None, false),
             },
@@ -4554,14 +4564,20 @@ impl<'db> Type<'db> {
                 }),
                 _,
             ) => {
-                let mut bindings = init_method.bindings(db);
+                let mut bindings = init_method
+                    .bindings(db)
+                    .into_constructor_bindings(
+                        constructor_instance_ty,
+                        ConstructorCallableKind::Init,
+                    )
+                    .with_constructed_instance_type(db, constructor_instance_ty);
                 if *definedness == Definedness::PossiblyUndefined {
                     bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
-                Some((bindings, *init_method))
+                Some(bindings)
             }
             (Place::Undefined, false) => {
-                let init_method_with_object = lookup_init_ty.member_lookup_with_policy(
+                let init_method_with_object = constructor_instance_ty.member_lookup_with_policy(
                     db,
                     "__init__".into(),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
@@ -4572,11 +4588,17 @@ impl<'db> Type<'db> {
                         definedness,
                         ..
                     }) => {
-                        let mut bindings = init_method.bindings(db);
+                        let mut bindings = init_method
+                            .bindings(db)
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::Init,
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                         if definedness == Definedness::PossiblyUndefined {
                             bindings.set_implicit_dunder_init_is_possibly_unbound();
                         }
-                        Some((bindings, init_method))
+                        Some(bindings)
                     }
                     Place::Undefined => {
                         // If we are using vendored typeshed, it should be impossible to have missing
@@ -4590,38 +4612,56 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::gradual_form(), constructor_instance_ty),
                         )
                         .into();
+                        bindings = bindings
+                            .into_constructor_bindings(
+                                constructor_instance_ty,
+                                ConstructorCallableKind::Init,
+                            )
+                            .with_constructed_instance_type(db, constructor_instance_ty);
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
-                        missing_init_bindings = Some(bindings);
-                        None
+                        Some(bindings)
                     }
                 }
             }
             (Place::Undefined, true) => None,
         };
 
-        let bindings = if let Some(bindings) = missing_init_bindings {
-            bindings
-        } else {
-            match (new_bindings, init_bindings) {
-                (Some((new_bindings, new_callable)), Some((init_bindings, init_callable))) => {
-                    let callable_type = UnionBuilder::new(db)
-                        .add(new_callable)
-                        .add(init_callable)
-                        .build();
-                    // Use both `__new__` and `__init__` bindings so argument inference/checking
-                    // happens under the combined constructor-call type context.
-                    // In ty unions of callables are checked as "all must accept".
-                    Bindings::from_union(callable_type, [new_bindings, init_bindings])
-                }
-                (Some((new_bindings, _)), None) => new_bindings,
-                (None, Some((init_bindings, _))) => init_bindings,
-                (None, None) => return fallback_bindings(),
+        let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
+            // Preserve the full `__new__` signature and defer `__init__` validation until we know
+            // which `__new__` overload matched at call time.
+            if let Some(init_bindings) = init_bindings.as_ref() {
+                new_bindings.set_downstream_constructor(init_bindings);
             }
+            Some(new_bindings)
+        } else {
+            init_bindings
         };
 
-        bindings
-            .with_generic_context(db, class_generic_context)
-            .with_constructor_instance_type(constructor_instance_ty)
+        let bindings = if let Place::Defined(DefinedPlace {
+            ty: metaclass_call_method,
+            ..
+        }) = metaclass_dunder_call.place
+        {
+            let mut metaclass_bindings = metaclass_call_method
+                .bindings(db)
+                .into_constructor_bindings(
+                    constructor_instance_ty,
+                    ConstructorCallableKind::MetaclassCall,
+                )
+                .with_constructed_instance_type(db, constructor_instance_ty);
+            if let Some(downstream_bindings) = constructor_bindings.as_ref() {
+                // Preserve the full metaclass `__call__` signature and defer whether constructor
+                // downstream checks apply until the matched overload is known.
+                metaclass_bindings.set_downstream_constructor(downstream_bindings);
+            }
+            metaclass_bindings
+        } else if let Some(constructor_bindings) = constructor_bindings {
+            constructor_bindings
+        } else {
+            return fallback_bindings();
+        };
+
+        bindings.with_generic_context(db, class_generic_context)
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if

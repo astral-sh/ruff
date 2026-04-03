@@ -1241,5 +1241,5 @@ def f(flag: bool):
     # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
     # because the early-return guard only matches `ClassLiteral`, not union members.
     MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
-    reveal_type(MyClass)  # revealed: type | Unknown
+    reveal_type(MyClass)  # revealed: type | int
 ```
