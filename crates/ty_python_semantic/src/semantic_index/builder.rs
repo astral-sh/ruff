@@ -87,7 +87,6 @@ struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
-    reachability: ScopedReachabilityConstraintId,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -181,12 +180,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors: RefCell::default(),
         };
 
-        builder.push_scope_with_parent(
-            NodeWithScopeRef::Module,
-            None,
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-        );
-
+        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
         builder
     }
 
@@ -304,17 +298,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
-        let parent = self.current_scope();
-        let reachability = self.current_use_def_map().reachability;
-        self.push_scope_with_parent(node, Some(parent), reachability);
+        self.push_scope_with_parent(node, Some(self.current_scope()));
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScopeRef,
-        parent: Option<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
-    ) {
+    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
         // Note `node` is guaranteed to be a child of `self.module`
@@ -346,7 +333,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
-            reachability,
         });
     }
 
@@ -645,12 +631,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn pop_scope(&mut self) -> (FileScopeId, ScopedReachabilityConstraintId) {
+    fn pop_scope(&mut self) -> FileScopeId {
         self.try_node_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
-            reachability: popped_scope_reachability,
             ..
         } = self
             .scope_stack
@@ -668,7 +653,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_lazy_snapshots(popped_scope_id);
         }
 
-        (popped_scope_id, popped_scope_reachability)
+        popped_scope_id
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {
@@ -1738,20 +1723,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.visit_body(self.module.suite());
 
         // Pop the root scope
-        let (_, reachability) = self.pop_scope();
+        self.pop_scope();
         self.mark_captured_bindings_used();
         self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
-
-        for scope in &self.scopes {
-            if let Some(parent) = scope.parent() {
-                self.use_def_maps[parent]
-                    .reachability_constraints
-                    .mark_used(reachability);
-            }
-        }
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -1862,7 +1839,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.visit_body(body);
 
                         builder.current_first_parameter_name = first_parameter_name;
-                        builder.pop_scope().0
+                        builder.pop_scope()
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
@@ -1906,7 +1883,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
 
-                        builder.pop_scope().0
+                        builder.pop_scope()
                     },
                 );
 
@@ -1931,7 +1908,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
                         builder.visit_expr(&type_alias.value);
-                        builder.pop_scope().0
+                        builder.pop_scope()
                     },
                 );
             }
