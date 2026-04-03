@@ -333,6 +333,8 @@ pub enum KnownModule {
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
     Uuid,
+    Datetime,
+    Decimal,
     Warnings,
     Numbers,
     #[strum(serialize = "struct", serialize = "_struct")]
@@ -364,6 +366,8 @@ impl KnownModule {
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
             Self::Uuid => "uuid",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",

@@ -52,6 +52,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 
+mod django_model;
 mod dynamic_literal;
 mod known;
 mod named_tuple;
