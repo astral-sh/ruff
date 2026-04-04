@@ -14,14 +14,15 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::semantic_index::definition::Definition;
+use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    CallSignatureDetails, call_signature_details, find_active_signature_from_details,
+    CallSignatureDetails, CallSignatureParameter, call_signature_details,
+    find_active_signature_from_details,
 };
-use ty_python_semantic::types::{ParameterKind, Type};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -41,6 +42,10 @@ pub struct ParameterDetails<'db> {
     pub documentation: Option<String>,
     /// True if the parameter is positional-only.
     pub is_positional_only: bool,
+    /// True if the parameter can absorb arbitrarily many positional arguments.
+    pub is_variadic: bool,
+    /// True if the parameter can absorb arbitrarily many keyword arguments.
+    pub is_keyword_variadic: bool,
 }
 
 /// Information about a function signature
@@ -93,7 +98,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     let signatures: Vec<SignatureDetails> = signature_details
         .into_iter()
         .map(|details| {
-            create_signature_details_from_call_signature_details(db, &details, current_arg_index)
+            create_signature_details_from_call_signature_details(db, details, current_arg_index)
         })
         .collect();
 
@@ -179,11 +184,9 @@ fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
 /// Create signature details from `CallSignatureDetails`.
 fn create_signature_details_from_call_signature_details<'db>(
     db: &dyn crate::Db,
-    details: &CallSignatureDetails<'db>,
+    details: CallSignatureDetails<'db>,
     current_arg_index: usize,
 ) -> SignatureDetails<'db> {
-    let signature_label = details.label.clone();
-
     let documentation = get_callable_documentation(db, details.definition);
 
     // Translate the argument index to parameter index using the mapping.
@@ -192,30 +195,29 @@ fn create_signature_details_from_call_signature_details<'db>(
             Some(0)
         } else {
             details
-                .argument_to_parameter_mapping
+                .argument_to_displayed_parameter_mapping
                 .get(current_arg_index)
-                .and_then(|mapping| mapping.parameters.first().copied())
+                .copied()
+                .flatten()
                 .or({
                     // If we can't find a mapping for this argument, but we have a current
                     // argument index, use that as the active parameter if it's within bounds.
-                    if current_arg_index < details.parameter_label_offsets.len() {
+                    if current_arg_index < details.parameters.len() {
                         Some(current_arg_index)
+                    } else if details.parameters.last().is_some_and(|parameter| {
+                        parameter.is_variadic || parameter.is_keyword_variadic
+                    }) {
+                        Some(details.parameters.len() - 1)
                     } else {
                         None
                     }
                 })
         };
 
-    let parameters = create_parameters_from_offsets(
-        &details.parameter_label_offsets,
-        &signature_label,
-        documentation.as_ref(),
-        &details.parameter_names,
-        &details.parameter_kinds,
-        &details.parameter_types,
-    );
+    let parameters = create_parameters(details.parameters, documentation.as_ref());
+    let active_parameter = active_parameter.filter(|&index| index < parameters.len());
     SignatureDetails {
-        label: signature_label,
+        label: details.label,
         documentation,
         parameters,
         active_parameter,
@@ -230,14 +232,10 @@ fn get_callable_documentation(
     Definitions(vec![ResolvedDefinition::Definition(definition?)]).docstring(db)
 }
 
-/// Create `ParameterDetails` objects from parameter label offsets.
-fn create_parameters_from_offsets<'db>(
-    parameter_offsets: &[TextRange],
-    signature_label: &str,
+/// Create `ParameterDetails` objects from semantic displayed parameter details.
+fn create_parameters<'db>(
+    parameters: Vec<CallSignatureParameter<'db>>,
     docstring: Option<&Docstring>,
-    parameter_names: &[String],
-    parameter_kinds: &[ParameterKind],
-    parameter_types: &[Type<'db>],
 ) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
@@ -246,31 +244,28 @@ fn create_parameters_from_offsets<'db>(
         std::collections::HashMap::new()
     };
 
-    parameter_offsets
-        .iter()
-        .enumerate()
-        .map(|(i, offset)| {
-            // Extract the parameter label from the signature string.
-            let start = usize::from(offset.start());
-            let end = usize::from(offset.end());
-            let label = signature_label
-                .get(start..end)
-                .unwrap_or("unknown")
-                .to_string();
-
+    parameters
+        .into_iter()
+        .map(|parameter| {
+            let CallSignatureParameter {
+                label,
+                name,
+                ty,
+                is_positional_only,
+                is_variadic,
+                is_keyword_variadic,
+            } = parameter;
             // Get the parameter name for documentation lookup.
-            let param_name = parameter_names.get(i).map(String::as_str).unwrap_or("");
-            let is_positional_only = matches!(
-                parameter_kinds.get(i),
-                Some(ParameterKind::PositionalOnly { .. })
-            );
+            let documentation = param_docs.get(name.as_str()).cloned();
 
             ParameterDetails {
-                name: param_name.to_string(),
+                name,
                 label,
-                ty: parameter_types[i],
-                documentation: param_docs.get(param_name).cloned(),
+                ty,
+                documentation,
                 is_positional_only,
+                is_variadic,
+                is_keyword_variadic,
             }
         })
         .collect()
@@ -899,6 +894,47 @@ def ab(a: int, *, c: int):
                 .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
+    }
+
+    #[test]
+    fn signature_help_paramspec_generic_class_constructor_inside_subscript() {
+        let test = cursor_test(
+            r#"
+        class A[**P]: ...
+
+        A[int,<CURSOR>]()
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        [**P]() -> A[(int, /)]
+        ---------------------------------------------
+
+        (no active parameter specified)
+        ");
+    }
+
+    #[test]
+    fn signature_help_bare_paramspec_keeps_active_parameter_for_later_arguments() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, ParamSpec
+
+        P = ParamSpec("P")
+
+        def takes(f: Callable[P, None]) -> None:
+            f(1, <CURSOR>)
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        let active_signature = &result.signatures[result.active_signature.unwrap_or(0)];
+
+        assert!(active_signature.label.starts_with("(**P"));
+        assert_eq!(active_signature.active_parameter, Some(0));
+        assert!(active_signature.parameters[0].label.starts_with("**P"));
     }
 
     #[test]

@@ -2245,13 +2245,15 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {
-                write!(f, "**{}", typevar.name(self.db))?;
+                let parameter_name = format!("**{}", typevar.name(self.db));
+                let mut parameter = f.with_detail(TypeDetail::Parameter(parameter_name.clone()));
+                write!(parameter, "{parameter_name}")?;
                 let binding_context = typevar.binding_context(self.db);
                 if let Some(binding_context_name) = binding_context.name(self.db)
                     && let Some(definition) = binding_context.definition()
                     && !self.settings.active_scopes.contains(&definition)
                 {
-                    write!(f, "@{binding_context_name}")?;
+                    write!(parameter, "@{binding_context_name}")?;
                 }
             }
         }

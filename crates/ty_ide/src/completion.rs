@@ -1503,7 +1503,11 @@ fn add_function_arg_completions<'db>(
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
+            if p.is_positional_only
+                || p.is_variadic
+                || p.is_keyword_variadic
+                || !set_function_args.insert(p.name.as_str())
+            {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -4578,6 +4582,29 @@ bar(o<CURSOR>
         foo
         "
         );
+    }
+
+    #[test]
+    fn call_bare_paramspec_does_not_suggest_keyword_argument_completion() {
+        let builder = completion_test_builder(
+            "\
+from typing import Callable, ParamSpec
+
+P = ParamSpec(\"P\")
+sentinel = 1
+
+def takes(f: Callable[P, None]) -> None:
+    f(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .skip_auto_import()
+            .build()
+            .contains("sentinel")
+            .not_contains("**P");
     }
 
     #[test]
