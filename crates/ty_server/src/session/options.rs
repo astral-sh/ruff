@@ -6,11 +6,13 @@ use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use strum::IntoEnumIterator;
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
@@ -305,26 +307,31 @@ impl WorkspaceOptions {
     }
 }
 
-/// Resolve the [`PythonVersion`] from an environment, if it's supported.
-fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<PythonVersion> {
-    let python_version = PythonVersion::try_from((version.major, version.minor))
-        .ok()
-        .filter(|version| version.is_known());
-
-    if python_version.is_none() {
+/// Resolve the selected editor Python version, if ty supports it.
+fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<SupportedPythonVersion> {
+    let warn_unsupported_editor_python_version = || {
         tracing::warn!(
             "Unsupported Python version `{}.{}` selected in your editor; ty won't set \
             the Python version to the selected interpreter's version. Expected one of {}.",
             version.major,
             version.minor,
-            PythonVersion::iter()
+            SupportedPythonVersion::iter()
                 .map(|version| format!("`{version}`"))
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-    }
+    };
 
-    python_version
+    let python_version = u8::try_from(version.major)
+        .and_then(|major| {
+            u8::try_from(version.minor).map(|minor| PythonVersion::from((major, minor)))
+        })
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()?;
+
+    SupportedPythonVersion::try_from(python_version)
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]

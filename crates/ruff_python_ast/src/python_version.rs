@@ -80,11 +80,6 @@ impl PythonVersion {
         (self.major, self.minor)
     }
 
-    /// Returns `true` if this version is in the set of known Python versions.
-    pub fn is_known(self) -> bool {
-        Self::iter().any(|supported| supported == self)
-    }
-
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
     }
