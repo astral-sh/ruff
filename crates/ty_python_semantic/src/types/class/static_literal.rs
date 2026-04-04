@@ -932,7 +932,7 @@ impl<'db> StaticClassLiteral<'db> {
                         metaclass,
                         explicit_metaclass_of: base_class_literal,
                     },
-                    candidate1_is_base_class: explicit_metaclass.is_none(),
+                    had_explicit_metaclass: explicit_metaclass.is_some(),
                 },
             });
         }
