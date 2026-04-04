@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -58,7 +57,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, MethodDecorator, extract_new_class_explicit_bases,
+    DynamicMetaclassConflict, MethodDecorator, extract_dynamic_class_explicit_bases,
 };
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InNoTypeCheck;
@@ -3735,51 +3734,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Box<[Type<'db>]>> {
         let db = self.db();
         let fn_name = kind.function_name();
-        match kind {
+        let formal_parameter_type = match kind {
             DynamicClassKind::TypeCall => {
-                if bases_type.tuple_instance_spec(db).is_none()
-                    && !bases_type.is_assignable_to(
-                        db,
-                        Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db)),
-                    )
-                    && let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
-                    ));
-                    diagnostic.set_primary_message(format_args!(
-                        "Expected `tuple[type, ...]`, found `{}`",
-                        bases_type.display(db)
-                    ));
-                }
-
-                bases_type
-                    .fixed_tuple_elements(db)
-                    .map(Cow::into_owned)
-                    .map(Into::into)
+                Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db))
             }
             DynamicClassKind::NewClass => {
-                let iterable_object =
-                    KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
-                if !bases_type.is_assignable_to(db, iterable_object)
-                    && let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
-                    ));
-                    diagnostic.set_primary_message(format_args!(
-                        "Expected `Iterable[object]`, found `{}`",
-                        bases_type.display(db)
-                    ));
-                }
-
-                extract_new_class_explicit_bases(db, bases_node, bases_type, |expr| {
-                    self.expression_type(expr)
-                })
+                KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])
             }
+        };
+
+        let is_valid_argument = match kind {
+            DynamicClassKind::TypeCall => {
+                bases_type.tuple_instance_spec(db).is_some()
+                    || bases_type.is_assignable_to(db, formal_parameter_type)
+            }
+            DynamicClassKind::NewClass => bases_type.is_assignable_to(db, formal_parameter_type),
+        };
+
+        if !is_valid_argument
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `{}`, found `{}`",
+                formal_parameter_type.display(db),
+                bases_type.display(db)
+            ));
         }
+
+        extract_dynamic_class_explicit_bases(db, bases_node, bases_type, |expr| {
+            self.expression_type(expr)
+        })
     }
 
     /// Validate base classes from the second argument of a `type()` or `types.new_class()` call.
@@ -3939,28 +3926,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
-                ClassBase::Dynamic(_) => {
-                    // `type[X]` where X is a concrete class is a valid base, but we
-                    // can't determine the exact class, so we emit
-                    // `unsupported-dynamic-base`. `type[Any]`/`type[Unknown]` are fine
-                    // as-is since the dynamic kind propagates.
-                    if let Type::SubclassOf(s) = base
-                        && !s.subclass_of().is_dynamic()
-                        && let Some(builder) = self
-                            .context
-                            .report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_node)
-                    {
-                        let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-                        diagnostic
-                            .set_primary_message(format_args!("Has type `{}`", base.display(db)));
-                        diagnostic.info(format_args!(
-                            "ty cannot determine a MRO for class `{name}` due to this base"
-                        ));
-                        diagnostic.info("Only class objects or `Any` are supported as class bases");
-                    }
-                }
-                ClassBase::Divergent(_) => {
-                    // Divergent bases are allowed.
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                    // Dynamic bases are allowed.
                 }
             }
         }
@@ -7119,6 +7086,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Infer the variadic argument types needed for call binding and emit the shared diagnostics
+    /// for invalid `*args` and `**kwargs` inputs.
+    fn prepare_call_arguments<'a>(
+        &mut self,
+        arguments: &'a ast::Arguments,
+    ) -> CallArguments<'a, 'db> {
+        let call_arguments =
+            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
+                let ty = self.infer_expression(splatted_value, TypeContext::default());
+                if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
+                    && argument.is_starred_expr()
+                {
+                    self.store_expression_type(argument, ty);
+                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
+                    return ty;
+                }
+
+                ty
+            });
+
+        for arg in &arguments.args {
+            if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
+                let iterable_type = self.expression_type(value);
+                if let Err(err) = iterable_type.try_iterate(self.db()) {
+                    err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                }
+            }
+        }
+
+        for keyword in arguments
+            .keywords
+            .iter()
+            .filter(|keyword| keyword.arg.is_none())
+        {
+            let mapping_type = self.expression_type(&keyword.value);
+
+            if mapping_type.as_paramspec_typevar(self.db()).is_some()
+                || mapping_type.unpack_keys_and_items(self.db()).is_some()
+            {
+                continue;
+            }
+
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
+            else {
+                continue;
+            };
+
+            builder
+                .into_diagnostic("Argument expression after ** must be a mapping type")
+                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
+        }
+
+        call_arguments
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -7208,51 +7232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let mut call_arguments =
-            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
-                let ty = self.infer_expression(splatted_value, TypeContext::default());
-                if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
-                    && argument.is_starred_expr()
-                {
-                    self.store_expression_type(argument, ty);
-                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
-                    return ty;
-                }
-
-                ty
-            });
-
-        // Validate that starred arguments are iterable.
-        for arg in &arguments.args {
-            if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
-                let iterable_type = self.expression_type(value);
-                if let Err(err) = iterable_type.try_iterate(self.db()) {
-                    err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                }
-            }
-        }
-
-        // Validate that double-starred keyword arguments are mappings.
-        for keyword in arguments.keywords.iter().filter(|k| k.arg.is_none()) {
-            let mapping_type = self.expression_type(&keyword.value);
-
-            if mapping_type.as_paramspec_typevar(self.db()).is_some()
-                || mapping_type.unpack_keys_and_items(self.db()).is_some()
-            {
-                continue;
-            }
-
-            let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
-            else {
-                continue;
-            };
-
-            builder
-                .into_diagnostic("Argument expression after ** must be a mapping type")
-                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
-        }
+        let mut call_arguments = self.prepare_call_arguments(arguments);
 
         if callable_type.is_notimplemented(self.db()) {
             if let Some(builder) = self

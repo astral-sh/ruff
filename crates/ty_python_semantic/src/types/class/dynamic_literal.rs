@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -15,13 +13,12 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
         definition_expression_type,
-        function::KnownFunction,
         member::Member,
         mro::{DynamicMroError, Mro, MroIterator},
     },
 };
 
-/// A class created dynamically via a three-argument `type()` call.
+/// A class created dynamically via a three-argument `type()` or `types.new_class()` call.
 ///
 /// For example:
 /// ```python
@@ -110,26 +107,32 @@ pub enum DynamicClassAnchor<'db> {
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
-/// Extract the explicit bases from a `types.new_class()` `bases` argument.
+/// Returns the `bases` argument for a dynamic class constructor call.
 ///
-/// This helper accepts tuple and list literals directly so we preserve precise base types for the
-/// common cases, and otherwise falls back to a fixed-length iterable extraction when the argument's
+/// Dynamic class constructors accept `bases` either as the second positional argument or as a
+/// `bases=` keyword argument.
+pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
+    arguments.args.get(1).or_else(|| {
+        arguments
+            .keywords
+            .iter()
+            .find(|kw| kw.arg.as_deref() == Some("bases"))
+            .map(|kw| &kw.value)
+    })
+}
+
+/// Extract the explicit bases from a dynamic class `bases` argument.
+///
+/// This helper accepts list literals directly so we preserve precise base types for the common
+/// cases, and otherwise falls back to a fixed-length iterable extraction when the argument's
 /// inferred type provides one.
-pub(crate) fn extract_new_class_explicit_bases<'db>(
+pub(crate) fn extract_dynamic_class_explicit_bases<'db>(
     db: &'db dyn Db,
     bases_arg: &ast::Expr,
     bases_type: Type<'db>,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
     match bases_arg {
-        ast::Expr::Tuple(tuple) => Some(
-            tuple
-                .elts
-                .iter()
-                .map(&mut expression_type)
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        ),
         ast::Expr::List(list) => Some(
             list.elts
                 .iter()
@@ -193,41 +196,17 @@ impl<'db> DynamicClassLiteral<'db> {
                 .as_call_expr()
                 .expect("Definition value should be a call expression");
 
-            // The `bases` argument is the second positional argument, or the `bases=` keyword.
-            let bases_arg = call_expr.arguments.args.get(1).or_else(|| {
-                call_expr
-                    .arguments
-                    .keywords
-                    .iter()
-                    .find(|kw| kw.arg.as_deref() == Some("bases"))
-                    .map(|kw| &kw.value)
-            });
-            let Some(bases_arg) = bases_arg else {
+            let Some(bases_arg) = dynamic_class_bases_argument(&call_expr.arguments) else {
                 return Box::default();
             };
-
-            let is_new_class = definition_expression_type(db, definition, call_expr.func.as_ref())
-                .as_function_literal()
-                .is_some_and(|function| function.is_known(db, KnownFunction::NewClass));
-
-            if is_new_class {
-                let bases_type = definition_expression_type(db, definition, bases_arg);
-                return extract_new_class_explicit_bases(db, bases_arg, bases_type, |expr| {
-                    definition_expression_type(db, definition, expr)
-                })
-                .unwrap_or_else(|| Box::from([Type::unknown()]));
-            }
 
             // Use `definition_expression_type` for deferred inference support.
             let bases_type = definition_expression_type(db, definition, bases_arg);
 
-            // For variable-length tuples (like `tuple[type, ...]`), we can't statically
-            // determine the bases, so return Unknown.
-            bases_type
-                .fixed_tuple_elements(db)
-                .map(Cow::into_owned)
-                .map(Into::into)
-                .unwrap_or_else(|| Box::from([Type::unknown()]))
+            extract_dynamic_class_explicit_bases(db, bases_arg, bases_type, |expr| {
+                definition_expression_type(db, definition, expr)
+            })
+            .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
         match self.anchor(db) {

@@ -1,7 +1,6 @@
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
-use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
@@ -100,15 +99,10 @@ impl<'db> ClassBase<'db> {
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                // Given `type[Any]` or `type[Unknown]`, preserve the dynamic kind.
-                SubclassOfInner::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
-                // Given `type[X]` for a concrete class or TypeVar, we know it's a valid class, but
-                // not which one; treat it as unknown.
-                SubclassOfInner::Class(_) | SubclassOfInner::TypeVar(_) => {
-                    Some(ClassBase::unknown())
-                }
-            },
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .map(ClassBase::Dynamic),
             Type::Intersection(inter) => {
                 let valid_element = inter
                     .positive(db)

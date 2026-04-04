@@ -545,10 +545,22 @@ type("Foo", (1, 2), {})
 type("Foo", (Base,), {b"attr": 1})
 ```
 
+Assigned calls still preserve list-literal base information after reporting the invalid `bases`
+argument:
+
+```py
+class Base:
+    attr: int = 1
+
+# error: [invalid-argument-type]
+FromList = type("FromList", [Base], {})
+reveal_type(FromList().attr)  # revealed: int
+```
+
 ## `type[...]` as base class
 
-`type[...]` (SubclassOf) types are valid class bases, but ty cannot determine the exact class, so it
-cannot solve the MRO. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
+`type[...]` (SubclassOf) types are valid class bases, but the exact class is not known, so the MRO
+cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
 This gives exactly one diagnostic rather than cascading errors:
 
 ```py
@@ -571,8 +583,8 @@ def f(x: type[Base]):
     reveal_type(child.base_attr)  # revealed: Unknown
 ```
 
-`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed — the MRO
-being unknowable is inherent to `Any`/`Unknown`, not a ty limitation:
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
+unknowable MRO is already inherent to `Any`/`Unknown`:
 
 ```py
 from typing import Any

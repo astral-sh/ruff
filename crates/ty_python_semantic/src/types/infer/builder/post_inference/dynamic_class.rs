@@ -2,7 +2,7 @@ use crate::{
     semantic_index::definition::{Definition, DefinitionKind},
     types::{
         ClassLiteral, Type, binding_type,
-        class::{DynamicClassAnchor, DynamicMetaclassConflict},
+        class::{DynamicClassAnchor, DynamicMetaclassConflict, dynamic_class_bases_argument},
         context::InferContext,
         diagnostic::{
             IncompatibleBases, report_conflicting_metaclass_from_bases,
@@ -43,15 +43,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    // Find the bases argument: second positional, or `bases=` keyword.
-    let Some(bases) = call_expr.arguments.args.get(1).or_else(|| {
-        call_expr
-            .arguments
-            .keywords
-            .iter()
-            .find(|kw| kw.arg.as_deref() == Some("bases"))
-            .map(|kw| &kw.value)
-    }) else {
+    let Some(bases) = dynamic_class_bases_argument(&call_expr.arguments) else {
         return;
     };
 

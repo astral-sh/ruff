@@ -1,8 +1,8 @@
 use super::{ArgumentsIter, DynamicClassKind, TypeInferenceBuilder};
 use crate::semantic_index::definition::Definition;
-use crate::types::call::CallArguments;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
+    dynamic_class_bases_argument,
 };
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
@@ -12,62 +12,6 @@ use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_exp
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// Deferred inference for assigned `types.new_class()` calls.
-    ///
-    /// Infers the bases argument that was skipped during initial inference to handle
-    /// forward references and recursive definitions.
-    pub(super) fn infer_new_class_deferred(
-        &mut self,
-        definition: Definition<'db>,
-        call_expr: &ast::Expr,
-    ) {
-        let db = self.db();
-
-        let ast::Expr::Call(call) = call_expr else {
-            return;
-        };
-
-        // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
-        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
-            return;
-        };
-
-        // Find the bases argument: second positional, or `bases=` keyword.
-        let bases_arg = call.arguments.args.get(1).or_else(|| {
-            call.arguments
-                .keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("bases"))
-                .map(|kw| &kw.value)
-        });
-
-        let Some(bases_arg) = bases_arg else {
-            return;
-        };
-
-        // Set the typevar binding context to allow legacy typevar binding in expressions
-        // like `Generic[T]`. This matches the context used during initial inference.
-        let previous_context = self.typevar_binding_context.replace(definition);
-
-        // Infer the bases argument (this was skipped during initial inference).
-        let bases_type = self.infer_expression(bases_arg, TypeContext::default());
-
-        // Restore the previous context.
-        self.typevar_binding_context = previous_context;
-
-        // Extract and validate bases.
-        let Some(bases) =
-            self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::NewClass)
-        else {
-            return;
-        };
-
-        // Validate individual bases for special types that aren't allowed in dynamic classes.
-        let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::NewClass);
-    }
-
     /// Infer a `types.new_class(name, bases, kwds, exec_body)` call.
     ///
     /// This method *does not* call `infer_expression` on the object being called;
@@ -113,12 +57,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .find(|kw| kw.arg.as_deref() == Some("name"))
                 .map(|kw| &kw.value)
         });
-        let bases_arg = args.get(1).or_else(|| {
-            keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("bases"))
-                .map(|kw| &kw.value)
-        });
+        let bases_arg = dynamic_class_bases_argument(&call_expr.arguments);
 
         self.validate_new_class_call_arguments(call_expr, name_node, bases_arg, definition);
 
@@ -190,6 +129,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `new_class()` doesn't accept a namespace dict, so members are always empty.
         // If `exec_body` is provided (and is not `None`), it can populate the namespace
         // dynamically, so we mark it as dynamic. Without `exec_body`, no members can be added.
+        //
+        // TODO: Model `kwds`, especially `{"metaclass": Meta}`. `types.new_class()` uses the
+        // third argument for explicit metaclass overrides, but we currently only account for
+        // metaclass behavior that follows from the resolved bases.
         let exec_body_arg = args.get(3).or_else(|| {
             keywords
                 .iter()
@@ -250,6 +193,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
     }
 
+    /// Deferred inference for assigned `types.new_class()` calls.
+    ///
+    /// Infers the bases argument that was skipped during initial inference to handle
+    /// forward references and recursive definitions.
+    pub(super) fn infer_new_class_deferred(
+        &mut self,
+        definition: Definition<'db>,
+        call_expr: &ast::Expr,
+    ) {
+        let db = self.db();
+
+        let ast::Expr::Call(call) = call_expr else {
+            return;
+        };
+
+        // Get the already-inferred class type from the initial pass.
+        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
+            return;
+        };
+
+        let Some(bases_arg) = dynamic_class_bases_argument(&call.arguments) else {
+            return;
+        };
+
+        // Set the typevar binding context to allow legacy typevar binding in expressions
+        // like `Generic[T]`. This matches the context used during initial inference.
+        let previous_context = self.typevar_binding_context.replace(definition);
+
+        // Infer the bases argument (this was skipped during initial inference).
+        let bases_type = self.infer_expression(bases_arg, TypeContext::default());
+
+        // Restore the previous context.
+        self.typevar_binding_context = previous_context;
+
+        // Extract and validate bases.
+        let Some(bases) =
+            self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::NewClass)
+        else {
+            return;
+        };
+
+        // Validate individual bases for special types that aren't allowed in dynamic classes.
+        let name = dynamic_class.name(db);
+        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::NewClass);
+    }
+
     /// Preserve normal call-binding diagnostics for `types.new_class()` while still allowing
     /// special inference of the name and bases arguments.
     fn validate_new_class_call_arguments(
@@ -262,59 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let callable_type = self.expression_type(call_expr.func.as_ref());
         let iterable_object = KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
-
-        let mut call_arguments = CallArguments::from_arguments(
-            &call_expr.arguments,
-            |arg_or_keyword, splatted_value| {
-                let ty = self.infer_expression(splatted_value, TypeContext::default());
-                if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
-                    && argument.is_starred_expr()
-                {
-                    self.store_expression_type(argument, ty);
-                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
-                    return ty;
-                }
-
-                ty
-            },
-        );
-
-        // Validate that starred arguments are iterable.
-        for arg in &call_expr.arguments.args {
-            if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
-                let iterable_type = self.expression_type(value);
-                if let Err(err) = iterable_type.try_iterate(db) {
-                    err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                }
-            }
-        }
-
-        // Validate that double-starred keyword arguments are mappings.
-        for keyword in call_expr
-            .arguments
-            .keywords
-            .iter()
-            .filter(|kw| kw.arg.is_none())
-        {
-            let mapping_type = self.expression_type(&keyword.value);
-
-            if mapping_type.as_paramspec_typevar(db).is_some()
-                || mapping_type.unpack_keys_and_items(db).is_some()
-            {
-                continue;
-            }
-
-            let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
-            else {
-                continue;
-            };
-
-            builder
-                .into_diagnostic("Argument expression after ** must be a mapping type")
-                .set_primary_message(format_args!("Found `{}`", mapping_type.display(db)));
-        }
+        let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
 
         let mut bindings = callable_type
             .bindings(db)

@@ -49,22 +49,6 @@ NewFoo = types.new_class("NewFoo", (Base,))
 tests.append(NewFoo)  # No error - type[NewFoo] is assignable to type[Base]
 ```
 
-## Assignment definition
-
-When assigned to a variable, the dynamic class is identified by the definition.
-
-```py
-import types
-
-class Base: ...
-
-MyClass = types.new_class("MyClass", (Base,))
-reveal_type(MyClass)  # revealed: <class 'MyClass'>
-
-instance = MyClass()
-reveal_type(instance)  # revealed: MyClass
-```
-
 ## Invalid calls
 
 ### Non-string name
@@ -151,6 +135,10 @@ types.new_class("Dup", (Base, Base))
 `types.new_class()` properly handles `__mro_entries__` and metaclasses, so it supports bases that
 `type()` does not.
 
+These cases are mostly about showing that class creation is valid and that ty preserves the base
+information it can see. `types.new_class()` still doesn't let ty observe explicit class members
+unless `exec_body` populates the namespace dynamically, and then attribute types become `Unknown`.
+
 ### Iterable bases
 
 Any iterable of bases is accepted. When the iterable is a list literal, we should still preserve the
@@ -221,8 +209,8 @@ reveal_type(TypedDictClass)  # revealed: <class 'TypedDictClass'>
 
 ### `type[X]` bases
 
-`type[X]` represents "some subclass of X". This is a valid base class, but ty cannot determine the
-exact class, so it cannot solve the MRO. `Unknown` is inserted and `unsupported-dynamic-base` is
+`type[X]` represents "some subclass of X". This is a valid base class, but the exact class is not
+known, so the MRO cannot be resolved. `Unknown` is inserted and `unsupported-dynamic-base` is
 emitted:
 
 ```py
@@ -242,8 +230,8 @@ def f(x: type[Base]):
     reveal_type(child.base_attr)  # revealed: Unknown
 ```
 
-`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed — the MRO
-being unknowable is inherent to `Any`/`Unknown`, not a ty limitation:
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
+unknowable MRO is already inherent to `Any`/`Unknown`:
 
 ```py
 import types
@@ -270,16 +258,19 @@ class Base:
 NoBody = types.new_class("NoBody", (Base,))
 instance = NoBody()
 reveal_type(instance.base_attr)  # revealed: int
+instance.missing_attr  # error: [unresolved-attribute]
 
 # With exec_body=None: same as no exec_body
 NoBodyExplicit = types.new_class("NoBodyExplicit", (Base,), exec_body=None)
 instance_explicit = NoBodyExplicit()
 reveal_type(instance_explicit.base_attr)  # revealed: int
+instance_explicit.missing_attr  # error: [unresolved-attribute]
 
 # With exec_body=None passed positionally: same as no exec_body
 NoBodyPositional = types.new_class("NoBodyPositional", (Base,), None, None)
 instance_positional = NoBodyPositional()
 reveal_type(instance_positional.base_attr)  # revealed: int
+instance_positional.missing_attr  # error: [unresolved-attribute]
 
 # With exec_body: namespace is dynamic, so any attribute access returns Unknown
 def body(ns):
@@ -288,7 +279,7 @@ def body(ns):
 WithBody = types.new_class("WithBody", (Base,), exec_body=body)
 instance2 = WithBody()
 reveal_type(instance2.x)  # revealed: Unknown
-reveal_type(instance2.anything)  # revealed: Unknown
+reveal_type(instance2.base_attr)  # revealed: Unknown
 ```
 
 ## Forward references via string annotations
