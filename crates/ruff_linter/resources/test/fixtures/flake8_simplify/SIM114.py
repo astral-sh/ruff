@@ -157,3 +157,35 @@ elif True:
     print(1)
 else:
     print(2)
+
+
+# See: https://github.com/astral-sh/ruff/issues/19576
+# Comments between branches should trigger an unsafe fix.
+if x == 1:
+    b
+# This is an important comment between branches
+elif x == 2:
+    b
+
+# Inline comment on the following elif test should trigger an unsafe fix.
+if x == 1:
+    b
+elif x == 2:  # trailing comment on elif
+    b
+
+# Comments in multi-line conditions should trigger an unsafe fix.
+if isinstance(exc, HTTPError) and (
+    exc.status == 408  # request timeout
+    or exc.status == 429  # too many requests
+):
+    b
+elif isinstance(exc, SSLError):
+    b
+
+# Differing body comments should trigger an unsafe fix.
+if x == 1:
+    # reason A
+    b
+elif x == 2:
+    # reason B
+    b

@@ -47,6 +47,7 @@ help: Combine `if` branches
 8  |     b
 9  |
 10 | if x == 1:
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
   --> SIM114.py:12:1
@@ -316,6 +317,34 @@ help: Combine `if` branches
 74 |
 
 SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:107:1
+    |
+105 |       errors = 1
+106 |
+107 | / if a:
+108 | |     # Ignore branches with diverging comments because it means we're repeating
+109 | |     # the bodies because we have different reasons for each branch
+110 | |     x = 1
+111 | | elif c:
+112 | |     x = 1
+    | |_________^
+    |
+help: Combine `if` branches
+104 | else:
+105 |     errors = 1
+106 |
+    - if a:
+107 + if a or c:
+108 |     # Ignore branches with diverging comments because it means we're repeating
+109 |     # the bodies because we have different reasons for each branch
+    -     x = 1
+    - elif c:
+110 |     x = 1
+111 |
+112 |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:118:5
     |
 116 |       a = True
@@ -406,6 +435,7 @@ help: Combine `if` branches
 139 |     b
 140 |
 141 |
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:144:1
@@ -468,3 +498,108 @@ help: Combine `if` branches
 155 |     print(1)
 156 | else:
 157 |     print(2)
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:164:1
+    |
+162 |   # See: https://github.com/astral-sh/ruff/issues/19576
+163 |   # Comments between branches should trigger an unsafe fix.
+164 | / if x == 1:
+165 | |     b
+166 | | # This is an important comment between branches
+167 | | elif x == 2:
+168 | |     b
+    | |_____^
+169 |
+170 |   # Inline comment on the following elif test should trigger an unsafe fix.
+    |
+help: Combine `if` branches
+161 |
+162 | # See: https://github.com/astral-sh/ruff/issues/19576
+163 | # Comments between branches should trigger an unsafe fix.
+    - if x == 1:
+    -     b
+    - # This is an important comment between branches
+    - elif x == 2:
+164 + if x == 1 or x == 2:
+165 |     b
+166 |
+167 | # Inline comment on the following elif test should trigger an unsafe fix.
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:171:1
+    |
+170 |   # Inline comment on the following elif test should trigger an unsafe fix.
+171 | / if x == 1:
+172 | |     b
+173 | | elif x == 2:  # trailing comment on elif
+174 | |     b
+    | |_____^
+175 |
+176 |   # Comments in multi-line conditions should trigger an unsafe fix.
+    |
+help: Combine `if` branches
+168 |     b
+169 |
+170 | # Inline comment on the following elif test should trigger an unsafe fix.
+    - if x == 1:
+    -     b
+    - elif x == 2:  # trailing comment on elif
+171 + if x == 1 or x == 2:
+172 |     b
+173 |
+174 | # Comments in multi-line conditions should trigger an unsafe fix.
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:177:1
+    |
+176 |   # Comments in multi-line conditions should trigger an unsafe fix.
+177 | / if isinstance(exc, HTTPError) and (
+178 | |     exc.status == 408  # request timeout
+179 | |     or exc.status == 429  # too many requests
+180 | | ):
+181 | |     b
+182 | | elif isinstance(exc, SSLError):
+183 | |     b
+    | |_____^
+184 |
+185 |   # Differing body comments should trigger an unsafe fix.
+    |
+help: Combine `if` branches
+177 | if isinstance(exc, HTTPError) and (
+178 |     exc.status == 408  # request timeout
+179 |     or exc.status == 429  # too many requests
+    - ):
+    -     b
+    - elif isinstance(exc, SSLError):
+180 + ) or isinstance(exc, SSLError):
+181 |     b
+182 |
+183 | # Differing body comments should trigger an unsafe fix.
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+   --> SIM114.py:186:1
+    |
+185 |   # Differing body comments should trigger an unsafe fix.
+186 | / if x == 1:
+187 | |     # reason A
+188 | |     b
+189 | | elif x == 2:
+190 | |     # reason B
+191 | |     b
+    | |_____^
+    |
+help: Combine `if` branches
+183 |     b
+184 |
+185 | # Differing body comments should trigger an unsafe fix.
+    - if x == 1:
+186 + if x == 1 or x == 2:
+187 |     # reason A
+    -     b
+    - elif x == 2:
+    -     # reason B
+188 |     b
+note: This is an unsafe fix and may change runtime behavior

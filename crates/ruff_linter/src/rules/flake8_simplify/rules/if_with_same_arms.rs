@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` branches with identical arm bodies.
@@ -35,6 +35,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// if x == 1 or x == 2:
 ///     print("Hello")
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the `if`/`elif` branches contain
+/// comments that would be deleted by merging the branches (e.g., comments
+/// between the branches, inline comments on the condition, or differing
+/// comments in the bodies). Otherwise, the fix can be applied safely.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.246")]
 pub(crate) struct IfWithSameArms;
@@ -73,7 +80,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        // ...and the same comments
+        // Check if body comments differ — if so, the fix removes comments
         let first_comments = checker
             .comment_ranges()
             .comments_in_range(body_range(&current_branch, checker.locator()))
@@ -84,9 +91,24 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             .comments_in_range(body_range(following_branch, checker.locator()))
             .iter()
             .map(|range| checker.locator().slice(*range));
-        if !first_comments.eq(second_comments) {
-            continue;
-        }
+        let has_different_body_comments = !first_comments.eq(second_comments);
+
+        // Check for comments between the branches or on the following branch's
+        // test line (e.g., inline comments in conditions, trailing comments on
+        // the elif line). These would be lost when the fix merges the branches.
+        let has_non_body_comments = !checker
+            .comment_ranges()
+            .comments_in_range(TextRange::new(
+                checker.locator().full_line_end(current_branch.end()),
+                checker.locator().line_end(following_branch.test.end()),
+            ))
+            .is_empty();
+
+        let applicability = if has_different_body_comments || has_non_body_comments {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
         let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
@@ -100,6 +122,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 following_branch,
                 checker.locator(),
                 checker.tokens(),
+                applicability,
             )
         });
     }
@@ -112,6 +135,7 @@ fn merge_branches(
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
+    applicability: Applicability,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -164,9 +188,10 @@ fn merge_branches(
             None
         };
 
-    Ok(Fix::safe_edits(
+    Ok(Fix::applicable_edits(
         deletion_edit,
         parenthesize_edit.into_iter().chain(Some(insertion_edit)),
+        applicability,
     ))
 }
 
