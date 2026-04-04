@@ -11,6 +11,7 @@ use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
@@ -320,12 +321,14 @@ impl WorkspaceOptions {
     }
 }
 
-fn resolve_editor_python_version(version: &EnvironmentVersion) -> Result<PythonVersion, String> {
+fn resolve_editor_python_version(
+    version: &EnvironmentVersion,
+) -> Result<SupportedPythonVersion, String> {
     let version_text = format!("{}.{}", version.major, version.minor);
     let unsupported_version = || {
         format!(
             "Unsupported Python version `{version_text}` selected in your editor; expected one of {}.",
-            PythonVersion::iter()
+            SupportedPythonVersion::iter()
                 .map(|version| format!("`{version}`"))
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -339,12 +342,8 @@ fn resolve_editor_python_version(version: &EnvironmentVersion) -> Result<PythonV
         return Err(unsupported_version());
     };
 
-    let python_version = PythonVersion::from((major, minor));
-    if PythonVersion::iter().any(|version| version == python_version) {
-        Ok(python_version)
-    } else {
-        Err(unsupported_version())
-    }
+    SupportedPythonVersion::try_from(PythonVersion::from((major, minor)))
+        .map_err(|_| unsupported_version())
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]

@@ -1,7 +1,6 @@
 mod args;
 mod logging;
 mod printer;
-mod python_version;
 mod rule;
 mod version;
 

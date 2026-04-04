@@ -4538,6 +4538,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
+ "clap",
  "colored 3.1.1",
  "crossbeam",
  "get-size2",

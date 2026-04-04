@@ -1,5 +1,4 @@
 use crate::logging::Verbosity;
-use crate::python_version::PythonVersion;
 use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
@@ -7,6 +6,7 @@ use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
 use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 use ty_static::EnvVars;
@@ -122,8 +122,8 @@ pub(crate) struct CheckCommand {
     /// 2. Check for an activated or configured Python environment
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
-    pub(crate) python_version: Option<PythonVersion>,
+    #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
+    pub(crate) python_version: Option<SupportedPythonVersion>,
 
     /// Target platform to assume when resolving types.
     ///
@@ -238,9 +238,7 @@ impl CheckCommand {
             .or(self.respect_ignore_files);
         let options = Options {
             environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
+                python_version: self.python_version.map(RangedValue::cli),
                 python_platform: self
                     .python_platform
                     .map(|platform| RangedValue::cli(platform.into())),

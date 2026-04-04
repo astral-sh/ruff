@@ -89,15 +89,15 @@ over all configuration files.</p>
 <p>If a version is not specified on the command line or in a configuration file, ty will try the following techniques in order of preference to determine a value: 1. Check for the <code>project.requires-python</code> setting in a <code>pyproject.toml</code> file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the latest stable Python version supported by ty (see <code>ty check --help</code> output)</p>
 <p>Possible values:</p>
 <ul>
-<li><code>3.7</code></li>
-<li><code>3.8</code></li>
-<li><code>3.9</code></li>
-<li><code>3.10</code></li>
-<li><code>3.11</code></li>
-<li><code>3.12</code></li>
-<li><code>3.13</code></li>
-<li><code>3.14</code></li>
-<li><code>3.15</code></li>
+<li><code>3.7</code>:  Python 3.7</li>
+<li><code>3.8</code>:  Python 3.8</li>
+<li><code>3.9</code>:  Python 3.9</li>
+<li><code>3.10</code>:  Python 3.10</li>
+<li><code>3.11</code>:  Python 3.11</li>
+<li><code>3.12</code>:  Python 3.12</li>
+<li><code>3.13</code>:  Python 3.13</li>
+<li><code>3.14</code>:  Python 3.14</li>
+<li><code>3.15</code>:  Python 3.15</li>
 </ul></dd><dt id="ty-check--quiet"><a href="#ty-check--quiet"><code>--quiet</code></a>, <code>-q</code></dt><dd><p>Use quiet output (or <code>-qq</code> for silent output)</p>
 </dd><dt id="ty-check--respect-ignore-files"><a href="#ty-check--respect-ignore-files"><code>--respect-ignore-files</code></a></dt><dd><p>Respect file exclusions via <code>.gitignore</code> and other standard ignore files. Use <code>--no-respect-ignore-files</code> to disable</p>
 </dd><dt id="ty-check--typeshed"><a href="#ty-check--typeshed"><code>--typeshed</code></a>, <code>--custom-typeshed-dir</code> <i>path</i></dt><dd><p>Custom directory to use for stdlib typeshed stubs</p>

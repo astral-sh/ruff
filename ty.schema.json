@@ -144,10 +144,10 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/definitions/SupportedPythonVersion"
             },
             {
               "type": "null"
@@ -307,50 +307,6 @@
         {
           "description": "Windows",
           "const": "win32"
-        }
-      ]
-    },
-    "PythonVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "description": "Python 3.7",
-          "const": "3.7"
-        },
-        {
-          "description": "Python 3.8",
-          "const": "3.8"
-        },
-        {
-          "description": "Python 3.9",
-          "const": "3.9"
-        },
-        {
-          "description": "Python 3.10",
-          "const": "3.10"
-        },
-        {
-          "description": "Python 3.11",
-          "const": "3.11"
-        },
-        {
-          "description": "Python 3.12",
-          "const": "3.12"
-        },
-        {
-          "description": "Python 3.13",
-          "const": "3.13"
-        },
-        {
-          "description": "Python 3.14",
-          "const": "3.14"
-        },
-        {
-          "description": "Python 3.15",
-          "const": "3.15"
         }
       ]
     },
@@ -1565,6 +1521,56 @@
         }
       },
       "additionalProperties": false
+    },
+    "SupportedPythonVersion": {
+      "description": "A Python version explicitly supported by ty configuration and CLI parsing.",
+      "oneOf": [
+        {
+          "description": "Python 3.7",
+          "type": "string",
+          "const": "3.7"
+        },
+        {
+          "description": "Python 3.8",
+          "type": "string",
+          "const": "3.8"
+        },
+        {
+          "description": "Python 3.9",
+          "type": "string",
+          "const": "3.9"
+        },
+        {
+          "description": "Python 3.10",
+          "type": "string",
+          "const": "3.10"
+        },
+        {
+          "description": "Python 3.11",
+          "type": "string",
+          "const": "3.11"
+        },
+        {
+          "description": "Python 3.12",
+          "type": "string",
+          "const": "3.12"
+        },
+        {
+          "description": "Python 3.13",
+          "type": "string",
+          "const": "3.13"
+        },
+        {
+          "description": "Python 3.14",
+          "type": "string",
+          "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "type": "string",
+          "const": "3.15"
+        }
+      ]
     },
     "SystemPathBuf": {
       "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",
