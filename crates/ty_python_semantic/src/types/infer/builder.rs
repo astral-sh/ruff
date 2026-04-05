@@ -3395,23 +3395,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let fn_name = kind.function_name();
         let formal_parameter_type = match kind {
-            DynamicClassKind::TypeCall => {
-                Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db))
-            }
+            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, Type::object()),
             DynamicClassKind::NewClass => {
                 KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])
             }
         };
 
-        let is_valid_argument = match kind {
-            DynamicClassKind::TypeCall => {
-                bases_type.tuple_instance_spec(db).is_some()
-                    || bases_type.is_assignable_to(db, formal_parameter_type)
-            }
-            DynamicClassKind::NewClass => bases_type.is_assignable_to(db, formal_parameter_type),
-        };
-
-        if !is_valid_argument
+        if !bases_type.is_assignable_to(db, formal_parameter_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(

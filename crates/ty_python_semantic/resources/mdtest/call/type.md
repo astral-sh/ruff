@@ -534,7 +534,7 @@ class Base: ...
 # error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[object, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
 # error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
