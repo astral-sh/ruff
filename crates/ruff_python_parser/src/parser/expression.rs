@@ -1562,16 +1562,27 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
-    fn check_fstring_comments(&mut self, range: TextRange) {
-        self.unsupported_syntax_errors
-            .extend(self.tokens.in_range(range).iter().filter_map(|token| {
-                token.kind().is_comment().then_some(UnsupportedSyntaxError {
-                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                    range: token.range(),
-                    target_version: self.options.target_version,
-                })
-            }));
+    /// Check `range` for comment tokens, report an `UnsupportedSyntaxError` for each one found,
+    /// and return whether any comments were found.
+    fn check_fstring_comments(&mut self, range: TextRange) -> bool {
+        let mut has_comments = false;
+
+        self.unsupported_syntax_errors.extend(
+            self.tokens
+                .in_range(range)
+                .iter()
+                .filter(|token| token.kind().is_comment())
+                .map(|token| {
+                    has_comments = true;
+                    UnsupportedSyntaxError {
+                        kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                        range: token.range(),
+                        target_version: self.options.target_version,
+                    }
+                }),
+        );
+
+        has_comments
     }
 
     /// Parses a list of f/t-string elements.
@@ -1852,6 +1863,9 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
         // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"{
+        //     1
+        // }"
         // f"test {a \
         //     } more"                        # line continuation
 
@@ -1873,6 +1887,9 @@ impl<'src> Parser<'src> {
         // f'outer {x:{"# not a comment"} }'
         // f"""{f'''{f'{"# not a comment"}'}'''}"""
         // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"""{
+        //     1
+        // }"""
         // f"escape outside of \t {expr}\n"
         // f"test\"abcd"
         // f"{1:\x64}"  # escapes are valid in the format spec
@@ -1887,6 +1904,9 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
         // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"{
+        //     1
+        // }"
         // f"test {a \
         //     } more"                        # line continuation
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
@@ -1920,7 +1940,10 @@ impl<'src> Parser<'src> {
 
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
+            let mut has_backslash_or_comment = false;
+
             for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
+                has_backslash_or_comment = true;
                 let slash_position = TextSize::try_from(slash_position).unwrap();
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
@@ -1938,7 +1961,19 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            self.check_fstring_comments(range);
+            has_backslash_or_comment |= self.check_fstring_comments(range);
+
+            // Before Python 3.12, replacement fields could only span physical lines when the
+            // outer f-string was triple-quoted.
+            if !flags.is_triple_quoted()
+                && !has_backslash_or_comment
+                && memchr::memchr2(b'\n', b'\r', self.source[range].as_bytes()).is_some()
+            {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak),
+                    TextRange::at(range.start(), '{'.text_len()),
+                );
+            }
         }
 
         ast::InterpolatedElement {
