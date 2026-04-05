@@ -21,7 +21,10 @@ use crate::string::{
 };
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
-use crate::{InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{
+    InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,
+    UnsupportedSyntaxErrorKind,
+};
 
 use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -1559,6 +1562,29 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Check `range` for comment tokens, report an `UnsupportedSyntaxError` for each one found,
+    /// and return whether any comments were found.
+    fn check_fstring_comments(&mut self, range: TextRange) -> bool {
+        let mut has_comments = false;
+
+        self.unsupported_syntax_errors.extend(
+            self.tokens
+                .in_range(range)
+                .iter()
+                .filter(|token| token.kind().is_comment())
+                .map(|token| {
+                    has_comments = true;
+                    UnsupportedSyntaxError {
+                        kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                        range: token.range(),
+                        target_version: self.options.target_version,
+                    }
+                }),
+        );
+
+        has_comments
+    }
+
     /// Parses a list of f/t-string elements.
     ///
     /// # Panics
@@ -1912,37 +1938,16 @@ impl<'src> Parser<'src> {
                 .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
                 .unwrap_or(range);
 
-            let source = self.source[range].as_bytes();
-            let has_line_break =
-                !flags.is_triple_quoted() && memchr::memchr2(b'\n', b'\r', source).is_some();
-            let backslash_ranges = memchr::memchr_iter(b'\\', source)
-                .map(|slash_position| {
-                    let slash_position = TextSize::try_from(slash_position).unwrap();
-                    TextRange::at(range.start() + slash_position, '\\'.text_len())
-                })
-                .collect::<Vec<_>>();
-            let comment_ranges = self
-                .tokens
-                .in_range(range)
-                .iter()
-                .filter_map(|token| token.kind().is_comment().then_some(token.range()))
-                .collect::<Vec<_>>();
-
-            // Before Python 3.12, replacement fields could only span physical lines when the
-            // outer f-string was triple-quoted.
-            if has_line_break && backslash_ranges.is_empty() && comment_ranges.is_empty() {
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak),
-                    TextRange::at(range.start(), '{'.text_len()),
-                );
-            }
-
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
-            for backslash_range in backslash_ranges {
+            let mut has_backslash_or_comment = false;
+
+            for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
+                has_backslash_or_comment = true;
+                let slash_position = TextSize::try_from(slash_position).unwrap();
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                    backslash_range,
+                    TextRange::at(range.start() + slash_position, '\\'.text_len()),
                 );
             }
 
@@ -1956,10 +1961,17 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            for comment_range in comment_ranges {
+            has_backslash_or_comment |= self.check_fstring_comments(range);
+
+            // Before Python 3.12, replacement fields could only span physical lines when the
+            // outer f-string was triple-quoted.
+            if !flags.is_triple_quoted()
+                && !has_backslash_or_comment
+                && memchr::memchr2(b'\n', b'\r', self.source[range].as_bytes()).is_some()
+            {
                 self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                    comment_range,
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::LineBreak),
+                    TextRange::at(range.start(), '{'.text_len()),
                 );
             }
         }
