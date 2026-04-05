@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -14,13 +12,13 @@ use crate::{
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
-        definition_expression_type,
+        definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
         mro::{DynamicMroError, Mro, MroIterator},
     },
 };
 
-/// A class created dynamically via a three-argument `type()` call.
+/// A class created dynamically via a three-argument `type()` or `types.new_class()` call.
 ///
 /// For example:
 /// ```python
@@ -36,8 +34,9 @@ use crate::{
 ///
 /// # Salsa interning
 ///
-/// This is a Salsa-interned struct. Two different `type()` calls always produce
-/// distinct `DynamicClassLiteral` instances, even if they have the same name and bases:
+/// This is a Salsa-interned struct. Two different `type()` / `types.new_class()` calls
+/// always produce distinct `DynamicClassLiteral` instances, even if they have the same
+/// name and bases:
 ///
 /// ```python
 /// Foo1 = type("Foo", (Base,), {})
@@ -46,32 +45,32 @@ use crate::{
 /// ```
 ///
 /// The `anchor` field provides stable identity:
-/// - For assigned `type()` calls, the `Definition` uniquely identifies the class.
-/// - For dangling `type()` calls, a relative node offset anchored to the enclosing scope
+/// - For assigned calls, the `Definition` uniquely identifies the class.
+/// - For dangling calls, a relative node offset anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicClassLiteral<'db> {
-    /// The name of the class (from the first argument to `type()`).
+    /// The name of the class (from the first argument).
     #[returns(ref)]
     pub name: Name,
 
     /// The anchor for this dynamic class, providing stable identity.
     ///
-    /// - `Definition`: The `type()` call is assigned to a variable. The definition
-    ///   uniquely identifies this class and can be used to find the `type()` call.
-    /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
+    /// - `Definition`: The call is assigned to a variable. The definition
+    ///   uniquely identifies this class and can be used to find the call expression.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
     #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
-    /// The class members from the namespace dict (third argument to `type()`).
+    /// The class members extracted from the namespace argument.
     /// Each entry is a (name, type) pair extracted from the dict literal.
     #[returns(deref)]
     pub members: Box<[(Name, Type<'db>)]>,
 
-    /// Whether the namespace dict (third argument) is dynamic (not a literal dict,
-    /// or contains non-string-literal keys). When true, attribute lookups on this
-    /// class and its instances return `Unknown` instead of failing.
+    /// Whether the namespace is dynamic (not a literal dict, or contains
+    /// non-string-literal keys). When true, attribute lookups on this class
+    /// and its instances return `Unknown` instead of failing.
     pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
@@ -86,13 +85,13 @@ pub struct DynamicClassLiteral<'db> {
 /// - For dangling calls, a relative offset provides stable identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicClassAnchor<'db> {
-    /// The `type()` call is assigned to a variable.
+    /// The call is assigned to a variable.
     ///
-    /// The `Definition` uniquely identifies this class. The `type()` call expression
+    /// The `Definition` uniquely identifies this class. The call expression
     /// is the `value` of the assignment, so we can get its range from the definition.
     Definition(Definition<'db>),
 
-    /// The `type()` call is "dangling" (not assigned to a variable).
+    /// The call is "dangling" (not assigned to a variable).
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
@@ -107,6 +106,20 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
+
+/// Returns the `bases` argument for a dynamic class constructor call.
+///
+/// Dynamic class constructors accept `bases` either as the second positional argument or as a
+/// `bases=` keyword argument.
+pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
+    arguments.args.get(1).or_else(|| {
+        arguments
+            .keywords
+            .iter()
+            .find(|kw| kw.arg.as_deref() == Some("bases"))
+            .map(|kw| &kw.value)
+    })
+}
 
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
@@ -128,20 +141,20 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the explicit base classes of this dynamic class.
     ///
-    /// For assigned `type()` calls, bases are computed lazily using deferred inference
-    /// to handle forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    /// For assigned calls, bases are computed lazily using deferred inference to handle
+    /// forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
     ///
-    /// For dangling `type()` calls, bases are computed eagerly at creation time and
-    /// stored directly on the anchor, since dangling calls cannot recursively reference
-    /// the class being defined.
+    /// For dangling calls, bases are computed eagerly at creation time and stored
+    /// directly on the anchor, since dangling calls cannot recursively reference the
+    /// class being defined.
     ///
     /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
-    /// or if the bases argument is not a tuple.
+    /// or if the bases argument cannot be extracted precisely.
     ///
-    /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
+    /// Returns `[Unknown]` if the bases iterable is variable-length.
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
-        /// Only called for assigned `type()` calls where inference was deferred.
+        /// Only called for assigned calls where inference was deferred.
         #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
@@ -157,21 +170,15 @@ impl<'db> DynamicClassLiteral<'db> {
                 .as_call_expr()
                 .expect("Definition value should be a call expression");
 
-            // The `bases` argument is the second positional argument.
-            let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+            let Some(bases_arg) = dynamic_class_bases_argument(&call_expr.arguments) else {
                 return Box::default();
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            let bases_type = definition_expression_type(db, definition, bases_arg);
-
-            // For variable-length tuples (like `tuple[type, ...]`), we can't statically
-            // determine the bases, so return Unknown.
-            bases_type
-                .fixed_tuple_elements(db)
-                .map(Cow::into_owned)
-                .map(Into::into)
-                .unwrap_or_else(|| Box::from([Type::unknown()]))
+            extract_fixed_length_iterable_element_types(db, bases_arg, |expr| {
+                definition_expression_type(db, definition, expr)
+            })
+            .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
         match self.anchor(db) {
