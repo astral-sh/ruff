@@ -3646,9 +3646,12 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                // Use the already-bound callable view here so `Self` is specialized from the
+                // receiver type before overload matching. Re-checking an implicit synthetic
+                // `self` argument is too strict for bound methods whose receiver is a typevar
+                // bounded by a union.
+                let callable = bound_method.into_callable_type(db);
+                CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
                     .into()
             }
 

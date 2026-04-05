@@ -126,6 +126,27 @@ class D[U](C[U]):
 reveal_type(D[int]().f)  # revealed: bound method D[int].f(x: int) -> str
 ```
 
+## `Self` methods on union-bounded typevars
+
+Bound methods should specialize `Self` from the original receiver typevar, even when that typevar's
+upper bound is a union of unrelated classes.
+
+```py
+from typing import Self, assert_type
+
+class A:
+    def f(self) -> Self:
+        return self
+
+class B:
+    def f(self) -> Self:
+        return self
+
+def f[T: A | B](x: T) -> T:
+    assert_type(x.f(), T)
+    return x.f()
+```
+
 ## Methods can mention other typevars
 
 > A type variable used in a method that does not match any of the variables that parameterize the
