@@ -6892,12 +6892,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(class) = class
             && class.is_typed_dict(self.db())
         {
+            let mut speculative = self.speculate();
             validate_typed_dict_constructor(
                 &self.context,
                 TypedDictType::new(class),
                 arguments,
                 func.as_ref().into(),
-                |expr| self.expression_type(expr),
+                |expr, tcx| speculative.infer_expression(expr, tcx),
             );
         }
 

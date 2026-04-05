@@ -922,7 +922,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     error_node: AnyNodeRef<'ast>,
-    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+    mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -939,7 +939,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             typed_dict,
             arguments,
             error_node,
-            &expression_type_fn,
+            &mut expression_type_fn,
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
     } else if is_single_positional_arg {
@@ -948,7 +948,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg);
+        let arg_ty = expression_type_fn(arg, TypeContext::default());
         let target_ty = Type::TypedDict(typed_dict);
 
         if !arg_ty.is_assignable_to(db, target_ty) {
@@ -966,7 +966,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             typed_dict,
             arguments,
             error_node,
-            &expression_type_fn,
+            &mut expression_type_fn,
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
     }
@@ -979,9 +979,10 @@ fn validate_from_dict_literal<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let mut provided_keys = OrderSet::new();
+    let items = typed_dict.items(context.db());
 
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
@@ -994,8 +995,11 @@ fn validate_from_dict_literal<'db, 'ast>(
                 let key = key_value.to_str();
                 provided_keys.insert(Name::new(key));
 
-                // Get the already-inferred argument type
-                let value_ty = expression_type_fn(&dict_item.value);
+                let value_tcx = items
+                    .get(key)
+                    .map(|field| TypeContext::new(Some(field.declared_ty)))
+                    .unwrap_or_default();
+                let value_ty = expression_type_fn(&dict_item.value, value_tcx);
                 TypedDictKeyAssignment {
                     context,
                     typed_dict,
@@ -1023,9 +1027,10 @@ fn validate_from_keywords<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
+    let items = typed_dict.items(db);
 
     // Collect keys from explicit keyword arguments
     let mut provided_keys: OrderSet<Name> = arguments
@@ -1038,7 +1043,11 @@ fn validate_from_keywords<'db, 'ast>(
     for keyword in &arguments.keywords {
         if let Some(arg_name) = &keyword.arg {
             // Explicit keyword argument: e.g., `name="Alice"`
-            let value_ty = expression_type_fn(&keyword.value);
+            let value_tcx = items
+                .get(arg_name.id.as_str())
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
                 context,
                 typed_dict,
@@ -1057,7 +1066,7 @@ fn validate_from_keywords<'db, 'ast>(
             // Unlike positional TypedDict arguments, unpacking passes all keys as explicit
             // keyword arguments, so extra keys should be flagged as errors (consistent with
             // explicitly providing those keys).
-            let unpacked_type = expression_type_fn(&keyword.value);
+            let unpacked_type = expression_type_fn(&keyword.value, TypeContext::default());
 
             // Never and Dynamic types are special: they can have any keys, so we skip
             // validation and mark all required keys as provided.
