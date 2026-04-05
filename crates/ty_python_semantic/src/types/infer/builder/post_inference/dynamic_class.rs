@@ -8,7 +8,7 @@ use crate::{
             IncompatibleBases, report_conflicting_metaclass_from_bases,
             report_instance_layout_conflict,
         },
-        infer::builder::report_dynamic_mro_errors,
+        infer::builder::dynamic_class::report_dynamic_mro_errors,
     },
 };
 
