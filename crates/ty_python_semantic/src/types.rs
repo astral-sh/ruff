@@ -4,7 +4,9 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::iter;
+use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -235,8 +237,108 @@ fn definition_expression_type<'db>(
     }
 }
 
+struct ApplyDefaultTypeMapping;
+struct ApplyTopMaterialization;
+struct ApplyBottomMaterialization;
+struct ApplyMaterializationEquivalence;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActiveTypeMapping {
+    Default,
+    TopMaterialization,
+    BottomMaterialization,
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
+///
+/// Materialization is the only mapping mode that needs to visit the same type under two different
+/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
+/// for those modes so invariant checks can safely reuse one visitor.
+pub(crate) struct ApplyTypeMappingVisitor<'db> {
+    default: TypeTransformer<'db, ApplyDefaultTypeMapping>,
+    top_materialization: TypeTransformer<'db, ApplyTopMaterialization>,
+    bottom_materialization: TypeTransformer<'db, ApplyBottomMaterialization>,
+    materialization_equivalence:
+        Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>,
+    active_type_mappings: RefCell<Vec<ActiveTypeMapping>>,
+}
+
+impl<'db> ApplyTypeMappingVisitor<'db> {
+    pub(crate) fn visit(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        let active_type_mapping = self
+            .active_type_mappings
+            .borrow()
+            .last()
+            .copied()
+            .unwrap_or(ActiveTypeMapping::Default);
+
+        match active_type_mapping {
+            ActiveTypeMapping::Default => self.default.visit(ty, func),
+            ActiveTypeMapping::TopMaterialization => self.top_materialization.visit(ty, func),
+            ActiveTypeMapping::BottomMaterialization => self.bottom_materialization.visit(ty, func),
+        }
+    }
+
+    pub(crate) fn with_type_mapping<T>(
+        &self,
+        type_mapping: &TypeMapping<'_, 'db>,
+        func: impl FnOnce() -> T,
+    ) -> T {
+        let active_type_mapping = match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => {
+                ActiveTypeMapping::TopMaterialization
+            }
+            TypeMapping::Materialize(MaterializationKind::Bottom) => {
+                ActiveTypeMapping::BottomMaterialization
+            }
+            _ => ActiveTypeMapping::Default,
+        };
+
+        self.active_type_mappings
+            .borrow_mut()
+            .push(active_type_mapping);
+
+        let result = func();
+
+        let previous = self.active_type_mappings.borrow_mut().pop();
+        debug_assert_eq!(previous, Some(active_type_mapping));
+
+        result
+    }
+
+    pub(crate) fn is_equivalent_to_materialization(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> bool {
+        self.materialization_equivalence.visit((left, right), || {
+            left.is_equivalent_to_with_materialization_visitor(db, right, self)
+        })
+    }
+
+    pub(crate) fn for_new_materialization_root(&self) -> Self {
+        Self {
+            default: TypeTransformer::default(),
+            top_materialization: TypeTransformer::default(),
+            bottom_materialization: TypeTransformer::default(),
+            materialization_equivalence: Rc::clone(&self.materialization_equivalence),
+            active_type_mappings: RefCell::default(),
+        }
+    }
+}
+
+impl<'db> Default for ApplyTypeMappingVisitor<'db> {
+    fn default() -> Self {
+        Self {
+            default: TypeTransformer::default(),
+            top_materialization: TypeTransformer::default(),
+            bottom_materialization: TypeTransformer::default(),
+            materialization_equivalence: Rc::new(CycleDetector::new(true)),
+            active_type_mappings: RefCell::default(),
+        }
+    }
+}
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
@@ -5516,7 +5618,7 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        match self {
+        visitor.with_type_mapping(type_mapping, || match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
@@ -5769,7 +5871,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
-        }
+        })
     }
 
     /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build

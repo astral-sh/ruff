@@ -1230,7 +1230,11 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Invariant => {
                         let top_materialization =
                             vartype.materialize(db, MaterializationKind::Top, visitor);
-                        if !vartype.is_equivalent_to(db, top_materialization) {
+                        if !visitor.is_equivalent_to_materialization(
+                            db,
+                            *vartype,
+                            top_materialization,
+                        ) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype
@@ -1270,11 +1274,13 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
+            &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
     }
@@ -1455,10 +1461,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        let source_top = source_type.top_materialization(db);
-        let source_bottom = source_type.bottom_materialization(db);
-        let target_top = target_type.top_materialization(db);
-        let target_bottom = target_type.bottom_materialization(db);
+        let source_top =
+            source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let source_bottom = source_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
+        let target_top =
+            target_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let target_bottom = target_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
 
         let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
             // TODO:
