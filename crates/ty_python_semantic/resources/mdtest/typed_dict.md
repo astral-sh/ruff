@@ -2398,6 +2398,27 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+TypedDict constructor calls should also use field type context when inferring nested recursive
+values:
+
+```py
+from typing import Any, List, TypedDict, Union
+from typing_extensions import NotRequired
+
+class Comparison(TypedDict):
+    field: str
+    op: NotRequired[str]
+    value: Any
+
+class Logical(TypedDict):
+    op: NotRequired[str]
+    conditions: List["Filter"]
+
+Filter = Union[Comparison, Logical]
+
+logical = Logical(conditions=[Comparison(field="a", value="b")])
+```
+
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
