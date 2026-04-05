@@ -12,53 +12,6 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// Deferred inference for assigned `type()` calls.
-    ///
-    /// Infers the bases argument that was skipped during initial inference to handle
-    /// forward references and recursive definitions.
-    pub(super) fn infer_builtins_type_deferred(
-        &mut self,
-        definition: Definition<'db>,
-        call_expr: &ast::Expr,
-    ) {
-        let db = self.db();
-
-        let ast::Expr::Call(call) = call_expr else {
-            return;
-        };
-
-        // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
-        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
-            return;
-        };
-
-        let [_name_arg, bases_arg, _namespace_arg] = &*call.arguments.args else {
-            return;
-        };
-
-        // Set the typevar binding context to allow legacy typevar binding in expressions
-        // like `Generic[T]`. This matches the context used during initial inference.
-        let previous_context = self.typevar_binding_context.replace(definition);
-
-        // Infer the bases argument (this was skipped during initial inference).
-        let bases_type = self.infer_expression(bases_arg, TypeContext::default());
-
-        // Restore the previous context.
-        self.typevar_binding_context = previous_context;
-
-        // Extract and validate bases.
-        let Some(bases) =
-            self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::TypeCall)
-        else {
-            return;
-        };
-
-        // Validate individual bases for special types that aren't allowed in dynamic classes.
-        let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::TypeCall);
-    }
-
     /// Infer a call to `builtins.type()`.
     ///
     /// `builtins.type` has two overloads: a single-argument overload (e.g. `type("foo")`,
@@ -350,5 +303,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
+    }
+
+    /// Deferred inference for assigned `type()` calls.
+    ///
+    /// Infers the bases argument that was skipped during initial inference to handle
+    /// forward references and recursive definitions.
+    pub(super) fn infer_builtins_type_deferred(
+        &mut self,
+        definition: Definition<'db>,
+        call_expr: &ast::Expr,
+    ) {
+        let db = self.db();
+
+        let ast::Expr::Call(call) = call_expr else {
+            return;
+        };
+
+        // Get the already-inferred class type from the initial pass.
+        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
+            return;
+        };
+
+        let [_name_arg, bases_arg, _namespace_arg] = &*call.arguments.args else {
+            return;
+        };
+
+        // Set the typevar binding context to allow legacy typevar binding in expressions
+        // like `Generic[T]`. This matches the context used during initial inference.
+        let previous_context = self.typevar_binding_context.replace(definition);
+
+        // Infer the bases argument (this was skipped during initial inference).
+        let bases_type = self.infer_expression(bases_arg, TypeContext::default());
+
+        // Restore the previous context.
+        self.typevar_binding_context = previous_context;
+
+        // Extract and validate bases.
+        let Some(bases) =
+            self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::TypeCall)
+        else {
+            return;
+        };
+
+        // Validate individual bases for special types that aren't allowed in dynamic classes.
+        let name = dynamic_class.name(db);
+        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::TypeCall);
     }
 }
