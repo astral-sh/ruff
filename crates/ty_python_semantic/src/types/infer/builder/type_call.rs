@@ -1,4 +1,3 @@
-use super::{DynamicClassKind, TypeInferenceBuilder, report_dynamic_mro_errors};
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
@@ -6,6 +5,10 @@ use crate::types::class::{
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
     report_instance_layout_conflict,
+};
+use crate::types::infer::builder::{
+    TypeInferenceBuilder,
+    dynamic_class::{DynamicClassKind, report_dynamic_mro_errors},
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast::name::Name;
