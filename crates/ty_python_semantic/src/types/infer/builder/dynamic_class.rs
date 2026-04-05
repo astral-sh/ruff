@@ -228,13 +228,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_BASE, diagnostic_node)
                         {
-                            let mut diagnostic = builder
-                                .into_diagnostic("Invalid base for class created via `type()`");
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid base for class created via `{fn_name}`"
+                            ));
                             diagnostic.set_primary_message(format_args!(
                                 "Has type `{}`",
                                 base.display(db)
                             ));
-                            diagnostic.info("Creating an enum class via `type()` is not supported");
+                            diagnostic.info(format_args!(
+                                "Creating an enum class via `{fn_name}` is not supported"
+                            ));
                             diagnostic.info(format_args!(
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));
