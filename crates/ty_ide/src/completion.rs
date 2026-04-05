@@ -26,6 +26,55 @@ use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
+use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashMap;
+
+use std::sync::OnceLock;
+
+// table complete
+// NOTE: I dont know whats the recommended way to include files in ty
+const RAW_FREQ_TABLE: &[u8] = include_bytes!("../t-complete/py_call_freq.7.bin");
+
+struct FreqTable {
+    map: FxHashMap<u32, u8>,
+}
+
+impl FreqTable {
+    const FNV_OFFSET_BASIS: u32 = 2_166_136_261;
+    const FNV_PRIME: u32 = 16_777_619;
+
+    fn get_score_by_key(&self, key: u32) -> u8 {
+        self.map.get(&key).copied().unwrap_or(0)
+    }
+
+    /// Single-string helper, like "print"; strings with prefix, such as os.<c> uses incremenal hash to save speed
+    fn get_score(&self, name: &str) -> u8 {
+        let mut h = Self::FNV_OFFSET_BASIS;
+        for &b in name.as_bytes() {
+            h ^= u32::from(b);
+            h = h.wrapping_mul(Self::FNV_PRIME);
+        }
+        let v = h >> 8;
+        self.get_score_by_key(if v == 0 { 1 } else { v })
+    }
+}
+
+fn freq_table() -> &'static FreqTable {
+    static TABLE: OnceLock<FreqTable> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let capacity = u32::from_le_bytes(RAW_FREQ_TABLE[12..16].try_into().unwrap());
+        let mut map = FxHashMap::with_capacity_and_hasher(capacity as usize, FxBuildHasher);
+
+        for chunk in RAW_FREQ_TABLE[16..].chunks_exact(4) {
+            let slot = u32::from_le_bytes(chunk.try_into().unwrap());
+            if slot != 0 {
+                map.insert(slot >> 8, (slot & 0xFF) as u8);
+            }
+        }
+        FreqTable { map }
+    })
+}
+
 pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
@@ -617,7 +666,7 @@ impl<'m> Context<'m> {
     ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
-            ContextKind::NonImport(_) => {
+            ContextKind::NonImport(ref non_import) => {
                 let exception_ty = self.cursor.exception_ty(db);
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
                     let mut bases = extract_base_class_names(class_def);
@@ -635,6 +684,14 @@ impl<'m> Context<'m> {
                     is_raising_exception: exception_ty.is_some(),
                     existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
+                    dot_prefix: match &non_import.target {
+                        CompletionTargetAst::ObjectDot { expr } => {
+                            Some(compact_str::CompactString::new(
+                                &self.cursor.source[expr.value.range()],
+                            ))
+                        }
+                        CompletionTargetAst::Scoped(_) => None,
+                    },
                 }
             }
         }
@@ -1098,6 +1155,8 @@ struct CollectionContext<'db> {
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
+    // capture the object preceding '.'; for table complete
+    dot_prefix: Option<compact_str::CompactString>,
 }
 
 impl<'db> CollectionContext<'db> {
@@ -1224,6 +1283,8 @@ struct Relevance {
     type_check_only: Sort,
     /// Deprecated symbols appear lower in the completion result
     deprecated: Sort,
+    /// Sort based on the popularity of the name
+    common: u8,
 }
 
 impl Relevance {
@@ -1231,7 +1292,33 @@ impl Relevance {
     ///
     /// A smaller rank means the completion should appear higher in the
     /// results shown to end users.
-    fn new(_ctx: &CollectionContext, query: &UserQuery, c: &CompletionBuilder) -> Relevance {
+    fn new(ctx: &CollectionContext, query: &UserQuery, c: &CompletionBuilder) -> Relevance {
+        let common = 255
+            - if let Some(prefix) = &ctx.dot_prefix {
+                let mut h = FreqTable::FNV_OFFSET_BASIS;
+
+                // 1. Hash the prefix (e.g., "os.path")
+                for &b in prefix.as_bytes() {
+                    h ^= u32::from(b);
+                    h = h.wrapping_mul(FreqTable::FNV_PRIME);
+                }
+                // 2. Hash the dot
+                h ^= u32::from(b'.');
+                h = h.wrapping_mul(FreqTable::FNV_PRIME);
+
+                // 3. Hash the completion candidate (e.g., "join")
+                for &b in c.name.as_bytes() {
+                    h ^= u32::from(b);
+                    h = h.wrapping_mul(FreqTable::FNV_PRIME);
+                }
+
+                let v = h >> 8;
+                freq_table().get_score_by_key(if v == 0 { 1 } else { v })
+            } else {
+                // Standalone variable/builtin (e.g., "print")
+                freq_table().get_score(c.name.as_str())
+            };
+
         Relevance {
             definitively_usable: if c.is_context_specific {
                 Sort::Higher
@@ -1279,6 +1366,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            common,
         }
     }
 }
@@ -7690,8 +7778,8 @@ if foo:
         // because `Protocol` has been imported, and the other completions are builtin.
         assert_snapshot!(snapshot, @"
         Protocol
-        PendingDeprecationWarning
         PermissionError
+        PendingDeprecationWarning
         ProcessLookupError
         PythonFinalizationError
         ");
@@ -8202,28 +8290,28 @@ multiprocess<CURSOR>
             .snapshot();
         assert_snapshot!(snapshot, @"
         multiprocessing
-        multiprocessing.connection
-        multiprocessing.context
+        multiprocessing.pool
         multiprocessing.dummy
+        multiprocessing.connection
+        multiprocessing.managers
+        multiprocessing.util
+        multiprocessing.process
+        multiprocessing.queues
+        multiprocessing.synchronize
+        multiprocessing.sharedctypes
+        multiprocessing.context
         multiprocessing.dummy.connection
         multiprocessing.forkserver
         multiprocessing.heap
-        multiprocessing.managers
-        multiprocessing.pool
         multiprocessing.popen_fork
         multiprocessing.popen_forkserver
         multiprocessing.popen_spawn_posix
         multiprocessing.popen_spawn_win32
-        multiprocessing.process
-        multiprocessing.queues
         multiprocessing.reduction
         multiprocessing.resource_sharer
         multiprocessing.resource_tracker
         multiprocessing.shared_memory
-        multiprocessing.sharedctypes
         multiprocessing.spawn
-        multiprocessing.synchronize
-        multiprocessing.util
         ");
     }
 
