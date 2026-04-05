@@ -2011,7 +2011,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return Err(error);
                 }
             }
-
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
@@ -2208,6 +2207,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         seen,
                     );
                 }
+            }
+
+            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(_)) => {
+                // Reuse the protocol constraint solver for union-typed arguments too.
+                // This allows protocols like `_SupportsRound1[T]` to infer `T` from
+                // annotations such as `float`, which are interpreted as `int | float`.
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+                let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                return Ok(());
             }
 
             (formal, Type::NominalInstance(actual_nominal)) => {

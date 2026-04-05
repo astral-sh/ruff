@@ -1975,3 +1975,10 @@ def takes_str_or_float(x: float | str): ...
 
 takes_str_or_float(round(1.0))
 ```
+
+```py
+def f(x: float) -> None:
+    reveal_type(round(x))  # revealed: int
+    reveal_type(round(x, None))  # revealed: int
+    reveal_type(round(x, 1))  # revealed: int | float
+```
