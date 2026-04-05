@@ -2,28 +2,6 @@
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 ---
 FBT001 Boolean-typed positional argument in function definition
- --> FBT.py:4:5
-  |
-2 |     posonly_nohint,
-3 |     posonly_nonboolhint: int,
-4 |     posonly_boolhint: bool,
-  |     ^^^^^^^^^^^^^^^^
-5 |     posonly_boolstrhint: "bool",
-6 |     /,
-  |
-
-FBT001 Boolean-typed positional argument in function definition
- --> FBT.py:5:5
-  |
-3 |     posonly_nonboolhint: int,
-4 |     posonly_boolhint: bool,
-5 |     posonly_boolstrhint: "bool",
-  |     ^^^^^^^^^^^^^^^^^^^
-6 |     /,
-7 |     offset,
-  |
-
-FBT001 Boolean-typed positional argument in function definition
   --> FBT.py:10:5
    |
  8 |     posorkw_nonvalued_nohint,

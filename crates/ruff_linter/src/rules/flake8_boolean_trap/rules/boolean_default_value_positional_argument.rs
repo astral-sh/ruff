@@ -27,7 +27,9 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
 ///
-/// This rule exempts methods decorated with [`@typing.override`][override],
+/// Positional-only parameters (those before `/`) are exempt from this rule,
+/// as the use of `/` is an explicit API design choice by the author.
+/// This rule also exempts methods decorated with [`@typing.override`][override],
 /// since changing the signature of a subclass method that overrides a
 /// superclass method may cause type checkers to complain about a violation of
 /// the Liskov Substitution Principle.
@@ -125,7 +127,8 @@ pub(crate) fn boolean_default_value_positional_argument(
         return;
     }
 
-    for param in parameters.posonlyargs.iter().chain(&parameters.args) {
+    // Skip positional-only parameters, as `/` signals an intentional API design choice.
+    for param in &parameters.args {
         if param.default().is_some_and(Expr::is_boolean_literal_expr) {
             // Allow Boolean defaults in setters.
             if decorator_list.iter().any(|decorator| {

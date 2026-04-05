@@ -29,8 +29,10 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
 ///
-/// Dunder methods that define operators are exempt from this rule, as are
-/// setters and [`@override`][override] definitions.
+/// Positional-only parameters (those before `/`) are exempt from this rule,
+/// as the use of `/` is an explicit API design choice by the author.
+/// Dunder methods that define operators are also exempt, as are setters and
+/// [`@override`][override] definitions.
 ///
 /// ## Example
 ///
@@ -124,7 +126,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
         return;
     }
 
-    for parameter in parameters.posonlyargs.iter().chain(&parameters.args) {
+    // Skip positional-only parameters, as `/` signals an intentional API design choice.
+    for parameter in &parameters.args {
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
