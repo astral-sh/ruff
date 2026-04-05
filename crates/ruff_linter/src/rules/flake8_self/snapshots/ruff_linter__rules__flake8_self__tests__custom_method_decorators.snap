@@ -5,7 +5,7 @@ SLF001 Private member accessed: `_x`
   --> SLF001_custom_decorators.py:19:16
    |
 17 |     @custom_staticmethod
-18 |     def bad_staticmethod(self):
-19 |         return self._x  # error
+18 |     def bad_staticmethod(this):
+19 |         return this._x  # error
    |                ^^^^^^^
    |

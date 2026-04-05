@@ -15,5 +15,5 @@ class C:
         return this._x  # fine
 
     @custom_staticmethod
-    def bad_staticmethod(self):
-        return self._x  # error
+    def bad_staticmethod(this):
+        return this._x  # error

@@ -10,7 +10,6 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_slf001_self_cls_mcs_enforcement_enabled;
 use crate::rules::pylint::helpers::is_dunder_operator_method;
 
 /// ## What it does
@@ -78,7 +77,6 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     let semantic = checker.semantic();
     let current_scope = semantic.current_scope();
-    let enforce_self_cls_mcs = is_slf001_self_cls_mcs_enforcement_enabled(checker.settings());
 
     if semantic.in_annotation() {
         return;
@@ -120,11 +118,11 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    if !enforce_self_cls_mcs
-        && let Some(name) = UnqualifiedName::from_expr(value)
-        && matches!(name.segments(), ["self" | "cls" | "mcs"])
-    {
-        return;
+    if let Some(name) = UnqualifiedName::from_expr(value) {
+        // Ignore `self` and `cls` accesses.
+        if matches!(name.segments(), ["self" | "cls" | "mcs"]) {
+            return;
+        }
     }
 
     if let Expr::Name(name) = value.as_ref() {
