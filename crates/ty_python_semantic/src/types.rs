@@ -242,6 +242,9 @@ struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
+type MaterializationEquivalenceVisitor<'db> =
+    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Materialization is the only mapping mode that needs to visit the same type under two different
@@ -251,14 +254,11 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
-    materialization_equivalence:
-        OnceCell<Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>>,
+    materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
-    fn materialization_equivalence(
-        &self,
-    ) -> &Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>> {
+    fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
         self.materialization_equivalence
             .get_or_init(|| Rc::new(CycleDetector::new(true)))
     }
@@ -311,7 +311,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
     }
 }
 
-impl<'db> Default for ApplyTypeMappingVisitor<'db> {
+impl Default for ApplyTypeMappingVisitor<'_> {
     fn default() -> Self {
         Self {
             default: OnceCell::new(),
@@ -1312,10 +1312,6 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
-    }
-
-    pub(crate) fn contains_type_alias(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| matches!(ty, Type::TypeAlias(_)))
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
