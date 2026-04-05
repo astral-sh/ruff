@@ -1144,6 +1144,42 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
 }
 
 #[test]
+fn config_file_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python-version = "2.7"
+            "#,
+        ),
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 3, column 18
+      |
+    3 | python-version = "2.7"
+      |                  ^^^^^
+    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+
+      Cause: TOML parse error at line 3, column 18
+      |
+    3 | python-version = "2.7"
+      |                  ^^^^^
+    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
