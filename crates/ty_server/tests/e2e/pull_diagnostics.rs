@@ -66,6 +66,34 @@ def foo():
 }
 
 #[test]
+fn unreachable_code_has_unnecessary_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo():
+    return 0
+    print(\"dead\")
+    print(\"still dead\")
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn workspace_reports_unused_binding_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -83,6 +111,36 @@ def foo():
             Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
         )?
         .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn workspace_reports_unreachable_code_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo():
+    return 0
+    print(\"dead\")
+    print(\"still dead\")
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 

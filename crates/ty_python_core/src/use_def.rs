@@ -508,6 +508,23 @@ impl<'db> UseDefMap<'db> {
                 block.in_type_checking_block && entry_range.contains_range(range)
             })
     }
+
+    /// Returns the merged ranges that are unconditionally unreachable within this scope.
+    ///
+    /// This is intentionally narrower than [`Self::is_range_reachable`]: it only reports ranges
+    /// whose reachability constraint is statically known to be false without evaluating
+    /// environment- or type-dependent predicates.
+    pub(crate) fn unconditionally_unreachable_ranges(
+        &self,
+    ) -> impl Iterator<Item = TextRange> + '_ {
+        self.range_reachability
+            .iter()
+            .filter_map(|&(entry_range, RangeInfo { reachability, .. })| {
+                (reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE)
+                    .then_some(entry_range)
+            })
+    }
+
     pub fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,
