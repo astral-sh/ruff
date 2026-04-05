@@ -2171,8 +2171,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
                 if subclass_of.is_type_var() =>
             {
-                let formal_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
+                let bound_typevar = subclass_of.into_type_var().unwrap();
+                let formal_instance = Type::TypeVar(bound_typevar);
                 if let Some(actual_instance) = ty.to_instance(self.db) {
+                    if actual_instance.is_typed_dict()
+                        && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            bound_typevar.typevar(self.db).bound_or_constraints(self.db)
+                        && actual_instance
+                            .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                            .is_never_satisfied(self.db)
+                        && ty
+                            .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                            .is_always_satisfied(self.db)
+                    {
+                        self.add_type_mapping(bound_typevar, actual_instance, polarity, f);
+                        return Ok(());
+                    }
+
                     return self.infer_map_impl(
                         formal_instance,
                         actual_instance,

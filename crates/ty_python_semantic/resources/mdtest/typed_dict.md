@@ -1973,6 +1973,27 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
 accepts_typed_dict_class(Person)
 ```
 
+## Protocol bounds
+
+`TypedDict` classes should also satisfy protocol bounds that model these special properties:
+
+```py
+from typing import ClassVar, Generic, Protocol, TypeVar, TypedDict
+
+class HasRequiredKeys(Protocol):
+    __required_keys__: ClassVar[frozenset[str]]
+
+T = TypeVar("T", bound=HasRequiredKeys)
+
+class Box(Generic[T]):
+    def __init__(self, value: type[T]) -> None: ...
+
+class D(TypedDict):
+    x: int
+
+reveal_type(Box(D))  # revealed: Box[D]
+```
+
 ## Subclassing
 
 `TypedDict` types can be subclassed. The subclass can add new keys:
