@@ -194,8 +194,8 @@ reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 
 ### Generic and TypedDict bases
 
-`type()` doesn't support `__mro_entries__`, so `Generic[T]` and `TypedDict` fail as bases for
-`type()`. `types.new_class()` handles `__mro_entries__` properly, so these are valid:
+Even though `types.new_class()` handles `__mro_entries__` at runtime, ty does not yet model the full
+typing semantics of dynamically-created generic classes or TypedDicts, so these bases are rejected:
 
 ```py
 import types
@@ -204,11 +204,11 @@ from typing_extensions import TypedDict
 
 T = TypeVar("T")
 
+# error: [invalid-base] "Invalid base for class created via `types.new_class()`"
 GenericClass = types.new_class("GenericClass", (Generic[T],))
-reveal_type(GenericClass)  # revealed: <class 'GenericClass'>
 
+# error: [invalid-base] "Invalid base for class created via `types.new_class()`"
 TypedDictClass = types.new_class("TypedDictClass", (TypedDict,))
-reveal_type(TypedDictClass)  # revealed: <class 'TypedDictClass'>
 ```
 
 ### `type[X]` bases

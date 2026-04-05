@@ -3456,9 +3456,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Check for special bases that are not allowed for dynamic classes.
             //
-            // `type()` doesn't support `__mro_entries__`, so Generic and TypedDict bases
-            // are invalid. `types.new_class()` handles `__mro_entries__` properly, so
-            // these are allowed.
+            // Generic and TypedDict bases rely on special typing semantics that ty cannot yet
+            // model for dynamically-created classes, so we reject them for both `type()` and
+            // `types.new_class()`.
             //
             // Protocol works with both, but ty can't yet represent a dynamically-created
             // protocol class, so we emit a warning.
@@ -3466,23 +3466,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (`NamedTuple` is rejected earlier: `try_from_type` returns `None`
             // without a concrete subclass, so it's reported as an `InvalidBases` MRO error.)
             match class_base {
-                ClassBase::Generic | ClassBase::TypedDict if kind == DynamicClassKind::TypeCall => {
+                ClassBase::Generic | ClassBase::TypedDict => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)
                     {
-                        let mut diagnostic =
-                            builder.into_diagnostic("Invalid base for class created via `type()`");
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid base for class created via `{fn_name}`"
+                        ));
                         diagnostic
                             .set_primary_message(format_args!("Has type `{}`", base.display(db)));
                         match class_base {
                             ClassBase::Generic => {
-                                diagnostic.info("Classes created via `type()` cannot be generic");
+                                diagnostic.info(format_args!(
+                                    "Classes created via `{fn_name}` cannot be generic"
+                                ));
                                 diagnostic.info(format_args!(
                                     "Consider using `class {name}(Generic[...]): ...` instead"
                                 ));
                             }
                             ClassBase::TypedDict => {
-                                diagnostic
-                                    .info("Classes created via `type()` cannot be TypedDicts");
+                                diagnostic.info(format_args!(
+                                    "Classes created via `{fn_name}` cannot be TypedDicts"
+                                ));
                                 diagnostic.info(format_args!(
                                     "Consider using `TypedDict(\"{name}\", {{}})` instead"
                                 ));
@@ -3490,9 +3494,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             _ => unreachable!(),
                         }
                     }
-                }
-                ClassBase::Generic | ClassBase::TypedDict => {
-                    // types.new_class() handles __mro_entries__, so these are valid.
                 }
                 ClassBase::Protocol => {
                     if let Some(builder) = self
