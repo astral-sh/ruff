@@ -155,6 +155,10 @@ reveal_type(FromList().base_attr)  # revealed: int
 
 FromKeywordList = types.new_class("FromKeywordList", bases=[Base])
 reveal_type(FromKeywordList().base_attr)  # revealed: int
+
+bases = (Base,)
+FromStarredList = types.new_class("FromStarredList", [*bases])
+reveal_type(FromStarredList().base_attr)  # revealed: int
 ```
 
 ### Enum bases

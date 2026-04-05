@@ -12,7 +12,7 @@ use crate::{
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
-        definition_expression_type,
+        definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
         mro::{DynamicMroError, Mro, MroIterator},
     },
@@ -121,32 +121,6 @@ pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option
     })
 }
 
-/// Extract the explicit bases from a dynamic class `bases` argument.
-///
-/// This helper accepts list literals directly so we preserve precise base types for the common
-/// cases, and otherwise falls back to a fixed-length iterable extraction when the argument's
-/// inferred type provides one.
-pub(crate) fn extract_dynamic_class_explicit_bases<'db>(
-    db: &'db dyn Db,
-    bases_arg: &ast::Expr,
-    bases_type: Type<'db>,
-    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
-) -> Option<Box<[Type<'db>]>> {
-    match bases_arg {
-        ast::Expr::List(list) => Some(
-            list.elts
-                .iter()
-                .map(expression_type)
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        ),
-        _ => bases_type.try_iterate(db).ok().and_then(|spec| {
-            spec.as_fixed_length()
-                .map(|tuple| tuple.all_elements().into())
-        }),
-    }
-}
-
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
     /// Returns the definition where this class is created, if it was assigned to a variable.
@@ -201,9 +175,7 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            let bases_type = definition_expression_type(db, definition, bases_arg);
-
-            extract_dynamic_class_explicit_bases(db, bases_arg, bases_type, |expr| {
+            extract_fixed_length_iterable_element_types(db, bases_arg, |expr| {
                 definition_expression_type(db, definition, expr)
             })
             .unwrap_or_else(|| Box::from([Type::unknown()]))

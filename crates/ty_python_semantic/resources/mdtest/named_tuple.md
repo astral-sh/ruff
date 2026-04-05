@@ -618,6 +618,13 @@ reveal_type(nt2.a)  # revealed: Any
 reveal_type(nt2.b)  # revealed: Any
 reveal_type(nt2.c)  # revealed: Any
 
+field_names = ("left", "right")
+NT2Starred = collections.namedtuple("NT2Starred", field_names=[*field_names])
+reveal_type(NT2Starred)  # revealed: <class 'NT2Starred'>
+nt2_starred = NT2Starred(1, 2)
+reveal_type(nt2_starred.left)  # revealed: Any
+reveal_type(nt2_starred.right)  # revealed: Any
+
 # Keyword arguments can be combined with other kwargs like `defaults`
 NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
 reveal_type(NT3)  # revealed: <class 'NT3'>
@@ -684,6 +691,14 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
 reveal_type(Person.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+
+defaults = (0, "Unknown")
+PersonStarred = collections.namedtuple(
+    "PersonStarred",
+    ["name", "age", "city"],
+    defaults=[*defaults],
+)
+reveal_type(PersonStarred.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any = 0, city: Any = "Unknown") -> Self
 
 # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Person)

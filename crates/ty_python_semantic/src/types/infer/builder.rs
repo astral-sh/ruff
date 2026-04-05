@@ -55,10 +55,7 @@ use crate::semantic_index::{
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, MethodDecorator,
-    extract_dynamic_class_explicit_bases,
-};
+use crate::types::class::{ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InNoTypeCheck;
 use crate::types::context::InferContext;
@@ -110,8 +107,9 @@ use crate::types::{
     MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, binding_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    TypedDictType, UnionBuilder, UnionType, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::UnpackPosition;
@@ -3426,7 +3424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        extract_dynamic_class_explicit_bases(db, bases_node, bases_type, |expr| {
+        extract_fixed_length_iterable_element_types(db, bases_node, |expr| {
             self.expression_type(expr)
         })
     }

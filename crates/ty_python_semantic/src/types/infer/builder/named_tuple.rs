@@ -11,6 +11,7 @@ use crate::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
             PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
         },
+        extract_fixed_length_iterable_element_types,
         function::KnownFunction,
         infer::TypeInferenceBuilder,
     },
@@ -205,41 +206,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
-                    // Extract element types from AST literals (using already-inferred types)
-                    // or fall back to the inferred tuple spec.
-                    match &kw.value {
-                        ast::Expr::List(list) => {
-                            // Elements were already inferred when we inferred kw.value above.
-                            default_types = list
-                                .elts
-                                .iter()
-                                .map(|elt| self.expression_type(elt))
-                                .collect();
-                        }
-                        ast::Expr::Tuple(tuple) => {
-                            // Elements were already inferred when we inferred kw.value above.
-                            default_types = tuple
-                                .elts
-                                .iter()
-                                .map(|elt| self.expression_type(elt))
-                                .collect();
-                        }
-                        _ => {
-                            // Fall back to using the already-inferred type.
-                            // Try to extract element types from tuple.
-                            if let Some(spec) = kw_type.exact_tuple_instance_spec(db)
-                                && let Some(fixed) = spec.as_fixed_length()
-                            {
-                                default_types = fixed.all_elements().to_vec();
-                            } else {
-                                // Can't determine individual types; use Any for each element.
-                                let count = kw_type
-                                    .exact_tuple_instance_spec(db)
-                                    .and_then(|spec| spec.len().maximum())
-                                    .unwrap_or(0);
-                                default_types = vec![Type::any(); count];
-                            }
-                        }
+                    if let Some(element_types) =
+                        extract_fixed_length_iterable_element_types(db, &kw.value, |expr| {
+                            self.expression_type(expr)
+                        })
+                    {
+                        default_types = element_types.into_vec();
+                    } else {
+                        // Can't determine individual types; use Any for each element.
+                        let count = kw_type
+                            .exact_tuple_instance_spec(db)
+                            .and_then(|spec| spec.len().maximum())
+                            .unwrap_or(0);
+                        default_types = vec![Type::any(); count];
                     }
                     // Emit diagnostic for invalid types (not Iterable[Any] | None).
                     let iterable_any =
@@ -436,32 +415,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .map(Name::new)
                         .collect(),
                 )
-            } else if let Some(tuple_spec) = fields_type.tuple_instance_spec(db)
-                && let Some(fixed_tuple) = tuple_spec.as_fixed_length()
-            {
-                // Handle list/tuple of strings (must be fixed-length).
-                fixed_tuple
-                    .all_elements()
-                    .iter()
-                    .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
-                    .collect()
             } else {
-                // Get the elements from the list or tuple literal.
-                let elements = match fields_arg {
-                    ast::Expr::List(list) => Some(&list.elts),
-                    ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                    _ => None,
-                };
-
-                elements.and_then(|elts| {
-                    elts.iter()
-                        .map(|elt| {
-                            // Each element should be a string literal.
-                            let field_ty = self.expression_type(elt);
-                            let field_lit = field_ty.as_string_literal()?;
-                            Some(Name::new(field_lit.value(db)))
-                        })
-                        .collect::<Option<_>>()
+                extract_fixed_length_iterable_element_types(db, fields_arg, |expr| {
+                    self.expression_type(expr)
+                })
+                .and_then(|field_types| {
+                    field_types
+                        .iter()
+                        .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
+                        .collect()
                 })
             };
 

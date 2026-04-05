@@ -555,6 +555,12 @@ class Base:
 # error: [invalid-argument-type]
 FromList = type("FromList", [Base], {})
 reveal_type(FromList().attr)  # revealed: int
+
+bases = (Base,)
+
+# error: [invalid-argument-type]
+FromStarredList = type("FromStarredList", [*bases], {})
+reveal_type(FromStarredList().attr)  # revealed: int
 ```
 
 ## `type[...]` as base class
