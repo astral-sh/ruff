@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -247,14 +248,21 @@ struct ApplyMaterializationEquivalence;
 /// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
 /// for those modes so invariant checks can safely reuse one visitor.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    default: TypeTransformer<'db, ApplyDefaultTypeMapping>,
-    top_materialization: TypeTransformer<'db, ApplyTopMaterialization>,
-    bottom_materialization: TypeTransformer<'db, ApplyBottomMaterialization>,
+    default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
+    top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
+    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
     materialization_equivalence:
-        Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>,
+        OnceCell<Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
+    fn materialization_equivalence(
+        &self,
+    ) -> &Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>> {
+        self.materialization_equivalence
+            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    }
+
     pub(crate) fn visit(
         &self,
         ty: Type<'db>,
@@ -262,13 +270,18 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => {
-                self.top_materialization.visit(ty, func)
-            }
-            TypeMapping::Materialize(MaterializationKind::Bottom) => {
-                self.bottom_materialization.visit(ty, func)
-            }
-            _ => self.default.visit(ty, func),
+            TypeMapping::Materialize(MaterializationKind::Top) => self
+                .top_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
+            TypeMapping::Materialize(MaterializationKind::Bottom) => self
+                .bottom_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
+            _ => self
+                .default
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
         }
     }
 
@@ -278,17 +291,22 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> bool {
-        self.materialization_equivalence.visit((left, right), || {
+        self.materialization_equivalence().visit((left, right), || {
             left.is_equivalent_to_with_materialization_visitor(db, right, self)
         })
     }
 
     pub(crate) fn for_new_materialization_root(&self) -> Self {
+        let materialization_equivalence = OnceCell::new();
+        let was_empty =
+            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
+        debug_assert!(was_empty.is_ok());
+
         Self {
-            default: TypeTransformer::default(),
-            top_materialization: TypeTransformer::default(),
-            bottom_materialization: TypeTransformer::default(),
-            materialization_equivalence: Rc::clone(&self.materialization_equivalence),
+            default: OnceCell::new(),
+            top_materialization: OnceCell::new(),
+            bottom_materialization: OnceCell::new(),
+            materialization_equivalence,
         }
     }
 }
@@ -296,10 +314,10 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 impl<'db> Default for ApplyTypeMappingVisitor<'db> {
     fn default() -> Self {
         Self {
-            default: TypeTransformer::default(),
-            top_materialization: TypeTransformer::default(),
-            bottom_materialization: TypeTransformer::default(),
-            materialization_equivalence: Rc::new(CycleDetector::new(true)),
+            default: OnceCell::new(),
+            top_materialization: OnceCell::new(),
+            bottom_materialization: OnceCell::new(),
+            materialization_equivalence: OnceCell::new(),
         }
     }
 }
@@ -1294,6 +1312,10 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
+    }
+
+    pub(crate) fn contains_type_alias(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| matches!(ty, Type::TypeAlias(_)))
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {

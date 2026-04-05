@@ -1650,6 +1650,15 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if !left.contains_type_alias(db) && !right.contains_type_alias(db) {
+            let relation_checker = self.as_relation_checker(self.materialization_visitor);
+            return relation_checker.check_type_pair(db, left, right).and(
+                db,
+                self.constraints,
+                || relation_checker.check_type_pair(db, right, left),
+            );
+        }
+
         // Recursive materialization fallbacks depend on the comparison root, so each directional
         // pass needs fresh materialization caches. Nested equivalence checks still share the
         // materialization-equivalence recursion guard to avoid re-entering the same comparison.
