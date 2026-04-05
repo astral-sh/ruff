@@ -1798,6 +1798,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 class.converter_input_type_for_field(db, name)
             }
+            Self::NonGeneric(ClassLiteral::DynamicDataclass(class)) => {
+                class.converter_input_type_for_field(db, name)
+            }
             Self::Generic(generic) => generic
                 .origin(db)
                 .converter_input_type_for_field(db, name)
@@ -1805,7 +1808,6 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicDataclass(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => None,

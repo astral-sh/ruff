@@ -29,9 +29,10 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
-            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
-            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicDataclassLiteral,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
+            synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
@@ -1427,6 +1428,7 @@ impl<'db> StaticClassLiteral<'db> {
                             default_ty: None,
                             init: *init,
                             kw_only: kw_only.unwrap_or(kw_only_default),
+                            converter: None,
                         })
                     } else {
                         None
@@ -1590,6 +1592,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> FxIndexMap<Name, Field<'db>> {
         enum FieldSource<'db> {
             Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
+            DynamicDataclass(DynamicDataclassLiteral<'db>),
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
         }
 
@@ -1616,6 +1619,12 @@ impl<'db> StaticClassLiteral<'db> {
                     return Some(FieldSource::DynamicTypedDict(typeddict));
                 }
 
+                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    && let ClassLiteral::DynamicDataclass(dataclass) = class.class_literal(db)
+                {
+                    return Some(FieldSource::DynamicDataclass(dataclass));
+                }
+
                 None
             })
             .flat_map(|source| match source {
@@ -1625,8 +1634,32 @@ impl<'db> StaticClassLiteral<'db> {
                         .iter()
                         .map(|(name, field)| (name.clone(), field.clone())),
                 ),
-                FieldSource::DynamicTypedDict(typeddict) => {
-                    Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
+                FieldSource::DynamicDataclass(dataclass) => Either::Right(Either::Left(
+                    dataclass.fields(db).iter().filter_map(|field| {
+                        (!field.class_var).then(|| {
+                            (
+                                field.name.clone(),
+                                Field {
+                                    declared_ty: field.ty,
+                                    kind: FieldKind::Dataclass {
+                                        default_ty: field.default_ty,
+                                        init_only: field.init_only,
+                                        init: field.init,
+                                        kw_only: field.kw_only,
+                                        alias: field
+                                            .alias
+                                            .as_ref()
+                                            .map(|alias| Box::<str>::from(alias.as_str())),
+                                        converter: field.converter,
+                                    },
+                                    first_declaration: None,
+                                },
+                            )
+                        })
+                    }),
+                )),
+                FieldSource::DynamicTypedDict(typeddict) => Either::Right(Either::Right(
+                    typeddict.items(db).iter().map(|(name, td_field)| {
                         (
                             name.clone(),
                             Field {
@@ -1638,8 +1671,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 first_declaration: td_field.first_declaration(),
                             },
                         )
-                    }))
-                }
+                    }),
+                )),
             })
             // KW_ONLY sentinels are markers, not real fields. Exclude them so
             // they cannot shadow an inherited field with the same name.

@@ -4,25 +4,31 @@ use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::is_keyword;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
-use super::{InferenceRegion, TypeInferenceBuilder, dynamic_class::DynamicClassKind};
+use super::{
+    DeferredExpressionState, InferenceRegion, TypeInferenceBuilder, dynamic_class::DynamicClassKind,
+};
+use crate::FxIndexMap;
 use crate::Program;
 use crate::types::call::{CallArguments, CallError};
 use crate::types::class::{
-    ClassLiteral, DataclassFieldSpec, DataclassSpec, DynamicDataclassAnchor,
-    DynamicDataclassLiteral, DynamicMetaclassConflict,
+    ClassLiteral, CodeGeneratorKind, DataclassFieldSpec, DataclassSpec, DynamicDataclassAnchor,
+    DynamicDataclassLiteral, DynamicMetaclassConflict, FieldKind,
 };
 use crate::types::diagnostic::{
-    CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
-    INVALID_DATACLASS, IncompatibleBases, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
-    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_conflicting_metaclass_from_bases,
-    report_instance_layout_conflict,
+    CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_BASE, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_DATACLASS, IncompatibleBases, MISSING_ARGUMENT,
+    PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
+    report_mismatched_type_name,
 };
 use crate::types::function::KnownFunction;
 use crate::types::mro::DynamicMroErrorKind;
 use crate::types::{
     ClassBase, DATACLASS_FLAGS, DataclassFlags, DataclassParams, KnownClass, KnownInstanceType,
-    SubclassOfType, Type, TypeContext, UnionType, add_inferred_python_version_hint_to_diagnostic,
+    SubclassOfType, Type, TypeContext, TypeQualifiers, UnionType,
+    add_inferred_python_version_hint_to_diagnostic,
 };
 use ty_python_core::definition::Definition;
 
@@ -35,6 +41,16 @@ struct MakeDataclassDecoratorConfig<'db, 'ast> {
 struct MakeDataclassDecoratorResolution<'db> {
     return_ty: Type<'db>,
     effective_dataclass_params: DataclassParams<'db>,
+}
+
+#[derive(Clone, Debug)]
+struct MakeDataclassFieldDefault<'db> {
+    default_ty: Option<Type<'db>>,
+    class_default_ty: Option<Type<'db>>,
+    init: bool,
+    kw_only: Option<bool>,
+    alias: Option<Name>,
+    converter: Option<(Type<'db>, Type<'db>)>,
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -74,6 +90,243 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Report diagnostics for required non-keyword-only fields after defaulted fields.
+    fn check_invalid_make_dataclass_field_order(
+        &self,
+        inherited_fields: &FxIndexMap<Name, DataclassFieldSpec<'db>>,
+        fields: &[DataclassFieldSpec<'db>],
+        field_sources: &[&ast::Expr],
+    ) -> bool {
+        let mut merged_fields: FxIndexMap<Name, (&DataclassFieldSpec<'db>, Option<&ast::Expr>)> =
+            inherited_fields
+                .iter()
+                .map(|(name, field)| (name.clone(), (field, None)))
+                .collect();
+
+        for (field, source) in fields.iter().zip(field_sources) {
+            merged_fields.insert(field.name.clone(), (field, Some(*source)));
+        }
+
+        let mut has_invalid_field_order = false;
+        let mut has_seen_default_field = false;
+
+        for (field, field_source) in merged_fields.values() {
+            if field.class_var || !field.init || field.kw_only == Some(true) {
+                continue;
+            }
+
+            if field.default_ty.is_some() {
+                has_seen_default_field = true;
+            } else if has_seen_default_field {
+                has_invalid_field_order = true;
+                if let Some(field_source) = field_source
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&DATACLASS_FIELD_ORDER, *field_source)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Required field `{}` cannot be defined after fields with default values",
+                        field.name
+                    ));
+                }
+            }
+        }
+
+        has_invalid_field_order
+    }
+
+    fn make_dataclass_field_default(
+        &self,
+        default_ty_value: Type<'db>,
+        kw_only_default: bool,
+        respect_field_specifier_metadata: bool,
+    ) -> MakeDataclassFieldDefault<'db> {
+        let db = self.db();
+
+        if let Type::KnownInstance(KnownInstanceType::Field(field)) = default_ty_value {
+            let default_ty = field.default_type(db);
+            let class_default_ty = field.class_default_type(db);
+            if respect_field_specifier_metadata {
+                MakeDataclassFieldDefault {
+                    default_ty,
+                    class_default_ty,
+                    init: field.init(db),
+                    kw_only: Some(field.kw_only(db).unwrap_or(kw_only_default)),
+                    alias: field.alias(db).map(Name::new),
+                    converter: field.converter(db),
+                }
+            } else {
+                MakeDataclassFieldDefault {
+                    default_ty,
+                    class_default_ty,
+                    init: true,
+                    kw_only: Some(kw_only_default),
+                    alias: None,
+                    converter: None,
+                }
+            }
+        } else {
+            MakeDataclassFieldDefault {
+                default_ty: Some(default_ty_value),
+                class_default_ty: Some(default_ty_value),
+                init: true,
+                kw_only: Some(kw_only_default),
+                alias: None,
+                converter: None,
+            }
+        }
+    }
+
+    fn make_dataclass_field_spec(
+        &self,
+        name: Name,
+        ty: Type<'db>,
+        default: Option<MakeDataclassFieldDefault<'db>>,
+        kw_only_default: bool,
+        init_only: bool,
+        class_var: bool,
+    ) -> DataclassFieldSpec<'db> {
+        let default = default.unwrap_or(MakeDataclassFieldDefault {
+            default_ty: None,
+            class_default_ty: None,
+            init: true,
+            kw_only: Some(kw_only_default),
+            alias: None,
+            converter: None,
+        });
+
+        DataclassFieldSpec {
+            name,
+            ty,
+            default_ty: default.default_ty,
+            class_default_ty: default.class_default_ty,
+            init: default.init,
+            kw_only: default.kw_only,
+            alias: default.alias,
+            converter: default.converter,
+            init_only,
+            class_var,
+        }
+    }
+
+    fn infer_make_dataclass_field_annotation(
+        &mut self,
+        annotation: &ast::Expr,
+        deferred_state: DeferredExpressionState,
+    ) -> (Type<'db>, bool, bool) {
+        let annotation = self.infer_annotation_expression(annotation, deferred_state);
+        let qualifiers = annotation.qualifiers();
+        (
+            annotation.inner_type(),
+            qualifiers.contains(TypeQualifiers::INIT_VAR),
+            qualifiers.contains(TypeQualifiers::CLASS_VAR),
+        )
+    }
+
+    fn inherited_make_dataclass_fields(
+        &self,
+        bases: &[ClassBase<'db>],
+    ) -> Option<FxIndexMap<Name, DataclassFieldSpec<'db>>> {
+        let db = self.db();
+        let mut fields = FxIndexMap::default();
+        let mut mro = Vec::new();
+
+        for base in bases {
+            mro.extend(base.mro(db, None));
+        }
+
+        for base in mro.into_iter().rev() {
+            let Some(class) = base.into_class() else {
+                continue;
+            };
+            let (class_literal, specialization) = class.class_literal_and_specialization(db);
+
+            match class_literal {
+                ClassLiteral::DynamicDataclass(dataclass) => {
+                    if !dataclass.has_known_fields(db) {
+                        return None;
+                    }
+
+                    let kw_only_default = dataclass
+                        .dataclass_params(db)
+                        .flags(db)
+                        .contains(DataclassFlags::KW_ONLY);
+                    for field in dataclass.fields(db) {
+                        let mut field = field.clone();
+                        if field.kw_only.is_none() {
+                            field.kw_only = Some(kw_only_default);
+                        }
+                        fields.insert(field.name.clone(), field);
+                    }
+                }
+                ClassLiteral::Static(static_class) => {
+                    let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                        CodeGeneratorKind::from_class(db, class_literal, specialization)
+                    else {
+                        continue;
+                    };
+
+                    for (field_name, field) in
+                        static_class.own_fields(db, specialization, field_policy)
+                    {
+                        if field.is_kw_only_sentinel(db) {
+                            continue;
+                        }
+
+                        let FieldKind::Dataclass {
+                            default_ty,
+                            init_only,
+                            init,
+                            kw_only,
+                            alias,
+                            converter,
+                        } = &field.kind
+                        else {
+                            continue;
+                        };
+
+                        fields.insert(
+                            field_name.clone(),
+                            DataclassFieldSpec {
+                                name: field_name.clone(),
+                                ty: field.declared_ty,
+                                default_ty: *default_ty,
+                                class_default_ty: *default_ty,
+                                init: *init,
+                                kw_only: Some(kw_only.unwrap_or(false)),
+                                alias: alias.as_ref().map(|alias| Name::new(alias.as_ref())),
+                                converter: *converter,
+                                init_only: *init_only,
+                                class_var: false,
+                            },
+                        );
+                    }
+                }
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => {}
+            }
+        }
+
+        Some(fields)
+    }
+
+    fn apply_inherited_make_dataclass_defaults(
+        fields: &mut [DataclassFieldSpec<'db>],
+        inherited_fields: &FxIndexMap<Name, DataclassFieldSpec<'db>>,
+    ) {
+        for field in fields {
+            if field.default_ty.is_none()
+                && let Some(inherited_field) = inherited_fields.get(&field.name)
+                && inherited_field.default_ty.is_some()
+            {
+                field.default_ty = inherited_field.default_ty;
+                field.class_default_ty = inherited_field.class_default_ty;
+            }
+        }
+    }
+
     /// Infer a `dataclasses.make_dataclass(cls_name, fields, ...)` call.
     ///
     /// This method *does not* call `infer_expression` on the object being called;
@@ -92,8 +345,56 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             node_index: _,
         } = &call_expr.arguments;
 
-        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
-        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
+        let starred_arguments: SmallVec<[&ast::Expr; 1]> =
+            args.iter().filter(|arg| arg.is_starred_expr()).collect();
+        let double_starred_arguments: SmallVec<[&ast::Keyword; 1]> =
+            keywords.iter().filter(|kw| kw.arg.is_none()).collect();
+        let has_starred = !starred_arguments.is_empty();
+        let has_double_starred = !double_starred_arguments.is_empty();
+
+        match (&*starred_arguments, &*double_starred_arguments) {
+            ([], []) => {}
+            (starred, []) => {
+                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, starred[0])
+                {
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Variadic positional arguments are not supported in `make_dataclass()` calls",
+                    );
+                    for arg in &starred[1..] {
+                        diagnostic.annotate(self.context.secondary(arg));
+                    }
+                }
+            }
+            ([], double_starred) => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_ARGUMENT_TYPE, double_starred[0])
+                {
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Variadic keyword arguments are not supported in `make_dataclass()` calls",
+                    );
+                    for arg in &double_starred[1..] {
+                        diagnostic.annotate(self.context.secondary(arg));
+                    }
+                }
+            }
+            _ => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_ARGUMENT_TYPE, starred_arguments[0])
+                {
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Variadic positional and keyword arguments are not supported in `make_dataclass()` calls",
+                    );
+                    for arg in &starred_arguments[1..] {
+                        diagnostic.annotate(self.context.secondary(arg));
+                    }
+                    for arg in &double_starred_arguments {
+                        diagnostic.annotate(self.context.secondary(arg));
+                    }
+                }
+            }
+        }
 
         let cls_name_kw = call_expr.arguments.find_keyword("cls_name");
         let fields_kw = call_expr.arguments.find_keyword("fields");
@@ -157,7 +458,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if has_starred || has_double_starred {
+            self.infer_expression(fields_arg, TypeContext::default());
+
             for kw in keywords {
+                if let Some(arg) = kw.arg.as_deref() {
+                    if name_from_keyword && arg == "cls_name" {
+                        continue;
+                    }
+                    if fields_from_keyword && arg == "fields" {
+                        continue;
+                    }
+                }
                 self.infer_expression(&kw.value, TypeContext::default());
             }
             return SubclassOfType::subclass_of_unknown();
@@ -241,7 +552,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let dict_type =
                         KnownClass::Dict.to_specialized_instance(db, &[Type::any(), Type::any()]);
                     let valid_type = UnionType::from_elements(db, [dict_type, Type::none(db)]);
-                    if !kw_type.is_assignable_to(db, valid_type) {
+                    if !matches!(kw_type, Type::TypedDict(_))
+                        && !kw_type.is_assignable_to(db, valid_type)
+                    {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                         {
@@ -295,22 +608,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
             .unwrap_or_default();
 
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `cls_name` of `make_dataclass()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
-            }
-            Name::new_static("<unknown>")
-        };
+        let name = name_type
+            .as_string_literal()
+            .map(|literal| Name::new(literal.value(db)));
+
+        if name.is_none()
+            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `cls_name` of `make_dataclass()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `str`, found `{}`",
+                name_type.display(db)
+            ));
+        } else if let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && Some(assigned_name.as_str()) != name.as_deref()
+            && decorator_config.decorator_arg.is_none()
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                "make_dataclass",
+                &assigned_name,
+                name.as_deref(),
+                name_type,
+            );
+        }
+
+        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
 
         let scope = self.scope();
         let scope_offset = definition.is_none().then(|| {
@@ -358,6 +686,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         fields_arg,
                         bases,
                         effective_dataclass_params,
+                        &members,
                     );
 
                     (
@@ -641,12 +970,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let decorator_config =
             self.make_dataclass_decorator_config(decorator_keyword_inputs, false);
         let raw_dataclass_params = decorator_config.raw_dataclass_params;
+        let (members, has_dynamic_namespace) = arguments
+            .find_keyword("namespace")
+            .map(|namespace_kw| {
+                let namespace_ty = self
+                    .try_expression_type(&namespace_kw.value)
+                    .unwrap_or_else(|| {
+                        self.infer_expression(&namespace_kw.value, TypeContext::default())
+                    });
+                self.extract_dynamic_namespace_members(&namespace_kw.value, namespace_ty, true)
+            })
+            .unwrap_or_default();
         let effective_dataclass_params = self.make_dataclass_effective_params(
             &name,
             raw_dataclass_params,
             DynamicDataclassAnchor::Definition(definition),
-            Box::default(),
-            false,
+            members.clone(),
+            has_dynamic_namespace,
             &decorator_config,
         );
 
@@ -659,7 +999,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Box::default()
         };
 
-        self.infer_make_dataclass_fields(fields_arg, bases, effective_dataclass_params);
+        self.infer_make_dataclass_fields(fields_arg, bases, effective_dataclass_params, &members);
         self.typevar_binding_context = previous_context;
     }
 
@@ -673,8 +1013,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fields_arg: &ast::Expr,
         bases: Box<[ClassBase<'db>]>,
         dataclass_params: DataclassParams<'db>,
+        namespace_members: &[(Name, Type<'db>)],
     ) -> DataclassSpec<'db> {
-        self.infer_make_dataclass_fields(fields_arg, bases, dataclass_params)
+        self.infer_make_dataclass_fields(fields_arg, bases, dataclass_params, namespace_members)
     }
 
     fn infer_dangling_make_dataclass_bases(
@@ -720,8 +1061,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer fields from a `make_dataclass` fields argument.
     ///
-    /// This method properly handles string annotations as forward references by using
-    /// `infer_type_expression` instead of `expression_type().in_type_expression()`.
+    /// This method properly handles annotation-only field forms such as `ClassVar` and `InitVar`,
+    /// and string annotations as forward references.
     ///
     /// Returns a `DataclassSpec` containing the fields. The spec is also stored as the
     /// expression type of the fields argument so it can be retrieved during deferred evaluation.
@@ -730,18 +1071,48 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fields_arg: &ast::Expr,
         bases: Box<[ClassBase<'db>]>,
         dataclass_params: DataclassParams<'db>,
+        namespace_members: &[(Name, Type<'db>)],
     ) -> DataclassSpec<'db> {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        enum SequenceKind {
+            List,
+            Tuple,
+        }
+
         let db = self.db();
+        let kw_only_default = dataclass_params.flags(db).contains(DataclassFlags::KW_ONLY);
         let field_specifiers = dataclass_params.field_specifiers(db);
         let respect_field_specifier_metadata = !field_specifiers.is_empty();
         self.with_dataclass_field_specifiers(field_specifiers, |this| {
-            let store_unknown_spec = |builder: &mut Self| {
-                let spec = DataclassSpec::unknown(db);
+            let store_unknown_spec = |builder: &mut Self, bases: Box<[ClassBase<'db>]>| {
+                let spec = DataclassSpec::unknown_with_bases(db, bases);
                 builder.store_expression_type(
                     fields_arg,
                     Type::KnownInstance(KnownInstanceType::DataclassSpec(spec)),
                 );
                 spec
+            };
+            let field_spec_expression_type =
+                |kind: SequenceKind, element_types: &[Type<'db>]| match kind {
+                    SequenceKind::Tuple => {
+                        Type::heterogeneous_tuple(db, element_types.iter().copied())
+                    }
+                    SequenceKind::List => KnownClass::List.to_specialized_instance(
+                        db,
+                        &[UnionType::from_elements(db, element_types.iter().copied())],
+                    ),
+                };
+            let namespace_default = |builder: &Self, name: &Name| {
+                namespace_members
+                    .iter()
+                    .find_map(|(member_name, ty)| (member_name == name).then_some(*ty))
+                    .map(|ty| {
+                        builder.make_dataclass_field_default(
+                            ty,
+                            kw_only_default,
+                            respect_field_specifier_metadata,
+                        )
+                    })
             };
 
             let elements: &[ast::Expr] = match fields_arg {
@@ -749,24 +1120,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Expr::Tuple(tuple) => &tuple.elts,
                 _ => {
                     this.infer_expression(fields_arg, TypeContext::default());
-                    return DataclassSpec::unknown(db);
+                    return DataclassSpec::unknown_with_bases(db, bases);
                 }
             };
 
             let mut fields = Vec::with_capacity(elements.len());
+            let mut field_sources = Vec::with_capacity(elements.len());
             let mut has_dynamic_fields = false;
 
-            for elt in elements {
+            for (i, elt) in elements.iter().enumerate() {
                 if let ast::Expr::StringLiteral(string_lit) = elt {
                     let name = Name::new(string_lit.value.to_str());
-                    fields.push(DataclassFieldSpec {
+                    let default = namespace_default(this, &name);
+                    fields.push(this.make_dataclass_field_spec(
                         name,
-                        ty: Type::any(),
-                        default_ty: None,
-                        init: true,
-                        kw_only: None,
-                        alias: None,
-                    });
+                        Type::any(),
+                        default,
+                        kw_only_default,
+                        false,
+                        false,
+                    ));
+                    field_sources.push(elt);
                     this.store_expression_type(
                         elt,
                         Type::string_literal(db, string_lit.value.to_str()),
@@ -774,9 +1148,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     continue;
                 }
 
-                let field_elements: &[ast::Expr] = match elt {
-                    ast::Expr::Tuple(tuple) => &tuple.elts,
-                    ast::Expr::List(list) => &list.elts,
+                let (field_elements, field_spec_kind): (&[ast::Expr], SequenceKind) = match elt {
+                    ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
+                    ast::Expr::List(list) => (&list.elts, SequenceKind::List),
                     _ => {
                         this.infer_expression(elt, TypeContext::default());
                         has_dynamic_fields = true;
@@ -787,18 +1161,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match field_elements {
                     [name_expr, type_expr] => {
                         let name_ty = this.infer_expression(name_expr, TypeContext::default());
-                        let field_ty = this.infer_type_expression(type_expr);
+                        let deferred_state = this.deferred_state;
+                        let (field_ty, init_only, class_var) =
+                            this.infer_make_dataclass_field_annotation(type_expr, deferred_state);
+                        this.store_expression_type(
+                            elt,
+                            field_spec_expression_type(field_spec_kind, &[name_ty, field_ty]),
+                        );
 
                         if let Some(name_lit) = name_ty.as_string_literal() {
                             let field_name = Name::new(name_lit.value(db));
-                            fields.push(DataclassFieldSpec {
-                                name: field_name,
-                                ty: field_ty,
-                                default_ty: None,
-                                init: true,
-                                kw_only: None,
-                                alias: None,
-                            });
+                            let default = namespace_default(this, &field_name);
+                            fields.push(this.make_dataclass_field_spec(
+                                field_name,
+                                field_ty,
+                                default,
+                                kw_only_default,
+                                init_only,
+                                class_var,
+                            ));
+                            field_sources.push(elt);
                         } else if !name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
                             if let Some(diagnostic_builder) =
                                 this.context.report_lint(&INVALID_DATACLASS, name_expr)
@@ -811,49 +1193,45 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     name_ty.display(db)
                                 ));
                             }
-                            return store_unknown_spec(this);
+                            for element in &elements[(i + 1)..] {
+                                this.infer_expression(element, TypeContext::default());
+                            }
+                            return store_unknown_spec(this, bases.clone());
                         } else {
                             has_dynamic_fields = true;
                         }
-                        this.store_expression_type(
-                            elt,
-                            Type::heterogeneous_tuple(db, [name_ty, field_ty]),
-                        );
                     }
                     [name_expr, type_expr, default_expr] => {
                         let name_ty = this.infer_expression(name_expr, TypeContext::default());
-                        let field_ty = this.infer_type_expression(type_expr);
+                        let deferred_state = this.deferred_state;
+                        let (field_ty, init_only, class_var) =
+                            this.infer_make_dataclass_field_annotation(type_expr, deferred_state);
                         let default_ty_value =
                             this.infer_expression(default_expr, TypeContext::default());
+                        this.store_expression_type(
+                            elt,
+                            field_spec_expression_type(
+                                field_spec_kind,
+                                &[name_ty, field_ty, default_ty_value],
+                            ),
+                        );
 
                         if let Some(name_lit) = name_ty.as_string_literal() {
                             let field_name = Name::new(name_lit.value(db));
-                            let (default_ty, init, kw_only, alias) =
-                                if let Type::KnownInstance(KnownInstanceType::Field(field)) =
-                                    default_ty_value
-                                {
-                                    let default_ty = field.default_type(db);
-                                    if respect_field_specifier_metadata {
-                                        (
-                                            default_ty,
-                                            field.init(db),
-                                            field.kw_only(db),
-                                            field.alias(db).map(Name::new),
-                                        )
-                                    } else {
-                                        (default_ty, true, None, None)
-                                    }
-                                } else {
-                                    (Some(default_ty_value), true, None, None)
-                                };
-                            fields.push(DataclassFieldSpec {
-                                name: field_name,
-                                ty: field_ty,
-                                default_ty,
-                                init,
-                                kw_only,
-                                alias,
-                            });
+                            let default = this.make_dataclass_field_default(
+                                default_ty_value,
+                                kw_only_default,
+                                respect_field_specifier_metadata,
+                            );
+                            fields.push(this.make_dataclass_field_spec(
+                                field_name,
+                                field_ty,
+                                Some(default),
+                                kw_only_default,
+                                init_only,
+                                class_var,
+                            ));
+                            field_sources.push(elt);
                         } else if !name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
                             if let Some(diagnostic_builder) =
                                 this.context.report_lint(&INVALID_DATACLASS, name_expr)
@@ -866,18 +1244,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     name_ty.display(db)
                                 ));
                             }
-                            return store_unknown_spec(this);
+                            for element in &elements[(i + 1)..] {
+                                this.infer_expression(element, TypeContext::default());
+                            }
+                            return store_unknown_spec(this, bases.clone());
                         } else {
                             has_dynamic_fields = true;
                         }
-                        this.store_expression_type(
-                            elt,
-                            Type::heterogeneous_tuple(db, [name_ty, field_ty, default_ty_value]),
-                        );
                     }
                     _ => {
-                        for expr in field_elements {
-                            this.infer_expression(expr, TypeContext::default());
+                        this.infer_expression(elt, TypeContext::default());
+                        for element in &elements[(i + 1)..] {
+                            this.infer_expression(element, TypeContext::default());
                         }
                         if let Some(diagnostic_builder) =
                             this.context.report_lint(&INVALID_DATACLASS, elt)
@@ -889,16 +1267,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 "Each field must be a string, or a length-2 or length-3 tuple/list",
                             );
                         }
-                        return store_unknown_spec(this);
+                        return store_unknown_spec(this, bases.clone());
                     }
                 }
             }
 
+            let inherited_fields = this
+                .inherited_make_dataclass_fields(&bases)
+                .unwrap_or_default();
+            Self::apply_inherited_make_dataclass_defaults(&mut fields, &inherited_fields);
+
             let field_names: Vec<Name> = fields.iter().map(|field| field.name.clone()).collect();
             this.check_invalid_make_dataclass_field_names(&field_names, fields_arg);
+            let has_invalid_field_order = this.check_invalid_make_dataclass_field_order(
+                &inherited_fields,
+                &fields,
+                &field_sources,
+            );
 
-            if has_dynamic_fields {
-                return store_unknown_spec(this);
+            if has_dynamic_fields || has_invalid_field_order {
+                return store_unknown_spec(this, bases);
             }
 
             let spec = DataclassSpec::known(db, fields.into_boxed_slice(), bases);

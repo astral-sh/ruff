@@ -5,7 +5,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{NodeIndex, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{ClassLiteral, ClassMemberResult, DynamicMetaclassConflict, MroIterator, MroLookup};
+use super::{
+    ClassLiteral, ClassMemberResult, CodeGeneratorKind, DynamicMetaclassConflict, FieldKind,
+    InstanceMemberResult, MroIterator, MroLookup,
+};
 use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
@@ -13,9 +16,9 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     ClassBase, ClassType, DataclassFlags, DataclassParams, KnownClass, KnownInstanceType,
     MemberLookupPolicy, SubclassOfType, Type, TypeQualifiers, UnionType,
-    definition_expression_type,
+    definition_expression_type, extract_fixed_length_iterable_element_types,
 };
-use crate::{Db, Program};
+use crate::{Db, FxIndexMap, Program};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -32,6 +35,8 @@ pub(super) struct DataclassFieldInfo<'db> {
     pub(super) init: bool,
     /// Whether this field is keyword-only.
     pub(super) kw_only: bool,
+    /// The converter types for this field, if a `converter` was specified.
+    pub(super) converter: Option<(Type<'db>, Type<'db>)>,
 }
 
 /// Synthesize a dataclass class member given the dataclass flags, instance type, and fields.
@@ -58,13 +63,18 @@ pub(super) fn synthesize_dataclass_class_member<'db>(
                 } else {
                     Parameter::positional_or_keyword(field.name)
                 };
-                param = param.with_annotated_type(field.ty);
+                let init_ty = field
+                    .converter
+                    .map(|(converter_input_ty, _)| converter_input_ty)
+                    .unwrap_or(field.ty);
+                param = param.with_annotated_type(init_ty);
                 if let Some(default) = field.default_ty {
                     param = param.with_default_type(default);
                 }
                 parameters.push(param);
             }
 
+            parameters.sort_by_key(Parameter::is_keyword_only);
             let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
             Some(Type::function_like_callable(db, signature))
         }
@@ -172,9 +182,13 @@ pub struct DataclassFieldSpec<'db> {
     pub name: Name,
     pub ty: Type<'db>,
     pub default_ty: Option<Type<'db>>,
+    pub class_default_ty: Option<Type<'db>>,
     pub init: bool,
     pub kw_only: Option<bool>,
     pub alias: Option<Name>,
+    pub converter: Option<(Type<'db>, Type<'db>)>,
+    pub init_only: bool,
+    pub class_var: bool,
 }
 
 /// A specification describing the fields and bases of a dynamic `make_dataclass` class.
@@ -201,6 +215,10 @@ impl<'db> DataclassSpec<'db> {
         Self::new(db, Box::default(), false, Box::default())
     }
 
+    pub(crate) fn unknown_with_bases(db: &'db dyn Db, bases: Box<[ClassBase<'db>]>) -> Self {
+        Self::new(db, Box::default(), false, bases)
+    }
+
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -225,13 +243,38 @@ impl<'db> DataclassSpec<'db> {
                     }
                     None => None,
                 };
+                let normalized_class_default = match field.class_default_ty {
+                    Some(default_ty) => {
+                        Some(default_ty.recursive_type_normalized_impl(db, div, nested)?)
+                    }
+                    None => None,
+                };
+                let normalized_converter = match field.converter {
+                    Some((input_ty, output_ty)) if nested => Some((
+                        input_ty.recursive_type_normalized_impl(db, div, true)?,
+                        output_ty.recursive_type_normalized_impl(db, div, true)?,
+                    )),
+                    Some((input_ty, output_ty)) => Some((
+                        input_ty
+                            .recursive_type_normalized_impl(db, div, true)
+                            .unwrap_or(div),
+                        output_ty
+                            .recursive_type_normalized_impl(db, div, true)
+                            .unwrap_or(div),
+                    )),
+                    None => None,
+                };
                 Some(DataclassFieldSpec {
                     name: field.name.clone(),
                     ty: normalized_ty,
                     default_ty: normalized_default,
+                    class_default_ty: normalized_class_default,
                     init: field.init,
                     kw_only: field.kw_only,
                     alias: field.alias.clone(),
+                    converter: normalized_converter,
+                    init_only: field.init_only,
+                    class_var: field.class_var,
                 })
             })
             .collect::<Option<Box<_>>>()?;
@@ -287,7 +330,24 @@ fn deferred_functional_dataclass_spec<'db>(
         return spec;
     }
 
-    DataclassSpec::unknown(db)
+    let bases = node
+        .arguments
+        .find_keyword("bases")
+        .map(|keyword| {
+            extract_fixed_length_iterable_element_types(db, &keyword.value, |expr| {
+                definition_expression_type(db, definition, expr)
+            })
+            .map(|bases| {
+                bases
+                    .iter()
+                    .filter_map(|base| ClassBase::try_from_type(db, *base, None))
+                    .collect()
+            })
+            .unwrap_or_else(|| Box::from([ClassBase::unknown()]))
+        })
+        .unwrap_or_default();
+
+    DataclassSpec::unknown_with_bases(db, bases)
 }
 
 /// Anchor for identifying a dynamic `make_dataclass` class literal.
@@ -452,6 +512,126 @@ impl<'db> DynamicDataclassLiteral<'db> {
         self.spec(db).bases(db)
     }
 
+    fn field_info_from_spec(
+        field: &DataclassFieldSpec<'db>,
+        kw_only_default: bool,
+    ) -> DataclassFieldInfo<'db> {
+        DataclassFieldInfo {
+            name: field.alias.clone().unwrap_or_else(|| field.name.clone()),
+            ty: field.ty,
+            default_ty: field.default_ty,
+            init: field.init,
+            kw_only: field.kw_only.unwrap_or(kw_only_default),
+            converter: field.converter,
+        }
+    }
+
+    fn fields_for_synthesis(self, db: &'db dyn Db) -> Option<Vec<DataclassFieldInfo<'db>>> {
+        let mut fields = FxIndexMap::default();
+
+        for base in self.iter_mro(db).rev() {
+            let Some(class) = base.into_class() else {
+                continue;
+            };
+            let (class_literal, specialization) = class.class_literal_and_specialization(db);
+
+            match class_literal {
+                ClassLiteral::DynamicDataclass(dataclass) => {
+                    if !dataclass.has_known_fields(db) {
+                        return None;
+                    }
+
+                    let kw_only_default = dataclass
+                        .dataclass_params(db)
+                        .flags(db)
+                        .contains(DataclassFlags::KW_ONLY);
+                    for field in dataclass.fields(db) {
+                        if field.class_var {
+                            continue;
+                        }
+                        fields.insert(
+                            field.name.clone(),
+                            Self::field_info_from_spec(field, kw_only_default),
+                        );
+                    }
+                }
+                ClassLiteral::Static(static_class) => {
+                    let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                        CodeGeneratorKind::from_class(db, class_literal, specialization)
+                    else {
+                        continue;
+                    };
+
+                    for (field_name, field) in
+                        static_class.own_fields(db, specialization, field_policy)
+                    {
+                        if field.is_kw_only_sentinel(db) {
+                            continue;
+                        }
+
+                        let FieldKind::Dataclass {
+                            default_ty,
+                            init,
+                            kw_only,
+                            alias,
+                            converter,
+                            ..
+                        } = &field.kind
+                        else {
+                            continue;
+                        };
+
+                        fields.insert(
+                            field_name.clone(),
+                            DataclassFieldInfo {
+                                name: alias
+                                    .as_ref()
+                                    .map(|alias| Name::new(alias.as_ref()))
+                                    .unwrap_or_else(|| field_name.clone()),
+                                ty: field.declared_ty,
+                                default_ty: *default_ty,
+                                init: *init,
+                                kw_only: kw_only.unwrap_or(false),
+                                converter: *converter,
+                            },
+                        );
+                    }
+                }
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => {}
+            }
+        }
+
+        Some(fields.into_values().collect())
+    }
+
+    pub(super) fn converter_input_type_for_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        self.iter_mro(db).find_map(|base| {
+            let class = base.into_class()?;
+            let (class_literal, specialization) = class.class_literal_and_specialization(db);
+            match class_literal {
+                ClassLiteral::DynamicDataclass(dataclass) => dataclass
+                    .fields(db)
+                    .iter()
+                    .find(|field| field.name == name)
+                    .and_then(|field| field.converter.map(|(input_ty, _)| input_ty)),
+                ClassLiteral::Static(static_class) => static_class
+                    .converter_input_type_for_field(db, name)
+                    .map(|ty| ty.apply_optional_specialization(db, specialization)),
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => None,
+            }
+        })
+    }
+
     #[salsa::tracked(
         returns(ref),
         heap_size = ruff_memory_usage::heap_size,
@@ -485,7 +665,7 @@ impl<'db> DynamicDataclassLiteral<'db> {
 
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         for field in self.fields(db) {
-            if field.name.as_str() == name {
+            if field.name.as_str() == name && !field.init_only && !field.class_var {
                 return Member::definitely_declared(field.ty);
             }
         }
@@ -498,21 +678,12 @@ impl<'db> DynamicDataclassLiteral<'db> {
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let result = self.own_instance_member(db, name);
-        if !result.is_undefined() {
-            return result.inner;
+        match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
+            InstanceMemberResult::Done(result) => result,
+            InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
+                .to_instance(db)
+                .instance_member(db, name),
         }
-
-        for base in self.bases(db) {
-            if let ClassBase::Class(class) = base {
-                let member = class.instance_member(db, name);
-                if !member.place.is_undefined() {
-                    return member;
-                }
-            }
-        }
-
-        KnownClass::Object.to_instance(db).instance_member(db, name)
     }
 
     pub(crate) fn class_member(
@@ -547,20 +718,23 @@ impl<'db> DynamicDataclassLiteral<'db> {
             };
         }
 
+        if let Some(field) = self
+            .fields(db)
+            .iter()
+            .find(|field| field.name.as_str() == name)
+        {
+            return field
+                .class_default_ty
+                .map(Member::definitely_declared)
+                .unwrap_or_else(Member::unbound);
+        }
+
         if let Some(ty) = self.namespace_member(db, name) {
             return Member::definitely_declared(ty);
         }
 
         if let Some(ty) = self.synthesized_class_member(db, name) {
             return Member::definitely_declared(ty);
-        }
-
-        if self
-            .fields(db)
-            .iter()
-            .any(|field| field.name.as_str() == name)
-        {
-            return Member::unbound();
         }
 
         self.has_dynamic_namespace(db)
@@ -620,15 +794,16 @@ impl<'db> DynamicDataclassLiteral<'db> {
             return Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]));
         }
 
-        let kw_only_default = flags.contains(DataclassFlags::KW_ONLY);
-        let fields_iter = self.fields(db).iter().map(|field| DataclassFieldInfo {
-            name: field.alias.clone().unwrap_or_else(|| field.name.clone()),
-            ty: field.ty,
-            default_ty: field.default_ty,
-            init: field.init,
-            kw_only: field.kw_only.unwrap_or(kw_only_default),
-        });
+        let Some(fields) = self.fields_for_synthesis(db) else {
+            match name {
+                "__new__" | "__init__" => {
+                    let signature = Signature::new(Parameters::gradual_form(), instance_ty);
+                    return Some(Type::function_like_callable(db, signature));
+                }
+                _ => return None,
+            }
+        };
 
-        synthesize_dataclass_class_member(db, name, instance_ty, flags, fields_iter)
+        synthesize_dataclass_class_member(db, name, instance_ty, flags, fields.into_iter())
     }
 }

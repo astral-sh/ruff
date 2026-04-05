@@ -93,6 +93,29 @@ p1 = PointWithDefault(1)
 p2 = PointWithDefault(1, 2)
 
 reveal_type(PointWithDefault.__init__)  # revealed: (self: PointWithDefault, x: int, y: int = 0) -> None
+reveal_type(PointWithDefault.y)  # revealed: Literal[0]
+```
+
+## `ClassVar` and `InitVar` field annotations
+
+```py
+from dataclasses import InitVar, make_dataclass
+from typing import ClassVar
+
+SpecialFields = make_dataclass(
+    "SpecialFields",
+    [("x", int), ("version", ClassVar[str], "v1"), ("temp", InitVar[int])],
+)
+
+reveal_type(SpecialFields.__init__)  # revealed: (self: SpecialFields, x: int, temp: int) -> None
+reveal_type(SpecialFields.__match_args__)  # revealed: tuple[Literal["x"], Literal["temp"]]
+reveal_type(SpecialFields.version)  # revealed: Literal["v1"]
+
+special = SpecialFields(1, 2)
+reveal_type(special.x)  # revealed: int
+
+# error: [unresolved-attribute] "Object of type `SpecialFields` has no attribute `temp`"
+reveal_type(special.temp)  # revealed: Unknown
 ```
 
 ## Fields with `field()` defaults
@@ -122,6 +145,10 @@ p3 = PointWithField(1, 2, [3])
 reveal_type(p1.x)  # revealed: int
 reveal_type(p1.y)  # revealed: int
 reveal_type(p1.z)  # revealed: list[Unknown]
+reveal_type(PointWithField.y)  # revealed: Literal[0]
+
+# error: [unresolved-attribute] "Attribute `z` can only be accessed on instances, not on the class object `<class 'PointWithField'>` itself."
+reveal_type(PointWithField.z)  # revealed: Unknown
 ```
 
 ## Fields with `init=False` via `field()`
@@ -169,6 +196,23 @@ reveal_type(p1.y)  # revealed: int
 PointKwOnlyField(1, 2)
 
 reveal_type(PointKwOnlyField.__init__)  # revealed: (self: PointKwOnlyField, x: int, *, y: int) -> None
+```
+
+## Keyword-only fields are moved after positional fields
+
+```py
+from dataclasses import field, make_dataclass
+
+KwOnlyFirst = make_dataclass(
+    "KwOnlyFirst",
+    [
+        ("x", int, field(kw_only=True)),
+        ("y", int),
+    ],
+)
+
+KwOnlyFirst(1, x=2)
+reveal_type(KwOnlyFirst.__init__)  # revealed: (self: KwOnlyFirst, y: int, *, x: int) -> None
 ```
 
 ## Fields with `kw_only=False` overriding class-level `kw_only=True`
@@ -582,6 +626,77 @@ reveal_type(d.value)  # revealed: int
 reveal_type(d.greet())  # revealed: str
 ```
 
+Dynamic dataclass fields are also included when a static dataclass inherits from a dynamic
+dataclass:
+
+```py
+from dataclasses import InitVar, dataclass, make_dataclass
+from typing import ClassVar
+
+BaseFields = make_dataclass("BaseFields", [("x", int)])
+BaseSpecialFields = make_dataclass(
+    "BaseSpecialFields",
+    [("a", int), ("version", ClassVar[str], "v1"), ("temp", InitVar[bytes])],
+)
+
+@dataclass
+class Child(BaseFields):
+    y: str
+
+@dataclass
+class ChildSpecial(Child, BaseSpecialFields):
+    z: bool
+
+reveal_type(Child.__init__)  # revealed: (self: Child, x: int, y: str) -> None
+reveal_type(ChildSpecial.__init__)  # revealed: (self: ChildSpecial, a: int, temp: bytes, x: int, y: str, z: bool) -> None
+
+child = Child(1, "ok")
+reveal_type(child.x)  # revealed: int
+reveal_type(child.y)  # revealed: str
+
+child_special = ChildSpecial(1, b"tmp", 2, "ok", True)
+reveal_type(child_special.a)  # revealed: int
+reveal_type(ChildSpecial.version)  # revealed: Literal["v1"]
+```
+
+Dataclass base fields are included when `make_dataclass` creates a derived dataclass:
+
+```py
+from dataclasses import make_dataclass
+
+BaseData = make_dataclass("BaseData", [("x", int)])
+DerivedData = make_dataclass("DerivedData", [("y", str)], bases=(BaseData,))
+
+reveal_type(DerivedData.__init__)  # revealed: (self: DerivedData, x: int, y: str) -> None
+
+good = DerivedData(1, "s")
+reveal_type(good.x)  # revealed: int
+reveal_type(good.y)  # revealed: str
+
+# error: [invalid-argument-type]
+# error: [missing-argument]
+DerivedData("s")
+```
+
+Dynamic dataclass instance attributes follow the full C3 MRO:
+
+```py
+from dataclasses import make_dataclass
+
+class Top:
+    value: object
+
+class Left(Top):
+    pass
+
+class Right(Top):
+    value: int
+
+Dynamic = make_dataclass("Dynamic", [], bases=(Left, Right))
+
+reveal_type(Dynamic().value)  # revealed: int
+```
+
 ## Inline functional dataclasses
 
 Inline `make_dataclass(...)` calls preserve their field types too:
@@ -634,28 +749,69 @@ reveal_mro(PointDynamic)  # revealed: (<class 'PointDynamic'>, <class 'object'>)
 reveal_type(p.unknown)  # revealed: Any
 ```
 
+Explicit bases are preserved even if the fields argument is dynamic:
+
+```py
+from dataclasses import make_dataclass
+from ty_extensions import reveal_mro
+
+class Base:
+    pass
+
+def get_fields():
+    return [("x", int)]
+
+fields = get_fields()
+DynamicDerived = make_dataclass("DynamicDerived", fields, bases=(Base,))
+
+reveal_mro(DynamicDerived)  # revealed: (<class 'DynamicDerived'>, <class 'Base'>, <class 'object'>)
+```
+
 ## Starred arguments
 
-When `*args` or `**kwargs` are used, we can't statically determine the arguments, so we fall back to
-gradual typing.
+When `*args` or `**kwargs` are used, we can't statically determine the arguments. We emit a
+diagnostic and fall back to gradual typing.
 
 ```py
 from dataclasses import make_dataclass
 
 args = ("Point", [("x", int)])
+# error: [invalid-argument-type] "Variadic positional arguments are not supported in `make_dataclass()` calls"
 PointStarred = make_dataclass(*args)
 
 p = PointStarred(1)  # No error - accepts any arguments
 reveal_type(p.x)  # revealed: Unknown
 
 kwargs = {"cls_name": "Point2", "fields": [("y", str)]}
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `make_dataclass()` calls"
 Point2 = make_dataclass(**kwargs)
 
 p2 = Point2("hello")  # No error - accepts any arguments
 reveal_type(p2.y)  # revealed: Unknown
+
+# error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `make_dataclass()` calls"
+Point3 = make_dataclass(*args, **kwargs)
+reveal_type(Point3)  # revealed: type[Unknown]
 ```
 
 ## Argument validation
+
+### Name mismatch
+
+The class name passed to `make_dataclass()` should match the name it is assigned to:
+
+```py
+from dataclasses import make_dataclass
+
+# error: [mismatched-type-name] "The name passed to `make_dataclass` must match the variable it is assigned to: Expected "Alias", got "Real""
+Alias = make_dataclass("Real", [])
+
+def get_name() -> str:
+    return "Dynamic"
+
+# error: [mismatched-type-name] "The name passed to `make_dataclass` must match the variable it is assigned to: Expected "DynamicName", got variable of type `str`"
+DynamicName = make_dataclass(get_name(), [])
+```
 
 ### Too few positional arguments
 
@@ -809,9 +965,28 @@ Point2 = make_dataclass("Point2", [("x", int)], decorator=dataclass)
 
 ```py
 from dataclasses import make_dataclass
+from typing import TypedDict
 
 Point1 = make_dataclass("Point1", [("x", int)], namespace=None)
 Point2 = make_dataclass("Point2", [("x", int)], namespace={"custom_attr": 42})
+NSDefault = make_dataclass(
+    "NSDefault",
+    [("x", int), "y"],
+    namespace={"x": 1, "y": "default"},
+)
+
+class Namespace(TypedDict):
+    version: int
+
+namespace: Namespace = {"version": 1}
+Point3 = make_dataclass("Point3", [("x", int)], namespace=namespace)
+
+reveal_type(Point3.version)  # revealed: int
+reveal_type(NSDefault.__init__)  # revealed: (self: NSDefault, x: int = 1, y: Any = "default") -> None
+reveal_type(NSDefault.x)  # revealed: Literal[1]
+reveal_type(NSDefault.y)  # revealed: Literal["default"]
+
+NSDefault()
 ```
 
 ### Valid `module`
@@ -905,6 +1080,39 @@ reveal_type(FancyPerson.__init__)  # revealed: (self: FancyPerson, name: str, *,
 reveal_type(PlainPerson.__init__)  # revealed: (self: PlainPerson, id: int = ...) -> None
 ```
 
+### `decorator=` respects field-specifier converters
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import make_dataclass
+from typing_extensions import Callable, dataclass_transform
+
+def model_field[T, R](*, converter: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(model_field,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def str_to_int(value: str) -> int:
+    return int(value)
+
+Converted = make_dataclass(
+    "Converted",
+    [("value", int, model_field(converter=str_to_int))],
+    decorator=model,
+)
+
+Converted("1")
+Converted(1)  # error: [invalid-argument-type]
+reveal_type(Converted.__init__)  # revealed: (self: Converted, value: str) -> None
+reveal_type(Converted("1").value)  # revealed: int
+```
+
 ### `decorator=` can change the return type
 
 ```toml
@@ -953,6 +1161,30 @@ BadIdent = make_dataclass("BadIdent", [("x-y", int)])
 
 # error: [invalid-dataclass]
 BadShape = make_dataclass("BadShape", [("x",)])
+
+# error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+RequiredAfterDefault = make_dataclass("RequiredAfterDefault", [("x", int, 0), ("y", int)])
+
+BaseWithDefault = make_dataclass("BaseWithDefault", [("x", int, 0)])
+
+ChildRequiredAfterInheritedDefault = make_dataclass(
+    "ChildRequiredAfterInheritedDefault",
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    [("y", int)],
+    bases=(BaseWithDefault,),
+)
+```
+
+### Invalid field definitions still infer later fields
+
+```py
+from dataclasses import make_dataclass
+
+# error: [invalid-dataclass]
+BadName = make_dataclass("BadName", [(1, int), ("x", int, reveal_type("default"))])  # revealed: Literal["default"]
+
+# error: [invalid-dataclass]
+BadShapeRecovery = make_dataclass("BadShapeRecovery", [("x",), ("y", int, reveal_type(1))])  # revealed: Literal[1]
 ```
 
 ### Leading underscores are allowed in field names

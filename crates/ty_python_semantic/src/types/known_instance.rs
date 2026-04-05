@@ -149,6 +149,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
             }
+            if let Some(class_default_ty) = field.class_default_type(db) {
+                visitor.visit_type(db, class_default_ty);
+            }
             if let Some((input_ty, output_ty)) = field.converter(db) {
                 visitor.visit_type(db, input_ty);
                 visitor.visit_type(db, output_ty);
@@ -184,6 +187,10 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
                 if let Some(default) = field.default_ty {
                     visitor.visit_type(db, default);
+                }
+                if let Some((input_ty, output_ty)) = field.converter {
+                    visitor.visit_type(db, input_ty);
+                    visitor.visit_type(db, output_ty);
                 }
             }
         }
@@ -396,6 +403,10 @@ pub struct FieldInstance<'db> {
     /// `default_factory` arguments to `dataclasses.field()`.
     pub default_type: Option<Type<'db>>,
 
+    /// The type of the default value that remains as an attribute on the class. This is only
+    /// present for an actual `default`, not for `default_factory`.
+    pub class_default_type: Option<Type<'db>>,
+
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
 
@@ -430,6 +441,15 @@ impl<'db> FieldInstance<'db> {
             ),
             None => None,
         };
+        let class_default_type = match self.class_default_type(db) {
+            Some(default) if nested => Some(default.recursive_type_normalized_impl(db, div, true)?),
+            Some(default) => Some(
+                default
+                    .recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
                 input_ty.recursive_type_normalized_impl(db, div, true)?,
@@ -448,6 +468,7 @@ impl<'db> FieldInstance<'db> {
         Some(FieldInstance::new(
             db,
             default_type,
+            class_default_type,
             self.init(db),
             self.kw_only(db),
             self.alias(db),

@@ -1620,7 +1620,8 @@ impl<'db> Bindings<'db> {
                             })
                         };
 
-                        let has_default_value = get_argument_type("default", false).is_some()
+                        let default_arg_ty = get_argument_type("default", false);
+                        let has_default_value = default_arg_ty.is_some()
                             || get_argument_type("default_factory", false).is_some()
                             || get_argument_type("factory", false).is_some();
 
@@ -1753,7 +1754,15 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only, alias, converter),
+                            FieldInstance::new(
+                                db,
+                                default_ty,
+                                default_arg_ty,
+                                init,
+                                kw_only,
+                                alias,
+                                converter,
+                            ),
                         )));
                     }
 
