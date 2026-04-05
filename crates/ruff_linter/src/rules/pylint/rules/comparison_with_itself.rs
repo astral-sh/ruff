@@ -12,8 +12,9 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// Checks for operations that compare a name to itself.
 ///
 /// ## Why is this bad?
-/// Comparing a name to itself always results in the same value, and is likely
-/// a mistake.
+/// For most objects, comparing a name to itself results in the same value,
+/// and is likely a mistake. Note that objects with a custom `__eq__`
+/// implementation (like `math.nan`) may not follow this pattern.
 ///
 /// ## Example
 /// ```python
