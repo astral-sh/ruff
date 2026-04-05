@@ -4,7 +4,6 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -242,13 +241,6 @@ struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ActiveTypeMapping {
-    Default,
-    TopMaterialization,
-    BottomMaterialization,
-}
-
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Materialization is the only mapping mode that needs to visit the same type under two different
@@ -260,50 +252,24 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     bottom_materialization: TypeTransformer<'db, ApplyBottomMaterialization>,
     materialization_equivalence:
         Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>,
-    active_type_mappings: RefCell<Vec<ActiveTypeMapping>>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
-    pub(crate) fn visit(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
-        let active_type_mapping = self
-            .active_type_mappings
-            .borrow()
-            .last()
-            .copied()
-            .unwrap_or(ActiveTypeMapping::Default);
-
-        match active_type_mapping {
-            ActiveTypeMapping::Default => self.default.visit(ty, func),
-            ActiveTypeMapping::TopMaterialization => self.top_materialization.visit(ty, func),
-            ActiveTypeMapping::BottomMaterialization => self.bottom_materialization.visit(ty, func),
-        }
-    }
-
-    pub(crate) fn with_type_mapping<T>(
+    pub(crate) fn visit(
         &self,
+        ty: Type<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
-        func: impl FnOnce() -> T,
-    ) -> T {
-        let active_type_mapping = match type_mapping {
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => {
-                ActiveTypeMapping::TopMaterialization
+                self.top_materialization.visit(ty, func)
             }
             TypeMapping::Materialize(MaterializationKind::Bottom) => {
-                ActiveTypeMapping::BottomMaterialization
+                self.bottom_materialization.visit(ty, func)
             }
-            _ => ActiveTypeMapping::Default,
-        };
-
-        self.active_type_mappings
-            .borrow_mut()
-            .push(active_type_mapping);
-
-        let result = func();
-
-        let previous = self.active_type_mappings.borrow_mut().pop();
-        debug_assert_eq!(previous, Some(active_type_mapping));
-
-        result
+            _ => self.default.visit(ty, func),
+        }
     }
 
     pub(crate) fn is_equivalent_to_materialization(
@@ -323,7 +289,6 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             top_materialization: TypeTransformer::default(),
             bottom_materialization: TypeTransformer::default(),
             materialization_equivalence: Rc::clone(&self.materialization_equivalence),
-            active_type_mappings: RefCell::default(),
         }
     }
 }
@@ -335,7 +300,6 @@ impl<'db> Default for ApplyTypeMappingVisitor<'db> {
             top_materialization: TypeTransformer::default(),
             bottom_materialization: TypeTransformer::default(),
             materialization_equivalence: Rc::new(CycleDetector::new(true)),
-            active_type_mappings: RefCell::default(),
         }
     }
 }
@@ -5618,11 +5582,11 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        visitor.with_type_mapping(type_mapping, || match self {
+        match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
+            Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5670,7 +5634,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -5751,7 +5715,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, || {
+            Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
@@ -5760,7 +5724,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+            Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5784,7 +5748,7 @@ impl<'db> Type<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, || {
+                let mapped = visitor.visit(self, type_mapping, || {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
@@ -5871,7 +5835,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
-        })
+        }
     }
 
     /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build
