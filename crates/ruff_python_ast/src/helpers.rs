@@ -185,8 +185,7 @@ where
             return false;
         }
 
-        // FString/TString: non-literal interpolation may invoke `__format__`/`__str__`.
-        // Return `false` to let the traversal descend and detect any `Yes` effects inside.
+        // Non-literal f-string interpolation may invoke `__format__`/`__str__`.
         if let Expr::FString(ast::ExprFString { value, .. }) = expr {
             if value.elements().any(has_uncertain_interpolation) {
                 effect = effect.merge(SideEffect::Maybe);
