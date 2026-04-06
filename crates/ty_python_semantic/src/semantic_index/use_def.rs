@@ -863,27 +863,27 @@ pub(crate) struct DeclarationWithConstraint<'db> {
 }
 
 impl<'db> DeclarationsIterator<'_, 'db> {
-    /// Returns `true` if `predicate` holds for every declaration whose
+    /// Returns `true` if `predicate` holds for at least one declaration whose
     /// reachability constraint is not statically false.
-    pub(crate) fn all_reachable(
-        self,
+    pub(crate) fn any_reachable(
+        mut self,
         db: &'db dyn crate::Db,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool {
         let predicates = self.predicates;
         let reachability_constraints = self.reachability_constraints;
 
-        self.filter(
+        self.any(
             |DeclarationWithConstraint {
+                 declaration,
                  reachability_constraint,
-                 ..
              }| {
-                !reachability_constraints
-                    .evaluate(db, predicates, *reachability_constraint)
-                    .is_always_false()
+                predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, predicates, reachability_constraint)
+                        .is_always_false()
             },
         )
-        .all(|DeclarationWithConstraint { declaration, .. }| predicate(declaration))
     }
 }
 
