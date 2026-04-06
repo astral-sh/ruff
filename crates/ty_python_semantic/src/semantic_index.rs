@@ -494,11 +494,30 @@ impl<'db> SemanticIndex<'db> {
             })
     }
 
+    pub(crate) fn is_scope_in_type_checking_block(
+        &self,
+        scope_id: FileScopeId,
+        module: &ParsedModuleRef,
+    ) -> bool {
+        self.parent_scope_id(scope_id)
+            .is_some_and(|parent_scope_id| {
+                if self.is_scope_in_type_checking_block(parent_scope_id, module) {
+                    return true;
+                }
+
+                let parent_use_def = self.use_def_map(parent_scope_id);
+                let Some(scope_range) = self.scope(scope_id).node().range(module) else {
+                    return false;
+                };
+                parent_use_def.is_range_in_type_checking_block(scope_range)
+            })
+    }
+
     /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
     /// scope reachability and statement-level reachability within the scope.
     pub(crate) fn is_range_reachable(
         &self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn Db,
         scope_id: FileScopeId,
         range: TextRange,
         module: &ParsedModuleRef,
@@ -511,8 +530,9 @@ impl<'db> SemanticIndex<'db> {
         &self,
         scope_id: FileScopeId,
         range: TextRange,
+        module: &ParsedModuleRef,
     ) -> bool {
-        self.scope(scope_id).in_type_checking_block()
+        self.is_scope_in_type_checking_block(scope_id, module)
             || self
                 .use_def_map(scope_id)
                 .is_range_in_type_checking_block(range)

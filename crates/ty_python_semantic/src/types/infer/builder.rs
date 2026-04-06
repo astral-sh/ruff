@@ -449,8 +449,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn is_in_type_checking_block(&self, scope: ScopeId<'db>, node: impl Ranged) -> bool {
-        self.index
-            .is_in_type_checking_block(scope.file_scope_id(self.db()), node.range())
+        self.index.is_in_type_checking_block(
+            scope.file_scope_id(self.db()),
+            node.range(),
+            self.module(),
+        )
     }
 
     /// If the current scope is a class body scope of a dataclass-like class, populate
