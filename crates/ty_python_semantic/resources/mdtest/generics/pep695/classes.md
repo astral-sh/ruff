@@ -268,6 +268,25 @@ class D[T = int]: ...
 reveal_type(D())  # revealed: D[int]
 ```
 
+A type parameter default can also specialize the class itself:
+
+```py
+class E[V = E[int]]: ...
+
+reveal_type(E())  # revealed: E[E[int]]
+```
+
+The same pattern also works in larger recursive generic definitions:
+
+```py
+class Token: ...
+
+class Expr[Child = Expr[Token]]:
+    parts: list[Token | Child]
+
+reveal_type(Expr())  # revealed: Expr[Expr[Token]]
+```
+
 If a typevar does not provide a default, we use `Unknown`:
 
 ```py

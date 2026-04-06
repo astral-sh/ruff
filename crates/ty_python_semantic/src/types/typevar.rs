@@ -1158,13 +1158,17 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    match (previous_default, default) {
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
