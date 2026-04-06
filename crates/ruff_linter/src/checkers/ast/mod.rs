@@ -1477,6 +1477,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 value,
                 ..
             }) => {
+                // PYI041: Check for redundant numeric unions in class fields and assignments
+                if self.is_rule_enabled(Rule::RedundantNumericUnion) {
+                    flake8_pyi::rules::check_annotation(self, annotation);
+                }
+
                 match AnnotationContext::from_model(
                     &self.semantic,
                     self.settings(),
