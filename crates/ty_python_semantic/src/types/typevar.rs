@@ -12,11 +12,11 @@ use crate::{
         semantic_index,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        AliasSpecializationPolicy, ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector,
+        DynamicType, KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
 };
 
@@ -863,7 +863,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             };
 
         match type_mapping {
-            TypeMapping::ApplySpecialization(specialization) => {
+            TypeMapping::ApplySpecialization { specialization, .. } => {
                 mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
             }
             TypeMapping::ApplySpecializationWithMaterialization {
@@ -904,7 +904,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::BindLegacyTypevars { .. }
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
@@ -1150,7 +1150,10 @@ fn bound_typevar_default_type<'db>(
     bound_typevar.typevar(db).default_type(db).map(|ty| {
         ty.apply_type_mapping(
             db,
-            &TypeMapping::BindLegacyTypevars(binding_context),
+            &TypeMapping::BindLegacyTypevars {
+                binding_context,
+                alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+            },
             TypeContext::default(),
         )
     })
@@ -1162,12 +1165,21 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous_default: &Option<Type<'db>>,
     default: Option<Type<'db>>,
-    _bound_typevar: BoundTypeVarInstance<'db>,
+    bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
-        (_, None) => None,
+    if matches!(
+        bound_typevar.binding_context(db),
+        BindingContext::Definition(definition) if matches!(definition.kind(db), DefinitionKind::TypeAlias(_))
+    ) {
+        return None;
+    }
+
+    match (*previous_default, default) {
+        (Some(previous_default), Some(default)) => {
+            Some(default.cycle_normalized(db, previous_default, cycle))
+        }
+        (Some(_), None) => None,
+        (None, default) => default,
     }
 }
 

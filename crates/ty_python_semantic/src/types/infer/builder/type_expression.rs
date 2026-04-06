@@ -18,10 +18,11 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    AliasSpecializationPolicy, BindingContext, CallableType, DynamicType, GenericContext,
+    IntersectionBuilder, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
+    todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1215,7 +1216,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             value_ty = value_ty.apply_type_mapping(
                 db,
-                &TypeMapping::BindLegacyTypevars(BindingContext::Definition(definition)),
+                &TypeMapping::BindLegacyTypevars {
+                    binding_context: BindingContext::Definition(definition),
+                    alias_policy: AliasSpecializationPolicy::UseDefaults,
+                },
                 TypeContext::default(),
             );
         }

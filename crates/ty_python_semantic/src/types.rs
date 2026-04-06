@@ -5470,9 +5470,10 @@ impl<'db> Type<'db> {
         specialization: Specialization<'db>,
     ) -> Type<'db> {
         let type_mapping = match specialization.materialization_kind(db) {
-            None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                specialization,
-            )),
+            None => TypeMapping::ApplySpecialization {
+                specialization: ApplySpecialization::Specialization(specialization),
+                alias_policy: AliasSpecializationPolicy::UseDefaults,
+            },
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: ApplySpecialization::Specialization(specialization),
                 materialization_kind,
@@ -5685,6 +5686,31 @@ impl<'db> Type<'db> {
                 let mapped = visitor.visit(self, || {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
+                        TypeMapping::ApplySpecialization {
+                            alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                            ..
+                        }
+                        | TypeMapping::BindLegacyTypevars {
+                            alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                            ..
+                        }
+                            if alias.specialization(db).is_none() =>
+                        {
+                            self
+                        }
+                        TypeMapping::BindLegacyTypevars {
+                            alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                            ..
+                        } => {
+                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            );
+                            alias.apply_explicit_specialization(db, value_type)
+                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        }
 
                         _ => {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
@@ -5692,6 +5718,19 @@ impl<'db> Type<'db> {
                         }
                     }
                 });
+
+                if matches!(
+                    type_mapping,
+                    TypeMapping::ApplySpecialization {
+                        alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                        ..
+                    } | TypeMapping::BindLegacyTypevars {
+                        alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                        ..
+                    }
+                ) {
+                    return mapped;
+                }
 
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
 
@@ -5708,9 +5747,9 @@ impl<'db> Type<'db> {
             }
 
             Type::LiteralValue(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
+                TypeMapping::ApplySpecialization { .. } |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindLegacyTypevars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
@@ -5723,9 +5762,9 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
+                TypeMapping::ApplySpecialization { .. } |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindLegacyTypevars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Promote(..) |
@@ -6013,11 +6052,12 @@ impl<'db> Type<'db> {
     ) {
         self.apply_type_mapping(
             db,
-            &TypeMapping::BindLegacyTypevars(
-                binding_context
+            &TypeMapping::BindLegacyTypevars {
+                binding_context: binding_context
                     .map(BindingContext::Definition)
                     .unwrap_or(BindingContext::Synthetic),
-            ),
+                alias_policy: AliasSpecializationPolicy::UseDefaults,
+            },
             TypeContext::default(),
         )
         .find_legacy_typevars(db, None, variables);
@@ -6505,8 +6545,11 @@ impl<'db> SelfBinding<'db> {
 /// literal).
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
-    /// Applies a specialization to the type
-    ApplySpecialization(ApplySpecialization<'a, 'db>),
+    /// Applies a specialization to the type.
+    ApplySpecialization {
+        specialization: ApplySpecialization<'a, 'db>,
+        alias_policy: AliasSpecializationPolicy,
+    },
     /// Applies a specialization and materializes only substituted typevars.
     ///
     /// The `materialization_kind` is flipped in contravariant positions.
@@ -6519,7 +6562,10 @@ pub enum TypeMapping<'a, 'db> {
     Promote(PromotionMode, PromotionKind),
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
-    BindLegacyTypevars(BindingContext<'db>),
+    BindLegacyTypevars {
+        binding_context: BindingContext<'db>,
+        alias_policy: AliasSpecializationPolicy,
+    },
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
@@ -6537,6 +6583,14 @@ pub enum TypeMapping<'a, 'db> {
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum AliasSpecializationPolicy {
+    /// Apply a type alias's own default specialization when the alias itself is unspecialized.
+    UseDefaults,
+    /// Leave unspecialized type aliases intact while still honoring any explicit specialization.
+    PreserveUnspecialized,
+}
+
 impl<'db> TypeMapping<'_, 'db> {
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
@@ -6545,7 +6599,7 @@ impl<'db> TypeMapping<'_, 'db> {
         context: GenericContext<'db>,
     ) -> GenericContext<'db> {
         match self {
-            TypeMapping::ApplySpecialization(specialization)
+            TypeMapping::ApplySpecialization { specialization, .. }
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
@@ -6566,7 +6620,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 )
             }
             TypeMapping::Promote(..)
-            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::BindLegacyTypevars { .. }
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
@@ -6609,8 +6663,8 @@ impl<'db> TypeMapping<'_, 'db> {
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
-            TypeMapping::ApplySpecialization(_)
-            | TypeMapping::BindLegacyTypevars(_)
+            TypeMapping::ApplySpecialization { .. }
+            | TypeMapping::BindLegacyTypevars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults

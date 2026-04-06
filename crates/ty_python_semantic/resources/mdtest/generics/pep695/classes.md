@@ -271,7 +271,8 @@ reveal_type(D())  # revealed: D[int]
 A type parameter default can also specialize the class itself:
 
 ```py
-class E[V = E[int]]: ...
+class E[V = E[int]]:
+    reveal_type(V.__default__)  # revealed: E[int]
 
 reveal_type(E())  # revealed: E[E[int]]
 ```

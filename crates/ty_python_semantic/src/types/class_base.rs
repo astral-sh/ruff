@@ -3,9 +3,9 @@ use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    AliasSpecializationPolicy, ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType,
+    DynamicType, KnownClass, KnownInstanceType, MaterializationKind, SpecialFormType,
+    StaticMroError, Type, TypeContext, TypeMapping, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -324,9 +324,10 @@ impl<'db> ClassBase<'db> {
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                    specialization,
-                )),
+                &TypeMapping::ApplySpecialization {
+                    specialization: ApplySpecialization::Specialization(specialization),
+                    alias_policy: AliasSpecializationPolicy::UseDefaults,
+                },
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );

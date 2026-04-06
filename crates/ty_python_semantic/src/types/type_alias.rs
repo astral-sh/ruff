@@ -80,6 +80,12 @@ impl<'db> PEP695TypeAliasType<'db> {
         }
     }
 
+    fn apply_explicit_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        self.specialization(db).map_or(ty, |specialization| {
+            ty.apply_specialization(db, specialization)
+        })
+    }
+
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -262,6 +268,13 @@ impl<'db> TypeAliasType<'db> {
     pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
+            TypeAliasType::ManualPEP695(_) => ty,
+        }
+    }
+
+    pub(super) fn apply_explicit_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_explicit_specialization(db, ty),
             TypeAliasType::ManualPEP695(_) => ty,
         }
     }

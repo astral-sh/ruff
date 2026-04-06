@@ -240,7 +240,7 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        if let TypeMapping::ApplySpecialization(specialization)
+        if let TypeMapping::ApplySpecialization { specialization, .. }
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {

@@ -29,10 +29,11 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    AliasSpecializationPolicy, ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance,
+    CallableType, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionType,
+    declaration_type,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 
@@ -621,7 +622,10 @@ impl<'db> GenericContext<'db> {
                         let apply = ApplySpecialization::ReturnCallables(&typevar_replacements);
                         let signatures = callable.signatures(db).apply_type_mapping_impl(
                             db,
-                            &TypeMapping::ApplySpecialization(apply),
+                            &TypeMapping::ApplySpecialization {
+                                specialization: apply,
+                                alias_policy: AliasSpecializationPolicy::UseDefaults,
+                            },
                             TypeContext::default(),
                             &ApplyTypeMappingVisitor::default(),
                         );
@@ -868,7 +872,10 @@ impl<'db> GenericContext<'db> {
                     };
                     let updated = types[i].apply_type_mapping(
                         db,
-                        &TypeMapping::ApplySpecialization(specialization),
+                        &TypeMapping::ApplySpecialization {
+                            specialization,
+                            alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                        },
                         TypeContext::default(),
                     );
                     if updated != types[i] {
@@ -943,7 +950,10 @@ impl<'db> GenericContext<'db> {
             };
             let default = default.apply_type_mapping(
                 db,
-                &TypeMapping::ApplySpecialization(specialization),
+                &TypeMapping::ApplySpecialization {
+                    specialization,
+                    alias_policy: AliasSpecializationPolicy::PreserveUnspecialized,
+                },
                 TypeContext::default(),
             );
             expanded[idx] = default;
@@ -1065,7 +1075,10 @@ impl<'db> Specialization<'db> {
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
         let new_specialization = self.apply_type_mapping(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(other)),
+            &TypeMapping::ApplySpecialization {
+                specialization: ApplySpecialization::Specialization(other),
+                alias_policy: AliasSpecializationPolicy::UseDefaults,
+            },
         );
         match other.materialization_kind(db) {
             None => new_specialization,
@@ -1635,10 +1648,10 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                bound_typevar,
-                replacement,
-            )),
+            &TypeMapping::ApplySpecialization {
+                specialization: ApplySpecialization::Single(bound_typevar, replacement),
+                alias_policy: AliasSpecializationPolicy::UseDefaults,
+            },
             TypeContext::default(),
         )
     }

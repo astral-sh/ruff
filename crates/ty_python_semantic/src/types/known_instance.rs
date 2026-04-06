@@ -283,10 +283,15 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Type<'db> {
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => Type::TypeVar(
-                    BoundTypeVarInstance::new(db, typevar, *binding_context, None),
-                ),
-                TypeMapping::ApplySpecialization(_)
+                TypeMapping::BindLegacyTypevars {
+                    binding_context, ..
+                } => Type::TypeVar(BoundTypeVarInstance::new(
+                    db,
+                    typevar,
+                    *binding_context,
+                    None,
+                )),
+                TypeMapping::ApplySpecialization { .. }
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
                 | TypeMapping::BindSelf(..)
