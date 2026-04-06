@@ -13,12 +13,12 @@ AIR302 [*] `airflow.operators.email_operator.EmailOperator` is moved into `smtp`
   |
 help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
 1 | from __future__ import annotations
-2 | 
+2 |
   - from airflow.operators.email_operator import EmailOperator
 3 + from airflow.providers.smtp.operators.smtp import EmailOperator
-4 | 
+4 |
 5 | EmailOperator()
-6 | 
+6 |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
@@ -30,11 +30,11 @@ AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider
   | ^^^^^^^^^^^^^
   |
 help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
-4 | 
+4 |
 5 | EmailOperator()
-6 | 
+6 |
   - from airflow.operators.email import EmailOperator
 7 + from airflow.providers.smtp.operators.smtp import EmailOperator
-8 | 
+8 |
 9 | EmailOperator()
 note: This is an unsafe fix and may change runtime behavior

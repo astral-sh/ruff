@@ -48,10 +48,18 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.try_upcast_to_callable_with_policy(db, policy);
+        }
+
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
             Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
+                db,
+                Signature::dynamic(self),
+            ))),
+            Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
             ))),
@@ -479,11 +487,8 @@ impl<'db> CallableTypes<'db> {
     }
 
     pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.0.as_slice() {
-            [] => unreachable!("CallableTypes should not be empty"),
-            [single] => Type::Callable(*single),
-            slice => UnionType::from_elements(db, slice.iter().copied().map(Type::Callable)),
-        }
+        assert!(!self.0.is_empty(), "CallableTypes should not be empty");
+        UnionType::from_elements(db, self.0.into_iter().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {

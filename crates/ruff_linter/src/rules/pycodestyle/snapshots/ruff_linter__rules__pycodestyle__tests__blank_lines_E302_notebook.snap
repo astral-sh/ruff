@@ -14,8 +14,8 @@ E302 [*] Expected 2 blank lines, found 1
 help: Add missing blank line(s)
 18 | def a():
 19 |     pass
-20 | 
-21 + 
+20 |
+21 +
 22 | def b():
 23 |     pass
 24 | # end

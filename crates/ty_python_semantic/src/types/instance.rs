@@ -8,7 +8,10 @@ use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
-use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
+use super::{
+    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
+    SubclassOfType, Type, TypeVarVariance,
+};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{
@@ -24,7 +27,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
@@ -39,20 +42,21 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
+                | Type::Divergent(DivergentType {
+                    materialization: Some(MaterializationKind::Top),
+                    ..
+                })
         )
     }
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match class.class_literal(db) {
             // Dynamic classes created via `type()` don't have special instance types.
-            // TODO: When we add functional TypedDict support, this branch should check
-            // for TypedDict and return `Type::typed_dict(class)` for that case.
-            ClassLiteral::Dynamic(_) => {
+            ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
-            ClassLiteral::DynamicNamedTuple(_) => {
-                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
-            }
+            // Functional TypedDicts return a TypedDict instance type.
+            ClassLiteral::DynamicTypedDict(_) => Type::typed_dict(class),
             ClassLiteral::Static(class_literal) => {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {
@@ -139,6 +143,16 @@ impl<'db> Type<'db> {
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
             SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
+        ))
+    }
+
+    /// Synthesize a protocol instance type with a given set of methods.
+    pub(super) fn protocol_with_methods<'a, M>(db: &'db dyn Db, methods: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, methods)),
         ))
     }
 }
@@ -814,6 +828,10 @@ impl<'db> Protocol<'db> {
                 synthesized.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
+    }
+
+    pub(super) const fn is_synthesized(self) -> bool {
+        matches!(self, Self::Synthesized(_))
     }
 }
 

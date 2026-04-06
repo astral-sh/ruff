@@ -11,8 +11,8 @@ RUF041 [*] Unnecessary nested `Literal`
   |
 help: Replace with flattened `Literal`
 3 | import typing_extensions
-4 | 
-5 | 
+4 |
+5 |
   - y: Literal[1, print("hello"), 3, Literal[4, 1]]
 6 + y: Literal[1, print("hello"), 3, 4, 1]
 7 | Literal[1, Literal[1]]
@@ -29,8 +29,8 @@ RUF041 [*] Unnecessary nested `Literal`
 9 | Literal[1, Literal[1], Literal[1]]
   |
 help: Replace with flattened `Literal`
-4  | 
-5  | 
+4  |
+5  |
 6  | y: Literal[1, print("hello"), 3, Literal[4, 1]]
    - Literal[1, Literal[1]]
 7  + Literal[1, 1]
@@ -49,7 +49,7 @@ RUF041 [*] Unnecessary nested `Literal`
 10 | Literal[1, Literal[2], Literal[2]]
    |
 help: Replace with flattened `Literal`
-5  | 
+5  |
 6  | y: Literal[1, print("hello"), 3, Literal[4, 1]]
 7  | Literal[1, Literal[1]]
    - Literal[1, 2, Literal[1, 2]]
@@ -144,7 +144,7 @@ help: Replace with flattened `Literal`
    -     ]
    - ]  # once
 12 + Literal[1, 1]  # once
-13 | 
+13 |
 14 | # Ensure issue is only raised once, even on nested literals
 15 | MyType = Literal["foo", Literal[True, False, True], "bar"]
 note: This is an unsafe fix and may change runtime behavior
@@ -160,11 +160,11 @@ RUF041 [*] Unnecessary nested `Literal`
    |
 help: Replace with flattened `Literal`
 17 | ]  # once
-18 | 
+18 |
 19 | # Ensure issue is only raised once, even on nested literals
    - MyType = Literal["foo", Literal[True, False, True], "bar"]
 20 + MyType = Literal["foo", True, False, True, "bar"]
-21 | 
+21 |
 22 | # nested literals, all equivalent to `Literal[1]`
 23 | Literal[Literal[1]]
 
@@ -179,13 +179,13 @@ RUF041 [*] Unnecessary nested `Literal`
    |
 help: Replace with flattened `Literal`
 20 | MyType = Literal["foo", Literal[True, False, True], "bar"]
-21 | 
+21 |
 22 | # nested literals, all equivalent to `Literal[1]`
    - Literal[Literal[1]]
 23 + Literal[1]
 24 | Literal[Literal[Literal[1], Literal[1]]]
 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
-26 | 
+26 |
 
 RUF041 [*] Unnecessary nested `Literal`
   --> RUF041.pyi:24:1
@@ -197,13 +197,13 @@ RUF041 [*] Unnecessary nested `Literal`
 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
    |
 help: Replace with flattened `Literal`
-21 | 
+21 |
 22 | # nested literals, all equivalent to `Literal[1]`
 23 | Literal[Literal[1]]
    - Literal[Literal[Literal[1], Literal[1]]]
 24 + Literal[1, 1]
 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
-26 | 
+26 |
 27 | # OK
 
 RUF041 [*] Unnecessary nested `Literal`
@@ -222,6 +222,6 @@ help: Replace with flattened `Literal`
 24 | Literal[Literal[Literal[1], Literal[1]]]
    - Literal[Literal[1], Literal[Literal[Literal[1]]]]
 25 + Literal[1, 1]
-26 | 
+26 |
 27 | # OK
 28 | x: Literal[True, False, True, False]

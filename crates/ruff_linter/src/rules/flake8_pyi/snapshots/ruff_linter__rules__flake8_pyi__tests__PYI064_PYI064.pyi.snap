@@ -13,12 +13,12 @@ PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Final`
   |
 help: Replace with `Final`
 1 | from typing import Final, Literal
-2 | 
+2 |
   - x: Final[Literal[True]]  # PYI064
 3 + x: Final = True  # PYI064
 4 | y: Final[Literal[None]] = None  # PYI064
 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
-6 | 
+6 |
 
 PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
  --> PYI064.pyi:4:1
@@ -30,12 +30,12 @@ PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
   |
 help: Replace with `Final`
 1 | from typing import Final, Literal
-2 | 
+2 |
 3 | x: Final[Literal[True]]  # PYI064
   - y: Final[Literal[None]] = None  # PYI064
 4 + y: Final = None  # PYI064
 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
-6 | 
+6 |
 7 | # This should be fixable, and marked as safe
 
 PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
@@ -49,12 +49,12 @@ PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
 7 | # This should be fixable, and marked as safe
   |
 help: Replace with `Final`
-2 | 
+2 |
 3 | x: Final[Literal[True]]  # PYI064
 4 | y: Final[Literal[None]] = None  # PYI064
   - z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
 5 + z: Final = "this is a really long literal, that won't be rendered in the issue text"  # PYI064
-6 | 
+6 |
 7 | # This should be fixable, and marked as safe
 8 | w1: Final[Literal[123]]  # PYI064
 
@@ -69,11 +69,11 @@ PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
    |
 help: Replace with `Final`
 5  | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
-6  | 
+6  |
 7  | # This should be fixable, and marked as safe
    - w1: Final[Literal[123]]  # PYI064
 8  + w1: Final = 123  # PYI064
-9  | 
+9  |
 10 | # This should not be fixable
 11 | w2: Final[Literal[123]] = "random value"  # PYI064
 

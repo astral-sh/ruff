@@ -31,6 +31,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.15
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python

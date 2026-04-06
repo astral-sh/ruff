@@ -57,8 +57,8 @@ help: Remove unnecessary `else`
    -         else:
    -             a = z
 36 +         a = z
-37 | 
-38 | 
+37 |
+38 |
 39 | def foo3(x, y, z):
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -102,8 +102,8 @@ help: Remove unnecessary `else`
    -             c = 3
 63 +         c = 3
 64 |         continue
-65 | 
-66 | 
+65 |
+66 |
 
 RET507 [*] Unnecessary `else` after `continue` statement
   --> RET507.py:74:13
@@ -149,6 +149,6 @@ help: Remove unnecessary `else`
 86 +             return
 87 +         except ValueError:
 88 +             continue
-89 | 
-90 | 
+89 |
+90 |
 91 | def bar1(x, y, z):

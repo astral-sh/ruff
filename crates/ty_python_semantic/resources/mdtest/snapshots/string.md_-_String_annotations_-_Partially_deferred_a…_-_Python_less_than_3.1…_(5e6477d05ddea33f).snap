@@ -102,7 +102,7 @@ error[unsupported-operator]: Unsupported `|` operation
 20 |     # error: [unsupported-operator]
 21 |     b: int | "memoryview" | bytes,
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -123,7 +123,7 @@ error[unsupported-operator]: Unsupported `|` operation
 22 |     # error: [unsupported-operator]
 23 |     c: "TD" | None,
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -144,7 +144,7 @@ error[unsupported-operator]: Unsupported `|` operation
 24 |     # error: [unsupported-operator]
 25 |     d: "P" | None,
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -165,7 +165,7 @@ error[unsupported-operator]: Unsupported `|` operation
 26 |     # fine: `TypeVar.__or__` accepts strings at runtime
 27 |     e: T | "Foo",
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -183,7 +183,7 @@ error[unsupported-operator]: Unsupported `|` operation
 34 |     # error: [unresolved-reference] "SomethingUndefined"
 35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 info: rule `unsupported-operator` is enabled by default
 
@@ -233,7 +233,7 @@ error[unsupported-operator]: Unsupported `|` operation
 40 | ):
 41 |     reveal_type(a)  # revealed: int | Foo
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -254,7 +254,7 @@ error[unsupported-operator]: Unsupported `|` operation
 40 | ):
 41 |     reveal_type(a)  # revealed: int | Foo
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
@@ -316,7 +316,7 @@ error[unsupported-operator]: Unsupported `|` operation
 67 |
 68 |     class Bar:
    |
-info: All type expressions are evaluated at runtime by default on Python <3.14
+info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default

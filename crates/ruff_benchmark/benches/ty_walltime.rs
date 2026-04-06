@@ -109,7 +109,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    860,
+    950,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
@@ -171,7 +171,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    4600,
+    5500,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -202,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13600,
+    14100,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -224,8 +224,8 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         repository: "https://github.com/static-frame/static-frame",
         commit: "34962b41baca5e7f98f5a758d530bff02748a421",
         paths: &["static_frame"],
-        // N.B. `arraykit` is installed as a dependency during mypy_primer runs,
-        // but it takes much longer to be installed in a Codspeed run than it does in a mypy_primer run
+        // N.B. `arraykit` is installed as a dependency during ecosystem runs,
+        // but it takes much longer to be installed in a Codspeed run
         // (seems to be built from source on the Codspeed CI runners for some reason).
         dependencies: &["numpy"],
         max_dep_date: "2025-08-09",

@@ -58,6 +58,22 @@ reveal_type(even)  # revealed: (int, /) -> bool
 reveal_type(even(14))  # revealed: bool
 ```
 
+Decorator expressions can also introduce bindings that remain visible after the decorated
+definition:
+
+```py
+def decorator_factory(flag: bool):
+    def decorator(func):
+        return func
+    return decorator
+
+@decorator_factory(seen := True)
+def f():
+    pass
+
+reveal_type(seen)  # revealed: Literal[True]
+```
+
 ## Multiple decorators
 
 Multiple decorators can be applied to a single function. They are applied in "bottom-up" order,

@@ -6,7 +6,7 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
 };
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtClassDef, StmtFunctionDef};
-use ruff_python_trivia::CommentLinePosition;
+use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -190,7 +190,7 @@ impl FoldingRangeVisitor<'_> {
 
     /// Check if there's a blank line appearing anywhere between two positions.
     fn has_blank_line_between(&self, start: TextSize, end: TextSize) -> bool {
-        let mut count = 0;
+        let mut count = 0usize;
         for line in self.source[TextRange::new(start, end)].universal_newlines() {
             if !line.is_empty() {
                 return count >= 2;
@@ -244,9 +244,18 @@ impl FoldingRangeVisitor<'_> {
                 !text.starts_with("region") && !text.starts_with("endregion");
 
             if is_non_region_comment {
-                // Extend the current comment block unless a blank line forces a new folding range.
+                // Extend the current comment block unless a blank line or a statement separates the comments.
                 if let Some(ref mut comment_block_range) = comment_block_range {
-                    if self.has_blank_line_between(comment_block_range.end(), comment_range.start())
+                    let has_text_between = !self.source
+                        [TextRange::new(comment_block_range.end(), comment_range.start())]
+                    .trim_matches(|c| matches!(c, '\n' | '\r') || is_python_whitespace(c))
+                    .is_empty();
+
+                    if has_text_between
+                        || self.has_blank_line_between(
+                            comment_block_range.end(),
+                            comment_range.start(),
+                        )
                     {
                         self.add_range(
                             FoldingRange::from(*comment_block_range)
@@ -1755,6 +1764,112 @@ with open("file.txt") as f:
         4 | |     process(content)
           | |____________________^
           |
+        "#);
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ty/issues/3106>
+    #[test]
+    fn folding_range_comment_block() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                def chunk_date_range():
+                    """Split a date range into chunks respecting the maximum days limit.
+
+                    The API has a 1-month limit, so this function splits larger ranges
+                    into smaller chunks that can be requested individually.
+                    """
+                    # Handle both date-only and datetime strings
+                    a = 10
+
+                    while current <= end:
+                        # Calculate the end of the current chunk
+                        # Go to the last day of the current month
+                        b = 20
+
+                        # Don't exceed the overall end date or max_days limit
+                        c = 30
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r#"
+        info[folding-range]: Folding Range
+          --> main.py:2:17
+           |
+         2 | /                 def chunk_date_range():
+         3 | |                     """Split a date range into chunks respecting the maximum days limit.
+         4 | |
+         5 | |                     The API has a 1-month limit, so this function splits larger ranges
+         6 | |                     into smaller chunks that can be requested individually.
+         7 | |                     """
+         8 | |                     # Handle both date-only and datetime strings
+         9 | |                     a = 10
+        10 | |
+        11 | |                     while current <= end:
+        12 | |                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+        14 | |                         b = 20
+        15 | |
+        16 | |                         # Don't exceed the overall end date or max_days limit
+        17 | |                         c = 30
+           | |______________________________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+         --> main.py:3:21
+          |
+        2 |                   def chunk_date_range():
+        3 | /                     """Split a date range into chunks respecting the maximum days limit.
+        4 | |
+        5 | |                     The API has a 1-month limit, so this function splits larger ranges
+        6 | |                     into smaller chunks that can be requested individually.
+        7 | |                     """
+          | |_______________________^
+        8 |                       # Handle both date-only and datetime strings
+        9 |                       a = 10
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:3:21
+          |
+        2 |                   def chunk_date_range():
+        3 | /                     """Split a date range into chunks respecting the maximum days limit.
+        4 | |
+        5 | |                     The API has a 1-month limit, so this function splits larger ranges
+        6 | |                     into smaller chunks that can be requested individually.
+        7 | |                     """
+          | |_______________________^
+        8 |                       # Handle both date-only and datetime strings
+        9 |                       a = 10
+          |
+
+        info[folding-range]: Folding Range
+          --> main.py:11:21
+           |
+         9 |                       a = 10
+        10 |
+        11 | /                     while current <= end:
+        12 | |                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+        14 | |                         b = 20
+        15 | |
+        16 | |                         # Don't exceed the overall end date or max_days limit
+        17 | |                         c = 30
+           | |______________________________^
+           |
+
+        info[folding-range]: Folding Range (comment)
+          --> main.py:12:1
+           |
+        11 |                       while current <= end:
+        12 | /                         # Calculate the end of the current chunk
+        13 | |                         # Go to the last day of the current month
+           | |_________________________________________________________________^
+        14 |                           b = 20
+           |
         "#);
     }
 

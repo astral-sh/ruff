@@ -188,6 +188,31 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Some(Ok(builder.build()))
         }
 
+        (Type::Intersection(intersection), right)
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                op,
+                right,
+                range,
+                visitor
+            ))
+        }
+        (left, Type::Intersection(intersection))
+            if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
+        {
+            Some(infer_binary_type_comparison(
+                context,
+                left,
+                op,
+                intersection.with_expanded_typevars_and_newtypes(db),
+                range,
+                visitor
+            ))
+        }
+
         (Type::Intersection(intersection), right) => {
             Some(
                 infer_binary_intersection_type_comparison(

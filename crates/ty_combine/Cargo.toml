@@ -9,6 +9,9 @@ repository.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[lib]
+doctest = false
+
 [dependencies]
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }

@@ -70,7 +70,7 @@ a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-z
 
 ```py
 # fmt: off
-def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...  # ty: ignore[fstring-type-annotation, byte-string-type-annotation]
+def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[invalid-type-form, unresolved-reference]
 ```
 
 ## Can't suppress syntax errors
@@ -167,15 +167,13 @@ a = 4 / 0  # ty: ignore[]
 
 ## File-level suppression comments
 
-File level suppression comments are currently intentionally unsupported because we've yet to decide
-if they should use a different syntax that also supports enabling rules or changing the rule's
-severity: `ty: possibly-undefined-reference=error`
+File level suppression comments suppress all errors in a file with a given code.
 
 ```py
-# error: [unused-ignore-comment]
 # ty: ignore[division-by-zero]
 
-a = 4 / 0  # error: [division-by-zero]
+a = 4 / 0
+b = a + c  # error: [unresolved-reference]
 ```
 
 ## Unknown rule

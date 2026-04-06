@@ -7,6 +7,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
@@ -439,6 +440,10 @@ fn typed_dict_subscript<'db>(
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
+    if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
+        return typed_dict_subscript(db, typed_dict, fallback);
+    }
+
     if slice_ty.is_dynamic() {
         return Ok(Type::unknown());
     }
@@ -477,10 +482,18 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.subscript(db, slice_ty, expr_context);
+        }
+
+        if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
+            return self.subscript(db, fallback, expr_context);
+        }
+
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
@@ -692,6 +705,13 @@ impl<'db> Type<'db> {
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
                 Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
+            }
+
+            (Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)), _) => {
+                // Subscripting `InitVar` gives you (bizarrely) an instance of `InitVar`,
+                // which isn't representable in our model because we don't recognise there as being
+                // an `InitVar` class at all. This doesn't really matter that much, so just infer `Any` here.
+                Some(Ok(Type::any()))
             }
 
             (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {

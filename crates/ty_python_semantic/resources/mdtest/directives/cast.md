@@ -81,6 +81,22 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
+Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast
+
+RecursiveAlias = list["RecursiveAlias | None"]
+
+def f(x: RecursiveAlias):
+    cast(RecursiveAlias, x)
+```
+
 ## Diagnostic snapshots
 
 <!-- snapshot-diagnostics -->

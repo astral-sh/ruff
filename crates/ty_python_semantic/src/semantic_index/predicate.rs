@@ -111,7 +111,24 @@ pub(crate) struct CallableAndCallExpr<'db> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
-    ReturnsNever(CallableAndCallExpr<'db>),
+    /// These predicates are recorded for statements with call expressions. As part of
+    /// reachability constraints, they are used to determine whether control flow can
+    /// continue past this statement or not.
+    ///
+    /// The predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysTrue`] in the common case where a call
+    /// is inferred as returning an inhabited type: in these situations, we will
+    /// infer control flow as flowing through the call expression without
+    /// terminating. If it can be statically guaranteed that a call always
+    /// returns `Never`/`NoReturn`, however, the predicate evaluates to
+    /// [`crate::types::Truthiness::AlwaysFalse`], signaling that control flow
+    /// ends as a result of the call: these call expressions are terminal.
+    ///
+    /// These predicates never evaluate to
+    /// [`crate::types::Truthiness::Ambiguous`], even if the return type of the
+    /// call is `Unknown`/`Any`, because that would result in too many false
+    /// positives.
+    IsNonTerminalCall(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }

@@ -24,7 +24,7 @@ help: Replace single quotes docstring with double quotes
   -     ''"Start with empty string" ' and lint docstring safely'
 2 +     ''"Start with empty string" " and lint docstring safely"
 3 |     ''' Not a docstring '''
-4 | 
+4 |
 5 |     def foo(self, bar='''not a docstring'''):
 
 Q002 Single quote docstring found but double quotes preferred
@@ -47,12 +47,12 @@ Q002 [*] Single quote docstring found but double quotes preferred
   |
 help: Replace single quotes docstring with double quotes
 3 |     ''' Not a docstring '''
-4 | 
+4 |
 5 |     def foo(self, bar='''not a docstring'''):
   -         ''"Start with empty string" ' and lint docstring safely'
 6 +         ''"Start with empty string" " and lint docstring safely"
 7 |         pass
-8 | 
+8 |
 9 |     class Nested(foo()[:]): ''"Start with empty string" ' and lint docstring safely'; pass
 
 Q002 Single quote docstring found but double quotes preferred
@@ -76,6 +76,6 @@ Q002 [*] Single quote docstring found but double quotes preferred
 help: Replace single quotes docstring with double quotes
 6 |         ''"Start with empty string" ' and lint docstring safely'
 7 |         pass
-8 | 
+8 |
   -     class Nested(foo()[:]): ''"Start with empty string" ' and lint docstring safely'; pass
 9 +     class Nested(foo()[:]): ''"Start with empty string" " and lint docstring safely"; pass

@@ -79,7 +79,7 @@ help: Merge into a single `startswith` call
 8  + obj.startswith((foo, "foo"))
 9  | # error
 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
-11 | 
+11 |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE810 [*] Call `startswith` once with a `tuple`
@@ -98,7 +98,7 @@ help: Merge into a single `startswith` call
 9  | # error
    - obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 10 + obj.endswith(foo) or obj.startswith((foo, "foo"))
-11 | 
+11 |
 12 | def func():
 13 |     msg = "hello world"
 note: This is an unsafe fix and may change runtime behavior
@@ -115,11 +115,11 @@ PIE810 [*] Call `startswith` once with a `tuple`
 help: Merge into a single `startswith` call
 16 |     y = ("h", "e", "l", "l", "o")  
 17 |     z = "w"
-18 | 
+18 |
    -     if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
 19 +     if msg.startswith((x, z)) or msg.startswith(y): # Error
 20 |         print("yes") 
-21 | 
+21 |
 22 | def func():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,11 +135,11 @@ PIE810 [*] Call `startswith` once with a `tuple`
 help: Merge into a single `startswith` call
 22 | def func():
 23 |     msg = "hello world"
-24 | 
+24 |
    -     if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
 25 +     if msg.startswith(("h", "e", "l", "l", "o", "h", "w")): # Error
 26 |         print("yes") 
-27 | 
+27 |
 28 | # ok
 note: This is an unsafe fix and may change runtime behavior
 
@@ -153,7 +153,7 @@ PIE810 [*] Call `startswith` once with a `tuple`
 84 |         print("yes")
    |
 help: Merge into a single `startswith` call
-80 | 
+80 |
 81 | def func():
 82 |     "Regression test for https://github.com/astral-sh/ruff/issues/9663"
    -     if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):

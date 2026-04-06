@@ -11,6 +11,7 @@ use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
+use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -75,7 +76,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_pattern(db, pattern)
             }
         }
-        PredicateNode::ReturnsNever(_) => return None,
+        PredicateNode::IsNonTerminalCall(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
 
@@ -189,7 +190,7 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            Type::Dynamic(_) => Some(classinfo),
+            Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
@@ -273,6 +274,11 @@ impl ClassInfoConstraintFunction {
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
                     .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+
+                // `InitVar` is a class at runtime, so can be used in `isinstance()`,
+                // but we can't represent internally the type that we should narrow to after an `isinstance()` check,
+                // so just intersect with `Any` in those cases.
+                SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => Some(Type::any()),
 
                 _ => None,
             },
@@ -602,7 +608,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
-            PredicateNode::ReturnsNever(_) => return None,
+            PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -618,7 +624,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db, self.module);
+        let expression_node = expression.node_ref(self.db).node(self.module);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -762,7 +768,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::ReturnsNever(CallableAndCallExpr { callable, .. }) => {
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
             }
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
@@ -1654,7 +1660,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         singleton: ast::Singleton,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let ty = match singleton {
@@ -1683,11 +1689,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let class_type =
-            infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module);
+        let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {
@@ -1714,7 +1719,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         let mapping_type = ClassInfoConstraintFunction::IsInstance
@@ -1737,16 +1742,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         value: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject_node = subject.node_ref(self.db, self.module);
+        let subject_node = subject.node_ref(self.db).node(self.module);
         let place = {
             let subject = PlaceExpr::try_from_expr(subject_node)?;
             self.expect_place(&subject)
         };
-        let subject_ty =
-            infer_same_file_expression_type(self.db, subject, TypeContext::default(), self.module);
-
-        let value_ty =
-            infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
 
         let mut constraints = self
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
@@ -2029,6 +2031,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
 
         Type::Dynamic(_)
+        | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
@@ -2117,6 +2120,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
         // always guarded by that check.
         Type::Dynamic(_)
+        | Type::Divergent(_)
         | Type::Never
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
@@ -2356,7 +2360,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         let mut places = PossiblyNarrowedPlaces::default();
 
         // The match subject can always be narrowed by a pattern
-        let subject_node = subject.node_ref(self.db, module);
+        let subject_node = subject.node_ref(self.db).node(module);
         if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
             if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
                 places.insert(place);

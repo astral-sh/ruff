@@ -15,7 +15,7 @@ help: Remove extraneous blank line(s)
 41 | # end
 42 | # E304
 43 | @decorator
-   - 
+   -
 44 | def function():
 45 |     pass
 46 | # end

@@ -44,18 +44,18 @@ help: Organize imports
 2  | # Comment 2
    - import D
 3  + import B  # Comment 4
-4  | 
+4  |
 5  | # Comment 3a
    - import C
-   - 
+   -
 6  | # Comment 3b
 7  | import C
-   - 
+   -
    - import B  # Comment 4
 8  + import D
-9  | 
+9  |
 10 | # Comment 5
-   - 
+   -
 11 | # Comment 6
 12 | from A import (
    -     a,  # Comment 7
@@ -73,12 +73,12 @@ help: Organize imports
 18 +     a_long_name_to_force_multiple_lines,  # Comment 12
 19 +     another_long_name_to_force_multiple_lines,  # Comment 13
 20 | )
-   - 
+   -
    - from D import a_long_name_to_force_multiple_lines # Comment 12
    - from D import another_long_name_to_force_multiple_lines # Comment 13
-   - 
+   -
 21 | from E import a  # Comment 1
-   - 
+   -
    - from F import a  # Comment 1
    - from F import b
 22 + from F import (

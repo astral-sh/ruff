@@ -292,7 +292,9 @@ impl<'db> Mro<'db> {
                                     later_indices: later_indices.iter().copied().collect(),
                                 });
                             }
-                            ClassBase::Dynamic(_) => duplicate_dynamic_bases = true,
+                            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                                duplicate_dynamic_bases = true;
+                            }
                         }
                     }
 
@@ -534,6 +536,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicNamedTuple(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicTypedDict(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
         }
     }
 
@@ -559,6 +564,11 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
+                    let mut full_mro_iter = literal.mro(self.db).iter();
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicTypedDict(literal) => {
                     let mut full_mro_iter = literal.mro(self.db).iter();
                     full_mro_iter.next();
                     full_mro_iter

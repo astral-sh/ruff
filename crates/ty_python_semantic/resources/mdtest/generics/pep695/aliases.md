@@ -45,6 +45,17 @@ You cannot use the same typevar more than once.
 type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
+Legacy type variables cannot be used:
+
+```py
+from typing import TypeVar
+
+V = TypeVar("V")
+
+# error: [unbound-type-variable]
+type TA1[K] = dict[K, V]
+```
+
 ## Specializing type aliases explicitly
 
 The type parameter can be specified explicitly:
@@ -94,11 +105,11 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
-# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[T@DoubleSpecialization]'>`"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias values"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
