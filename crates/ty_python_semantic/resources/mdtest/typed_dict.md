@@ -408,6 +408,38 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
+preserve shared required keys:
+
+```py
+from typing import TypedDict
+
+class ChildWithOptionalCount(TypedDict, total=False):
+    count: int
+
+ChildWithOptionalCount({"count": "wrong"}, count=1)
+
+class Base(TypedDict):
+    name: str
+
+class ChildKwargs(TypedDict):
+    name: str
+    count: int
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+def _(
+    base: Base,
+    maybe_name: MaybeName,
+):
+    ChildKwargs(base, count=1)
+    ChildKwargs(**base, count=1)
+
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ChildKwargs` constructor"
+    ChildKwargs(**maybe_name, count=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -521,6 +553,28 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
 (a_person := {"name": "Alice", "age": 30, "extra": True})
+```
+
+## Mixed positional and unpacked keyword constructors
+
+These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
+validate normally and produce ordinary diagnostics:
+
+```py
+from typing import TypedDict
+
+class MixedTarget(TypedDict):
+    x: int
+    y: int
+
+class MaybeY(TypedDict, total=False):
+    y: int
+
+def _(target: MixedTarget, maybe_y: MaybeY):
+    MixedTarget(target, **maybe_y)
+
+    # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
+    MixedTarget({"x": 1}, **maybe_y)
 ```
 
 ## Union of `TypedDict`
