@@ -335,7 +335,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Vec<(TextRange, BasicBlock)>,
+    range_reachability: Vec<(TextRange, RangeInfo)>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -393,8 +393,9 @@ pub(crate) struct UseDefMap<'db> {
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
+/// Information about a given range of source code.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct BasicBlock {
+struct RangeInfo {
     reachability: ScopedReachabilityConstraintId,
     in_type_checking_block: bool,
 }
@@ -508,7 +509,7 @@ impl<'db> UseDefMap<'db> {
             .range_reachability
             .iter()
             .take_while(|(entry_range, _)| entry_range.start() <= range.start())
-            .any(|&(entry_range, BasicBlock { reachability, .. })| {
+            .any(|&(entry_range, RangeInfo { reachability, .. })| {
                 entry_range.contains_range(range) && !self.is_reachable(db, reachability)
             })
     }
@@ -951,7 +952,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
-    range_reachability: Vec<(TextRange, BasicBlock)>,
+    range_reachability: Vec<(TextRange, RangeInfo)>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
@@ -1462,21 +1463,21 @@ impl<'db> UseDefMapBuilder<'db> {
         range: TextRange,
         is_type_checking_block: bool,
     ) {
-        let this_basic_block = BasicBlock {
+        let this_range_info = RangeInfo {
             reachability: self.reachability,
             in_type_checking_block: is_type_checking_block,
         };
 
-        // If the last entry has the same reachability constraint, extend it
-        // to cover this range too, collapsing consecutive statements in the
-        // same basic block into a single entry.
-        if let Some((last_range, last_basic_block)) = self.range_reachability.last_mut()
-            && *last_basic_block == this_basic_block
+        // If the last entry has the same reachability constraint and the same
+        // "in-TYPE_CHECKING" status, extend it to cover this range too, collapsing
+        // consecutive statements in a contiguous rangfe into a single entry.
+        if let Some((last_range, last_range_info)) = self.range_reachability.last_mut()
+            && *last_range_info == this_range_info
         {
             *last_range = last_range.cover(range);
             return;
         }
-        self.range_reachability.push((range, this_basic_block));
+        self.range_reachability.push((range, this_range_info));
     }
 
     pub(super) fn snapshot_enclosing_state(
@@ -1727,7 +1728,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for &(_, BasicBlock { reachability, .. }) in &self.range_reachability {
+        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
         for symbol_state in &mut self.symbol_states {
