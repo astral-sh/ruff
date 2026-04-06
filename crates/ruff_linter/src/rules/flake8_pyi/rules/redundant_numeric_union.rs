@@ -1,7 +1,8 @@
 use bitflags::bitflags;
+use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, Parameters, PythonVersion};
+use ruff_python_ast::{self as ast, AnyParameterRef, Expr, ExprBinOp, Operator, Parameters, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -11,48 +12,6 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
 
-/// ## What it does
-/// Checks for parameter annotations that contain redundant unions between
-/// builtin numeric types (e.g., `int | float`).
-///
-/// ## Why is this bad?
-/// The [typing specification] states:
-///
-/// > Python’s numeric types `complex`, `float` and `int` are not subtypes of
-/// > each other, but to support common use cases, the type system contains a
-/// > straightforward shortcut: when an argument is annotated as having type
-/// > `float`, an argument of type `int` is acceptable; similar, for an
-/// > argument annotated as having type `complex`, arguments of type `float` or
-/// > `int` are acceptable.
-///
-/// As such, a union that includes both `int` and `float` is redundant in the
-/// specific context of a parameter annotation, as it is equivalent to a union
-/// that only includes `float`. For readability and clarity, unions should omit
-/// redundant elements.
-///
-/// ## Example
-///
-/// ```pyi
-/// def foo(x: float | int | str) -> None: ...
-/// ```
-///
-/// Use instead:
-///
-/// ```pyi
-/// def foo(x: float | str) -> None: ...
-/// ```
-///
-/// ## Fix safety
-/// This rule's fix is marked as safe, unless the type annotation contains comments.
-///
-/// Note that while the fix may flatten nested unions into a single top-level union,
-/// the semantics of the annotation will remain unchanged.
-///
-/// ## References
-/// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
-/// - [PEP 484: The numeric tower](https://peps.python.org/pep-0484/#the-numeric-tower)
-///
-/// [typing specification]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct RedundantNumericUnion {
@@ -60,7 +19,6 @@ pub(crate) struct RedundantNumericUnion {
 }
 
 impl Violation for RedundantNumericUnion {
-    // Always fixable, but currently under preview.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -79,14 +37,15 @@ impl Violation for RedundantNumericUnion {
     }
 }
 
-/// PYI041
+/// PYI041 - Entry point for function parameters
 pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }
 
-fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: &'b Expr)
+/// PYI041 - Core logic for any type annotation (Class Fields, Variables, etc.)
+pub(crate) fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: &'b Expr)
 where
     'a: 'b,
 {
@@ -96,26 +55,22 @@ where
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             return;
         };
-
         numeric_flags.seen_builtin_type(builtin_type);
     };
 
     let annotation = map_maybe_stringized_annotation(checker, unresolved_annotation);
 
-    // Traverse the union, and remember which numeric types are found.
     traverse_union(&mut find_numeric_type, checker.semantic(), &annotation);
 
     let Some(redundancy) = Redundancy::from_numeric_flags(numeric_flags) else {
         return;
     };
 
-    // Traverse the union a second time to construct the fix.
     let mut necessary_nodes: Vec<&Expr> = Vec::new();
-
     let mut union_type = UnionKind::TypingUnion;
+
     let mut remove_numeric_type = |expr: &'b Expr, parent: &'b Expr| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
-            // Keep type annotations that are not numeric.
             necessary_nodes.push(expr);
             return;
         };
@@ -124,16 +79,17 @@ where
             union_type = UnionKind::PEP604;
         }
 
-        // `int` is always dropped, since `float` or `complex` must be present.
-        // `float` is only dropped if `complex`` is present.
-        if (builtin_type == "float" && !numeric_flags.contains(NumericFlags::COMPLEX))
-            || (builtin_type != "float" && builtin_type != "int")
-        {
+        let is_redundant = match builtin_type {
+            "int" => numeric_flags.intersects(NumericFlags::FLOAT | NumericFlags::COMPLEX),
+            "float" => numeric_flags.contains(NumericFlags::COMPLEX),
+            _ => false,
+        };
+
+        if !is_redundant {
             necessary_nodes.push(expr);
         }
     };
 
-    // Traverse the union a second time to construct a [`Fix`].
     traverse_union(&mut remove_numeric_type, checker.semantic(), &annotation);
 
     let mut diagnostic =
@@ -143,19 +99,13 @@ where
         && !checker.source_type.is_stub()
         && fix_starts_with_none_none(&necessary_nodes)
     {
-        // If there are multiple `None` literals, we cannot apply the fix in a runtime context.
-        // E.g., `None | None | int` will cause a `RuntimeError`.
         return;
     }
 
     if annotation.is_complex() {
-        // No fix for concatenated string literals and other complex
-        // annotations. They're rare and too complex to handle.
-        // https://github.com/astral-sh/ruff/issues/19184#issuecomment-3047695205
         return;
     }
 
-    // Mark [`Fix`] as unsafe when comments are in range.
     let applicability =
         if annotation.is_string() || checker.comment_ranges().intersects(annotation.range()) {
             Applicability::Unsafe
@@ -163,9 +113,7 @@ where
             Applicability::Safe
         };
 
-    // Generate the flattened fix once.
     let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
-        // Generate a [`Fix`] for a single type expression, e.g. `int`.
         Some(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
             applicability,
@@ -200,11 +148,6 @@ where
     }
 }
 
-/// Given a type annotation [`Expr`], abstracting over the fact that the annotation expression
-/// might be "stringized".
-///
-/// A stringized annotation is one enclosed in string quotes:
-/// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
 fn map_maybe_stringized_annotation<'a, 'b>(
     checker: &Checker<'a>,
     expr: &'b Expr,
@@ -229,38 +172,23 @@ where
 }
 
 enum AnnotationKind<'a> {
-    /// A simple non-string annotation like `x: int`.
     Simple(&'a Expr),
-    /// A simple string annotation like `x: "Union[int, str]"`.
     String(&'a Expr),
-    /// A complex string annotation with a concatenated string, escaped
-    /// character, or other complication.
-    ///
-    /// See [`ruff_python_parser::typing::AnnotationKind::Complex`] for more
-    /// details.
     Complex(&'a Expr),
 }
 
 impl<'a> std::ops::Deref for AnnotationKind<'a> {
     type Target = &'a Expr;
-
     fn deref(&self) -> &Self::Target {
         match self {
-            AnnotationKind::Simple(expr)
-            | AnnotationKind::String(expr)
-            | AnnotationKind::Complex(expr) => expr,
+            AnnotationKind::Simple(expr) | AnnotationKind::String(expr) | AnnotationKind::Complex(expr) => expr,
         }
     }
 }
 
 impl AnnotationKind<'_> {
-    fn is_string(&self) -> bool {
-        matches!(self, Self::String(_))
-    }
-
-    fn is_complex(&self) -> bool {
-        matches!(self, Self::Complex(_))
-    }
+    fn is_string(&self) -> bool { matches!(self, Self::String(_)) }
+    fn is_complex(&self) -> bool { matches!(self, Self::Complex(_)) }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -290,24 +218,19 @@ impl Redundancy {
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub(super) struct NumericFlags: u8 {
-        /// `int`
         const INT = 1 << 0;
-        /// `float`
         const FLOAT = 1 << 1;
-        /// `complex`
         const COMPLEX = 1 << 2;
     }
 }
 
 impl NumericFlags {
     pub(super) fn seen_builtin_type(&mut self, name: &str) {
-        let flag: NumericFlags = match name {
+        let flag = match name {
             "int" => NumericFlags::INT,
             "float" => NumericFlags::FLOAT,
             "complex" => NumericFlags::COMPLEX,
-            _ => {
-                return;
-            }
+            _ => return,
         };
         self.insert(flag);
     }
@@ -315,21 +238,17 @@ impl NumericFlags {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum UnionKind {
-    /// E.g., `typing.Union[int, str]`
     TypingUnion,
-    /// E.g., `int | str`
     PEP604,
 }
 
-/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
 fn generate_pep604_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
     annotation: &Expr,
     applicability: Applicability,
 ) -> Fix {
-    debug_assert!(nodes.len() >= 2, "At least two nodes required");
-
+    debug_assert!(nodes.len() >= 2);
     let new_expr = nodes
         .into_iter()
         .fold(None, |acc: Option<Expr>, right: &Expr| {
@@ -353,7 +272,6 @@ fn generate_pep604_fix(
     )
 }
 
-/// Check whether the proposed fix starts with two `None` literals.
 fn fix_starts_with_none_none(nodes: &[&Expr]) -> bool {
     nodes.len() >= 2 && nodes.iter().take(2).all(|node| node.is_none_literal_expr())
 }
