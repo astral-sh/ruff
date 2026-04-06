@@ -145,7 +145,6 @@ struct LoopMutationsVisitor<'a> {
     target: &'a Expr,
     index: &'a Expr,
     mutations: HashMap<u32, Vec<TextRange>>,
-    branches: Vec<u32>,
     branch: u32,
 }
 
@@ -157,7 +156,6 @@ impl<'a> LoopMutationsVisitor<'a> {
             target,
             index,
             mutations: HashMap::new(),
-            branches: vec![0],
             branch: 0,
         }
     }
@@ -239,6 +237,16 @@ impl<'a> LoopMutationsVisitor<'a> {
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            // After a terminator, remaining statements are unreachable.
+            if matches!(stmt, Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_)) {
+                break;
+            }
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             // Ex) `del items[0]`
@@ -270,31 +278,34 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 elif_else_clauses,
                 ..
             }) => {
+                let saved_branch = self.branch;
+
                 // Handle the `if` branch.
                 self.branch += 1;
-                self.branches.push(self.branch);
                 self.visit_expr(test);
                 self.visit_body(body);
-                self.branches.pop();
 
                 // Handle the `elif` and `else` branches.
                 for clause in elif_else_clauses {
                     self.branch += 1;
-                    self.branches.push(self.branch);
                     if let Some(test) = &clause.test {
                         self.visit_expr(test);
                     }
                     self.visit_body(&clause.body);
-                    self.branches.pop();
                 }
+
+                self.branch = saved_branch;
             }
 
-            // On break, clear the mutations for the current branch.
+            // On break or return, the loop exits, so the mutation is safe.
             Stmt::Break(_) | Stmt::Return(_) => {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
             }
+
+            // On continue, the mutation is NOT safe (loop keeps iterating).
+            Stmt::Continue(_) => {}
 
             // Avoid recursion for class and function definitions.
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {}

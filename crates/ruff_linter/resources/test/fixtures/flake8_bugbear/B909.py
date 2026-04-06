@@ -120,7 +120,7 @@ for _ in foo:
         ...
     break
 
-# should error (?)
+# should not error - outer break makes the mutation safe
 for _ in foo:
     foo.remove(1)
     if bar:
@@ -193,3 +193,16 @@ def success_map(mapping):
 def fail_list(seq):
     for val in seq:
         return seq.pop(4)
+
+# should not error - break after non-flow-altering if (issue #12402)
+for item in some_list:
+    some_list.append(item)
+    if True:
+        pass
+    break
+
+# should error - continue followed by unreachable break (issue #12402)
+for item in some_list:
+    some_list.remove(item)
+    continue
+    break
