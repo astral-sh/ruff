@@ -1,82 +1,82 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:11:5
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:11:5
    |
  9 | def bad1():
 10 |     print("start")
-11 |     yield  # RUF072
+11 |     yield  # RUF074
    |     ^^^^^
 12 |     print("cleanup")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:18:9
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:18:9
    |
 16 | def bad_with_code_after_yield():
 17 |     with other_cm():
-18 |         yield  # RUF072
+18 |         yield  # RUF074
    |         ^^^^^
 19 |         print("cleanup")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:25:9
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:25:9
    |
 23 | def bad_nested_conditional_not_last():
 24 |     if condition:
-25 |         yield  # RUF072
+25 |         yield  # RUF074
    |         ^^^^^
 26 |     print("after if")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:32:9
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:32:9
    |
 30 | def bad_nested_in_loop_not_last():
 31 |     for i in range(10):
-32 |         yield  # RUF072
+32 |         yield  # RUF074
    |         ^^^^^
 33 |     print("after loop")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:39:9
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:39:9
    |
 37 | def bad_nested_in_while_not_last():
 38 |     while condition:
-39 |         yield  # RUF072
+39 |         yield  # RUF074
    |         ^^^^^
 40 |     print("after while")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:48:9
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:48:9
    |
 46 |         pass
 47 |     elif condition2:
-48 |         yield  # RUF072
+48 |         yield  # RUF074
    |         ^^^^^
 49 |     print("after if")
    |
 
-RUF072 Context manager does not catch exceptions
-  --> RUF072.py:56:13
+RUF074 Context manager does not catch exceptions
+  --> RUF074.py:56:13
    |
 54 |     match x:
 55 |         case 1:
-56 |             yield  # RUF072
+56 |             yield  # RUF074
    |             ^^^^^
 57 |     print("after match")
    |
 
-RUF072 Context manager does not catch exceptions
-   --> RUF072.py:358:21
+RUF074 Context manager does not catch exceptions
+   --> RUF074.py:358:21
     |
 356 | @contextmanager
 357 | def bad_yield_in_with_items():
-358 |     with some_call((yield)):  # RUF072
+358 |     with some_call((yield)):  # RUF074
     |                     ^^^^^
 359 |         pass
 360 |     print("cleanup")
