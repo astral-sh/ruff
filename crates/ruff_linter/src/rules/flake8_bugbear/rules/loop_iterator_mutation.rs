@@ -145,7 +145,10 @@ struct LoopMutationsVisitor<'a> {
     target: &'a Expr,
     index: &'a Expr,
     mutations: HashMap<u32, Vec<TextRange>>,
+    /// The branch ID for the current scope.
     branch: u32,
+    /// Counter for generating unique branch IDs.
+    next_branch_id: u32,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
@@ -157,6 +160,7 @@ impl<'a> LoopMutationsVisitor<'a> {
             index,
             mutations: HashMap::new(),
             branch: 0,
+            next_branch_id: 0,
         }
     }
 
@@ -281,13 +285,15 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 let saved_branch = self.branch;
 
                 // Handle the `if` branch.
-                self.branch += 1;
+                self.next_branch_id += 1;
+                self.branch = self.next_branch_id;
                 self.visit_expr(test);
                 self.visit_body(body);
 
                 // Handle the `elif` and `else` branches.
                 for clause in elif_else_clauses {
-                    self.branch += 1;
+                    self.next_branch_id += 1;
+                    self.branch = self.next_branch_id;
                     if let Some(test) = &clause.test {
                         self.visit_expr(test);
                     }
