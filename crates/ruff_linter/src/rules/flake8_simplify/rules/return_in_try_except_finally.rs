@@ -33,8 +33,6 @@ use crate::checkers::ast::Checker;
 ///         return_value = n**2
 ///     except Exception:
 ///         return_value = "An exception occurred"
-///     finally:
-///         return_value = -1
 ///     return return_value
 /// ```
 ///
