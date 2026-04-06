@@ -7,13 +7,23 @@ Similarly, in `and` expressions, if the left-hand side is falsy, the right-hand 
 evaluated.
 
 ```py
-def _(flag: bool):
-    if flag or (x := 1):
+def _(flag1: bool, flag2: bool):
+    if flag1:
+        pass
+    elif flag2 or (x := 1):
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]
 
-    if flag and (x := 1):
+    if flag1 or (x := 1):
         # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
+
+    if flag1:
+        pass
+    elif flag2 and (x := 1):
+        reveal_type(x)  # revealed: Literal[1]
+
+    if flag1 and (x := 1):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
