@@ -1091,7 +1091,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                 } else {
                     // For declarations, it is important to consider the possibility that they might only
                     // be bound in one control flow path, while the other path contains a binding. In order
-                    // to even consider the bindings as well in `place_by_id`, we return `PossiblyUnbound`
+                    // to even consider the bindings as well in `place_by_id`, we return `PossiblyUndefined`
                     // here.
                     Definedness::PossiblyUndefined
                 }
