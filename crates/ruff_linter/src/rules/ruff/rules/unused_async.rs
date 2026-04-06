@@ -30,6 +30,18 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// def foo():
 ///     bar()
 /// ```
+///
+/// ## Note
+/// Removing `async` from a function changes the execution context it runs in.
+/// This can alter observable behavior when the function interacts with
+/// [`contextvars.ContextVar`]. Async tasks run in a *copy* of the parent
+/// context, so a `ContextVar.set()` inside an `async` function is invisible
+/// to the caller, whereas the same call in a regular (sync) function mutates
+/// the caller's context directly. If the function relies on this isolation
+/// (or lack thereof), removing `async` will change program semantics even
+/// though no `await` is present.
+///
+/// See [#23196](https://github.com/astral-sh/ruff/issues/23196) for more details.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.4.0")]
 pub(crate) struct UnusedAsync {
