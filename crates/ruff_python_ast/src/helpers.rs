@@ -40,6 +40,63 @@ where
     matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
+/// Whether an expression definitely has no side effects, maybe has side effects,
+/// or definitely has side effects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SideEffect {
+    /// The expression is definitely side-effect-free.
+    No,
+    /// The expression may have side effects (e.g., f-string interpolation
+    /// may invoke `__format__` or `__str__`).
+    Maybe,
+    /// The expression definitely has side effects.
+    Yes,
+}
+
+impl SideEffect {
+    pub const fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+
+    pub const fn is_no(self) -> bool {
+        matches!(self, Self::No)
+    }
+
+    #[must_use]
+    pub const fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Yes, _) | (_, Self::Yes) => Self::Yes,
+            (Self::Maybe, _) | (_, Self::Maybe) => Self::Maybe,
+            _ => Self::No,
+        }
+    }
+}
+
+fn is_definitely_side_effect_free_interpolation_expr(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+    )
+}
+
+fn has_uncertain_interpolation(element: &InterpolatedStringElement) -> bool {
+    match element {
+        InterpolatedStringElement::Literal(_) => false,
+        InterpolatedStringElement::Interpolation(interp) => {
+            !is_definitely_side_effect_free_interpolation_expr(&interp.expression)
+                || interp
+                    .format_spec
+                    .as_ref()
+                    .is_some_and(|spec| spec.elements.iter().any(has_uncertain_interpolation))
+        }
+    }
+}
+
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
 ///
@@ -48,6 +105,21 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
+    side_effect(expr, is_builtin).is_yes()
+}
+
+/// Return whether `expr` has no side effects, maybe has side effects, or definitely
+/// has side effects.
+///
+/// Unlike [`contains_effect`], which returns a simple `bool`, this function distinguishes
+/// between expressions that are definitely side-effect-free, definitely side-effectful,
+/// and those that may invoke user-defined code (e.g., formatting a non-literal f-string
+/// interpolation can call `__format__` or `__str__`).
+pub fn side_effect<F>(expr: &Expr, is_builtin: F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    let mut effect = SideEffect::No;
     any_over_expr(expr, |expr| {
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
@@ -57,10 +129,10 @@ where
             node_index: _,
         }) = expr
         {
-            // Ex) `list()`
             if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        effect = SideEffect::Yes;
                         return true;
                     }
                     return false;
@@ -87,6 +159,7 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
+                effect = SideEffect::Yes;
                 return true;
             }
             if !matches!(
@@ -106,13 +179,29 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
+                effect = SideEffect::Yes;
                 return true;
             }
             return false;
         }
 
+        // FString/TString: non-literal interpolation may invoke `__format__`/`__str__`.
+        // Return `false` to let the traversal descend and detect any `Yes` effects inside.
+        if let Expr::FString(ast::ExprFString { value, .. }) = expr {
+            if value.elements().any(has_uncertain_interpolation) {
+                effect = effect.merge(SideEffect::Maybe);
+            }
+            return false;
+        }
+        if let Expr::TString(ast::ExprTString { value, .. }) = expr {
+            if value.elements().any(has_uncertain_interpolation) {
+                effect = effect.merge(SideEffect::Maybe);
+            }
+            return false;
+        }
+
         // Otherwise, avoid all complex expressions.
-        matches!(
+        if matches!(
             expr,
             Expr::Await(_)
                 | Expr::Call(_)
@@ -124,8 +213,14 @@ where
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
                 | Expr::IpyEscapeCommand(_)
-        )
-    })
+        ) {
+            effect = SideEffect::Yes;
+            return true;
+        }
+
+        false
+    });
+    effect
 }
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression

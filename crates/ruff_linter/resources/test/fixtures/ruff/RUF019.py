@@ -30,3 +30,17 @@ if (
         d ["key"]
 ):
     ...
+
+# https://github.com/astral-sh/ruff/issues/12953
+# F-string with non-literal interpolation — unsafe fix (may invoke __str__)
+c = object()
+if f"{c}" in d and d[f"{c}"]:
+    pass
+
+# F-string with only literal interpolation — safe fix
+if f"{1}" in d and d[f"{1}"]:
+    pass
+
+# Plain f-string without interpolation — safe fix
+if f"key" in d and d[f"key"]:
+    pass

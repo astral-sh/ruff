@@ -3,7 +3,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::side_effect;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
@@ -31,7 +31,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe, unless the expression contains comments.
+/// This rule's fix is marked as safe, unless the expression contains comments
+/// or may have side effects.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryKeyCheck;
@@ -101,15 +102,16 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
-    {
+    let obj_effect = side_effect(obj_left, |id| checker.semantic().has_builtin_binding(id));
+    let key_effect = side_effect(key_left, |id| checker.semantic().has_builtin_binding(id));
+    let combined = obj_effect.merge(key_effect);
+    if combined.is_yes() {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
 
-    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+    let applicability = if !combined.is_no() || checker.comment_ranges().intersects(expr.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
