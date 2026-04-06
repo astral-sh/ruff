@@ -3647,13 +3647,20 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 // Preserve the synthetic bound receiver argument so calls like `def copy(self: T)
-                // -> T` can still infer `T` from the receiver, but specialize `typing.Self`
-                // eagerly so union-bounded receivers don't get rechecked against each union arm's
-                // owner class.
-                let signature = bound_method
-                    .function(db)
-                    .signature(db)
-                    .specialize_bound_self(db, bound_method.typing_self_type(db));
+                // -> T` can still infer `T` from the receiver. We only eagerly specialize
+                // `typing.Self` when the receiver itself is a non-`Self` type variable; applying
+                // the specialization more broadly regresses existing `super()` checks and concrete
+                // receiver flows.
+                let signature = if let Type::TypeVar(typevar) = bound_method.self_instance(db)
+                    && !typevar.typevar(db).is_self(db)
+                {
+                    bound_method
+                        .function(db)
+                        .signature(db)
+                        .specialize_bound_self(db, bound_method.typing_self_type(db))
+                } else {
+                    bound_method.function(db).signature(db).clone()
+                };
                 CallableBinding::from_overloads(self, signature.iter().cloned())
                     .with_bound_type(bound_method.self_instance(db))
                     .into()
@@ -6470,6 +6477,10 @@ impl<'db> SelfBinding<'db> {
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)
             }
+            Type::LiteralValue(literal) => literal
+                .fallback_instance(db)
+                .nominal_class(db)
+                .map(|class| class.class_literal(db)),
             _ => self_type
                 .nominal_class(db)
                 .map(|class| class.class_literal(db)),

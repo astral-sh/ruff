@@ -722,6 +722,25 @@ class Child2(Parent2):
         super().__init__(children)  # OK
 ```
 
+## Direct `Self` parameters should not add a second `super()` error
+
+If the override itself is already invalid, forwarding the concrete argument to `super()` should not
+add a separate argument-type error just because the parent method uses `Self` directly.
+
+```py
+from __future__ import annotations
+from typing_extensions import Self
+
+class Parent:
+    def compare(self, other: Self) -> Self:
+        return self
+
+class Child(Parent):
+    # error: [invalid-method-override]
+    def compare(self, other: Child) -> Child:
+        return super().compare(other)
+```
+
 ## Super in Protocol Classes
 
 Using `super()` in a class that inherits from `typing.Protocol` (similar to beartype's caching

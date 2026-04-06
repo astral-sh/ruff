@@ -22,6 +22,29 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Flag operators
+
+`enum.Flag` and `enum.IntFlag` methods use `Self` in typeshed, so enum member literals need to bind
+`Self` through their fallback instance type.
+
+```py
+from enum import Flag, IntFlag, auto
+
+class Mode(Flag):
+    A = auto()
+    B = auto()
+
+class IntMode(IntFlag):
+    A = auto()
+    B = auto()
+
+mode: Mode = Mode.A | Mode.B
+mode = Mode.A & Mode.B
+reveal_type(Mode.A in (Mode.A | Mode.B))  # revealed: bool
+int_mode: IntMode = IntMode.A | IntMode.B
+reveal_type(IntMode.A in (IntMode.A | IntMode.B))  # revealed: bool
+```
+
 ## Enum members
 
 ### Basic
