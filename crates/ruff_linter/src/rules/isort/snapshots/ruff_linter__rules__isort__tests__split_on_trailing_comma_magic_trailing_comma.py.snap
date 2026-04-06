@@ -52,7 +52,7 @@ help: Organize imports
    -     stdout,
    -     exit,
    - )
-   - 
+   -
    - # No magic comma, this will be rolled into one line.
    - from os import (
    -     path,
@@ -60,23 +60,23 @@ help: Organize imports
    -     execl,
    -     execv
    - )
-   - 
+   -
 2  | from glob import (
 3  +     escape,  # Ends with a comment, should still treat as magic trailing comma.
 4  |     glob,
 5  |     iglob,
    -     escape,  # Ends with a comment, should still treat as magic trailing comma.
 6  | )
-7  | 
+7  |
 8  + # No magic comma, this will be rolled into one line.
 9  + from os import environ, execl, execv, path
 10 + from sys import argv, exit, stderr, stdout
-11 + 
+11 +
 12 | # These will be combined, but without a trailing comma.
    - from foo import bar
    - from foo import baz
 13 + from foo import bar, baz
-14 | 
+14 |
 15 | # These will be combined, _with_ a trailing comma.
    - from module1 import member1
    - from module1 import (
@@ -84,7 +84,7 @@ help: Organize imports
    -     member3,
    - )
 16 + from module1 import member1, member2, member3
-17 | 
+17 |
 18 | # These will be combined, _with_ a trailing comma.
    - from module2 import member1, member2
    - from module2 import (

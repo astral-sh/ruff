@@ -12,9 +12,9 @@ UP025 [*] Remove unicode literals from strings
 help: Remove unicode prefix
   - u"Hello"
 1 + "Hello"
-2 | 
+2 |
 3 | x = u"Hello"  # UP025
-4 | 
+4 |
 
 UP025 [*] Remove unicode literals from strings
  --> UP025.py:3:5
@@ -28,12 +28,12 @@ UP025 [*] Remove unicode literals from strings
   |
 help: Remove unicode prefix
 1 | u"Hello"
-2 | 
+2 |
   - x = u"Hello"  # UP025
 3 + x = "Hello"  # UP025
-4 | 
+4 |
 5 | u'world'  # UP025
-6 | 
+6 |
 
 UP025 [*] Remove unicode literals from strings
  --> UP025.py:5:1
@@ -46,14 +46,14 @@ UP025 [*] Remove unicode literals from strings
 7 | print(u"Hello")  # UP025
   |
 help: Remove unicode prefix
-2 | 
+2 |
 3 | x = u"Hello"  # UP025
-4 | 
+4 |
   - u'world'  # UP025
 5 + 'world'  # UP025
-6 | 
+6 |
 7 | print(u"Hello")  # UP025
-8 | 
+8 |
 
 UP025 [*] Remove unicode literals from strings
  --> UP025.py:7:7
@@ -66,14 +66,14 @@ UP025 [*] Remove unicode literals from strings
 9 | print(u'world')  # UP025
   |
 help: Remove unicode prefix
-4  | 
+4  |
 5  | u'world'  # UP025
-6  | 
+6  |
    - print(u"Hello")  # UP025
 7  + print("Hello")  # UP025
-8  | 
+8  |
 9  | print(u'world')  # UP025
-10 | 
+10 |
 
 UP025 [*] Remove unicode literals from strings
   --> UP025.py:9:7
@@ -86,14 +86,14 @@ UP025 [*] Remove unicode literals from strings
 11 | import foo
    |
 help: Remove unicode prefix
-6  | 
+6  |
 7  | print(u"Hello")  # UP025
-8  | 
+8  |
    - print(u'world')  # UP025
 9  + print('world')  # UP025
-10 | 
+10 |
 11 | import foo
-12 | 
+12 |
 
 UP025 [*] Remove unicode literals from strings
   --> UP025.py:13:5
@@ -106,12 +106,12 @@ UP025 [*] Remove unicode literals from strings
 15 | # Retain quotes when fixing.
    |
 help: Remove unicode prefix
-10 | 
+10 |
 11 | import foo
-12 | 
+12 |
    - foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
 13 + foo("Hello", U"world", a=u"Hello", b=u"world")  # UP025
-14 | 
+14 |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
 
@@ -126,12 +126,12 @@ UP025 [*] Remove unicode literals from strings
 15 | # Retain quotes when fixing.
    |
 help: Remove unicode prefix
-10 | 
+10 |
 11 | import foo
-12 | 
+12 |
    - foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
 13 + foo(u"Hello", "world", a=u"Hello", b=u"world")  # UP025
-14 | 
+14 |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
 
@@ -146,12 +146,12 @@ UP025 [*] Remove unicode literals from strings
 15 | # Retain quotes when fixing.
    |
 help: Remove unicode prefix
-10 | 
+10 |
 11 | import foo
-12 | 
+12 |
    - foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
 13 + foo(u"Hello", U"world", a="Hello", b=u"world")  # UP025
-14 | 
+14 |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
 
@@ -166,12 +166,12 @@ UP025 [*] Remove unicode literals from strings
 15 | # Retain quotes when fixing.
    |
 help: Remove unicode prefix
-10 | 
+10 |
 11 | import foo
-12 | 
+12 |
    - foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
 13 + foo(u"Hello", U"world", a=u"Hello", b="world")  # UP025
-14 | 
+14 |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
 
@@ -186,7 +186,7 @@ UP025 [*] Remove unicode literals from strings
    |
 help: Remove unicode prefix
 13 | foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
-14 | 
+14 |
 15 | # Retain quotes when fixing.
    - x = u'hello'  # UP025
 16 + x = 'hello'  # UP025
@@ -205,14 +205,14 @@ UP025 [*] Remove unicode literals from strings
 19 | x = u'Hello "World"'  # UP025
    |
 help: Remove unicode prefix
-14 | 
+14 |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
    - x = u"""hello"""  # UP025
 17 + x = """hello"""  # UP025
 18 | x = u'''hello'''  # UP025
 19 | x = u'Hello "World"'  # UP025
-20 | 
+20 |
 
 UP025 [*] Remove unicode literals from strings
   --> UP025.py:18:5
@@ -230,7 +230,7 @@ help: Remove unicode prefix
    - x = u'''hello'''  # UP025
 18 + x = '''hello'''  # UP025
 19 | x = u'Hello "World"'  # UP025
-20 | 
+20 |
 21 | u = "Hello"  # OK
 
 UP025 [*] Remove unicode literals from strings
@@ -249,7 +249,7 @@ help: Remove unicode prefix
 18 | x = u'''hello'''  # UP025
    - x = u'Hello "World"'  # UP025
 19 + x = 'Hello "World"'  # UP025
-20 | 
+20 |
 21 | u = "Hello"  # OK
 22 | u = u  # OK
 
@@ -265,11 +265,11 @@ UP025 [*] Remove unicode literals from strings
 help: Remove unicode prefix
 24 | def hello():
 25 |     return"Hello"  # OK
-26 | 
+26 |
    - f"foo"u"bar"  # OK
 27 + f"foo" "bar"  # OK
 28 | f"foo" u"bar"  # OK
-29 | 
+29 |
 30 | # https://github.com/astral-sh/ruff/issues/18895
 
 UP025 [*] Remove unicode literals from strings
@@ -283,11 +283,11 @@ UP025 [*] Remove unicode literals from strings
    |
 help: Remove unicode prefix
 25 |     return"Hello"  # OK
-26 | 
+26 |
 27 | f"foo"u"bar"  # OK
    - f"foo" u"bar"  # OK
 28 + f"foo" "bar"  # OK
-29 | 
+29 |
 30 | # https://github.com/astral-sh/ruff/issues/18895
 31 | ""u""
 
@@ -302,7 +302,7 @@ UP025 [*] Remove unicode literals from strings
    |
 help: Remove unicode prefix
 28 | f"foo" u"bar"  # OK
-29 | 
+29 |
 30 | # https://github.com/astral-sh/ruff/issues/18895
    - ""u""
 31 + "" ""
@@ -321,7 +321,7 @@ UP025 [*] Remove unicode literals from strings
 34 | ""U"helloooo"
    |
 help: Remove unicode prefix
-29 | 
+29 |
 30 | # https://github.com/astral-sh/ruff/issues/18895
 31 | ""u""
    - ""u"hi"

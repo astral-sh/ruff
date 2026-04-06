@@ -40,6 +40,36 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
+## No type qualifiers
+
+The right-hand side of a type alias definition is a type expression, not an annotation expression.
+Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
+appear at the top level of a PEP 695 alias definition:
+
+```py
+from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
+from dataclasses import InitVar
+
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+type Bad1 = ClassVar[str]
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+type Bad2 = ClassVar
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+type Bad3 = Final[int]
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+type Bad4 = Final
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type alias values"
+type Bad5 = Required[int]
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type alias values"
+type Bad6 = NotRequired[int]
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type alias values"
+type Bad7 = ReadOnly[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+type Bad8 = InitVar[int]
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+type Bad9 = InitVar
+```
+
 ## Type aliases in type aliases
 
 ```py
@@ -547,4 +577,23 @@ def foo(a: int, b: int) -> RecursiveT:
     some_intermediate_var = (a, b)
     # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
+```
+
+### Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+from collections.abc import Callable
+
+type RecursiveIs = TypeIs[RecursiveIs]  # error: [cyclic-type-alias-definition]
+type RecursiveGuard = TypeGuard[RecursiveGuard]
+
+type AliasIs = RecursiveIs  # error: [cyclic-type-alias-definition]
+type AliasGuard = RecursiveGuard
+
+type CallableIs = TypeIs[Callable[[], CallableIs]]
+type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
+
+reveal_type(CallableIs)  # revealed: TypeAliasType
+reveal_type(CallableGuard)  # revealed: TypeAliasType
 ```

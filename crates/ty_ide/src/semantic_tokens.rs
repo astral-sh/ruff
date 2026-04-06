@@ -46,8 +46,10 @@ use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_for_name,
+    HasType, SemanticModel,
+    semantic_index::definition::DefinitionKind,
+    types::Type,
+    types::ide_support::{definition_for_name, static_member_type_for_attribute},
 };
 
 /// Semantic token types supported by the language server.
@@ -442,6 +444,32 @@ impl<'db> SemanticTokenVisitor<'db> {
         ty: Type,
         attr_name: &ast::Identifier,
     ) -> (SemanticTokenType, SemanticTokenModifier) {
+        enum UnifiedTokenType {
+            None,
+            /// All types have the same semantic token type
+            Uniform(SemanticTokenType),
+            /// The elements have different semantic token types
+            Fallback,
+        }
+
+        impl UnifiedTokenType {
+            fn add(&mut self, ty: SemanticTokenType) {
+                *self = match self {
+                    Self::None => Self::Uniform(ty),
+                    Self::Uniform(current) if *current == ty => Self::Uniform(ty),
+                    Self::Uniform(_) | Self::Fallback => Self::Fallback,
+                }
+            }
+
+            fn into_semantic_token_type(self) -> Option<SemanticTokenType> {
+                match self {
+                    UnifiedTokenType::None | UnifiedTokenType::Fallback => None,
+                    UnifiedTokenType::Uniform(ty) => Some(ty),
+                }
+            }
+        }
+
+        let db = self.model.db();
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
 
@@ -449,35 +477,58 @@ impl<'db> SemanticTokenVisitor<'db> {
             return classification;
         }
 
-        // Classify based on the inferred type of the attribute
-        match ty {
-            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::FunctionLiteral(_) => {
-                // This is a function accessed as an attribute, likely a method
-                (SemanticTokenType::Method, modifiers)
-            }
-            Type::BoundMethod(_) => {
-                // Method bound to an instance
-                (SemanticTokenType::Method, modifiers)
-            }
-            Type::ModuleLiteral(_) => {
-                // Module accessed as an attribute (e.g., from os import path)
-                (SemanticTokenType::Namespace, modifiers)
-            }
-            _ if ty.is_property_instance() => {
-                // Actual Python property
-                (SemanticTokenType::Property, modifiers)
-            }
-            _ => {
-                // Check for constant naming convention
-                if Self::is_constant_name(attr_name_str) {
-                    modifiers |= SemanticTokenModifier::READONLY;
-                }
+        let elements = if let Some(union) = ty.as_union() {
+            union.elements(db)
+        } else {
+            std::slice::from_ref(&ty)
+        };
 
-                // For other types (variables, constants, etc.), classify as variable
-                (SemanticTokenType::Variable, modifiers)
+        let mut token_type = UnifiedTokenType::None;
+        let mut all_properties_are_readonly = true;
+
+        for element in elements {
+            // Classify based on the inferred type of the attribute
+            match element {
+                Type::ClassLiteral(_) => {
+                    token_type.add(SemanticTokenType::Class);
+                }
+                Type::FunctionLiteral(_) => {
+                    // This is a function accessed as an attribute, likely a method
+                    token_type.add(SemanticTokenType::Method);
+                }
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {
+                    // Method bound to an instance
+                    token_type.add(SemanticTokenType::Method);
+                }
+                Type::ModuleLiteral(_) => {
+                    // Module accessed as an attribute (e.g., from os import path)
+                    token_type.add(SemanticTokenType::Namespace);
+                }
+                Type::PropertyInstance(property) => {
+                    token_type.add(SemanticTokenType::Property);
+                    all_properties_are_readonly &= property.setter(db).is_none();
+                }
+                _ => {
+                    token_type = UnifiedTokenType::Fallback;
+                }
             }
         }
+
+        if let Some(uniform) = token_type.into_semantic_token_type() {
+            if uniform == SemanticTokenType::Property && all_properties_are_readonly {
+                modifiers |= SemanticTokenModifier::READONLY;
+            }
+            return (uniform, modifiers);
+        }
+
+        // Check for constant naming convention
+        if Self::is_constant_name(attr_name_str) {
+            modifiers |= SemanticTokenModifier::READONLY;
+        }
+
+        // For other types (variables, constants, etc.), classify as variable
+        // Should this always be property?
+        (SemanticTokenType::Variable, modifiers)
     }
 
     fn classify_parameter(
@@ -852,7 +903,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
+                let ty = static_member_type_for_attribute(self.model, attr)
+                    .unwrap_or_else(|| expr.inferred_type(self.model).unwrap_or(Type::unknown()));
                 let (token_type, modifiers) = self.classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
             }
@@ -1744,7 +1796,7 @@ b: list["int | str"] | None
 c: "list[int | str] | None"
 d: "list[int | str]" | "None"
 e: 'list["int | str"] | "None"'
-f: """'list["int | str"]' | 'None'""" 
+f: """'list["int | str"]' | 'None'"""
 "#,
         );
 
@@ -1819,6 +1871,7 @@ z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
 w = obj.prop             # prop should be property
 v = MyClass.method       # method should be method (function)
 u = List.__name__        # __name__ should be variable
+t = MyClass.prop          # prop should be property on the class itself
 ",
         );
 
@@ -1855,13 +1908,213 @@ u = List.__name__        # __name__ should be variable
         "CONSTANT" @ 413..421: Variable [readonly]
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
-        "prop" @ 491..495: Variable
+        "prop" @ 491..495: Property [readonly]
         "v" @ 534..535: Variable [definition]
         "MyClass" @ 538..545: Class
         "method" @ 546..552: Method
         "u" @ 596..597: Variable [definition]
         "List" @ 600..604: Variable
         "__name__" @ 605..613: Variable
+        "t" @ 651..652: Variable [definition]
+        "MyClass" @ 655..662: Class
+        "prop" @ 663..667: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn property_with_return_annotation() {
+        let test = SemanticTokenTest::new(
+            "
+class Foo:
+    @property
+    def prop(self) -> int:
+        return 4
+
+foo = Foo()
+w = foo.prop
+x = Foo.prop
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Foo" @ 7..10: Class [definition]
+        "property" @ 17..25: Decorator
+        "prop" @ 34..38: Method [definition]
+        "self" @ 39..43: SelfParameter [definition]
+        "int" @ 48..51: Class
+        "4" @ 68..69: Number
+        "foo" @ 71..74: Variable [definition]
+        "Foo" @ 77..80: Class
+        "w" @ 83..84: Variable [definition]
+        "foo" @ 87..90: Variable
+        "prop" @ 91..95: Property [readonly]
+        "x" @ 96..97: Variable [definition]
+        "Foo" @ 100..103: Class
+        "prop" @ 104..108: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn property_readonly_modifier() {
+        // Verify that the readonly modifier is set for getter-only properties
+        // and NOT set for properties that also have a setter.
+        let test = SemanticTokenTest::new(
+            "
+class Config:
+    @property
+    def read_only(self) -> str:
+        return 'value'
+
+    @property
+    def read_write(self) -> int:
+        return self._x
+
+    @read_write.setter
+    def read_write(self, value: int) -> None:
+        self._x = value
+
+cfg = Config()
+a = cfg.read_only
+b = cfg.read_write
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Config" @ 7..13: Class [definition]
+        "property" @ 20..28: Decorator
+        "read_only" @ 37..46: Method [definition]
+        "self" @ 47..51: SelfParameter [definition]
+        "str" @ 56..59: Class
+        "'value'" @ 76..83: String
+        "property" @ 90..98: Decorator
+        "read_write" @ 107..117: Method [definition]
+        "self" @ 118..122: SelfParameter [definition]
+        "int" @ 127..130: Class
+        "self" @ 147..151: SelfParameter
+        "_x" @ 152..154: Variable
+        "read_write" @ 161..171: Method
+        "setter" @ 172..178: Method
+        "read_write" @ 187..197: Method [definition]
+        "self" @ 198..202: SelfParameter [definition]
+        "value" @ 204..209: Parameter [definition]
+        "int" @ 211..214: Class
+        "None" @ 219..223: BuiltinConstant
+        "self" @ 233..237: SelfParameter
+        "_x" @ 238..240: Variable
+        "value" @ 243..248: Parameter
+        "cfg" @ 250..253: Variable [definition]
+        "Config" @ 256..262: Class
+        "a" @ 265..266: Variable [definition]
+        "cfg" @ 269..272: Variable
+        "read_only" @ 273..282: Property [readonly]
+        "b" @ 283..284: Variable [definition]
+        "cfg" @ 287..290: Variable
+        "read_write" @ 291..301: Property
+        "#);
+    }
+
+    #[test]
+    fn property_union_with_non_property_falls_back() {
+        let test = SemanticTokenTest::new(
+            "
+class WithProperty:
+    @property
+    def value(self) -> int:
+        return 1
+
+class WithAttribute:
+    value = 2
+
+def f(obj: WithProperty | WithAttribute):
+    return obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "WithProperty" @ 7..19: Class [definition]
+        "property" @ 26..34: Decorator
+        "value" @ 43..48: Method [definition]
+        "self" @ 49..53: SelfParameter [definition]
+        "int" @ 58..61: Class
+        "1" @ 78..79: Number
+        "WithAttribute" @ 87..100: Class [definition]
+        "value" @ 106..111: Variable [definition]
+        "2" @ 114..115: Number
+        "f" @ 121..122: Function [definition]
+        "obj" @ 123..126: Parameter [definition]
+        "WithProperty" @ 128..140: Class
+        "WithAttribute" @ 143..156: Class
+        "obj" @ 170..173: Parameter
+        "value" @ 174..179: Variable
+        "#);
+    }
+
+    #[test]
+    fn property_union_readonly_only_if_all_variants_are_readonly() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ReadWrite:
+    @property
+    def value(self) -> int:
+        return self._value
+
+    @value.setter
+    def value(self, new_value: int) -> None:
+        self._value = new_value
+
+obj = ReadOnly() if random() else ReadWrite()
+x = obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "ReadOnly" @ 34..42: Class [definition]
+        "property" @ 49..57: Decorator
+        "value" @ 66..71: Method [definition]
+        "self" @ 72..76: SelfParameter [definition]
+        "int" @ 81..84: Class
+        "1" @ 101..102: Number
+        "ReadWrite" @ 110..119: Class [definition]
+        "property" @ 126..134: Decorator
+        "value" @ 143..148: Method [definition]
+        "self" @ 149..153: SelfParameter [definition]
+        "int" @ 158..161: Class
+        "self" @ 178..182: SelfParameter
+        "_value" @ 183..189: Variable
+        "value" @ 196..201: Method
+        "setter" @ 202..208: Method
+        "value" @ 217..222: Method [definition]
+        "self" @ 223..227: SelfParameter [definition]
+        "new_value" @ 229..238: Parameter [definition]
+        "int" @ 240..243: Class
+        "None" @ 248..252: BuiltinConstant
+        "self" @ 262..266: SelfParameter
+        "_value" @ 267..273: Variable
+        "new_value" @ 276..285: Parameter
+        "obj" @ 287..290: Variable [definition]
+        "ReadOnly" @ 293..301: Class
+        "random" @ 307..313: Variable
+        "ReadWrite" @ 321..330: Class
+        "x" @ 333..334: Variable [definition]
+        "obj" @ 337..340: Variable
+        "value" @ 341..346: Property
         "#);
     }
 
@@ -1893,6 +2146,264 @@ y = obj.unknown_attr     # Should fall back to variable
         "y" @ 187..188: Variable [definition]
         "obj" @ 191..194: Variable
         "unknown_attr" @ 195..207: Variable
+        "#);
+    }
+
+    #[test]
+    fn attribute_on_union_1() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class Foo:
+    CONSTANT = 42
+
+    def method(self):
+        return \"hello\"
+
+    @property
+    def prop(self) -> str:
+        return \"hello\"
+
+class Bar:
+    CONSTANT = 24
+
+    def method(self, x: int = 1) -> int:
+        return 42
+
+    @property
+    def prop(self) -> int:
+        return self.CONSTANT
+
+
+foobar = Foo() if random() else Bar()
+y = foobar.method                                # method should be method (bound method)
+z = foobar.CONSTANT                              # CONSTANT should be variable with readonly modifier
+w = foobar.prop                                  # prop should be property
+foobar_cls = Foo if random() else Bar
+v = foobar_cls.method                            # method should be method (function)
+x = foobar_cls.prop                              # prop should be property
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Foo" @ 34..37: Class [definition]
+        "CONSTANT" @ 43..51: Variable [definition, readonly]
+        "42" @ 54..56: Number
+        "method" @ 66..72: Method [definition]
+        "self" @ 73..77: SelfParameter [definition]
+        "\"hello\"" @ 95..102: String
+        "property" @ 109..117: Decorator
+        "prop" @ 126..130: Method [definition]
+        "self" @ 131..135: SelfParameter [definition]
+        "str" @ 140..143: Class
+        "\"hello\"" @ 160..167: String
+        "Bar" @ 175..178: Class [definition]
+        "CONSTANT" @ 184..192: Variable [definition, readonly]
+        "24" @ 195..197: Number
+        "method" @ 207..213: Method [definition]
+        "self" @ 214..218: SelfParameter [definition]
+        "x" @ 220..221: Parameter [definition]
+        "int" @ 223..226: Class
+        "1" @ 229..230: Number
+        "int" @ 235..238: Class
+        "42" @ 255..257: Number
+        "property" @ 264..272: Decorator
+        "prop" @ 281..285: Method [definition]
+        "self" @ 286..290: SelfParameter [definition]
+        "int" @ 295..298: Class
+        "self" @ 315..319: SelfParameter
+        "CONSTANT" @ 320..328: Variable [readonly]
+        "foobar" @ 331..337: Variable [definition]
+        "Foo" @ 340..343: Class
+        "random" @ 349..355: Variable
+        "Bar" @ 363..366: Class
+        "y" @ 369..370: Variable [definition]
+        "foobar" @ 373..379: Variable
+        "method" @ 380..386: Method
+        "z" @ 459..460: Variable [definition]
+        "foobar" @ 463..469: Variable
+        "CONSTANT" @ 470..478: Variable [readonly]
+        "w" @ 561..562: Variable [definition]
+        "foobar" @ 565..571: Variable
+        "prop" @ 572..576: Property [readonly]
+        "foobar_cls" @ 636..646: Variable [definition]
+        "Foo" @ 649..652: Class
+        "random" @ 656..662: Variable
+        "Bar" @ 670..673: Class
+        "v" @ 674..675: Variable [definition]
+        "foobar_cls" @ 678..688: Variable
+        "method" @ 689..695: Method
+        "x" @ 760..761: Variable [definition]
+        "foobar_cls" @ 764..774: Variable
+        "prop" @ 775..779: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn attribute_on_union_2() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+# There is also this way to create union types:
+class Baz:
+    if random():
+        CONSTANT = 42
+
+        def method(self) -> int:
+            return 42
+
+        @property
+        def prop(self) -> int:
+            return 42
+    else:
+        CONSTANT = \"hello\"
+
+        def method(self) -> str:
+            return \"hello\"
+
+        @property
+        def prop(self) -> str:
+            return \"hello\"
+
+baz = Baz()
+s = baz.method      # method should be bound method
+t = baz.CONSTANT    # CONSTANT should be variable with readonly
+r = baz.prop        # prop should be property
+q = Baz.prop        # prop should be property on the class as well
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Baz" @ 82..85: Class [definition]
+        "random" @ 94..100: Variable
+        "CONSTANT" @ 112..120: Variable [definition, readonly]
+        "42" @ 123..125: Number
+        "method" @ 139..145: Method [definition]
+        "self" @ 146..150: SelfParameter [definition]
+        "int" @ 155..158: Class
+        "42" @ 179..181: Number
+        "property" @ 192..200: Decorator
+        "prop" @ 213..217: Method [definition]
+        "self" @ 218..222: SelfParameter [definition]
+        "int" @ 227..230: Class
+        "42" @ 251..253: Number
+        "CONSTANT" @ 272..280: Variable [definition, readonly]
+        "\"hello\"" @ 283..290: String
+        "method" @ 304..310: Method [definition]
+        "self" @ 311..315: SelfParameter [definition]
+        "str" @ 320..323: Class
+        "\"hello\"" @ 344..351: String
+        "property" @ 362..370: Decorator
+        "prop" @ 383..387: Method [definition]
+        "self" @ 388..392: SelfParameter [definition]
+        "str" @ 397..400: Class
+        "\"hello\"" @ 421..428: String
+        "baz" @ 430..433: Variable [definition]
+        "Baz" @ 436..439: Class
+        "s" @ 442..443: Variable [definition]
+        "baz" @ 446..449: Variable
+        "method" @ 450..456: Method
+        "t" @ 494..495: Variable [definition]
+        "baz" @ 498..501: Variable
+        "CONSTANT" @ 502..510: Variable [readonly]
+        "r" @ 558..559: Variable [definition]
+        "baz" @ 562..565: Variable
+        "prop" @ 566..570: Property [readonly]
+        "q" @ 604..605: Variable [definition]
+        "Baz" @ 608..611: Class
+        "prop" @ 612..616: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn attribute_on_union_3() {
+        // This is a test where the unions are not actually composed of the same elements,
+        // so the regular fallback logic should apply.
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class Baz:
+    if random():
+        CONSTANT = 42
+
+        def method(self) -> int:
+            return 42
+
+        @property
+        def prop(self) -> int:
+            return 42
+    else:
+        def CONSTANT(self):
+            return \"hello\"
+
+        @property
+        def method(self) -> str:
+            return \"hello\"
+
+        prop: str = \"hello\"
+
+baz = Baz()
+s = baz.method
+t = baz.CONSTANT
+r = baz.prop
+q = Baz.prop
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "Baz" @ 34..37: Class [definition]
+        "random" @ 46..52: Variable
+        "CONSTANT" @ 64..72: Variable [definition, readonly]
+        "42" @ 75..77: Number
+        "method" @ 91..97: Method [definition]
+        "self" @ 98..102: SelfParameter [definition]
+        "int" @ 107..110: Class
+        "42" @ 131..133: Number
+        "property" @ 144..152: Decorator
+        "prop" @ 165..169: Method [definition]
+        "self" @ 170..174: SelfParameter [definition]
+        "int" @ 179..182: Class
+        "42" @ 203..205: Number
+        "CONSTANT" @ 228..236: Method [definition]
+        "self" @ 237..241: SelfParameter [definition]
+        "\"hello\"" @ 263..270: String
+        "property" @ 281..289: Decorator
+        "method" @ 302..308: Method [definition]
+        "self" @ 309..313: SelfParameter [definition]
+        "str" @ 318..321: Class
+        "\"hello\"" @ 342..349: String
+        "prop" @ 359..363: Method [definition]
+        "str" @ 365..368: Class
+        "\"hello\"" @ 371..378: String
+        "baz" @ 380..383: Variable [definition]
+        "Baz" @ 386..389: Class
+        "s" @ 392..393: Variable [definition]
+        "baz" @ 396..399: Variable
+        "method" @ 400..406: Variable
+        "t" @ 407..408: Variable [definition]
+        "baz" @ 411..414: Variable
+        "CONSTANT" @ 415..423: Variable [readonly]
+        "r" @ 424..425: Variable [definition]
+        "baz" @ 428..431: Variable
+        "prop" @ 432..436: Variable
+        "q" @ 437..438: Variable [definition]
+        "Baz" @ 441..444: Class
+        "prop" @ 445..449: Variable
         "#);
     }
 
@@ -2078,7 +2589,7 @@ class MyClass:
     def __init__(self): pass
 
     """unrelated string"""
-    
+
     x: str = "hello"
 "#,
         );
@@ -2109,7 +2620,7 @@ What a good module wooo
 def my_func(): pass
 
 """unrelated string"""
-    
+
 x: str = "hello"
 "#,
         );
@@ -2745,10 +3256,10 @@ class BoundedContainer[T: int, U = str]:
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
         "P" @ 354..355: Variable
-        "args" @ 356..360: Variable
+        "args" @ 356..360: Property [readonly]
         "kwargs" @ 364..370: Parameter [definition]
         "P" @ 372..373: Variable
-        "kwargs" @ 374..380: Variable
+        "kwargs" @ 374..380: Property [readonly]
         "str" @ 385..388: Class
         "str" @ 405..408: Class
         "func" @ 409..413: Parameter

@@ -56,12 +56,12 @@ info: `A.f` is decorated with `@final`, forbidding overrides
 help: Remove the override of `f`
 info: rule `override-of-final-method` is enabled by default
 5  |     def f(self): ...
-6  | 
+6  |
 7  | class B(A):
    -     @final
    -     def f(self): ...  # error: [override-of-final-method]
 8  +     pass  # error: [override-of-final-method]
-9  | 
+9  |
 10 | class C(B):
 11 |     @final
 note: This is an unsafe fix and may change runtime behavior
@@ -91,7 +91,7 @@ info: `B.f` is decorated with `@final`, forbidding overrides
 help: Remove the override of `f`
 info: rule `override-of-final-method` is enabled by default
 9  |     def f(self): ...  # error: [override-of-final-method]
-10 | 
+10 |
 11 | class C(B):
    -     @final
    -     # we only emit one error here, not two

@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF072 [*] Empty `finally` clause
+ --> RUF072_SIM105.py:8:1
+  |
+6 |   except Exception:
+7 |       pass
+8 | / finally:
+9 | |     pass
+  | |________^
+  |
+help: Remove the `finally` clause
+5 |     foo()
+6 | except Exception:
+7 |     pass
+  - finally:
+  -     pass
+8 |

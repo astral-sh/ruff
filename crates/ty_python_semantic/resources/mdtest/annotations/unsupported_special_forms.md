@@ -60,16 +60,16 @@ def _(
     a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
     b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
     c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
-    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
     e: ParamSpec,
-    f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in type expressions"
+    f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in parameter annotations"
 ) -> None:
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
 
-    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a type expression"
+    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a parameter annotation"
     def foo(a_: e) -> None:
         reveal_type(a_)  # revealed: Unknown
 ```
@@ -109,7 +109,6 @@ from typing_extensions import Self, TypeAlias, TypeVar
 T = TypeVar("T")
 
 # error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
-# error: [unbound-type-variable]
 X: TypeAlias[T] = int
 
 class Foo[T]:

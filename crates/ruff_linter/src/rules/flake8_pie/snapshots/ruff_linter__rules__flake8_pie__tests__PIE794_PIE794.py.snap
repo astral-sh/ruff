@@ -16,7 +16,7 @@ help: Remove duplicate field definition for `name`
 2 |     name = StringField()
 3 |     # ....
   -     name = StringField()  # PIE794
-4 | 
+4 |
 5 |     def remove(self) -> None:
 6 |         ...
 note: This is an unsafe fix and may change runtime behavior
@@ -36,7 +36,7 @@ help: Remove duplicate field definition for `name`
 11 |     name: str = StringField()
 12 |     # ....
    -     name = StringField()  # PIE794
-13 | 
+13 |
 14 |     def foo(self) -> None:
 15 |         ...
 note: This is an unsafe fix and may change runtime behavior
@@ -54,8 +54,8 @@ help: Remove duplicate field definition for `bar`
 21 |     foo: bool = BooleanField()
 22 |     # ...
    -     bar = StringField()  # PIE794
-23 | 
-24 | 
+23 |
+24 |
 25 | class User(BaseModel):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,8 +72,8 @@ help: Remove duplicate field definition for `bar`
 38 |     foo: bool = BooleanField()
 39 |     # ...
    -     bar = StringField()  # PIE794
-40 | 
-41 | 
+40 |
+41 |
 42 | class Person:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -90,8 +90,8 @@ help: Remove duplicate field definition for `name`
 44 |     name = "Foo"
 45 |     name = name + " Bar"
    -     name = "Bar"  # PIE794
-46 | 
-47 | 
+46 |
+47 |
 48 | class Person:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,8 +108,8 @@ help: Remove duplicate field definition for `name`
 50 |     name: str = "Foo"
 51 |     name: str = name + " Bar"
    -     name: str = "Bar"  # PIE794
-52 | 
-53 | 
+52 |
+53 |
 54 | class TextEdit:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -122,7 +122,7 @@ PIE794 [*] Class field `start_line` is defined multiple times
    |     ^^^^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `start_line`
-54 | 
+54 |
 55 | class TextEdit:
 56 |     start_line: int
    -     start_line: int  # PIE794

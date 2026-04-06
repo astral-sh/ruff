@@ -1,213 +1,373 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF072 `@abstractmethod` should be placed after `@property`
-  --> RUF072.py:14:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:8:1
    |
-13 | class AbstractAboveProperty:
-14 |     @abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^
-15 |     @property
-16 |     def foo(self): ...
+ 6 |   except Exception:
+ 7 |       bar()
+ 8 | / finally:
+ 9 | |     pass
+   | |________^
+10 |
+11 |   # try/except/finally with ellipsis
    |
+help: Remove the `finally` clause
+5  |     foo()
+6  | except Exception:
+7  |     bar()
+   - finally:
+   -     pass
+8  |
+9  | # try/except/finally with ellipsis
+10 | try:
 
-RUF072 `@abstractmethod` should be placed after `@classmethod`
-  --> RUF072.py:19:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:16:1
    |
-18 | class AbstractAboveClassmethod:
-19 |     @abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^
-20 |     @classmethod
-21 |     def foo(cls): ...
+14 |   except Exception:
+15 |       bar()
+16 | / finally:
+17 | |     ...
+   | |_______^
+18 |
+19 |   # try/except/else/finally with pass
    |
+help: Remove the `finally` clause
+13 |     foo()
+14 | except Exception:
+15 |     bar()
+   - finally:
+   -     ...
+16 |
+17 | # try/except/else/finally with pass
+18 | try:
 
-RUF072 `@abstractmethod` should be placed after `@staticmethod`
-  --> RUF072.py:24:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:26:1
    |
-23 | class AbstractAboveStaticmethod:
-24 |     @abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^
-25 |     @staticmethod
-26 |     def foo(): ...
+24 |   else:
+25 |       baz()
+26 | / finally:
+27 | |     pass
+   | |________^
+28 |
+29 |   # bare try/finally with pass
    |
+help: Remove the `finally` clause
+23 |     bar()
+24 | else:
+25 |     baz()
+   - finally:
+   -     pass
+26 |
+27 | # bare try/finally with pass
+28 | try:
 
-RUF072 `@contextmanager` should be placed after `@classmethod`
-  --> RUF072.py:31:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:32:1
    |
-30 | class ContextManagerAboveClassmethod:
-31 |     @contextmanager  # RUF072
-   |     ^^^^^^^^^^^^^^^
-32 |     @classmethod
-33 |     def foo(cls): ...
+30 |   try:
+31 |       foo()
+32 | / finally:
+33 | |     pass
+   | |________^
+34 |
+35 |   # bare try/finally with ellipsis
    |
+help: Remove the `finally` clause
+27 |     pass
+28 |
+29 | # bare try/finally with pass
+   - try:
+   -     foo()
+   - finally:
+   -     pass
+30 + foo()
+31 |
+32 | # bare try/finally with ellipsis
+33 | try:
 
-RUF072 `@asynccontextmanager` should be placed after `@classmethod`
-  --> RUF072.py:36:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:38:1
    |
-35 | class AsyncContextManagerAboveClassmethod:
-36 |     @asynccontextmanager  # RUF072
-   |     ^^^^^^^^^^^^^^^^^^^^
-37 |     @classmethod
-38 |     def foo(cls): ...
+36 |   try:
+37 |       foo()
+38 | / finally:
+39 | |     ...
+   | |_______^
+40 |
+41 |   # bare try/finally with multi-line body
    |
+help: Remove the `finally` clause
+33 |     pass
+34 |
+35 | # bare try/finally with ellipsis
+   - try:
+   -     foo()
+   - finally:
+   -     ...
+36 + foo()
+37 |
+38 | # bare try/finally with multi-line body
+39 | try:
 
-RUF072 `@functools.cache` should be placed after `@property`
-  --> RUF072.py:43:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:46:1
    |
-42 | class CacheAboveProperty:
-43 |     @cache  # RUF072
-   |     ^^^^^^
-44 |     @property
-45 |     def foo(self): ...
+44 |       bar()
+45 |       baz()
+46 | / finally:
+47 | |     pass
+   | |________^
+48 |
+49 |   # Nested try with useless finally
    |
+help: Remove the `finally` clause
+39 |     ...
+40 |
+41 | # bare try/finally with multi-line body
+   - try:
+   -     foo()
+   -     bar()
+   -     baz()
+   - finally:
+   -     pass
+42 + foo()
+43 + bar()
+44 + baz()
+45 |
+46 | # Nested try with useless finally
+47 | try:
 
-RUF072 `@functools.lru_cache` should be placed after `@property`
-  --> RUF072.py:48:5
-   |
-47 | class LruCacheAboveProperty:
-48 |     @lru_cache  # RUF072
-   |     ^^^^^^^^^^
-49 |     @property
-50 |     def foo(self): ...
-   |
-
-RUF072 `@functools.cache` should be placed after `@classmethod`
+RUF072 [*] Empty `finally` clause
   --> RUF072.py:53:5
    |
-52 | class CacheAboveClassmethod:
-53 |     @cache  # RUF072
-   |     ^^^^^^
-54 |     @classmethod
-55 |     def foo(cls): ...
+51 |       try:
+52 |           foo()
+53 | /     finally:
+54 | |         pass
+   | |____________^
+55 |   except Exception:
+56 |       bar()
    |
+help: Remove the `finally` clause
+48 |
+49 | # Nested try with useless finally
+50 | try:
+   -     try:
+   -         foo()
+   -     finally:
+   -         pass
+51 +     foo()
+52 | except Exception:
+53 |     bar()
+54 |
 
-RUF072 `@functools.lru_cache` should be placed after `@classmethod`
-  --> RUF072.py:58:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:63:1
    |
-57 | class LruCacheAboveClassmethod:
-58 |     @lru_cache  # RUF072
-   |     ^^^^^^^^^^
-59 |     @classmethod
-60 |     def foo(cls): ...
+61 |   except Exception:
+62 |       bar()
+63 | / finally:
+64 | |     pass
+65 | |     pass
+   | |________^
+66 |
+67 |   # bare try/finally with pass and ellipsis
    |
+help: Remove the `finally` clause
+60 |     foo()
+61 | except Exception:
+62 |     bar()
+   - finally:
+   -     pass
+   -     pass
+63 |
+64 | # bare try/finally with pass and ellipsis
+65 | try:
 
-RUF072 `@functools.cache` should be placed after `@functools.cached_property`
-  --> RUF072.py:63:5
+RUF072 [*] Empty `finally` clause
+  --> RUF072.py:70:1
    |
-62 | class CacheAboveCachedProperty:
-63 |     @cache  # RUF072
-   |     ^^^^^^
-64 |     @cached_property
-65 |     def foo(self): ...
+68 |   try:
+69 |       foo()
+70 | / finally:
+71 | |     pass
+72 | |     ...
+   | |_______^
+73 |
+74 |   # OK
    |
+help: Remove the `finally` clause
+65 |     pass
+66 |
+67 | # bare try/finally with pass and ellipsis
+   - try:
+   -     foo()
+   - finally:
+   -     pass
+   -     ...
+68 + foo()
+69 |
+70 | # OK
+71 |
 
-RUF072 `@functools.lru_cache` should be placed after `@functools.cached_property`
-  --> RUF072.py:68:5
-   |
-67 | class LruCacheAboveCachedProperty:
-68 |     @lru_cache  # RUF072
-   |     ^^^^^^^^^^
-69 |     @cached_property
-70 |     def foo(self): ...
-   |
-
-RUF072 `@classmethod` should be placed after `@functools.cached_property`
-  --> RUF072.py:73:5
-   |
-72 | class ClassmethodAboveCachedProperty:
-73 |     @classmethod  # RUF072
-   |     ^^^^^^^^^^^^
-74 |     @cached_property
-75 |     def foo(cls): ...
-   |
-
-RUF072 `@abstractmethod` should be placed after `@property`
-  --> RUF072.py:80:5
-   |
-79 | class QualifiedAbstractAboveProperty:
-80 |     @abc.abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^^^^^
-81 |     @property
-82 |     def foo(self): ...
-   |
-
-RUF072 `@functools.lru_cache` should be placed after `@property`
-  --> RUF072.py:85:5
-   |
-84 | class QualifiedLruCacheAboveProperty:
-85 |     @functools.lru_cache  # RUF072
-   |     ^^^^^^^^^^^^^^^^^^^^
-86 |     @property
-87 |     def foo(self): ...
-   |
-
-RUF072 `@abstractmethod` should be placed after `@property`
-  --> RUF072.py:92:5
-   |
-91 | class DeprecatedAbstractPropertyBelowAbstractmethod:
-92 |     @abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^
-93 |     @abstractproperty
-94 |     def foo(self): ...
-   |
-
-RUF072 `@abstractmethod` should be placed after `@classmethod`
-  --> RUF072.py:97:5
-   |
-96 | class DeprecatedAbstractClassmethodBelowAbstractmethod:
-97 |     @abstractmethod  # RUF072
-   |     ^^^^^^^^^^^^^^^
-98 |     @abstractclassmethod
-99 |     def foo(cls): ...
-   |
-
-RUF072 `@abstractmethod` should be placed after `@staticmethod`
-   --> RUF072.py:102:5
+RUF072 Empty `finally` clause
+   --> RUF072.py:102:1
     |
-101 | class DeprecatedAbstractStaticmethodBelowAbstractmethod:
-102 |     @abstractmethod  # RUF072
-    |     ^^^^^^^^^^^^^^^
-103 |     @abstractstaticmethod
-104 |     def foo(): ...
+100 |   except Exception:
+101 |       bar()
+102 | / finally:  # comment
+103 | |     pass
+    | |________^
+104 |
+105 |   # Comment on `pass` line
     |
+help: Remove the `finally` clause
 
-RUF072 `@functools.lru_cache` should be placed after `@property`
-   --> RUF072.py:109:5
+RUF072 Empty `finally` clause
+   --> RUF072.py:110:1
     |
-108 | class LruCacheCallAboveProperty:
-109 |     @lru_cache()  # RUF072
-    |     ^^^^^^^^^^^^
-110 |     @property
-111 |     def foo(self): ...
+108 |   except Exception:
+109 |       bar()
+110 | / finally:
+111 | |     pass  # comment
+    | |________^
+112 |
+113 |   # Preceding own-line comment
     |
+help: Remove the `finally` clause
 
-RUF072 `@functools.lru_cache` should be placed after `@property`
-   --> RUF072.py:114:5
+RUF072 Empty `finally` clause
+   --> RUF072.py:119:1
     |
-113 | class LruCacheCallWithArgsAboveProperty:
-114 |     @lru_cache(maxsize=128)  # RUF072
-    |     ^^^^^^^^^^^^^^^^^^^^^^^
-115 |     @property
-116 |     def foo(self): ...
+117 |       bar()
+118 |   # comment
+119 | / finally:
+120 | |     pass
+    | |________^
+121 |
+122 |   # Trailing own-line comment
     |
+help: Remove the `finally` clause
 
-RUF072 `@abstractmethod` should be placed after `@property`
-   --> RUF072.py:121:5
+RUF072 Empty `finally` clause
+   --> RUF072.py:127:1
     |
-120 | class MultipleViolations:
-121 |     @abstractmethod  # RUF072
-    |     ^^^^^^^^^^^^^^^
-122 |     @property
-123 |     @contextmanager  # RUF072
+125 |   except Exception:
+126 |       bar()
+127 | / finally:
+128 | |     pass
+    | |________^
+129 |       # comment
     |
+help: Remove the `finally` clause
 
-RUF072 `@contextmanager` should be placed after `@classmethod`
-   --> RUF072.py:123:5
+RUF072 Empty `finally` clause
+   --> RUF072.py:136:1
     |
-121 |     @abstractmethod  # RUF072
-122 |     @property
-123 |     @contextmanager  # RUF072
-    |     ^^^^^^^^^^^^^^^
-124 |     @classmethod
-125 |     def foo(cls): ...
+134 |   except Exception:
+135 |       bar()
+136 | / finally:
+137 | |     # comment
+138 | |     pass
+    | |________^
+139 |
+140 |   # Own-line comment extra-indented before `pass`
     |
+help: Remove the `finally` clause
+
+RUF072 Empty `finally` clause
+   --> RUF072.py:145:1
+    |
+143 |   except Exception:
+144 |       bar()
+145 | / finally:
+146 | |         # comment
+147 | |     pass
+    | |________^
+148 |
+149 |   # Trailing comment indented one level (belongs to finally body)
+    |
+help: Remove the `finally` clause
+
+RUF072 Empty `finally` clause
+   --> RUF072.py:154:1
+    |
+152 |   except Exception:
+153 |       bar()
+154 | / finally:
+155 | |     pass
+    | |________^
+156 |           # indented comment
+    |
+help: Remove the `finally` clause
+
+RUF072 Empty `finally` clause
+   --> RUF072.py:164:1
+    |
+162 |   except Exception:
+163 |       bar()
+164 | / finally:
+165 | |     pass
+    | |________^
+166 |   # dedented comment
+    |
+help: Remove the `finally` clause
+
+RUF072 Empty `finally` clause
+   --> RUF072.py:171:1
+    |
+169 |   try:
+170 |       foo()
+171 | / finally:  # comment
+172 | |     pass
+    | |________^
+173 |
+174 |   # Bare try finally with line starting with a formfeed
+    |
+help: Remove the `finally` clause
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:178:1
+    |
+176 |       1
+177 |       2
+178 | / finally:
+179 | |     pass
+    | |________^
+    |
+help: Remove the `finally` clause
+172 |     pass
+173 |
+174 | # Bare try finally with line starting with a formfeed
+    - try:
+    -     1
+    -     2
+    - finally:
+    -     pass
+175 + 1
+176 + 2
+177 |
+178 |
+179 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:186:1
+    |
+184 |   try:
+185 |       1
+186 | / finally:
+187 | |     pass
+    | |________^
+    |
+help: Remove the `finally` clause
+181 |
+182 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+183 | # (`try` is preceded by a form feed below)
+    - try:
+    -     1
+    - finally:
+    -     pass
+184 + 1

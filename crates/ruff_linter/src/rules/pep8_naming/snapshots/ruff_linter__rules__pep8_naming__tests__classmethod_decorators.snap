@@ -10,13 +10,13 @@ N805 [*] First argument of a method should be named `self`
 8 |         pass
   |
 help: Rename `this` to `self`
-4  | 
-5  | 
+4  |
+5  |
 6  | class Class:
    -     def bad_method(this):
 7  +     def bad_method(self):
 8  |         pass
-9  | 
+9  |
 10 |     if False:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,12 +30,12 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `this` to `self`
 8  |         pass
-9  | 
+9  |
 10 |     if False:
    -         def extra_bad_method(this):
 11 +         def extra_bad_method(self):
 12 |             pass
-13 | 
+13 |
 14 |     def good_method(self):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,12 +51,12 @@ N805 [*] First argument of a method should be named `self`
 help: Rename `this` to `self`
 60 |     def good_method_pos_only(self, blah, /, something: str):
 61 |         pass
-62 | 
+62 |
    -     def bad_method_pos_only(this, blah, /, something: str):
 63 +     def bad_method_pos_only(self, blah, /, something: str):
 64 |         pass
-65 | 
-66 | 
+65 |
+66 |
 note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
@@ -69,13 +69,13 @@ N805 [*] First argument of a method should be named `self`
 70 |         pass
    |
 help: Rename `cls` to `self`
-66 | 
+66 |
 67 | class ModelClass:
 68 |     @hybrid_property
    -     def bad(cls):
 69 +     def bad(self):
 70 |         pass
-71 | 
+71 |
 72 |     @bad.expression
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,12 +89,12 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `cls` to `self`
 74 |         pass
-75 | 
+75 |
 76 |     @bad.wtf
    -     def bad(cls):
 77 +     def bad(self):
 78 |         pass
-79 | 
+79 |
 80 |     @hybrid_property
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,13 +108,13 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `foo` to `self`
 90 |         pass
-91 | 
+91 |
 92 |     @foobar.thisisstatic
    -     def badstatic(foo):
 93 +     def badstatic(self):
 94 |         pass
-95 | 
-96 | 
+95 |
+96 |
 note: This is an unsafe fix and may change runtime behavior
 
 N805 First argument of a method should be named `self`
@@ -181,8 +181,8 @@ N805 [*] First argument of a method should be named `self`
 117 |         this
     |
 help: Rename `this` to `self`
-112 | 
-113 | 
+112 |
+113 |
 114 | class RenamingInMethodBodyClass:
     -     def bad_method(this):
     -         this = this
@@ -190,7 +190,7 @@ help: Rename `this` to `self`
 115 +     def bad_method(self):
 116 +         self = self
 117 +         self
-118 | 
+118 |
 119 |     def bad_method(this):
 120 |         self = this
 note: This is an unsafe fix and may change runtime behavior
@@ -215,15 +215,15 @@ N805 [*] First argument of a method should be named `self`
 125 |         hºusehold(1)
     |
 help: Rename `household` to `self`
-121 | 
-122 | 
+121 |
+122 |
 123 | class RenamingWithNFKC:
     -     def formula(household):
     -         hºusehold(1)
 124 +     def formula(self):
 125 +         self(1)
-126 | 
-127 | 
+126 |
+127 |
 128 | from typing import Protocol
 note: This is an unsafe fix and may change runtime behavior
 

@@ -9,11 +9,11 @@ F401 [*] `sys` imported but unused
    |
 help: Remove unused import: `sys`
 16 | import argparse  # Ok: is exported in __all__
-17 | 
-18 | 
+17 |
+18 |
    - import sys  # F401: remove unused
-19 | 
-20 | 
+19 |
+20 |
 21 | # first-party
 note: This is an unsafe fix and may change runtime behavior
 
@@ -25,11 +25,11 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
    |
 help: Remove unused import: `.unused`
 33 | from . import exported  # Ok: is exported in __all__
-34 | 
-35 | 
+34 |
+35 |
    - from . import unused  # F401: add to __all__
-36 | 
-37 | 
+36 |
+37 |
 38 | from . import renamed as bees  # F401: add to __all__
 note: This is an unsafe fix and may change runtime behavior
 
@@ -41,10 +41,10 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
    |
 help: Remove unused import: `.renamed`
 36 | from . import unused  # F401: add to __all__
-37 | 
-38 | 
+37 |
+38 |
    - from . import renamed as bees  # F401: add to __all__
-39 | 
-40 | 
+39 |
+40 |
 41 | __all__ = ["argparse", "exported"]
 note: This is an unsafe fix and may change runtime behavior

@@ -1,227 +1,187 @@
-"""Tests for RUF072 (incorrect-decorator-order)."""
+# Errors
 
-from abc import abstractmethod, abstractproperty, abstractclassmethod, abstractstaticmethod
-from contextlib import contextmanager, asynccontextmanager
-from functools import cache, cached_property, lru_cache, wraps
-import abc
-import functools
+# try/except/finally with pass
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
 
-# ===== Errors =====
+# try/except/finally with ellipsis
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    ...
 
-# --- Core: abstractmethod above descriptors ---
+# try/except/else/finally with pass
+try:
+    foo()
+except Exception:
+    bar()
+else:
+    baz()
+finally:
+    pass
 
-class AbstractAboveProperty:
-    @abstractmethod  # RUF072
-    @property
-    def foo(self): ...
+# bare try/finally with pass
+try:
+    foo()
+finally:
+    pass
 
-class AbstractAboveClassmethod:
-    @abstractmethod  # RUF072
-    @classmethod
-    def foo(cls): ...
+# bare try/finally with ellipsis
+try:
+    foo()
+finally:
+    ...
 
-class AbstractAboveStaticmethod:
-    @abstractmethod  # RUF072
-    @staticmethod
-    def foo(): ...
+# bare try/finally with multi-line body
+try:
+    foo()
+    bar()
+    baz()
+finally:
+    pass
 
-# --- Core: contextmanager above classmethod ---
+# Nested try with useless finally
+try:
+    try:
+        foo()
+    finally:
+        pass
+except Exception:
+    bar()
 
-class ContextManagerAboveClassmethod:
-    @contextmanager  # RUF072
-    @classmethod
-    def foo(cls): ...
+# finally with two pass statements
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+    pass
 
-class AsyncContextManagerAboveClassmethod:
-    @asynccontextmanager  # RUF072
-    @classmethod
-    def foo(cls): ...
+# bare try/finally with pass and ellipsis
+try:
+    foo()
+finally:
+    pass
+    ...
 
-# --- Functools: caching decorators above descriptors ---
+# OK
 
-class CacheAboveProperty:
-    @cache  # RUF072
-    @property
-    def foo(self): ...
+# finally with real code
+try:
+    foo()
+finally:
+    cleanup()
 
-class LruCacheAboveProperty:
-    @lru_cache  # RUF072
-    @property
-    def foo(self): ...
+# finally with pass and other statements
+try:
+    foo()
+finally:
+    pass
+    cleanup()
 
-class CacheAboveClassmethod:
-    @cache  # RUF072
-    @classmethod
-    def foo(cls): ...
+# No finally at all
+try:
+    foo()
+except Exception:
+    bar()
 
-class LruCacheAboveClassmethod:
-    @lru_cache  # RUF072
-    @classmethod
-    def foo(cls): ...
+# Comments — diagnostic but no fix
 
-class CacheAboveCachedProperty:
-    @cache  # RUF072
-    @cached_property
-    def foo(self): ...
+# Comment on `finally:` line
+try:
+    foo()
+except Exception:
+    bar()
+finally:  # comment
+    pass
 
-class LruCacheAboveCachedProperty:
-    @lru_cache  # RUF072
-    @cached_property
-    def foo(self): ...
+# Comment on `pass` line
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass  # comment
 
-class ClassmethodAboveCachedProperty:
-    @classmethod  # RUF072
-    @cached_property
-    def foo(cls): ...
+# Preceding own-line comment
+try:
+    foo()
+except Exception:
+    bar()
+# comment
+finally:
+    pass
 
-# --- Qualified imports ---
+# Trailing own-line comment
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+    # comment
 
-class QualifiedAbstractAboveProperty:
-    @abc.abstractmethod  # RUF072
-    @property
-    def foo(self): ...
+# Own-line comment before `pass` in the finally body
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    # comment
+    pass
 
-class QualifiedLruCacheAboveProperty:
-    @functools.lru_cache  # RUF072
-    @property
-    def foo(self): ...
+# Own-line comment extra-indented before `pass`
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+        # comment
+    pass
 
-# --- Deprecated abc forms ---
+# Trailing comment indented one level (belongs to finally body)
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+        # indented comment
 
-class DeprecatedAbstractPropertyBelowAbstractmethod:
-    @abstractmethod  # RUF072
-    @abstractproperty
-    def foo(self): ...
+# Trailing comment dedented one level (not part of finally, but
+# immediately adjacent — suppresses fix conservatively)
+try:
+    foo()
+except Exception:
+    bar()
+finally:
+    pass
+# dedented comment
 
-class DeprecatedAbstractClassmethodBelowAbstractmethod:
-    @abstractmethod  # RUF072
-    @abstractclassmethod
-    def foo(cls): ...
+# Comment on bare try/finally
+try:
+    foo()
+finally:  # comment
+    pass
 
-class DeprecatedAbstractStaticmethodBelowAbstractmethod:
-    @abstractmethod  # RUF072
-    @abstractstaticmethod
-    def foo(): ...
+# Bare try finally with line starting with a formfeed
+try:
+    1
+    2
+finally:
+    pass
 
-# --- Decorator call form ---
 
-class LruCacheCallAboveProperty:
-    @lru_cache()  # RUF072
-    @property
-    def foo(self): ...
-
-class LruCacheCallWithArgsAboveProperty:
-    @lru_cache(maxsize=128)  # RUF072
-    @property
-    def foo(self): ...
-
-# --- Multiple violations on same function (adjacent pairs only) ---
-
-class MultipleViolations:
-    @abstractmethod  # RUF072
-    @property
-    @contextmanager  # RUF072
-    @classmethod
-    def foo(cls): ...
-
-# ===== No errors =====
-
-# --- Correct orderings ---
-
-class CorrectPropertyAboveAbstractmethod:
-    @property
-    @abstractmethod
-    def foo(self): ...
-
-class CorrectClassmethodAboveAbstractmethod:
-    @classmethod
-    @abstractmethod
-    def foo(cls): ...
-
-class CorrectStaticmethodAboveAbstractmethod:
-    @staticmethod
-    @abstractmethod
-    def foo(): ...
-
-class CorrectContextmanagerAboveStaticmethod:
-    @contextmanager
-    @staticmethod
-    def foo(): ...
-
-class CorrectAsyncContextmanagerAboveStaticmethod:
-    @asynccontextmanager
-    @staticmethod
-    def foo(): ...
-
-class CorrectStaticmethodAboveContextmanager:
-    @staticmethod
-    @contextmanager
-    def foo(): ...
-
-class CorrectClassmethodAboveContextmanager:
-    @classmethod
-    @contextmanager
-    def foo(cls): ...
-
-class CorrectPropertyAboveCache:
-    @property
-    @cache
-    def foo(self): ...
-
-class CorrectPropertyAboveLruCache:
-    @property
-    @lru_cache
-    def foo(self): ...
-
-class CorrectAbstractmethodAboveCachedProperty:
-    @abstractmethod
-    @cached_property
-    def foo(self): ...
-
-class CachedPropertyAboveAbstractmethod:
-    @cached_property
-    @abstractmethod
-    def foo(self): ...
-
-# --- Non-adjacent known-bad pair (only adjacent pairs are checked) ---
-
-class InterleavedDecorator:
-    @abstractmethod
-    @some_other_decorator
-    @property
-    def foo(self): ...
-
-# --- Single decorators ---
-
-class SingleAbstractmethod:
-    @abstractmethod
-    def foo(self): ...
-
-class SingleProperty:
-    @property
-    def foo(self): ...
-
-# --- Unrelated decorators only ---
-
-class UnrelatedDecorators:
-    @some_decorator
-    @another_decorator
-    def foo(self): ...
-
-# --- Same decorator twice ---
-
-class DuplicateDecorator:
-    @abstractmethod
-    @abstractmethod
-    def foo(self): ...
-
-# --- functools.wraps is not checked ---
-
-class WrapsWithAnything:
-    @wraps(some_func)
-    @property
-    def foo(self): ...
-
-    @abstractmethod
-    @wraps(some_func)
-    def bar(self): ...
+# Regression test for https://github.com/astral-sh/ruff/issues/24373
+# (`try` is preceded by a form feed below)
+try:
+    1
+finally:
+    pass

@@ -20,17 +20,16 @@ use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::string_annotation::{
-    BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
-    IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
-    RAW_STRING_TYPE_ANNOTATION,
+    ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
+    INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    protocol_class::ProtocolClass,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
+    binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -78,6 +77,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -150,6 +150,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
@@ -159,9 +160,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
 
     // String annotations
-    registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
-    registry.register_lint(&FSTRING_TYPE_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
@@ -936,6 +935,31 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `yield` and `yield from` expressions where the "yield" or "send" type
+    /// is incompatible with the generator function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Yielding a value of a type that doesn't match the generator's declared yield type,
+    /// or using `yield from` with a sub-iterator whose yield or send type is incompatible,
+    /// is a type error that may cause downstream consumers of the generator to receive
+    /// values of an unexpected type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Iterator
+    ///
+    /// def gen() -> Iterator[int]:
+    ///     yield "not an int"  # error: [invalid-yield]
+    /// ```
+    pub(crate) static INVALID_YIELD = {
+        summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
+        status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
     }
 }
@@ -2991,6 +3015,31 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects invalid `TypedDict` field declarations.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the
+    /// subtype guarantees that `TypedDict` inheritance is meant to preserve.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Base(TypedDict):
+    ///     x: int
+    ///
+    /// class Child(Base):
+    ///     x: str  # error: [invalid-typed-dict-field]
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_FIELD = {
+        summary: "detects invalid `TypedDict` field declarations",
+        status: LintStatus::stable("0.0.28"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects errors in `TypedDict` class headers, such as unexpected arguments
     /// or invalid base classes.
     ///
@@ -3447,6 +3496,109 @@ pub(super) fn note_numbers_module_not_supported<'db>(
     }
 }
 
+fn covariant_supertype_hint<'db>(
+    class: ClassType<'db>,
+    db: &'db dyn Db,
+    mismatched_invariant_parameters: &[usize],
+) -> Option<&'static str> {
+    match (class.known(db), mismatched_invariant_parameters) {
+        (Some(KnownClass::List | KnownClass::Deque), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Sequence`")
+        }
+        (Some(KnownClass::Set), [0]) => {
+            Some("Consider using the covariant supertype `collections.abc.Set`")
+        }
+        (
+            Some(
+                KnownClass::Dict
+                | KnownClass::DefaultDict
+                | KnownClass::OrderedDict
+                | KnownClass::ChainMap,
+            ),
+            [1],
+        ) => Some(
+            "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
+        ),
+        _ => None,
+    }
+}
+
+/// Add a diagnostic hint for cases like an invalid `list[bool]` to `list[int]` assignment,
+/// that fails due to invariance.
+pub(super) fn add_invariant_generic_hints<'db>(
+    db: &'db dyn Db,
+    diag: &mut Diagnostic,
+    expected_ty: Type<'db>,
+    provided_ty: Type<'db>,
+) {
+    let Some(expected_class) = expected_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(provided_class) = provided_ty.nominal_class(db) else {
+        return;
+    };
+    let Some(expected_specialization) = expected_ty.class_specialization(db) else {
+        return;
+    };
+    let Some(provided_specialization) = provided_ty.class_specialization(db) else {
+        return;
+    };
+
+    if expected_class.class_literal(db) != provided_class.class_literal(db) {
+        return;
+    }
+
+    let generic_context = expected_specialization.generic_context(db);
+    if generic_context != provided_specialization.generic_context(db) {
+        return;
+    }
+
+    let mismatched_invariant_arguments = generic_context
+        .variables(db)
+        .zip(expected_specialization.types(db))
+        .zip(provided_specialization.types(db))
+        .enumerate()
+        .filter_map(|(index, ((bound_typevar, expected_arg), provided_arg))| {
+            (bound_typevar.variance(db) == TypeVarVariance::Invariant
+                && !expected_arg.is_equivalent_to(db, *provided_arg))
+            .then_some((index, expected_arg, provided_arg))
+        });
+
+    let mut mismatch_indices = Vec::new();
+    for (index, expected_arg, provided_arg) in mismatched_invariant_arguments {
+        if !provided_arg.is_assignable_to(db, *expected_arg) {
+            return;
+        }
+        mismatch_indices.push(index);
+    }
+
+    if mismatch_indices.is_empty() {
+        return;
+    }
+
+    let class_name = expected_class.name(db);
+    let message = match (generic_context.len(db), mismatch_indices.as_slice()) {
+        (1, _) => {
+            format!("`{class_name}` is invariant in its type parameter")
+        }
+        (_, [0]) => format!("`{class_name}` is invariant in its first type parameter"),
+        (_, [1]) => format!("`{class_name}` is invariant in its second type parameter"),
+        (_, [2]) => format!("`{class_name}` is invariant in its third type parameter"),
+        (2, [0, 1]) => {
+            format!("`{class_name}` is invariant in its first and second type parameters")
+        }
+        _ => format!("`{class_name}` is invariant in (one of) its type parameters"),
+    };
+    diag.info(message);
+
+    if let Some(note) = covariant_supertype_hint(expected_class, db, &mismatch_indices) {
+        diag.info(note);
+    }
+    diag.info(
+        "For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics",
+    );
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
@@ -3531,6 +3683,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
     // special case message
     note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(context.db(), &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -3658,6 +3811,61 @@ pub(super) fn report_invalid_generator_function_return_type(
         "Function is inferred as returning `{inferred_ty}` because it is {description}"
     ));
     diag.info(format_args!("See {link} for more details"));
+}
+
+#[derive(Copy, Clone)]
+pub(super) enum GeneratorMismatchKind {
+    YieldType,
+    SendType,
+}
+
+pub(super) fn report_invalid_generator_yield_type(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+    kind: GeneratorMismatchKind,
+) {
+    let Some(builder) = context.report_lint(&INVALID_YIELD, object_range) else {
+        return;
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
+    let expected_ty = expected_ty.display_with(context.db(), settings.clone());
+    let actual_ty = actual_ty.display_with(context.db(), settings);
+
+    let (kind_name, title, concise) = match kind {
+        GeneratorMismatchKind::YieldType => (
+            "yield",
+            "Yield expression type does not match annotation",
+            format!("Yield type `{actual_ty}` does not match annotated yield type `{expected_ty}`"),
+        ),
+        GeneratorMismatchKind::SendType => (
+            "send",
+            "Send type does not match annotation",
+            format!("Send type `{actual_ty}` does not match annotated send type `{expected_ty}`"),
+        ),
+    };
+
+    let mut diag = builder.into_diagnostic(title);
+    diag.set_concise_message(concise);
+    let primary = match kind {
+        GeneratorMismatchKind::YieldType => {
+            format!("expression of type `{actual_ty}`, expected `{expected_ty}`")
+        }
+        GeneratorMismatchKind::SendType => {
+            format!("generator with send type `{actual_ty}`, expected `{expected_ty}`")
+        }
+    };
+    diag.set_primary_message(primary);
+
+    if let Some(return_type_span) = return_type_span {
+        diag.annotate(Annotation::secondary(return_type_span).message(format!(
+            "Function annotated with {kind_name} type `{expected_ty}` here"
+        )));
+    }
 }
 
 pub(super) fn report_implicit_return_type(
@@ -6040,4 +6248,21 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+}
+
+pub(super) fn report_invalid_concatenate_last_arg<'db>(
+    context: &InferContext<'db, '_>,
+    last_arg: &ast::Expr,
+    last_arg_type: Type<'db>,
+) {
+    if let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENTS, last_arg) {
+        let mut diag = builder.into_diagnostic(
+            "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` \
+                type variable",
+        );
+        diag.set_primary_message(format_args!(
+            "Got `{}`",
+            last_arg_type.display(context.db())
+        ));
+    }
 }

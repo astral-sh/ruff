@@ -12,7 +12,7 @@ B011 [*] Do not `assert False` (`python -O` removes these calls), raise `Asserti
    |
 help: Replace `assert False`
 5  | """
-6  | 
+6  |
 7  | assert 1 != 2
    - assert False
 8  + raise AssertionError()

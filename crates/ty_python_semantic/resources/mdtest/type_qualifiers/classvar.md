@@ -333,10 +333,10 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 from ty_extensions import reveal_mro
 
-# error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
+# error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
 x: ClassVar[int] = 1
 
 class C:
@@ -344,24 +344,22 @@ class C:
         # error: [invalid-type-form] "`ClassVar` annotations are not allowed for non-name targets"
         self.x: ClassVar[int] = 1
 
-        # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
+        # error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
         y: ClassVar[int] = 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f(x: ClassVar[int]) -> None:
     pass
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f() -> ClassVar[int]:
     return 1
 
-# error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
-# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in return type annotations"
 def f[T](x: T) -> ClassVar[T]:
     return x
 
@@ -371,6 +369,12 @@ class Foo(ClassVar[tuple[int]]): ...
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
 # revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
 reveal_mro(Foo)
+
+class Foo(TypedDict):
+    # error: [invalid-type-form] "`ClassVar` is not allowed in TypedDict fields"
+    x: ClassVar[int]
+    # error: [invalid-type-form] "`ClassVar` is not allowed in TypedDict fields"
+    y: ClassVar
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

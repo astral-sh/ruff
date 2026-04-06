@@ -51,7 +51,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
         let value_inference =
             infer_expression_types(self.db(), value.expression(), TypeContext::default());
-        let value_expr = value.expression().node_ref(self.db(), self.module());
+        let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         if matches!(value.kind(), UnpackKind::Assign)
             && self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)

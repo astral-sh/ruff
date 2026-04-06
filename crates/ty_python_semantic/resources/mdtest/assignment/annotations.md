@@ -580,7 +580,7 @@ def _():
     reveal_type(x4)  # revealed: X
 ```
 
-## Prefer the declared type of generic classes
+## Prefer the declared type of generic classes and callables
 
 ```toml
 [environment]
@@ -615,8 +615,7 @@ e: list[Any] | None = [1]
 reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
-# TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[int] | None
+reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
@@ -681,6 +680,38 @@ class X[T]:
 
 x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
+```
+
+We also prefer the declared type of `Callable` parameters, which are in contravariant position:
+
+```py
+from typing import Callable
+
+type AnyToBool = Callable[[Any], bool]
+
+def wrap[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def maybe_make_callable[T](x: T) -> Callable[[T], bool] | None:
+    raise NotImplementedError
+
+x1: Callable[[Any], bool] = make_callable(0)
+reveal_type(x1)  # revealed: (Any, /) -> bool
+
+x2: AnyToBool = make_callable(0)
+reveal_type(x2)  # revealed: (Any, /) -> bool
+
+x3: Callable[[list[Any]], bool] = make_callable([0])
+reveal_type(x3)  # revealed: (list[Any], /) -> bool
+
+x4: Callable[[Any], bool] = wrap(make_callable(0))
+reveal_type(x4)  # revealed: (Any, /) -> bool
+
+x5: Callable[[Any], bool] | None = maybe_make_callable(0)
+reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 ```
 
 ## Declared type preference sees through subtyping
@@ -776,33 +807,48 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import reveal_type, TypedDict
+from typing import reveal_type, Any, Callable, TypedDict
 
 def identity[T](x: T) -> T:
     return x
 
-def _(narrow: dict[str, str], target: list[str] | dict[str, str] | None):
+type Target = Any | list[str] | dict[str, str] | Callable[[str], None] | None
+
+def _(narrow: dict[str, str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: dict[str, str]
 
-def _(narrow: list[str], target: list[str] | dict[str, str] | None):
+def _(narrow: list[str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str]
 
-def _(narrow: list[str] | dict[str, str], target: list[str] | dict[str, str] | None):
+def _(narrow: Callable[[str], None], target: Target):
+    target = identity(narrow)
+    reveal_type(target)  # revealed: (str, /) -> None
+
+def _(narrow: list[str] | dict[str, str], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str] | dict[str, str]
 
 class TD(TypedDict):
     x: int
 
-def _(target: list[TD] | dict[str, TD] | None):
+type TargetWithTD = Any | list[TD] | dict[str, TD] | Callable[[TD], None] | None
+
+def _(target: TargetWithTD):
     target = identity([{"x": 1}])
     reveal_type(target)  # revealed: list[TD]
 
-def _(target: list[TD] | dict[str, TD] | None):
+def _(target: TargetWithTD):
     target = identity({"x": {"x": 1}})
     reveal_type(target)  # revealed: dict[str, TD]
+
+def _(target: TargetWithTD):
+    def make_callable[T](x: T) -> Callable[[T], None]:
+        raise NotImplementedError
+
+    target = identity(make_callable({"x": 1}))
+    reveal_type(target)  # revealed: (TD, /) -> None
 ```
 
 ## Prefer the inferred type of non-generic classes
@@ -887,7 +933,7 @@ def _(a: int, b: str, c: int | str):
     reveal_type(x10)  # revealed: int | str | None
 ```
 
-## Assignability diagnostics ignore declared type of generic classes
+## Assignability diagnostics ignore declared type
 
 ```toml
 [environment]
@@ -913,19 +959,27 @@ class A(TypedDict):
 x2: list[A | bool] = [{"bar": 1}, 1]
 ```
 
-However, the declared type of generic classes should be ignored if the specialization is not
-solvable:
+However, the declared type should be ignored if the specialization is not solvable:
 
 ```py
+from typing import Any, Callable
+
 def g[T](x: list[T]) -> T:
     return x[0]
 
 def _(a: int | None):
     # error: [invalid-assignment] "Object of type `list[int | None]` is not assignable to `list[str]`"
-    y1: list[str] = f(a)
+    x1: list[str] = f(a)
 
     # error: [invalid-assignment] "Object of type `int | None` is not assignable to `str`"
-    y2: str = g(f(a))
+    x2: str = g(f(a))
+
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def _(a: int | None):
+    # error: [invalid-assignment] "Object of type `(int | None, /) -> bool` is not assignable to `(str, /) -> bool`"
+    x1: Callable[[str], bool] = make_callable(a)
 ```
 
 ## Forward annotation with unclosed string literal

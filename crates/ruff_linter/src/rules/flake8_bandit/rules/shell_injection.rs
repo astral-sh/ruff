@@ -294,16 +294,27 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
-/// Check if an expression is a trusted input for subprocess.run.
-/// We assume that any str, list[str] or tuple[str] literal can be trusted.
-fn is_trusted_input(arg: &Expr) -> bool {
-    match arg {
+/// Check if a single expression element is trusted input.
+/// String literals and `sys.executable` are considered trusted.
+fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
         Expr::StringLiteral(_) => true,
+        _ => semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|name| matches!(name.segments(), ["sys", "executable"])),
+    }
+}
+
+/// Check if an expression is a trusted input for subprocess calls.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted,
+/// as well as `sys.executable`.
+fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
+    match arg {
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+            elts.iter().all(|elt| is_trusted_element(elt, semantic))
         }
-        Expr::Named(named) => is_trusted_input(&named.value),
-        _ => false,
+        Expr::Named(named) => is_trusted_input(&named.value, semantic),
+        _ => is_trusted_element(arg, semantic),
     }
 }
 
@@ -329,7 +340,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg) {
+                    if !is_trusted_input(arg, checker.semantic()) {
                         checker.report_diagnostic_if_enabled(
                             SubprocessWithoutShellEqualsTrue,
                             call.func.range(),
@@ -515,7 +526,9 @@ fn is_full_path(text: &str) -> bool {
 /// partial path.
 fn is_partial_path(expr: &Expr) -> bool {
     let string_literal = match expr {
-        Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.first().and_then(string_literal)
+        }
         _ => string_literal(expr),
     };
     string_literal.is_some_and(|text| !is_full_path(text))

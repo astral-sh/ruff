@@ -275,6 +275,10 @@ impl PlaceTableBuilder {
         self.symbols.symbol(id)
     }
 
+    pub(super) fn member(&self, id: ScopedMemberId) -> &Member {
+        self.member.member(id)
+    }
+
     pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.symbols.symbol_id(name)
     }

@@ -37,3 +37,6 @@ test-case = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

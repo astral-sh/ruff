@@ -11,9 +11,9 @@ TC008 [*] Remove quotes from type alias
 7 | b: TypeAlias = 'int' | None  # TC010
   |
 help: Remove quotes
-3 | 
+3 |
 4 | from typing import TypeAlias
-5 | 
+5 |
   - a: TypeAlias = 'int | None'  # TC008
 6 + a: TypeAlias = int | None  # TC008
 7 | b: TypeAlias = 'int' | None  # TC010

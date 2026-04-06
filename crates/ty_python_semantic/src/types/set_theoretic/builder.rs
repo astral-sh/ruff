@@ -38,6 +38,7 @@
 
 use super::RecursivelyDefined;
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -1145,18 +1146,13 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(mut self) -> Type<'db> {
-        // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
-        if self.intersections.len() == 1 {
-            self.intersections.pop().unwrap().build(self.db)
-        } else {
-            UnionType::from_elements(
-                self.db,
-                self.intersections
-                    .into_iter()
-                    .map(|inner| inner.build(self.db)),
-            )
-        }
+    pub(crate) fn build(self) -> Type<'db> {
+        UnionType::from_elements(
+            self.db,
+            self.intersections
+                .into_iter()
+                .map(|inner| inner.build(self.db)),
+        )
     }
 }
 
@@ -1348,10 +1344,20 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        // `Divergent & ~T` -> `Divergent`. Note that `~Divergent` becomes `Divergent` via the
-        // `Type::Dynamic` branch below, so we don't need a special case for that.
+        // `Never & ~T` -> `Never`.
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `Divergent & ~T` -> `Divergent`.
         if self.positive.iter().any(Type::is_divergent) {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
+        if let Some(negated_divergent) = new_negative.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated_divergent);
             return;
         }
 
@@ -1516,30 +1522,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // to their upper bound and all constrained type variables to the union of their constraints.
         // If that speculative intersection simplifies to `Never`, this intersection must also simplify
         // to `Never`.
-        if self.positive.iter().any(|ty| ty.is_type_var()) {
-            let mut speculative = IntersectionBuilder::new(db);
-            for pos in &self.positive {
-                match pos {
-                    Type::TypeVar(type_var) => {
-                        match type_var.typevar(db).bound_or_constraints(db) {
-                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                speculative = speculative.add_positive(bound);
-                            }
-                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(constraints.as_type(db));
-                            }
-                            // TypeVars without a bound or constraint implicitly have `object` as their
-                            // upper bound, and it is always a no-op to add `object` to an intersection.
-                            None => {}
-                        }
-                    }
-                    _ => speculative = speculative.add_positive(*pos),
-                }
-            }
-            for neg in &self.negative {
-                speculative = speculative.add_negative(*neg);
-            }
-            if speculative.build().is_never() {
+        if self
+            .positive
+            .iter()
+            .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
+        {
+            let speculative =
+                expand_intersection_typevars_and_newtypes(db, &self.positive, &self.negative);
+            if speculative.is_never() {
                 return Type::Never;
             }
         }

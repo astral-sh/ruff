@@ -268,6 +268,10 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
+                ClassBase::Divergent(_) => {
+                    has_dynamic_superclass = true;
+                    continue;
+                }
                 ClassBase::TypedDict => {
                     has_typeddict_in_mro = true;
                     continue;

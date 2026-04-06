@@ -12,7 +12,7 @@ UP037 [*] Remove quotes from type annotation
 17 |     _doubleton: "EmptyCell"
    |
 help: Remove quotes
-12 | 
+12 |
 13 | @dataclass(frozen=True)
 14 | class EmptyCell:
    -     _singleton: ClassVar[Optional["EmptyCell"]] = None
