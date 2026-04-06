@@ -6888,14 +6888,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
+        let typed_dict_constructor_targets =
+            self.collect_typed_dict_constructor_targets(callable_type);
+
         // Validate `TypedDict` constructor calls after argument type inference.
-        if let Some(class) = class
-            && class.is_typed_dict(self.db())
-        {
+        for typed_dict in typed_dict_constructor_targets {
             let mut speculative = self.speculate();
             validate_typed_dict_constructor(
                 &self.context,
-                TypedDictType::new(class),
+                typed_dict,
                 arguments,
                 func.as_ref().into(),
                 |expr, tcx| speculative.infer_expression(expr, tcx),
@@ -6999,6 +7000,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
             _ => return_ty,
         }
+    }
+
+    fn collect_typed_dict_constructor_targets(
+        &self,
+        callable_type: Type<'db>,
+    ) -> Vec<TypedDictType<'db>> {
+        fn push<'db>(
+            builder: &TypeInferenceBuilder<'db, '_>,
+            class: ClassType<'db>,
+            seen: &mut FxHashSet<TypedDictType<'db>>,
+            targets: &mut Vec<TypedDictType<'db>>,
+        ) {
+            if class.is_typed_dict(builder.db()) {
+                let typed_dict = TypedDictType::new(class);
+                if seen.insert(typed_dict) {
+                    targets.push(typed_dict);
+                }
+            }
+        }
+
+        fn inner<'db>(
+            builder: &TypeInferenceBuilder<'db, '_>,
+            callable_type: Type<'db>,
+            seen: &mut FxHashSet<TypedDictType<'db>>,
+            targets: &mut Vec<TypedDictType<'db>>,
+        ) {
+            let db = builder.db();
+
+            match callable_type.resolve_type_alias(db) {
+                Type::ClassLiteral(class) => {
+                    push(builder, ClassType::NonGeneric(class), seen, targets);
+                }
+                Type::GenericAlias(alias) => {
+                    push(builder, ClassType::Generic(alias), seen, targets);
+                }
+                Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                    SubclassOfInner::Class(class) => {
+                        push(builder, class, seen, targets);
+                    }
+                    SubclassOfInner::Dynamic(_) => {}
+                    SubclassOfInner::TypeVar(_) => {
+                        // Recover the single class that `type[T]` already exposes through
+                        // `into_class()`, so upper-bounded `TypedDict` constructors continue to
+                        // validate. We intentionally avoid walking constraints independently here,
+                        // because that would lose the correlation between the constructor target
+                        // and other arguments typed as the same `T`.
+                        if let Some(class) = subclass_of.subclass_of().into_class(db) {
+                            push(builder, class, seen, targets);
+                        }
+                    }
+                },
+                Type::Union(union) => {
+                    for element in union.elements(db) {
+                        inner(builder, *element, seen, targets);
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    for element in intersection.positive_elements_or_object(db) {
+                        inner(builder, element, seen, targets);
+                    }
+                }
+                Type::TypeAlias(alias) => {
+                    inner(builder, alias.value_type(db), seen, targets);
+                }
+                _ => {}
+            }
+        }
+
+        let mut seen = FxHashSet::default();
+        let mut targets = Vec::new();
+        inner(self, callable_type, &mut seen, &mut targets);
+        targets
     }
 
     fn infer_starred_expression(
