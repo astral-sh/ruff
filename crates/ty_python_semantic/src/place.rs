@@ -1314,9 +1314,9 @@ fn place_from_bindings_impl<'db>(
                     return None;
                 }
                 DefinitionState::Deleted => {
-                    deleted_reachability = deleted_reachability.or(
+                    deleted_reachability = deleted_reachability.or_else(|| {
                         reachability_constraints.evaluate(db, predicates, reachability_constraint)
-                    );
+                    });
                     return None;
                 }
             };
@@ -1592,52 +1592,43 @@ fn place_from_declarations_impl<'db>(
     let reachability_constraints = declarations.reachability_constraints;
     let boundness_analysis = declarations.boundness_analysis;
     let mut declarations = declarations.peekable();
-    let mut first_declaration = None;
+    let first_declaration = declarations.peek().cloned();
+    let mut first_bound_declaration = None;
 
     let is_non_exported = |declaration: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
     };
 
-    let undeclared_reachability = match declarations.peek() {
-        Some(DeclarationWithConstraint {
-            declaration,
-            reachability_constraint,
-        }) if declaration.is_undefined_or(is_non_exported) => {
-            reachability_constraints.evaluate(db, predicates, *reachability_constraint)
-        }
-        _ => Truthiness::AlwaysFalse,
-    };
-
     let mut all_declarations_definitely_reachable = true;
 
-    let mut types = declarations.filter_map(
-        |DeclarationWithConstraint {
-             declaration,
-             reachability_constraint,
-         }| {
-            let DefinitionState::Defined(declaration) = declaration else {
-                return None;
-            };
+    let mut types = declarations.filter_map(|declaration_with_constraint| {
+        let DeclarationWithConstraint {
+            declaration,
+            reachability_constraint,
+        } = declaration_with_constraint;
 
-            if is_non_exported(declaration) {
-                return None;
-            }
+        let DefinitionState::Defined(declaration) = declaration else {
+            return None;
+        };
 
-            first_declaration.get_or_insert(declaration);
+        if is_non_exported(declaration) {
+            return None;
+        }
 
-            let static_reachability =
-                reachability_constraints.evaluate(db, predicates, reachability_constraint);
+        first_bound_declaration.get_or_insert(declaration);
 
-            if static_reachability.is_always_false() {
-                None
-            } else {
-                all_declarations_definitely_reachable =
-                    all_declarations_definitely_reachable && static_reachability.is_always_true();
+        let static_reachability =
+            reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
-                Some(declaration_type(db, declaration))
-            }
-        },
-    );
+        if static_reachability.is_always_false() {
+            None
+        } else {
+            all_declarations_definitely_reachable =
+                all_declarations_definitely_reachable && static_reachability.is_always_true();
+
+            Some(declaration_type(db, declaration))
+        }
+    });
 
     if let Some(first) = types.next() {
         let (declared, conflicting) = if let Some(second) = types.next() {
@@ -1664,15 +1655,26 @@ fn place_from_declarations_impl<'db>(
                     Definedness::PossiblyUndefined
                 }
             }
-            BoundnessAnalysis::BasedOnUnboundVisibility => match undeclared_reachability {
-                Truthiness::AlwaysTrue => {
-                    unreachable!(
-                        "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
-                    )
+            BoundnessAnalysis::BasedOnUnboundVisibility => {
+                let undeclared_reachability = match first_declaration {
+                    Some(DeclarationWithConstraint {
+                        declaration,
+                        reachability_constraint,
+                    }) if declaration.is_undefined_or(is_non_exported) => {
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
+                    }
+                    _ => Truthiness::AlwaysFalse,
+                };
+                match undeclared_reachability {
+                    Truthiness::AlwaysTrue => {
+                        unreachable!(
+                            "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
+                        )
+                    }
+                    Truthiness::AlwaysFalse => Definedness::AlwaysDefined,
+                    Truthiness::Ambiguous => Definedness::PossiblyUndefined,
                 }
-                Truthiness::AlwaysFalse => Definedness::AlwaysDefined,
-                Truthiness::Ambiguous => Definedness::PossiblyUndefined,
-            },
+            }
         };
 
         let place_and_quals = Place::Defined(
@@ -1683,12 +1685,16 @@ fn place_from_declarations_impl<'db>(
         .with_qualifiers(declared.qualifiers());
 
         if let Some(conflicting) = conflicting {
-            PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting, first_declaration)
+            PlaceFromDeclarationsResult::conflict(
+                place_and_quals,
+                conflicting,
+                first_bound_declaration,
+            )
         } else {
             PlaceFromDeclarationsResult {
                 place_and_quals,
                 conflicting_types: None,
-                first_declaration,
+                first_declaration: first_bound_declaration,
             }
         }
     } else {

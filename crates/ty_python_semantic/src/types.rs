@@ -7247,10 +7247,16 @@ impl Truthiness {
     }
 
     pub(crate) fn or(self, other: Self) -> Self {
-        match (self, other) {
-            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
-            (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
-            _ => Truthiness::Ambiguous,
+        match self {
+            Truthiness::AlwaysTrue | Truthiness::Ambiguous => self,
+            Truthiness::AlwaysFalse => other,
+        }
+    }
+
+    pub(crate) fn or_else(self, other: impl Fn() -> Self) -> Self {
+        match self {
+            Truthiness::AlwaysTrue | Truthiness::Ambiguous => self,
+            Truthiness::AlwaysFalse => other(),
         }
     }
 
