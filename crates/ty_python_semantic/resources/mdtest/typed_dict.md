@@ -2060,6 +2060,72 @@ def _(t: type[Foo | Bar]) -> None:
     t(a="baz")
 ```
 
+## Constrained class-object constructors
+
+Constrained `type[T]` constructor calls keep the relationship between the constructor target and
+other arguments typed as the same `T`:
+
+```py
+from typing import TypeVar, TypedDict
+
+class Foo(TypedDict):
+    foo: int
+
+class Bar(TypedDict):
+    bar: int
+
+T = TypeVar("T", Foo, Bar)
+
+def _(t: type[T], kwargs: T) -> None:
+    t(**kwargs)
+```
+
+The same unpacked key information should be preserved at ordinary `**kwargs` call sites:
+
+```py
+from typing import TypeVar, TypedDict
+
+class Foo(TypedDict):
+    foo: int
+
+class Bar(TypedDict):
+    bar: str
+
+class MaybeFoo(TypedDict, total=False):
+    foo: int
+
+class BadBar(TypedDict):
+    bar: int
+
+T = TypeVar("T", Foo, Bar)
+U = TypeVar("U", Foo, BadBar)
+
+def needs_both(*, foo: int, bar: str) -> None:
+    pass
+
+def needs_foo(*, foo: int) -> None:
+    pass
+
+def foo_only(*, foo: int = 0) -> None:
+    pass
+
+def typed_bar(*, foo: int = 0, bar: str = "") -> None:
+    pass
+
+def _(kwargs: T, maybe_foo: MaybeFoo, other_kwargs: U) -> None:
+    # error: [missing-argument] "No arguments provided for required parameters `foo`, `bar` of function `needs_both`"
+    needs_both(**kwargs)
+
+    # error: [missing-argument] "No argument provided for required parameter `foo` of function `needs_foo`"
+    needs_foo(**maybe_foo)
+
+    # error: [unknown-argument] "Argument `bar` does not match any known parameter of function `foo_only`"
+    foo_only(**kwargs)
+
+    # error: [invalid-argument-type] "Argument to function `typed_bar` is incorrect"
+    typed_bar(**other_kwargs)
+```
+
 Upper-bounded `type[T]` constructor calls still validate the bound `TypedDict` schema:
 
 ```py
