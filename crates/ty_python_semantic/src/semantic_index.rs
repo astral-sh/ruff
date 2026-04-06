@@ -499,6 +499,17 @@ impl<'db> SemanticIndex<'db> {
             && self.use_def_map(scope_id).is_range_reachable(db, range)
     }
 
+    pub(crate) fn is_in_type_checking_block(
+        &self,
+        scope_id: FileScopeId,
+        range: TextRange,
+    ) -> bool {
+        self.scope(scope_id).in_type_checking_block()
+            || self
+                .use_def_map(scope_id)
+                .is_range_in_type_checking_block(range)
+    }
+
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
     pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {

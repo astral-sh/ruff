@@ -448,6 +448,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.db().analysis_settings(self.file())
     }
 
+    fn is_in_type_checking_block(&self, scope: ScopeId<'db>, node: impl Ranged) -> bool {
+        self.index
+            .is_in_type_checking_block(scope.file_scope_id(self.db()), node.range())
+    }
+
     /// If the current scope is a class body scope of a dataclass-like class, populate
     /// `self.dataclass_field_specifiers` with the field specifiers from the class's
     /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that

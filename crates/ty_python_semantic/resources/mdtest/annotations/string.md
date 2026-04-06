@@ -125,13 +125,7 @@ class Foo: ...
 X = list["int" | None]
 
 if TYPE_CHECKING:
-    # TODO: ideally we would not error here, since `if TYPE_CHECKING`
-    # blocks are not executed at runtime. Requires
-    # https://github.com/astral-sh/ty/issues/1553.
-    bar: "int" | "None"  # error: [unsupported-operator]
-
-    # TODO: same as above
-    # error: [unsupported-operator]
+    bar: "int" | "None"
     def foo(x: "int" | "None"): ...
 
     class Bar:

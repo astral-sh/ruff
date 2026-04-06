@@ -189,7 +189,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
                         if !self.deferred_state.is_deferred()
-                            && !self.scope.scope(self.db()).in_type_checking_block()
+                            && !self.is_in_type_checking_block(self.scope(), binary)
                         {
                             let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,

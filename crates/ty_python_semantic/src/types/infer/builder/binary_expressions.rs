@@ -314,7 +314,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let pep_604_unions_allowed = || {
             Program::get(db).python_version(db) >= PythonVersion::PY310
                 || self.file().is_stub(db)
-                || self.scope().scope(db).in_type_checking_block()
+                || self.is_in_type_checking_block(self.scope(), node)
         };
 
         match (left_ty, right_ty, op) {
