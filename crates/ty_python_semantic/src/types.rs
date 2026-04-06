@@ -3646,12 +3646,16 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                // Use the already-bound callable view here so `Self` is specialized from the
-                // receiver type before overload matching. Re-checking an implicit synthetic
-                // `self` argument is too strict for bound methods whose receiver is a typevar
-                // bounded by a union.
-                let callable = bound_method.into_callable_type(db);
-                CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
+                // Preserve the synthetic bound receiver argument so calls like `def copy(self: T)
+                // -> T` can still infer `T` from the receiver, but specialize `typing.Self`
+                // eagerly so union-bounded receivers don't get rechecked against each union arm's
+                // owner class.
+                let signature = bound_method
+                    .function(db)
+                    .signature(db)
+                    .specialize_bound_self(db, bound_method.typing_self_type(db));
+                CallableBinding::from_overloads(self, signature.iter().cloned())
+                    .with_bound_type(bound_method.self_instance(db))
                     .into()
             }
 

@@ -314,6 +314,18 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
+    /// given type while preserving the first parameter for later bound-method argument inference.
+    pub(crate) fn specialize_bound_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        Self {
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.specialize_bound_self(db, self_type))
+                .collect(),
+        }
+    }
+
     pub(crate) fn is_single_paramspec(&self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         Self::signatures_is_single_paramspec(&self.overloads)
     }
@@ -755,6 +767,30 @@ impl<'db> Signature<'db> {
                 .apply_type_mapping(db, &self_mapping, TypeContext::default());
         Self {
             generic_context: self.generic_context,
+            definition: self.definition,
+            parameters,
+            return_ty,
+        }
+    }
+
+    /// Replaces any occurrences of `typing.Self` with the given type, but keeps the first
+    /// parameter intact so bound-method calls can still use the receiver for generic inference.
+    pub(crate) fn specialize_bound_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        let binding_context = self.definition.map(BindingContext::Definition);
+        let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
+        let parameters = self.parameters.apply_type_mapping_impl(
+            db,
+            &self_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let return_ty =
+            self.return_ty
+                .apply_type_mapping(db, &self_mapping, TypeContext::default());
+        Self {
+            generic_context: self
+                .generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
