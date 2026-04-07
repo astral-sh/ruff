@@ -1069,7 +1069,7 @@ impl<'db> StaticClassLiteral<'db> {
                     field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
         }

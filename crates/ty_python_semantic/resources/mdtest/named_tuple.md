@@ -84,6 +84,8 @@ reveal_type(Person.age)  # revealed: property
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
+# error: [invalid-assignment]
+del alice.id
 ```
 
 Alternative functional syntax with a list of tuples:

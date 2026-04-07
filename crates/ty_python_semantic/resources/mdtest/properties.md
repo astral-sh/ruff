@@ -112,8 +112,7 @@ c.my_property = "b"
 
 ## `property.deleter`
 
-We do not support `property.deleter` yet, but we make sure that it does not invalidate the getter or
-setter:
+We support `property.deleter`, and it preserves the getter and setter:
 
 ```py
 class C:
@@ -131,6 +130,7 @@ class C:
 
 c = C()
 reveal_type(c.my_property)  # revealed: int
+del c.my_property
 c.my_property = 2
 # error: [invalid-assignment]
 c.my_property = "a"

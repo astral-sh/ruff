@@ -1246,6 +1246,26 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderDelete) => {
+                        if let [Some(Type::PropertyInstance(property)), Some(instance), ..] =
+                            overload.parameter_types()
+                        {
+                            if let Some(deleter) = property.deleter(db) {
+                                if let Err(_call_error) =
+                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the deleter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoDeleter(*property));
+                            }
+                        }
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
@@ -1260,6 +1280,26 @@ impl<'db> Bindings<'db> {
                                 overload
                                     .errors
                                     .push(BindingError::PropertyHasNoSetter(property));
+                            }
+                        }
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
+                        property,
+                    )) => {
+                        if let [Some(instance), ..] = overload.parameter_types() {
+                            if let Some(deleter) = property.deleter(db) {
+                                if let Err(_call_error) =
+                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the deleter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoDeleter(property));
                             }
                         }
                     }
@@ -1321,6 +1361,7 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 property.getter(db),
                                                 Some(*setter),
+                                                property.deleter(db),
                                             ));
                                     }
                                     overload.set_return_type(ty_property);
@@ -1335,15 +1376,26 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 Some(*getter),
                                                 property.setter(db),
+                                                property.deleter(db),
                                             ));
                                     }
                                     overload.set_return_type(ty_property);
                                 }
                             }
                             "deleter" => {
-                                // TODO: we do not store deleters yet
-                                let ty_property = bound_method.self_instance(db);
-                                overload.set_return_type(ty_property);
+                                if let [Some(_), Some(deleter)] = overload.parameter_types() {
+                                    let mut ty_property = bound_method.self_instance(db);
+                                    if let Type::PropertyInstance(property) = ty_property {
+                                        ty_property =
+                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                                db,
+                                                property.getter(db),
+                                                property.setter(db),
+                                                Some(*deleter),
+                                            ));
+                                    }
+                                    overload.set_return_type(ty_property);
+                                }
                             }
                             _ => {
                                 // Fall back to typeshed stubs for all other methods
@@ -2293,9 +2345,9 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownClass::Property) => {
-                            if let [getter, setter, ..] = overload.parameter_types() {
+                            if let [getter, setter, deleter, ..] = overload.parameter_types() {
                                 overload.set_return_type(Type::PropertyInstance(
-                                    PropertyInstanceType::new(db, *getter, *setter),
+                                    PropertyInstanceType::new(db, *getter, *setter, *deleter),
                                 ));
                             }
                         }
@@ -5318,12 +5370,19 @@ impl<'db> CallableDescription<'db> {
                     name: "`__get__` of property",
                 })
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
+                Some(CallableDescription {
+                    kind: "method wrapper",
+                    name: "`__delete__` of property",
+                })
+            }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
                 kind: "wrapper descriptor",
                 name: match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
+                    WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
                 },
             }),
             _ => None,
@@ -5434,6 +5493,7 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
     },
     PropertyHasNoSetter(PropertyInstanceType<'db>),
+    PropertyHasNoDeleter(PropertyInstanceType<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
     /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
     /// can occur when the call to the underlying getter/setter fails.
@@ -5490,7 +5550,8 @@ impl BindingError<'_> {
             | BindingError::InvalidDataclassApplication(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
-            | BindingError::PropertyHasNoSetter(..) => {}
+            | BindingError::PropertyHasNoSetter(..)
+            | BindingError::PropertyHasNoDeleter(..) => {}
         }
     }
 }
@@ -5538,6 +5599,7 @@ impl<'db> BindingError<'db> {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
             | Self::PropertyHasNoSetter(_)
+            | Self::PropertyHasNoDeleter(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
 
@@ -5984,6 +6046,17 @@ impl<'db> BindingError<'db> {
 
             Self::PropertyHasNoSetter(_) => {
                 BindingError::InternalCallError("property has no setter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    compound_diag,
+                    matching_overload,
+                );
+            }
+
+            Self::PropertyHasNoDeleter(_) => {
+                BindingError::InternalCallError("property has no deleter").report_diagnostic(
                     context,
                     node,
                     callable_ty,
