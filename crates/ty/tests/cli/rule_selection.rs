@@ -35,8 +35,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -66,8 +64,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -124,8 +120,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -172,8 +166,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -215,8 +207,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -247,8 +237,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -383,8 +371,6 @@ fn overrides_basic() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     ");
 
@@ -443,8 +429,6 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     ");
 
@@ -505,8 +489,6 @@ fn overrides_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     ");
 
@@ -582,8 +564,6 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     ");
 
@@ -735,8 +715,6 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "#);
 
@@ -793,8 +771,6 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "#);
 
@@ -853,8 +829,6 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "#);
 
@@ -925,8 +899,6 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     "#);
 
@@ -1006,8 +978,6 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -1056,8 +1026,6 @@ fn cli_all_rules_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -1140,8 +1108,6 @@ fn configuration_all_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -1204,8 +1170,6 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -1272,8 +1236,6 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     ");
 
@@ -1362,8 +1324,6 @@ fn all_overrides() -> anyhow::Result<()> {
     Found 4 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 2 file(s) in 0.000s
     ");
 

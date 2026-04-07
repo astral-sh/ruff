@@ -414,8 +414,6 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -461,8 +459,6 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    INFO Defaulting to python-platform `linux`
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 1 file(s) in 0.000s
     "
     );
@@ -904,6 +900,8 @@ impl CliTest {
             "INFO Checking file `[^`]+` took more than 100ms \\([^)]+\\)\n",
             "",
         );
+        settings.add_filter("INFO Defaulting to python-platform `[^`]+`\n", "");
+        settings.add_filter("INFO Python version: [^,]+, platform: [a-z0-9_]+\n", "");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

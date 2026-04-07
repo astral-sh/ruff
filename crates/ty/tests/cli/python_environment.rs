@@ -774,7 +774,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 7 file(s) in 0.000s
     ");
     Ok(())
