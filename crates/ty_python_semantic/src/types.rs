@@ -4465,8 +4465,7 @@ impl<'db> Type<'db> {
         };
 
         // Checking TypedDict construction happens in `infer_call_expression_impl`, so here we just
-        // return a permissive fallback binding. TODO maybe we should just synthesize bindings for
-        // a TypedDict constructor? That would handle unions/intersections correctly.
+        // return a permissive fallback binding.
         if class_literal.is_typed_dict(db)
             || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
         {
