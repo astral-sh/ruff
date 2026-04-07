@@ -1752,8 +1752,8 @@ impl<'db> StaticClassLiteral<'db> {
             // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
             // us to generate a union of `__init__` methods.
             if declarations.clone().any_reachable(db, |declaration| {
-                declaration.is_defined_and(|declaration| {
-                    !matches!(
+                !declaration.is_undefined_or(|declaration| {
+                    matches!(
                         declaration.kind(db),
                         DefinitionKind::AnnotatedAssignment(..)
                     )

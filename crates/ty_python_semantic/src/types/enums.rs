@@ -350,8 +350,8 @@ pub(crate) fn enum_metadata<'db>(
 
             if !explicit_member_wrapper
                 && declarations.clone().any_reachable(db, |declaration| {
-                    declaration.is_defined_and(|declaration| {
-                        !matches!(
+                    !declaration.is_undefined_or(|declaration| {
+                        matches!(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(assignment)
                                 if assignment
