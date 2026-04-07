@@ -6,12 +6,20 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
-use std::hash::Hash;
 use std::iter::FusedIterator;
 
+/// A structural key for a place expression that ignores semantic-index flags.
+#[derive(Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize, salsa::Update)]
+pub(crate) enum PlaceKey {
+    Symbol(Name),
+    Member(MemberExpr),
+}
+
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize, salsa::Update)]
 pub(crate) enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
@@ -133,6 +141,24 @@ impl<'a> From<&'a PlaceExpr> for PlaceExprRef<'a> {
         match value {
             PlaceExpr::Symbol(symbol) => PlaceExprRef::Symbol(symbol),
             PlaceExpr::Member(member) => PlaceExprRef::Member(member),
+        }
+    }
+}
+
+impl<'a> From<PlaceExprRef<'a>> for PlaceKey {
+    fn from(value: PlaceExprRef<'a>) -> Self {
+        match value {
+            PlaceExprRef::Symbol(symbol) => Self::Symbol(symbol.name().clone()),
+            PlaceExprRef::Member(member) => Self::Member(member.expression().clone()),
+        }
+    }
+}
+
+impl From<&PlaceExpr> for PlaceKey {
+    fn from(value: &PlaceExpr) -> Self {
+        match value {
+            PlaceExpr::Symbol(symbol) => Self::Symbol(symbol.name().clone()),
+            PlaceExpr::Member(member) => Self::Member(member.expression().clone()),
         }
     }
 }
@@ -268,6 +294,39 @@ impl PlaceTableBuilder {
                 self.member.member_id(member.expression()).map(Into::into)
             }
         }
+    }
+
+    /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
+    ///
+    /// Note, this iterator may skip some parents if they are not defined in the current scope.
+    pub(crate) fn parents<'a>(
+        &'a self,
+        place_expr: impl Into<PlaceExprRef<'a>>,
+    ) -> ParentPlaceIter<'a> {
+        match place_expr.into() {
+            PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
+            PlaceExprRef::Member(member) => {
+                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
+            }
+        }
+    }
+
+    /// Collect `PlaceKey`s for all places and their parents.
+    pub(super) fn place_keys(&self, places: &FxHashSet<ScopedPlaceId>) -> FxHashSet<PlaceKey> {
+        let mut place_keys = FxHashSet::default();
+
+        for &place_id in places {
+            let place_expr = self.place(place_id);
+            let place_key = PlaceKey::from(place_expr);
+            place_keys.insert(place_key);
+
+            for parent_id in self.parents(place_expr) {
+                let parent_key = PlaceKey::from(self.place(parent_id));
+                place_keys.insert(parent_key);
+            }
+        }
+
+        place_keys
     }
 
     #[track_caller]
