@@ -1192,8 +1192,6 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Movie(title: str, year: int)`
-    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_typeddict_constructor() {
         let test = hover_test(
@@ -1209,10 +1207,18 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ---------------------------------------------
         ```python
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1221,6 +1227,53 @@ mod tests {
         6 |     year: int
         7 |
         8 | x = Movie(title="Alien", year=1979)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_positional_map() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        m: Movie = {"title": "Alien", "year": 1979}
+        x = Mov<CURSOR>ie(m)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            __map: Movie,
+            *,
+            /,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            __map: Movie,
+            *,
+            /,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:5
+          |
+        8 | m: Movie = {"title": "Alien", "year": 1979}
+        9 | x = Movie(m)
           |     ^^^-^
           |     |  |
           |     |  Cursor offset
