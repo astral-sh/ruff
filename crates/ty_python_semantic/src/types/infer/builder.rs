@@ -6900,6 +6900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 func.as_ref().into(),
                 |expr, tcx| speculative.infer_expression(expr, tcx),
             );
+            self.extend(speculative);
         }
 
         let mut bindings = match bindings_result {
