@@ -968,15 +968,13 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 for (argument_index, argument) in
                     call.arguments.arguments_source_order().enumerate()
                 {
-                    if matches!(
-                        argument_forms.get(argument_index).copied(),
-                        Some(CallArgumentForm::Type)
-                    ) {
-                        self.visit_annotation(argument.value());
-                    } else {
-                        match argument {
-                            ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
-                            ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                    match argument_forms.get(argument_index).copied() {
+                        Some(CallArgumentForm::Type) => self.visit_annotation(argument.value()),
+                        Some(CallArgumentForm::Unknown | CallArgumentForm::Value) | None => {
+                            match argument {
+                                ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
+                                ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                            }
                         }
                     }
                 }
