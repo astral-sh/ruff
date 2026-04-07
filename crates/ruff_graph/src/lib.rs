@@ -4,17 +4,11 @@ use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use ruff_python_ast::helpers::to_module_path;
-use ruff_python_parser::{ParseOptions, parse};
+use ruff_python_imports::AnalyzeOptions;
 
-use crate::collector::Collector;
-pub use crate::db::ModuleDb;
-use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction, StringImports};
+pub use ruff_python_imports::ImportDb as ModuleDb;
 
-mod collector;
-mod db;
-mod resolver;
 mod settings;
 
 #[derive(Debug, Default)]
@@ -32,27 +26,25 @@ impl ModuleImports {
         string_imports: StringImports,
         type_checking_imports: bool,
     ) -> Result<Self> {
-        // Parse the source code.
-        let parsed = parse(source, ParseOptions::from(source_type))?;
+        let imports = ruff_python_imports::analyze_file(
+            db,
+            path,
+            package,
+            source,
+            source_type,
+            &AnalyzeOptions {
+                string_imports: ruff_python_imports::StringImports {
+                    enabled: string_imports.enabled,
+                    min_dots: string_imports.min_dots,
+                },
+                type_checking_imports,
+            },
+        )?;
 
-        let module_path =
-            package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
-
-        // Collect the imports.
-        let imports = Collector::new(
-            module_path.as_deref(),
-            string_imports,
-            type_checking_imports,
-        )
-        .collect(parsed.syntax());
-
-        // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            for resolved in Resolver::new(db, path).resolve(import) {
-                if let Some(path) = resolved.as_system_path() {
-                    resolved_imports.insert(path.to_path_buf());
-                }
+            if let Some(path) = import.resolved_path {
+                resolved_imports.insert(path);
             }
         }
 

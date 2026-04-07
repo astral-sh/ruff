@@ -19,17 +19,12 @@ ruff_db = { workspace = true, features = ["serde"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_parser = { workspace = true }
-ty_module_resolver = { workspace = true }
-ty_site_packages = { workspace = true }
+ruff_python_imports = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
-memchr = { workspace = true }
-salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-zip = { workspace = true, features = [] }
 
 [lints]
 workspace = true
