@@ -314,6 +314,8 @@ fn type_alias_variance() {
     db.write_dedented(
         "/src/a.py",
         r#"
+from typing import Callable, Concatenate
+
 class Covariant[T]:
     def get(self) -> T:
         raise ValueError
@@ -335,6 +337,9 @@ type CovariantAlias[T] = Covariant[T]
 type ContravariantAlias[T] = Contravariant[T]
 type InvariantAlias[T] = Invariant[T]
 type BivariantAlias[T] = Bivariant[T]
+type ParamSpecContravariantAlias[**P] = Callable[P, None]
+type ParamSpecConcatenateAlias[**P] = Callable[Concatenate[int, P], None]
+type ParamSpecBivariantAlias[**P] = int
 
 type RecursiveAlias[T] = None | list[RecursiveAlias[T]]
 type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
@@ -369,6 +374,27 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
         TypeVarVariance::Bivariant
     );
 
+    let paramspec_contravariant = get_type_alias(&db, "ParamSpecContravariantAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_contravariant))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_contravariant)),
+        TypeVarVariance::Contravariant
+    );
+
+    let paramspec_concatenate = get_type_alias(&db, "ParamSpecConcatenateAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_concatenate)),
+        TypeVarVariance::Contravariant
+    );
+
+    let paramspec_bivariant = get_type_alias(&db, "ParamSpecBivariantAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_bivariant)),
+        TypeVarVariance::Bivariant
+    );
+
     let recursive = get_type_alias(&db, "RecursiveAlias");
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
@@ -387,6 +413,9 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     assert_effective_variance(&db, contravariant, TypeVarVariance::Contravariant);
     assert_effective_variance(&db, invariant, TypeVarVariance::Invariant);
     assert_effective_variance(&db, bivariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, paramspec_contravariant, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, paramspec_concatenate, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, paramspec_bivariant, TypeVarVariance::Covariant);
     assert_effective_variance(&db, recursive, TypeVarVariance::Covariant);
     assert_effective_variance(&db, recursive2, TypeVarVariance::Invariant);
 
