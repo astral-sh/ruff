@@ -324,7 +324,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             node_with_kind,
             children_start..children_start,
             reachability,
-            self.in_type_checking_block,
         );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
