@@ -69,8 +69,8 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delete_call,
-    report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_class_match_pattern,
     report_invalid_exception_caught, report_invalid_exception_cause,
@@ -2816,54 +2816,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match delattr_dunder_call_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
-                    Err(CallDunderError::CallError(kind, bindings)) => {
+                    Err(CallDunderError::CallError(kind, _bindings)) => {
                         if emit_diagnostics {
-                            let failure = CallError(kind, bindings);
-                            if kind == CallErrorKind::BindingError {
-                                report_bad_dunder_delete_call(
-                                    &self.context,
-                                    &failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            } else if let Some(builder) =
-                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot delete attribute `{attribute}` on type `{}` \
-                                     with custom `__delattr__` method.",
-                                    object_ty.display(db),
-                                ));
-                            }
+                            report_bad_dunder_delattr_call(
+                                &self.context,
+                                attribute,
+                                object_ty,
+                                target,
+                                kind == CallErrorKind::BindingError,
+                            );
                         }
                         return false;
                     }
                     Err(CallDunderError::MethodNotAvailable) => {}
                 }
 
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    return true;
-                };
-
-                let explicit_attr = match meta_attr.place {
-                    Place::Defined(DefinedPlace {
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) => Some(meta_attr),
-                    Place::Defined(DefinedPlace {
-                        definedness: Definedness::PossiblyUndefined,
-                        ..
-                    })
-                    | Place::Undefined => fallback_attr,
-                };
-
                 if let Some(PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: attr_ty,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }),
                     ..
-                }) = explicit_attr
+                }) = self
+                    .assignment_attribute_members(object_ty, attribute)
+                    .map(|(meta_attr, _)| meta_attr)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
                     match attr_ty.try_call_dunder(

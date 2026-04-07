@@ -3787,6 +3787,33 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
     }
 }
 
+pub(super) fn report_bad_dunder_delattr_call(
+    context: &InferContext<'_, '_>,
+    attribute: &str,
+    object_type: Type,
+    target: &ast::ExprAttribute,
+    binding_error: bool,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method.",
+        object_type.display(db),
+    ));
+    if binding_error {
+        diagnostic.info(format_args!(
+            "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
+            object_type.display(db)
+        ));
+        diagnostic.info(
+            "Expected a signature at least as permissive as \
+            `def __delattr__(self, name: str, /) -> None`",
+        );
+    }
+}
+
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
