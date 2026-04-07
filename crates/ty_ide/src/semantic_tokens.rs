@@ -2534,26 +2534,31 @@ z2 = os.PathLike[str]
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 5,
-            "expected import plus annotation tokens, got {pathlike_types:?}"
-        );
-
-        assert_eq!(
-            pathlike_types[1..5],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
-        );
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "x1" @ 36..38: Variable [definition]
+        "os" @ 40..42: Namespace
+        "PathLike" @ 43..51: Class
+        "x2" @ 52..54: Variable [definition]
+        "os" @ 56..58: Namespace
+        "PathLike" @ 59..67: Class
+        "str" @ 68..71: Class
+        "y1" @ 74..76: Variable [definition]
+        "PathLike" @ 78..86: Class
+        "y2" @ 87..89: Variable [definition]
+        "PathLike" @ 91..99: Class
+        "str" @ 100..103: Class
+        "z1" @ 106..108: Class [definition]
+        "os" @ 111..113: Namespace
+        "PathLike" @ 114..122: Class
+        "z2" @ 123..125: Class [definition]
+        "os" @ 128..130: Namespace
+        "PathLike" @ 131..139: Class
+        "str" @ 140..143: Class
+        "#);
     }
 
     #[test]
@@ -2572,25 +2577,33 @@ x3 = typing.cast(os.PathLike[str], "")
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 4,
-            "expected import plus cast tokens, got {pathlike_types:?}"
-        );
-
-        assert_eq!(
-            pathlike_types[1..4],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
-        );
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "cast" @ 68..72: Function
+        "x1" @ 74..76: Variable [definition]
+        "cast" @ 79..83: Function
+        "os" @ 84..86: Namespace
+        "PathLike" @ 87..95: Class
+        "str" @ 96..99: Class
+        "\"\"" @ 102..104: String
+        "x2" @ 106..108: Variable [definition]
+        "cast" @ 111..115: Function
+        "PathLike" @ 116..124: Class
+        "str" @ 125..128: Class
+        "\"\"" @ 131..133: String
+        "x3" @ 135..137: Variable [definition]
+        "typing" @ 140..146: Namespace
+        "cast" @ 147..151: Method
+        "os" @ 152..154: Namespace
+        "PathLike" @ 155..163: Class
+        "str" @ 164..167: Class
+        "\"\"" @ 170..172: String
+        "#);
     }
 
     #[test]
@@ -2609,25 +2622,33 @@ x3 = typing.assert_type("", os.PathLike[str])
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 4,
-            "expected import plus assert_type tokens, got {pathlike_types:?}"
-        );
-
-        assert_eq!(
-            pathlike_types[1..4],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
-        );
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "assert_type" @ 68..79: Function
+        "x1" @ 81..83: Variable [definition]
+        "assert_type" @ 86..97: Function
+        "\"\"" @ 98..100: String
+        "os" @ 102..104: Namespace
+        "PathLike" @ 105..113: Class
+        "str" @ 114..117: Class
+        "x2" @ 120..122: Variable [definition]
+        "assert_type" @ 125..136: Function
+        "\"\"" @ 137..139: String
+        "PathLike" @ 141..149: Class
+        "str" @ 150..153: Class
+        "x3" @ 156..158: Variable [definition]
+        "typing" @ 161..167: Namespace
+        "assert_type" @ 168..179: Method
+        "\"\"" @ 180..182: String
+        "os" @ 184..186: Namespace
+        "PathLike" @ 187..195: Class
+        "str" @ 196..199: Class
+        "#);
     }
 
     #[test]
@@ -2646,26 +2667,37 @@ x4 = assert_type(value="", type=PathLike[str])
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 5,
-            "expected import plus keyword-argument type-form tokens, got {pathlike_types:?}"
-        );
-
-        assert_eq!(
-            pathlike_types[1..5],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
-        );
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "typing" @ 40..46: Namespace
+        "assert_type" @ 54..65: Function
+        "cast" @ 67..71: Function
+        "x1" @ 73..75: Variable [definition]
+        "cast" @ 78..82: Function
+        "os" @ 87..89: Namespace
+        "PathLike" @ 90..98: Class
+        "str" @ 99..102: Class
+        "\"\"" @ 109..111: String
+        "x2" @ 113..115: Variable [definition]
+        "cast" @ 118..122: Function
+        "\"\"" @ 127..129: String
+        "PathLike" @ 135..143: Class
+        "str" @ 144..147: Class
+        "x3" @ 150..152: Variable [definition]
+        "assert_type" @ 155..166: Function
+        "os" @ 172..174: Namespace
+        "PathLike" @ 175..183: Class
+        "str" @ 184..187: Class
+        "\"\"" @ 196..198: String
+        "x4" @ 200..202: Variable [definition]
+        "assert_type" @ 205..216: Function
+        "\"\"" @ 223..225: String
+        "PathLike" @ 232..240: Class
+        "str" @ 241..244: Class
+        "#);
     }
 
     #[test]
