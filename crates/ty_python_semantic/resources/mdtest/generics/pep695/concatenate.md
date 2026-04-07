@@ -216,6 +216,8 @@ type argument.
 ```py
 from typing import Concatenate
 
+class Foo[T]: ...
+
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 def invalid0(x: Concatenate): ...
 
@@ -227,6 +229,10 @@ def invalid2(x: Concatenate[int, ...]) -> None: ...
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
 def invalid3() -> Concatenate[int, ...]: ...
+
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid4[**P](x: Foo[Concatenate[P, ...]]) -> None: ...
 ```
 
 ### Too few arguments

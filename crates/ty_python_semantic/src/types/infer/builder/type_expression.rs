@@ -2530,18 +2530,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let mut prefix_params = Vec::with_capacity(prefix_args.len());
-        for arg in prefix_args {
-            let previously_allowed_paramspec = self
-                .inference_flags
-                .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
-            let arg_type = self.infer_type_expression(arg);
-            self.inference_flags.set(
-                InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                previously_allowed_paramspec,
-            );
-            prefix_params.push(Parameter::positional_only(None).with_annotated_type(arg_type));
-        }
+        let previously_allowed_paramspec = self
+            .inference_flags
+            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
+        let prefix_params = prefix_args
+            .iter()
+            .map(|arg| {
+                Parameter::positional_only(None)
+                    .with_annotated_type(self.infer_type_expression(arg))
+            })
+            .collect();
+        self.inference_flags.set(
+            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+            previously_allowed_paramspec,
+        );
 
         let parameters = self
             .infer_concatenate_tail(last_arg)
