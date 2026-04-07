@@ -92,6 +92,11 @@ pub(crate) fn check_overloaded_function<'db>(
                 &function_node.name
             ));
             diagnostic.set_primary_message("Only one overload defined here");
+            if let Some(decorator) =
+                single_overload.find_known_decorator_span(db, KnownFunction::Overload)
+            {
+                diagnostic.annotate(Annotation::secondary(decorator));
+            }
         }
     }
 
@@ -130,9 +135,10 @@ pub(crate) fn check_overloaded_function<'db>(
             let function_node = overloads[0].node(db, context.file(), context.module());
             if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Overloads for function `{}` must be followed by a non-`@overload`-decorated implementation function",
-                            &function_node.name
-                        ));
+                    "Overloads for function `{}` must be followed by a \
+                    non-`@overload`-decorated implementation function",
+                    &function_node.name
+                ));
                 diagnostic.info(format_args!(
                     "Attempting to call `{}` will raise `TypeError` at runtime",
                     &function_node.name
@@ -178,7 +184,7 @@ pub(crate) fn check_overloaded_function<'db>(
         if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` does not use the `@{name}` decorator \
-                         consistently",
+                    consistently",
                 &function_node.name
             ));
             for function in decorator_missing {
@@ -187,6 +193,11 @@ pub(crate) fn check_overloaded_function<'db>(
                         .secondary(function.focus_range(db, context.module()))
                         .message(format_args!("Missing here")),
                 );
+                if let Some(decorator) =
+                    function.find_known_decorator_span(db, KnownFunction::Overload)
+                {
+                    diagnostic.annotate(Annotation::secondary(decorator));
+                }
             }
         }
     }
@@ -207,11 +218,13 @@ pub(crate) fn check_overloaded_function<'db>(
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`@{name}` decorator should be applied only to the \
-                            overload implementation",
+                        overload implementation",
                     name = function.name()
                 ));
-                if let Some(decorator) = overload.find_known_decorator_span(db, function) {
-                    diagnostic.annotate(Annotation::secondary(decorator));
+                for function in [function, KnownFunction::Overload] {
+                    if let Some(decorator) = overload.find_known_decorator_span(db, function) {
+                        diagnostic.annotate(Annotation::secondary(decorator));
+                    }
                 }
                 diagnostic.annotate(
                     context
@@ -235,7 +248,7 @@ pub(crate) fn check_overloaded_function<'db>(
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`@{name}` decorator should be applied only to the \
-                                first overload",
+                        first overload",
                     name = function.name()
                 ));
                 if let Some(decorator) = overload.find_known_decorator_span(db, function) {
@@ -246,6 +259,11 @@ pub(crate) fn check_overloaded_function<'db>(
                         .secondary(first_overload.focus_range(db, context.module()))
                         .message(format_args!("First overload defined here")),
                 );
+                if let Some(decorator) =
+                    first_overload.find_known_decorator_span(db, KnownFunction::Overload)
+                {
+                    diagnostic.annotate(Annotation::secondary(decorator));
+                }
             }
         }
     }
