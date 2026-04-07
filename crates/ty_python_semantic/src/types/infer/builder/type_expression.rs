@@ -91,17 +91,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
-        let result_ty = ty
-            .default_specialize(self.db())
-            .in_type_expression(
-                self.db(),
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags,
-            )
-            .unwrap_or_else(|error| {
-                error.into_fallback_type(&self.context, annotation, self.inference_flags)
-            });
+        let result_ty = if let (Some(binding_context), Type::ClassLiteral(class)) =
+            (self.typevar_binding_context, ty)
+            && class.definition(self.db()) == Some(binding_context)
+            && class.generic_context(self.db()).is_some()
+        {
+            Type::instance(self.db(), class.unknown_specialization(self.db()))
+        } else {
+            ty.default_specialize(self.db())
+                .in_type_expression(
+                    self.db(),
+                    self.scope(),
+                    self.typevar_binding_context,
+                    self.inference_flags,
+                )
+                .unwrap_or_else(|error| {
+                    error.into_fallback_type(&self.context, annotation, self.inference_flags)
+                })
+        };
         self.check_for_unbound_type_variable(annotation, result_ty)
     }
 

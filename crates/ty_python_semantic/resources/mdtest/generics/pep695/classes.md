@@ -288,6 +288,18 @@ class Expr[Child = Expr[Token]]:
 reveal_type(Expr())  # revealed: Expr[Expr[Token]]
 ```
 
+Self-referential defaults normalize on the first cycle instead of leaking a deeper expansion:
+
+```py
+class Recursive[T = Recursive]: ...
+class Nested[T = list[Nested]]: ...
+class RecursivePartial[T = int, U = RecursivePartial[T]]: ...
+
+reveal_type(Recursive())  # revealed: Recursive[Recursive[Unknown]]
+reveal_type(Nested())  # revealed: Nested[list[Nested[Unknown]]]
+reveal_type(RecursivePartial())  # revealed: RecursivePartial[int, RecursivePartial[Unknown, Unknown]]
+```
+
 If a typevar does not provide a default, we use `Unknown`:
 
 ```py

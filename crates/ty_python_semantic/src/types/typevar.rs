@@ -1175,11 +1175,14 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     }
 
     match (*previous_default, default) {
-        (Some(previous_default), Some(default)) => {
-            Some(default.cycle_normalized(db, previous_default, cycle))
-        }
+        // Bound defaults are re-applied when a generic class is default-specialized at call
+        // sites. Once we've recovered the first recursive expansion, keep that value for later
+        // iterations so recursive class defaults stop at the first cycle instead of expanding
+        // more deeply on each pass.
+        (Some(previous_default), Some(_)) => Some(previous_default),
         (Some(_), None) => None,
-        (None, default) => default,
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (None, None) => None,
     }
 }
 

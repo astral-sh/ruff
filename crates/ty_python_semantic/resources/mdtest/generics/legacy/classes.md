@@ -386,6 +386,26 @@ class D(Generic[DefaultT]): ...
 reveal_type(D())  # revealed: D[int]
 ```
 
+Self-referential defaults normalize on the first cycle instead of leaking a deeper expansion:
+
+```py
+RecursiveT = TypeVar("RecursiveT", default="Recursive")
+NestedT = TypeVar("NestedT", default="list[Nested]")
+RecursivePartialT = TypeVar("RecursivePartialT", default=int)
+RecursivePartialU = TypeVar(
+    "RecursivePartialU",
+    default="RecursivePartial[RecursivePartialT]",
+)
+
+class Recursive(Generic[RecursiveT]): ...
+class Nested(Generic[NestedT]): ...
+class RecursivePartial(Generic[RecursivePartialT, RecursivePartialU]): ...
+
+reveal_type(Recursive())  # revealed: Recursive[Recursive[Unknown]]
+reveal_type(Nested())  # revealed: Nested[list[Nested[Unknown]]]
+reveal_type(RecursivePartial())  # revealed: RecursivePartial[int, RecursivePartial[Unknown, Unknown]]
+```
+
 If a typevar does not provide a default, we use `Unknown`:
 
 ```py

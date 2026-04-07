@@ -875,6 +875,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
+        let deferred_binding_context = match definition.scope(self.db()).node(self.db()) {
+            NodeWithScopeKind::ClassTypeParameters(class) => Some(
+                self.index
+                    .expect_single_definition(class.node(self.module())),
+            ),
+            NodeWithScopeKind::FunctionTypeParameters(function) => Some(
+                self.index
+                    .expect_single_definition(function.node(self.module())),
+            ),
+            NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => Some(
+                self.index
+                    .expect_single_definition(type_alias.node(self.module())),
+            ),
+            _ => None,
+        };
+
         // N.B. We don't defer the types for an annotated assignment here because it is done in
         // the same definition query. It utilizes the deferred expression state instead.
         //
@@ -892,10 +908,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_class_deferred(definition, class.node(self.module()));
             }
             DefinitionKind::TypeVar(typevar) => {
+                let previous_typevar_binding_context =
+                    std::mem::replace(&mut self.typevar_binding_context, deferred_binding_context);
                 self.infer_typevar_deferred(typevar.node(self.module()));
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
             DefinitionKind::ParamSpec(paramspec) => {
+                let previous_typevar_binding_context =
+                    std::mem::replace(&mut self.typevar_binding_context, deferred_binding_context);
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(
