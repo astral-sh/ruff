@@ -57,5 +57,6 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
  9 |     @abstractmethod
 10 |     def bbbbbbbb(self) -> int: ...
    |
+info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

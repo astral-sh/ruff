@@ -109,7 +109,7 @@ fn test_output_format_env() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
     ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
@@ -386,7 +386,7 @@ fn user_configuration() -> anyhow::Result<()> {
     let config_env_var = user_config_directory_env_var();
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
     success: false
     exit_code: 1
@@ -409,10 +409,14 @@ fn user_configuration() -> anyhow::Result<()> {
     7 | prin(x)
       | ^^^^
       |
+    info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -429,7 +433,7 @@ fn user_configuration() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
     success: true
     exit_code: 0
@@ -457,6 +461,9 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -783,7 +790,7 @@ fn github_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
     ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
@@ -893,6 +900,10 @@ impl CliTest {
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         // 0.003s
         settings.add_filter(r"\d.\d\d\ds", "0.000s");
+        settings.add_filter(
+            "INFO Checking file `[^`]+` took more than 100ms \\([^)]+\\)\n",
+            "",
+        );
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

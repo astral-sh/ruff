@@ -16,7 +16,6 @@ fn only_warnings() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -100,7 +99,6 @@ fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -133,7 +131,6 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -164,7 +161,6 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [not-subscriptable]
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -203,7 +199,6 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
       |       ^
     3 | print(4[1])  # [not-subscriptable]
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -242,7 +237,6 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [not-subscriptable]
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7

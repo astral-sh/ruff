@@ -18,7 +18,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -30,10 +30,14 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
+    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     case.write_file(
@@ -45,7 +49,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -62,6 +66,9 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     Ok(())
@@ -86,7 +93,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
     // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -102,6 +109,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -111,15 +119,20 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     9 | prin(x)  # unresolved-reference
       | ^^^^
       |
+    info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--ignore")
             .arg("unresolved-reference")
             .arg("--warn")
@@ -159,6 +172,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -182,7 +198,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's a `unresolved-reference` diagnostic (error) by default.
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -194,15 +210,20 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
+    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--warn")
             .arg("unresolved-reference")
             .arg("--warn")
@@ -226,6 +247,9 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -322,7 +346,7 @@ fn overrides_basic() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -359,6 +383,9 @@ fn overrides_basic() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -401,7 +428,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -416,6 +443,9 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -452,7 +482,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -475,6 +505,9 @@ fn overrides_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -515,7 +548,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -549,6 +582,9 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -670,7 +706,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -699,6 +735,9 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "#);
 
     Ok(())
@@ -728,7 +767,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -754,6 +793,9 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "#);
 
     Ok(())
@@ -782,7 +824,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -811,6 +853,9 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "#);
 
     Ok(())
@@ -848,7 +893,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -880,6 +925,9 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     "#);
 
     Ok(())
@@ -932,6 +980,7 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--warn")
             .arg("all"),
         @"
@@ -957,6 +1006,9 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -982,6 +1034,7 @@ fn cli_all_rules_precedence() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--ignore")
             .arg("all")
             .arg("--error")
@@ -1003,6 +1056,9 @@ fn cli_all_rules_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -1067,7 +1123,7 @@ fn configuration_all_rules() -> anyhow::Result<()> {
 
     // The "all" rule should be processed first, ignoring all rules,
     // then unresolved-reference should be enabled as error
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1084,6 +1140,9 @@ fn configuration_all_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     Ok(())
@@ -1120,7 +1179,7 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1145,6 +1204,9 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     Ok(())
@@ -1185,7 +1247,7 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1210,6 +1272,9 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     Ok(())
@@ -1250,7 +1315,7 @@ fn all_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1297,6 +1362,9 @@ fn all_overrides() -> anyhow::Result<()> {
     Found 4 diagnostics
 
     ----- stderr -----
+    INFO Defaulting to python-platform `linux`
+    INFO Python version: Python 3.14, platform: linux
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())

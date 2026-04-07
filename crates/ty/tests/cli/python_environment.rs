@@ -769,6 +769,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   7. <temp_dir>/ (first-party code)
     info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
