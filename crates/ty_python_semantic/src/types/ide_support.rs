@@ -930,19 +930,31 @@ pub fn call_argument_forms(
         });
     }
 
-    let Some(resolved) = resolve_call_signature(model, call_expr) else {
+    let successful_bindings: Vec<_> = bindings
+        .iter_flat()
+        .flatten()
+        .filter(|binding| binding.errors().is_empty())
+        .collect();
+
+    if successful_bindings.is_empty() {
         return argument_forms;
-    };
+    }
 
-    for (arg_index, arg_mapping) in resolved.argument_to_parameter_mapping.iter().enumerate() {
-        if arg_mapping.matched && arg_mapping.parameters.len() == 1 {
-            continue;
-        }
-
+    for arg_index in 0..argument_forms.len() {
         let Some(argument_form) = argument_forms.get_mut(arg_index) else {
             break;
         };
-        *argument_form = CallArgumentForm::Unknown;
+
+        let is_unambiguous_single_match = successful_bindings.iter().all(|binding| {
+            binding
+                .argument_matches()
+                .get(arg_index)
+                .is_some_and(|arg_mapping| arg_mapping.matched && arg_mapping.parameters.len() == 1)
+        });
+
+        if !is_unambiguous_single_match {
+            *argument_form = CallArgumentForm::Unknown;
+        }
     }
 
     argument_forms
@@ -2176,14 +2188,14 @@ f(y="", x=1)
     }
 
     #[test]
-    fn conditional_special_forms_currently_lose_type_form_information() -> anyhow::Result<()> {
+    fn conditional_special_forms_preserve_type_form_information() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
                 r#"
-from typing import assert_type, cast
+from typing_extensions import assert_type, cast
 
-flag = bool()
+flag = bool(input())
 f = cast if flag else assert_type
 f(val="", typ=int)
 "#,
@@ -2203,11 +2215,46 @@ f(val="", typ=int)
             .unwrap();
         let model = SemanticModel::new(&db, file);
 
-        // TODO: Preserve the `cast` / `assert_type` type-form information through this
-        // conditional expression instead of degrading both arguments to value forms.
         assert_eq!(
             call_argument_forms(&model, call),
-            [CallArgumentForm::Value, CallArgumentForm::Value]
+            [CallArgumentForm::Value, CallArgumentForm::Type]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn conditional_special_forms_degrade_to_unknown_for_positional_arguments() -> anyhow::Result<()>
+    {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing_extensions import assert_type, cast
+
+flag = bool(input())
+f = cast if flag else assert_type
+f("", int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Unknown, CallArgumentForm::Unknown]
         );
 
         Ok(())
