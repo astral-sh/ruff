@@ -2116,7 +2116,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // store without going through type-expression inference.
                         self.store_expression_type(argument, Type::unknown());
                     } else if i < arguments.len() - 1 {
+                        let previously_allowed_paramspec = self
+                            .inference_flags
+                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                         self.infer_type_expression(argument);
+                        self.inference_flags.set(
+                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                            previously_allowed_paramspec,
+                        );
                     } else {
                         let previously_allowed_paramspec = self
                             .inference_flags
@@ -2523,13 +2530,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let prefix_params = prefix_args
-            .iter()
-            .map(|arg| {
-                Parameter::positional_only(None)
-                    .with_annotated_type(self.infer_type_expression(arg))
-            })
-            .collect();
+        let mut prefix_params = Vec::with_capacity(prefix_args.len());
+        for arg in prefix_args {
+            let previously_allowed_paramspec = self
+                .inference_flags
+                .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
+            let arg_type = self.infer_type_expression(arg);
+            self.inference_flags.set(
+                InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                previously_allowed_paramspec,
+            );
+            prefix_params.push(Parameter::positional_only(None).with_annotated_type(arg_type));
+        }
 
         let parameters = self
             .infer_concatenate_tail(last_arg)

@@ -288,6 +288,7 @@ class Foo[**P1]:
 # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `int`"
 def invalid1[**P2](c: Callable[Concatenate[P2, int], bool]):
     reveal_type(c)  # revealed: (...) -> bool
+    # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
     # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `int`"
     reveal_type(Foo[Concatenate[P2, int]].attr)  # revealed: (...) -> None
 
@@ -297,7 +298,8 @@ def invalid2[**P2](c: Callable[Concatenate[P2, ...], bool]):
     # gradual tail, resulting in `(Unknown, /, *args: Any, **kwargs: Any) -> bool`.
     reveal_type(c)  # revealed: (Unknown, /, *args: Any, **kwargs: Any) -> bool
 
-    # revealed: (P2@invalid2, /, *args: Any, **kwargs: Any) -> None
+    # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
+    # revealed: (Unknown, /, *args: Any, **kwargs: Any) -> None
     reveal_type(Foo[Concatenate[P2, ...]].attr)
 
 def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
@@ -305,6 +307,16 @@ def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
 
     # revealed: (int, /, *args: P2@valid.args, **kwargs: P2@valid.kwargs) -> None
     reveal_type(Foo[Concatenate[int, P2]].attr)
+
+type Alias[**P1] = int
+
+def invalid3[**P2](
+    # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
+    x: Foo[Concatenate[P2, P2]],
+    # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
+    y: Alias[Concatenate[P2, P2]],
+):
+    pass
 ```
 
 ### Nested `Concatenate`
