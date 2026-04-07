@@ -31,6 +31,7 @@ except ...:
     exc("")
 
 
+# Closures defined in except handlers have access to exc_info
 try:
     ...
 except ...:
