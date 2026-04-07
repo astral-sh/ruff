@@ -6,7 +6,6 @@ use strum::IntoEnumIterator;
 
 use super::TypeInferenceBuilder;
 use crate::TypeQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -21,6 +20,7 @@ use crate::types::typed_dict::{
 use crate::types::{
     IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
 };
+use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.

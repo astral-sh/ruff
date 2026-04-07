@@ -31,7 +31,7 @@ use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::ModuleName;
 use ty_project::Db;
-use ty_python_semantic::semantic_index::definition::DefinitionKind;
+use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{MemberDefinition, SemanticModel};
 
@@ -892,9 +892,8 @@ mod tests {
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SemanticModel,
-    };
+    use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_semantic::{PythonVersionWithSource, SemanticModel};
 
     use super::*;
 

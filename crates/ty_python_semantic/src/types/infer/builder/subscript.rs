@@ -7,10 +7,6 @@ use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
-use crate::semantic_index::SemanticIndex;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
-use crate::semantic_index::scope::FileScopeId;
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -36,6 +32,10 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::SemanticIndex;
+use ty_python_core::definition::Definition;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::scope::FileScopeId;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_subscript_expression(

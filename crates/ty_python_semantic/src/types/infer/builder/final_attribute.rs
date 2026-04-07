@@ -4,13 +4,13 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::place::{PlaceExpr, ScopedPlaceId};
-use crate::semantic_index::semantic_index;
 use crate::{
     TypeQualifiers,
     types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
 };
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
+use ty_python_core::semantic_index;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.

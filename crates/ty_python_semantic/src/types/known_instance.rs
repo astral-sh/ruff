@@ -2,7 +2,6 @@ use itertools::Either;
 
 use crate::{
     Db, DisplaySettings,
-    semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
@@ -16,6 +15,7 @@ use crate::{
         visitor,
     },
 };
+use ty_python_core::{definition::Definition, scope::ScopeId};
 
 /// A Salsa-interned constraint set. This is only needed to have something appropriately small to
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using

@@ -1,8 +1,8 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 
-use crate::semantic_index::place::PlaceExpr;
-use crate::semantic_index::symbol::Symbol;
+use crate::place::PlaceExpr;
+use crate::symbol::Symbol;
 
 /// Do a pre-walk of a `while` loop to collect all the places that are bound, prior to visiting the
 /// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops, but not in

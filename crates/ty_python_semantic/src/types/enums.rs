@@ -6,13 +6,14 @@ use smallvec::SmallVec;
 use crate::{
     Db, FxIndexMap,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
-    semantic_index::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map},
+    reachability::DeclarationsIteratorExtension,
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
         MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
         set_theoretic::builder::UnionBuilder,
     },
 };
+use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
 
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {

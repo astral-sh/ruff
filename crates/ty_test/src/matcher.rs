@@ -429,9 +429,9 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
     use ty_module_resolver::SearchPathSettings;
-    use ty_python_semantic::{
-        FallibleStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    };
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,

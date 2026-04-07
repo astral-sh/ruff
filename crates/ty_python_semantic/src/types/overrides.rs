@@ -13,14 +13,6 @@ use crate::{
     Db,
     lint::LintId,
     place::{DefinedPlace, Place},
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        place::ScopedPlaceId,
-        place_table,
-        scope::ScopeId,
-        symbol::ScopedSymbolId,
-        use_def_map,
-    },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
         StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -39,6 +31,14 @@ use crate::{
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
         tuple::Tuple,
     },
+};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    place_table,
+    scope::ScopeId,
+    symbol::ScopedSymbolId,
+    use_def_map,
 };
 
 /// Prohibited `NamedTuple` attributes that cannot be overwritten.

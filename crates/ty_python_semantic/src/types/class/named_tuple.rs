@@ -6,7 +6,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db, Program,
     place::{Place, PlaceAndQualifiers},
-    semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
@@ -14,6 +13,7 @@ use crate::{
         definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
     },
 };
+use ty_python_core::{definition::Definition, scope::ScopeId};
 
 /// Synthesize a namedtuple class member given the field information.
 ///

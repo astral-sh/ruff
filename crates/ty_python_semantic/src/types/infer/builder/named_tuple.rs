@@ -1,6 +1,5 @@
 use crate::{
     Db,
-    semantic_index::definition::Definition,
     types::{
         ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
         TypeContext, UnionType,
@@ -20,6 +19,7 @@ use crate::{
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.

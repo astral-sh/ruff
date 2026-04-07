@@ -17,7 +17,6 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
-use crate::semantic_index::definition::Definition;
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -44,7 +43,6 @@ use crate::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
     },
-    semantic_index::{place_table, use_def_map},
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
 use ruff_db::diagnostic::Span;
@@ -52,6 +50,8 @@ use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
+use ty_python_core::definition::Definition;
+use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
