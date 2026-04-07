@@ -2092,3 +2092,160 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
         Some(all_sigs.join("\n"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CallArgumentForm, call_argument_forms};
+    use crate::SemanticModel;
+    use crate::db::tests::TestDbBuilder;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+
+    #[test]
+    fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+cast(val="", typ=int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Type]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn overloaded_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import overload
+
+@overload
+def f(x: int, y: str) -> None: ...
+@overload
+def f(x: str) -> None: ...
+def f(*args, **kwargs): ...
+
+f(y="", x=1)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn conditional_special_forms_currently_lose_type_form_information() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import assert_type, cast
+
+flag = bool()
+f = cast if flag else assert_type
+f(val="", typ=int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        // TODO: Preserve the `cast` / `assert_type` type-form information through this
+        // conditional expression instead of degrading both arguments to value forms.
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn variadic_call_argument_forms_are_unknown_when_matched_to_multiple_parameters()
+    -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+args: tuple[str, type[int]] = ("", int)
+cast(*args)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Unknown]
+        );
+
+        Ok(())
+    }
+}
