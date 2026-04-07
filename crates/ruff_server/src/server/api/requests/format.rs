@@ -105,6 +105,7 @@ fn format_text_document(
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
+    let source_type = settings.formatter.extension.get_source_type(&file_path);
 
     // If the document is excluded, return early.
     if is_document_excluded_for_formatting(
@@ -119,7 +120,7 @@ fn format_text_document(
     let source = text_document.contents();
     let formatted = crate::format::format(
         text_document,
-        query.source_type(),
+        source_type,
         &settings.formatter,
         &file_path,
         backend,
@@ -171,4 +172,75 @@ fn format_text_document(
         range: source_range.to_range(source, unformatted_index, encoding),
         new_text: formatted[formatted_range].to_owned(),
     }]))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use lsp_types::{ClientCapabilities, Url};
+
+    use crate::server::api::requests::format::format_document;
+    use crate::session::{Client, GlobalOptions};
+    use crate::{PositionEncoding, TextDocument, Workspace, Workspaces};
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        std::env::temp_dir().join(format!("ruff-server-{name}-{nanos}"))
+    }
+
+    #[test]
+    fn format_custom_extension_mapped_to_markdown() {
+        let workspace_dir = unique_temp_dir("custom-markdown");
+        fs::create_dir_all(&workspace_dir).expect("create temp workspace");
+        fs::write(
+            workspace_dir.join("pyproject.toml"),
+            r#"[tool.ruff]
+extension = { thing = "markdown" }
+
+[tool.ruff.format]
+preview = true
+"#,
+        )
+        .expect("write pyproject");
+
+        let file_path = workspace_dir.join("test.thing");
+        let content = "# title\n\n```python\nx='hi'\n```\n";
+        fs::write(&file_path, content).expect("write document");
+
+        let (main_loop_sender, _) = crossbeam::channel::unbounded();
+        let (client_sender, _) = crossbeam::channel::unbounded();
+        let client = Client::new(main_loop_sender, client_sender);
+
+        let workspace_url = Url::from_file_path(&workspace_dir).expect("workspace url");
+        let global = GlobalOptions::default().into_settings(client.clone());
+
+        let mut session = crate::Session::new(
+            &ClientCapabilities::default(),
+            PositionEncoding::UTF16,
+            global,
+            &Workspaces::new(vec![
+                Workspace::new(workspace_url).with_options(crate::ClientOptions::default()),
+            ]),
+            &client,
+        )
+        .expect("create session");
+
+        let file_url = Url::from_file_path(&file_path).expect("file url");
+        let document = TextDocument::new(content.to_string(), 0).with_language_id("markdown");
+        session.open_text_document(file_url.clone(), document);
+
+        let snapshot = session.take_snapshot(file_url).expect("snapshot");
+        let result = format_document(&snapshot, &client).expect("format request should succeed");
+        let edits = result.expect("expected formatting edits for markdown-mapped extension");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "x = \"hi\"\n");
+
+        fs::remove_dir_all(&workspace_dir).ok();
+    }
 }
