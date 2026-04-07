@@ -584,6 +584,14 @@ impl<'db> Bindings<'db> {
         &self.argument_forms.values
     }
 
+    /// Returns the agreed parameter form for each call argument, in source order.
+    ///
+    /// An argument form is "non-conflicting" when the binding analysis did not observe that same
+    /// call-site argument being used as both a value form and a type form across the participating
+    /// bindings. For such arguments this returns `Some(form)`.
+    ///
+    /// This returns `None` for arguments whose form is unknown and for arguments where multiple
+    /// bindings disagreed about whether the argument should be interpreted as a value or as a type.
     pub(crate) fn non_conflicting_argument_forms(
         &self,
     ) -> impl Iterator<Item = Option<ParameterForm>> + '_ {

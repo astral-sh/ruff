@@ -7,7 +7,7 @@ use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::signatures::{ParametersKind, Signature};
+use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
     Type, TypeContext, UnionType,
@@ -877,12 +877,17 @@ pub enum CallArgumentForm {
     Type,
 }
 
+/// Fully binds and type-checks a call expression against the given callee type.
+///
+/// This is the expensive path for call-argument form analysis: it matches call-site arguments to
+/// parameters, checks argument types, and preserves the resulting bindings even when the call is
+/// invalid so IDE features can inspect the best available binding information.
 fn full_type_bindings_for_call<'db>(
     model: &SemanticModel<'db>,
+    func_type: Type<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<crate::types::call::Bindings<'db>> {
+) -> crate::types::call::Bindings<'db> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model)?;
     let call_arguments =
         CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
             splatted_value
@@ -891,19 +896,35 @@ fn full_type_bindings_for_call<'db>(
         });
     let constraints = ConstraintSetBuilder::new();
 
-    Some(
-        func_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments)
-            .check_types(
-                db,
-                &constraints,
-                &call_arguments,
-                TypeContext::default(),
-                &[],
-            )
-            .unwrap_or_else(|CallError(_, bindings)| *bindings),
-    )
+    func_type
+        .bindings(db)
+        .match_parameters(db, &call_arguments)
+        .check_types(
+            db,
+            &constraints,
+            &call_arguments,
+            TypeContext::default(),
+            &[],
+        )
+        .unwrap_or_else(|CallError(_, bindings)| *bindings)
+}
+
+/// Returns the form for a single argument from a successful binding.
+fn argument_form_from_successful_binding(
+    binding: &crate::types::call::Binding<'_>,
+    argument_index: usize,
+) -> CallArgumentForm {
+    if let Some(argument_match) = binding.argument_matches().get(argument_index)
+        && argument_match.matched
+        && let [parameter_index] = argument_match.parameters.as_slice()
+    {
+        return match binding.signature.parameters()[*parameter_index].form {
+            ParameterForm::Value => CallArgumentForm::Value,
+            ParameterForm::Type => CallArgumentForm::Type,
+        };
+    }
+
+    CallArgumentForm::Unknown
 }
 
 /// Returns the form of each call-site argument in source order.
@@ -914,22 +935,30 @@ pub fn call_argument_forms(
     model: &SemanticModel<'_>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallArgumentForm> {
-    let argument_count = call_expr.arguments.arguments_source_order().count();
-    let Some(bindings) = full_type_bindings_for_call(model, call_expr) else {
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
         return Vec::new();
     };
 
-    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
-    for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
-        let Some(argument_form) = argument_forms.get_mut(arg_index) else {
-            break;
-        };
-        *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
-            crate::types::signatures::ParameterForm::Value => CallArgumentForm::Value,
-            crate::types::signatures::ParameterForm::Type => CallArgumentForm::Type,
-        });
+    let argument_count = call_expr.arguments.arguments_source_order().count();
+
+    // If the function doesn't contain any type forms, for any overloads, short-circuit.
+    if !func_type.bindings(model.db()).iter_flat().any(|binding| {
+        binding.overloads().iter().any(|overload| {
+            overload
+                .signature
+                .parameters()
+                .into_iter()
+                .any(|parameter| parameter.form == ParameterForm::Type)
+        })
+    }) {
+        return vec![CallArgumentForm::Value; argument_count];
     }
 
+    let bindings = full_type_bindings_for_call(model, func_type, call_expr);
+
+    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
+
+    // If any bindings are successful, limit analysis to those bindings.
     let successful_bindings: Vec<_> = bindings
         .iter_flat()
         .flatten()
@@ -937,23 +966,36 @@ pub fn call_argument_forms(
         .collect();
 
     if successful_bindings.is_empty() {
+        // If no binding succeeds, fall back to the merged non-conflicting forms from the full
+        // binding result so callers still get the best conservative answer available.
+        for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
+            let Some(argument_form) = argument_forms.get_mut(arg_index) else {
+                break;
+            };
+            *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
+                ParameterForm::Value => CallArgumentForm::Value,
+                ParameterForm::Type => CallArgumentForm::Type,
+            });
+        }
         return argument_forms;
     }
 
-    for arg_index in 0..argument_forms.len() {
-        let Some(argument_form) = argument_forms.get_mut(arg_index) else {
-            break;
-        };
+    // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
+    // fall back to `CallArgumentForm::Unknown`.
+    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
+    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
+        return argument_forms;
+    };
 
-        let is_unambiguous_single_match = successful_bindings.iter().all(|binding| {
-            binding
-                .argument_matches()
-                .get(arg_index)
-                .is_some_and(|arg_mapping| arg_mapping.matched && arg_mapping.parameters.len() == 1)
-        });
-
-        if !is_unambiguous_single_match {
-            *argument_form = CallArgumentForm::Unknown;
+    for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
+        let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
+        if argument_form == CallArgumentForm::Unknown {
+            continue;
+        }
+        if remaining_bindings.iter().all(|binding| {
+            argument_form_from_successful_binding(binding, arg_index) == argument_form
+        }) {
+            *resolved_argument_form = argument_form;
         }
     }
 
@@ -2255,6 +2297,85 @@ f("", int)
         assert_eq!(
             call_argument_forms(&model, call),
             [CallArgumentForm::Unknown, CallArgumentForm::Unknown]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn successful_call_argument_forms_ignore_failed_bindings() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+flag = bool(input())
+def g(x):
+    return x
+
+x = ""
+f = cast if flag else g
+f(int, x)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_argument_forms_fast_path_value_only_signatures() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import cast
+
+def f(x: type[int], y: int) -> None:
+    pass
+
+cast(int, 1)
+f(int, 1)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let calls: Vec<_> = parsed
+            .suite()
+            .iter()
+            .filter_map(|stmt| stmt.as_expr_stmt()?.value.as_call_expr())
+            .collect();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(calls.len(), 2);
+        assert_eq!(
+            call_argument_forms(&model, calls[0]),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[1]),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
         );
 
         Ok(())

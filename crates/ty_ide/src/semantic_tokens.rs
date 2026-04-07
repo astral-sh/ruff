@@ -963,19 +963,18 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
             ast::Expr::Call(call) => {
                 self.visit_expr(call.func.as_ref());
-                let argument_forms = call_argument_forms(self.model, call);
 
-                for (argument_index, argument) in
-                    call.arguments.arguments_source_order().enumerate()
+                // Determine whether each argument should be considered a type annotation or a
+                // value based on the position.
+                let argument_forms = call_argument_forms(self.model, call);
+                for (argument, form) in call.arguments.arguments_source_order().zip(argument_forms)
                 {
-                    match argument_forms.get(argument_index).copied() {
-                        Some(CallArgumentForm::Type) => self.visit_annotation(argument.value()),
-                        Some(CallArgumentForm::Unknown | CallArgumentForm::Value) | None => {
-                            match argument {
-                                ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
-                                ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
-                            }
-                        }
+                    match form {
+                        CallArgumentForm::Type => self.visit_annotation(argument.value()),
+                        CallArgumentForm::Unknown | CallArgumentForm::Value => match argument {
+                            ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
+                            ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                        },
                     }
                 }
             }
@@ -2696,6 +2695,47 @@ x4 = assert_type(value="", type=PathLike[str])
         "PathLike" @ 232..240: Class
         "str" @ 241..244: Class
         "#);
+    }
+
+    #[test]
+    fn semantic_tokens_ignore_failed_bindings_for_type_form_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import cast
+
+flag = bool(input())
+def g(x):
+    return x
+
+x = ""
+f = cast if flag else g
+f(int, x)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+
+        let int_start = TextSize::from(
+            u32::try_from(source.rfind("int").expect("call argument `int` to exist"))
+                .expect("source offset to fit into TextSize"),
+        );
+        let x_start = TextSize::from(
+            u32::try_from(source.rfind("x)").expect("call argument `x` to exist"))
+                .expect("source offset to fit into TextSize"),
+        );
+
+        let int_token = tokens
+            .iter()
+            .find(|token| token.range == TextRange::at(int_start, "int".text_len()))
+            .expect("semantic token for `int` call argument");
+        let x_token = tokens
+            .iter()
+            .find(|token| token.range == TextRange::at(x_start, "x".text_len()))
+            .expect("semantic token for `x` call argument");
+
+        assert_eq!(int_token.token_type, SemanticTokenType::Class);
+        assert_eq!(x_token.token_type, SemanticTokenType::Variable);
     }
 
     #[test]
