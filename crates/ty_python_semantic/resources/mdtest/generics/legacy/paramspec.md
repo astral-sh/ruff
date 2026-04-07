@@ -221,12 +221,13 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, Generic
+from typing import Callable, Generic, assert_type
 from typing_extensions import ParamSpec
 
 PList = ParamSpec("PList", default=[str])
 PEllipsis = ParamSpec("PEllipsis", default=...)
 PAnother = ParamSpec("PAnother", default=PList)
+DefaultP = ParamSpec("DefaultP", default=[str, int])
 
 class C1(Generic[PList]):
     x: Callable[PList, None]
@@ -237,9 +238,14 @@ class C2(Generic[PEllipsis]):
 class C3(Generic[PList, PAnother]):
     x: Callable[PAnother, None]
 
+class ClassParamSpec(Generic[DefaultP]):
+    x: Callable[DefaultP, None]
+
 reveal_type(C1().x)  # revealed: (str, /) -> None
 reveal_type(C2().x)  # revealed: (...) -> None
 reveal_type(C3().x)  # revealed: (str, /) -> None
+assert_type(ClassParamSpec(), ClassParamSpec[str, int])
+assert_type(ClassParamSpec[[bool, bool]](), ClassParamSpec[bool, bool])
 ```
 
 ### Forward references in stub files
