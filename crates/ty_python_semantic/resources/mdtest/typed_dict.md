@@ -2398,25 +2398,30 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
-TypedDict constructor calls should also use field type context when inferring nested recursive
-values:
+TypedDict constructor calls should also use field type context when inferring nested values:
 
 ```py
-from typing import Any, List, TypedDict, Union
-from typing_extensions import NotRequired
+from typing import TypedDict
 
 class Comparison(TypedDict):
     field: str
-    op: NotRequired[str]
-    value: Any
+    value: object
 
 class Logical(TypedDict):
-    op: NotRequired[str]
-    conditions: List["Filter"]
+    primary: Comparison
+    conditions: list[Comparison]
 
-Filter = Union[Comparison, Logical]
+logical_from_literal = Logical(
+    primary=Comparison(field="a", value="b"),
+    conditions=[Comparison(field="c", value="d")],
+)
+logical_from_dict_call = Logical(dict(primary=dict(field="a", value="b"), conditions=[dict(field="c", value="d")]))
 
-logical = Logical(conditions=[Comparison(field="a", value="b")])
+# error: [missing-typed-dict-key]
+missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[dict(field="c", value="d")])
+
+# error: [missing-typed-dict-key]
+missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
 ```
 
 ## Function/assignment syntax

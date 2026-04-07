@@ -948,8 +948,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg, TypeContext::default());
         let target_ty = Type::TypedDict(typed_dict);
+        let arg_ty = expression_type_fn(arg, TypeContext::new(Some(target_ty)));
 
         if !arg_ty.is_assignable_to(db, target_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
