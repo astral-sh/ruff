@@ -39,6 +39,5 @@ error[invalid-key]: Unknown key "legs" for TypedDict `Person`
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
    |
-info: rule `invalid-key` is enabled by default
 
 ```

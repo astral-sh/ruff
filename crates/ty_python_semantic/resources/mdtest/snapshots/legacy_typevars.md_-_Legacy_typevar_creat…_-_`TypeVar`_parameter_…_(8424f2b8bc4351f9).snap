@@ -29,6 +29,5 @@ error[invalid-legacy-type-variable]: The name of a `TypeVar` (`Q`) must match th
 4 | T = TypeVar("Q")
   | ^
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

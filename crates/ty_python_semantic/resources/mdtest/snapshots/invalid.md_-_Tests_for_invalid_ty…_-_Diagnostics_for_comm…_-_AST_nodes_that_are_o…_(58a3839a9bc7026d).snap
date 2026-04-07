@@ -40,7 +40,6 @@ error[invalid-type-form]: Int literals are not allowed in this context in a para
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -57,7 +56,6 @@ error[invalid-type-form]: Bytes literals are not allowed in this context in a pa
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -74,7 +72,6 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -88,6 +85,5 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation:
    |        ^^^^^^^^^^^^^^^^ Did you mean `typing.Literal["invalid syntax"]`?
 10 | ): ...
    |
-info: rule `invalid-syntax-in-forward-annotation` is enabled by default
 
 ```

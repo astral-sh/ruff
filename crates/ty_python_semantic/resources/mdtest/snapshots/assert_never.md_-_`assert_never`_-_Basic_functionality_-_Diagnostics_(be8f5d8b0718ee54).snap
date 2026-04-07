@@ -53,7 +53,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 7 | def _():
   |
 info: `Never` and `Literal[0]` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -70,7 +69,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 10 | def _():
    |
 info: `Never` and `Literal[""]` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -87,7 +85,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 13 | def _():
    |
 info: `Never` and `None` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -104,7 +101,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 16 | def _(flag: bool, never: Never):
    |
 info: `Never` and `tuple[()]` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -121,7 +117,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 19 | def _(any_: Any):
    |
 info: `Never` and `Literal[1]` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -138,7 +133,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
 22 | def _(unknown: Unknown):
    |
 info: `Never` and `Any` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -153,6 +147,5 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
    |                  Inferred type of argument is `Unknown`
    |
 info: `Never` and `Unknown` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```

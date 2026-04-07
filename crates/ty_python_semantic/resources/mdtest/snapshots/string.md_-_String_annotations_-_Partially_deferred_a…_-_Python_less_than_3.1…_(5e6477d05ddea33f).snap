@@ -99,7 +99,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -120,7 +119,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -141,7 +139,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -162,7 +159,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -179,7 +175,6 @@ error[unsupported-operator]: Unsupported `|` operation
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -194,7 +189,6 @@ error[unresolved-reference]: Name `SomethingUndefined` used when not defined
 37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -209,7 +203,6 @@ error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
 37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -230,7 +223,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -251,7 +243,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -271,6 +262,5 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```

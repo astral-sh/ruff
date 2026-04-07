@@ -47,7 +47,6 @@ error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str`
   |               - Type variable defined here
 2 |     x: T
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -67,6 +66,5 @@ error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `b
   |                   - Type variable defined here
 5 |     x: U
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```

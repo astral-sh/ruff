@@ -43,7 +43,6 @@ error[invalid-base]: Invalid class base with type `Literal[2]`
 3 |     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
   |
 info: Definition of class `Foo` will raise `TypeError` at runtime
-info: rule `invalid-base` is enabled by default
 
 ```
 
@@ -60,7 +59,6 @@ warning[unsupported-base]: Unsupported class base
   |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `Bar` due to this base
 info: Only class objects or `Any` are supported as class bases
-info: rule `unsupported-base` is enabled by default
 
 ```
 
@@ -78,7 +76,6 @@ info: Definition of class `BadSub1` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `Bad1` has an `__mro_entries__` method, but it cannot be called with the expected arguments
 info: Expected a signature at least as permissive as `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`
-info: rule `invalid-base` is enabled by default
 
 ```
 
@@ -93,6 +90,5 @@ error[invalid-base]: Invalid class base with type `Bad2`
 info: Definition of class `BadSub2` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `Bad2` has an `__mro_entries__` method, but it does not return a tuple of types
-info: rule `invalid-base` is enabled by default
 
 ```

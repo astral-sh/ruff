@@ -103,7 +103,6 @@ error[invalid-method-override]: Invalid override of method `method`
 9 | class Child(Parent):
   |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -127,7 +126,6 @@ error[invalid-method-override]: Invalid override of method `method`
  9 | class Child(Parent):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -151,7 +149,6 @@ error[invalid-method-override]: Invalid override of method `method`
  9 | class Child(Parent):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -170,7 +167,6 @@ error[invalid-method-override]: Invalid override of method `method`
 30 | class ChildWithReturnType(ParentWithReturnType):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -191,7 +187,6 @@ error[invalid-method-override]: Invalid override of method `method`
 35 | class GradualParent(Grandparent):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -213,7 +208,6 @@ error[invalid-method-override]: Invalid override of method `method`
  6 | class Parent(Grandparent):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -232,6 +226,5 @@ error[invalid-method-override]: Invalid override of method `get`
 7 | get = 56
   |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```

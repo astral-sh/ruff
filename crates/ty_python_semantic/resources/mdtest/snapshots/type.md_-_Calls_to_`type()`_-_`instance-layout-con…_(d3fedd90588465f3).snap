@@ -55,7 +55,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
  9 | class C:
 10 |     __slots__ = ("x",)
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -69,6 +68,5 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
    |     ^^^^^^^^^^^^^^^^^^^^ Bases `C` and `D` cannot be combined in multiple inheritance
    |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
-info: rule `instance-layout-conflict` is enabled by default
 
 ```

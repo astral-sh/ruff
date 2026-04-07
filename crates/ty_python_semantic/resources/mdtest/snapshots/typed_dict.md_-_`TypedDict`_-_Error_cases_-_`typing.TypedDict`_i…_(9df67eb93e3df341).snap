@@ -30,6 +30,5 @@ error[invalid-type-form]: The special form `typing.TypedDict` is not allowed in 
   |    ^^^^^^^^^
   |
 help: You might have meant to use a concrete TypedDict or `collections.abc.Mapping[str, object]`
-info: rule `invalid-type-form` is enabled by default
 
 ```

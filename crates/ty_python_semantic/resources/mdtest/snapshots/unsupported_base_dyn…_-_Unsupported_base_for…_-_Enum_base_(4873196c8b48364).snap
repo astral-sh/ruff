@@ -34,6 +34,5 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 info: Creating an enum class via `type()` is not supported
 info: Consider using `Enum("X", [])` instead
-info: rule `invalid-base` is enabled by default
 
 ```

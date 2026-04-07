@@ -37,6 +37,5 @@ error[invalid-await]: `MissingAwait` is not awaitable
 2 |     pass
   |
 info: `__await__` is missing
-info: rule `invalid-await` is enabled by default
 
 ```

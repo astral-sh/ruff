@@ -50,7 +50,6 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
 info: Expected signature for `__next__` is `def __next__(self): ...`
-info: rule `not-iterable` is enabled by default
 
 ```
 
@@ -64,6 +63,5 @@ error[not-iterable]: Object of type `Iterable2` is not iterable
 22 |     reveal_type(y)  # revealed: Unknown
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
-info: rule `not-iterable` is enabled by default
 
 ```

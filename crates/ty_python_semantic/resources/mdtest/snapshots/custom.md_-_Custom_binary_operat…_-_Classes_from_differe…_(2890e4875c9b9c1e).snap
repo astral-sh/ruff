@@ -40,6 +40,5 @@ error[unsupported-operator]: Unsupported `+` operation
   | |     Has type `mod1.A`
   | Has type `mod2.A`
   |
-info: rule `unsupported-operator` is enabled by default
 
 ```

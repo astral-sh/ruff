@@ -71,7 +71,6 @@ error[unsupported-operator]: Unsupported `<` operation
 14 |     b < a
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -90,7 +89,6 @@ error[unsupported-operator]: Unsupported `<` operation
 16 |     a < c
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -109,7 +107,6 @@ error[unsupported-operator]: Unsupported `<` operation
 18 |     c < a
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -128,7 +125,6 @@ error[unsupported-operator]: Unsupported `<` operation
 20 |     var_int: tuple[int, ...],
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -147,7 +143,6 @@ error[unsupported-operator]: Unsupported `<` operation
 30 |     # Variable `tuple[int, ...]` vs. fixed `tuple[int, str]`:
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -166,7 +161,6 @@ error[unsupported-operator]: Unsupported `<` operation
 36 |     # Variable `tuple[str, ...]` vs. fixed `tuple[int, str]`:
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -183,6 +177,5 @@ error[unsupported-operator]: Unsupported `<` operation
    |     Has type `tuple[str, ...]`
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```

@@ -45,6 +45,5 @@ error[unsupported-operator]: Unsupported `<` operation
 9 |     prefix_int_var_int: tuple[int, *tuple[int, ...]],
   |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```

@@ -47,6 +47,5 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to attr
 12 |
 13 |     class C2:
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -173,7 +173,6 @@ error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<c
 info: Type variable `S` has `object` as its implicit upper bound
 info: `object` is not an instance or subclass of `<class 'Foo'>`
 help: Consider adding an upper bound to type variable `S`
-info: rule `invalid-super-argument` is enabled by default
 
 ```
 
@@ -189,7 +188,6 @@ error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<c
    |
 info: Type variable `S` has upper bound `int`
 info: `int` is not an instance or subclass of `<class 'Foo'>`
-info: rule `invalid-super-argument` is enabled by default
 
 ```
 
@@ -205,7 +203,6 @@ error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<c
    |
 info: Type variable `S` has constraints `int, str`
 info: `int | str` is not an instance or subclass of `<class 'Foo'>`
-info: rule `invalid-super-argument` is enabled by default
 
 ```
 
@@ -221,6 +218,5 @@ error[invalid-super-argument]: `S@method10` is a type variable with an abstract/
 102 |     # TypeVar bounded by `type[Foo]` rather than `Foo`
     |
 info: Type variable `S` has upper bound `(...) -> str`
-info: rule `invalid-super-argument` is enabled by default
 
 ```

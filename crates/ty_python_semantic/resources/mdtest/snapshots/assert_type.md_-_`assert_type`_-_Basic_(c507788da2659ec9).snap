@@ -38,7 +38,6 @@ error[type-assertion-failure]: Argument does not have asserted type `str`
 7 |     assert_type(y, int)  # error: [type-assertion-failure]
   |
 info: `str` and `int` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -54,6 +53,5 @@ error[type-assertion-failure]: Argument does not have asserted type `int`
   |                 Inferred type is `bool`
   |
 info: `bool` is a subtype of `int`, but they are not equivalent
-info: rule `type-assertion-failure` is enabled by default
 
 ```

@@ -65,7 +65,6 @@ info: Function defined here
   |     ^^^         ------------------ Parameter declared here
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -89,7 +88,6 @@ info: Function defined here
   |     ^^^                                            ------------------ Parameter declared here
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -113,7 +111,6 @@ info: Function signature here
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `unknown-argument` is enabled by default
 
 ```
 
@@ -136,7 +133,6 @@ info: Function signature here
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `too-many-positional-arguments` is enabled by default
 
 ```
 
@@ -159,7 +155,6 @@ info: Function signature here
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `positional-only-parameter-as-kwarg` is enabled by default
 
 ```
 
@@ -183,7 +178,6 @@ info: Parameter declared here
   |                                     ^^^^^^^^^^^^^
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -198,7 +192,6 @@ error[parameter-already-assigned]: Multiple values provided for parameter `a` of
 26 |
 27 | # error: [missing-argument]
    |
-info: rule `parameter-already-assigned` is enabled by default
 
 ```
 
@@ -219,6 +212,5 @@ info: Parameters declared here
   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `missing-argument` is enabled by default
 
 ```

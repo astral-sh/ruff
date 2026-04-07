@@ -32,7 +32,6 @@ error[unresolved-import]: Cannot resolve imported module `compression.zstd`
   |
 info: The stdlib module `compression` is only available on Python 3.14+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -48,7 +47,6 @@ error[unresolved-import]: Cannot resolve imported module `compression`
   |
 info: The stdlib module `compression` is only available on Python 3.14+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -64,7 +62,6 @@ error[unresolved-import]: Cannot resolve imported module `compression.fakebutwho
   |
 info: The stdlib module `compression` is only available on Python 3.14+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -79,6 +76,5 @@ error[unresolved-import]: Cannot resolve imported module `compression`
   |
 info: The stdlib module `compression` is only available on Python 3.14+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```

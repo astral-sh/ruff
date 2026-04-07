@@ -50,7 +50,6 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `Other`
 11 | class PersonWithAge(TypedDict):
 12 |     name: str
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -66,7 +65,6 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `PersonW
 17 | class Person(TypedDict):
 18 |     name: str
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -80,6 +78,5 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             |
    |             Declared type
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -80,7 +80,6 @@ error[missing-argument]: No argument provided for required parameter `y`
 14 |
 15 | C(3, y="")
    |
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -95,7 +94,6 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
 14 |
 15 | C(3, y="")
    |
-info: rule `too-many-positional-arguments` is enabled by default
 
 ```
 
@@ -111,7 +109,6 @@ error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_O
 19 |     b: KW_ONLY
    |
 info: `KW_ONLY` fields: `b`, `d`
-info: rule `duplicate-kw-only` is enabled by default
 
 ```
 
@@ -126,6 +123,5 @@ error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_O
 31 |     _1: KW_ONLY
    |
 info: `KW_ONLY` fields: `_1`, `_2`
-info: rule `duplicate-kw-only` is enabled by default
 
 ```

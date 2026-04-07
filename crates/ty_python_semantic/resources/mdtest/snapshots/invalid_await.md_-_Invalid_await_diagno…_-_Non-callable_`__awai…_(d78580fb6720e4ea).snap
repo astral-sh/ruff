@@ -31,6 +31,5 @@ error[invalid-await]: `NonCallableAwait` is not awaitable
   |           ^^^^^^^^^^^^^^^^^^
   |
 info: `__await__` is possibly not callable
-info: rule `invalid-await` is enabled by default
 
 ```

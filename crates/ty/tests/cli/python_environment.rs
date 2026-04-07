@@ -45,7 +45,6 @@ fn config_override_python_version() -> anyhow::Result<()> {
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
       |
-    info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
@@ -161,7 +160,6 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     3 | python-version = "3.8"
       |                  ^^^^^ Python version configuration
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -180,7 +178,6 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
       |
     info: `aiter` was added as a builtin in Python 3.10
     info: Python 3.9 was assumed when resolving types because it was specified on the command line
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -213,7 +210,6 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     1 | from . import nonexistent_submodule
       |               ^^^^^^^^^^^^^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -282,7 +278,6 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/python3.8/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -309,7 +304,6 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/pypy3.8/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -339,7 +333,6 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     info: Python 3.13 was assumed when resolving modules because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/python3.13t/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -426,7 +419,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
@@ -441,7 +433,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -467,7 +458,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
@@ -482,7 +472,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -508,7 +497,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
@@ -523,7 +511,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -549,7 +536,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `colorama`
      --> test.py:3:8
@@ -564,7 +550,6 @@ import colorama
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -620,7 +605,6 @@ import bar",
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/strange-venv-location/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -669,7 +653,6 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     info:   3. <temp_dir>/.venv/lib/python3.13/site-packages (site-packages)
     info:   4. <temp_dir>/.venv/lib64/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -716,7 +699,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   5. <temp_dir>/ (first-party code)
     info:   6. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -750,7 +732,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
     info:   ... and 3 more paths. Run with `-v` to see all paths.
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -793,7 +774,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 7 file(s) in 0.000s
     ");
     Ok(())
@@ -848,7 +828,6 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
     3 | home = foo/bar/bin
       |
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -906,7 +885,6 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
       |                       ^^^ Virtual environment metadata
       |
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -1302,7 +1280,6 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |                  ^^^^^^ Python version configuration
     4 | python-platform = "linux"
       |
-    info: rule `unresolved-attribute` is enabled by default
 
     error[unresolved-import]: Module `typing` has no member `LiteralString`
      --> main.py:6:20
@@ -1321,7 +1298,6 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |                  ^^^^^^ Python version configuration
     4 | python-platform = "linux"
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -1523,7 +1499,6 @@ home = ./
       |                      ^^^^^^^^^^^
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1545,7 +1520,6 @@ home = ./
     3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1568,7 +1542,6 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1592,7 +1565,6 @@ home = ./
       |                      ^^^^^^^^^^^
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1617,7 +1589,6 @@ home = ./
     3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1641,7 +1612,6 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1665,7 +1635,6 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1688,7 +1657,6 @@ home = ./
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1782,7 +1750,6 @@ home = ./
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:3:6
@@ -1797,7 +1764,6 @@ home = ./
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:4:6
@@ -1812,7 +1778,6 @@ home = ./
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `package1`
      --> test.py:5:6
@@ -1826,7 +1791,6 @@ home = ./
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 4 diagnostics
 
@@ -1848,7 +1812,6 @@ home = ./
     3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1871,7 +1834,6 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1894,7 +1856,6 @@ home = ./
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1919,7 +1880,6 @@ home = ./
     3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1942,7 +1902,6 @@ home = ./
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1966,7 +1925,6 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1989,7 +1947,6 @@ home = ./
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2124,7 +2081,6 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     9 | from shared_package import FromLocalVenv
       |                            ^^^^^^^^^^^^^
       |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2205,7 +2161,6 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/active-venv/<site-packages> (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2328,7 +2283,6 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/.venv/<site-packages> (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2642,7 +2596,6 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2716,7 +2669,6 @@ fn default_root_python_package() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2762,7 +2714,6 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2802,7 +2753,6 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -2857,7 +2807,6 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `foo`
      --> src/main.py:3:8
@@ -2873,7 +2822,6 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 

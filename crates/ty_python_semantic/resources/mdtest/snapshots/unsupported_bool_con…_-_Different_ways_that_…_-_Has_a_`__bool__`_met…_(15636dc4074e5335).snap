@@ -43,6 +43,5 @@ info: `str` is not assignable to `bool`
   |         Method defined here
 3 |         return "wat"
   |
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```

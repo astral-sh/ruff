@@ -52,7 +52,6 @@ error[call-non-callable]: Object of type `<special-form 'typing.Protocol'>` is n
 5 |
 6 | class MyProtocol(Protocol):
   |
-info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -75,7 +74,6 @@ info: Protocol classes cannot be instantiated
   |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
 7 |     x: int
   |
-info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -97,6 +95,5 @@ info: Protocol classes cannot be instantiated
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol` declared as a protocol here
 13 |     x: T
    |
-info: rule `call-non-callable` is enabled by default
 
 ```

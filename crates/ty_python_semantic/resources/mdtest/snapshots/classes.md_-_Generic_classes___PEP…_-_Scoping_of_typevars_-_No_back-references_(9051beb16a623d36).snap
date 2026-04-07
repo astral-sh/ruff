@@ -50,7 +50,6 @@ error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
   |            ^
 3 |     pass
   |
-info: rule `invalid-type-variable-bound` is enabled by default
 
 ```
 
@@ -63,7 +62,6 @@ error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
   |               ^
 7 |     pass
   |
-info: rule `invalid-type-variable-bound` is enabled by default
 
 ```
 
@@ -76,7 +74,6 @@ error[invalid-type-variable-constraints]: TypeVar constraint cannot be generic
    |                  ^
 11 |     pass
    |
-info: rule `invalid-type-variable-constraints` is enabled by default
 
 ```
 
@@ -92,7 +89,6 @@ error[invalid-generic-class]: Default of `S` cannot reference later type paramet
 22 |
 23 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -106,6 +102,5 @@ error[invalid-generic-class]: Default of `S` cannot reference later type paramet
    |               |
    |               `S` defined here
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```

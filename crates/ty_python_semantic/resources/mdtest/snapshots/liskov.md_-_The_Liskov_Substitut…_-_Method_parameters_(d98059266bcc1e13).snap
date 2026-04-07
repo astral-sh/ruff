@@ -126,7 +126,6 @@ error[invalid-method-override]: Invalid override of method `method`
  4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -150,7 +149,6 @@ error[invalid-method-override]: Invalid override of method `method`
  4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -174,7 +172,6 @@ error[invalid-method-override]: Invalid override of method `method`
  4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -198,7 +195,6 @@ error[invalid-method-override]: Invalid override of method `method`
  4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -217,7 +213,6 @@ error[invalid-method-override]: Invalid override of method `method2`
 61 | class Sub17(Super2):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -240,7 +235,6 @@ error[invalid-method-override]: Invalid override of method `method2`
 58 | class Sub16(Super2):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -263,7 +257,6 @@ error[invalid-method-override]: Invalid override of method `method3`
 67 | class Sub18(Super3):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -286,7 +279,6 @@ error[invalid-method-override]: Invalid override of method `method`
 76 | class Sub20(Super4):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -309,6 +301,5 @@ error[invalid-method-override]: Invalid override of method `method`
 76 | class Sub20(Super4):
    |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```

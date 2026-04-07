@@ -48,7 +48,6 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
 4 | T2 = TypeVar("T2")
   |
 info: `T1` has bound `int` but is not constrained
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
 
@@ -71,6 +70,5 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
  6 | # error: [invalid-type-variable-default]
    |
 info: `T2` has no bound or constraints
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
