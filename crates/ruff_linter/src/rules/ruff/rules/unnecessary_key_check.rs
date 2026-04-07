@@ -111,11 +111,12 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
 
-    let applicability = if !combined.is_absent() || checker.comment_ranges().intersects(expr.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if !combined.is_absent() || checker.comment_ranges().intersects(expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
