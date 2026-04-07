@@ -34,7 +34,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `HasName` is not assignable to `SupportsName`
   --> src/mdtest_snippet.py:13:13
    |
-12 | def _(source: HasName):
 13 |     target: SupportsName = source  # error: [invalid-assignment]
    |             ------------   ^^^^^^ Incompatible value of type `HasName`
    |             |

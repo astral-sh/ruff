@@ -100,12 +100,8 @@ help: Replace with `None`
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
   --> PYI061.pyi:21:5
    |
-19 | def func6(arg1: Literal[
-20 |     "hello",
 21 |     None  # Comment 1
    |     ^^^^
-22 |     , "world"
-23 | ]): ...
    |
 help: Replace with `Literal[...] | None`
 16 | def func5(arg1: Literal[None, None]): ...
@@ -125,10 +121,8 @@ note: This is an unsafe fix and may change runtime behavior
 PYI061 [*] Use `None` rather than `Literal[None]`
   --> PYI061.pyi:27:5
    |
-26 | def func7(arg1: Literal[
 27 |     None  # Comment 1
    |     ^^^^
-28 | ]): ...
    |
 help: Replace with `None`
 23 | ]): ...
@@ -170,10 +164,8 @@ help: Replace with `None`
 PYI061 [*] Use `None` rather than `Literal[None]`
   --> PYI061.pyi:42:9
    |
-41 | # From flake8-pyi
 42 | Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
    |         ^^^^
-43 | Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
    |
 help: Replace with `None`
 39 |
@@ -188,8 +180,6 @@ help: Replace with `None`
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
   --> PYI061.pyi:43:15
    |
-41 | # From flake8-pyi
-42 | Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
 43 | Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
    |               ^^^^
    |
@@ -206,34 +196,24 @@ help: Replace with `Literal[...] | None`
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:47:12
    |
-46 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
 47 | x: Literal[None] | None
    |            ^^^^
-48 | y: None | Literal[None]
-49 | z: Union[Literal[None], None]
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:48:19
    |
-46 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
-47 | x: Literal[None] | None
 48 | y: None | Literal[None]
    |                   ^^^^
-49 | z: Union[Literal[None], None]
    |
 help: Replace with `None`
 
 PYI061 [*] Use `None` rather than `Literal[None]`
   --> PYI061.pyi:49:18
    |
-47 | x: Literal[None] | None
-48 | y: None | Literal[None]
 49 | z: Union[Literal[None], None]
    |                  ^^^^
-50 |
-51 | a: int | Literal[None] | None
    |
 help: Replace with `None`
 46 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
@@ -248,54 +228,38 @@ help: Replace with `None`
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:51:18
    |
-49 | z: Union[Literal[None], None]
-50 |
 51 | a: int | Literal[None] | None
    |                  ^^^^
-52 | b: None | Literal[None] | None
-53 | c: (None | Literal[None]) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:52:19
    |
-51 | a: int | Literal[None] | None
 52 | b: None | Literal[None] | None
    |                   ^^^^
-53 | c: (None | Literal[None]) | None
-54 | d: None | (Literal[None] | None)
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:53:20
    |
-51 | a: int | Literal[None] | None
-52 | b: None | Literal[None] | None
 53 | c: (None | Literal[None]) | None
    |                    ^^^^
-54 | d: None | (Literal[None] | None)
-55 | e: None | ((None | Literal[None]) | None) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:54:20
    |
-52 | b: None | Literal[None] | None
-53 | c: (None | Literal[None]) | None
 54 | d: None | (Literal[None] | None)
    |                    ^^^^
-55 | e: None | ((None | Literal[None]) | None) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:55:28
    |
-53 | c: (None | Literal[None]) | None
-54 | d: None | (Literal[None] | None)
 55 | e: None | ((None | Literal[None]) | None) | None
    |                            ^^^^
    |

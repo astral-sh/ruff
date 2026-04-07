@@ -27,8 +27,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> bool` is not assignable to `(tuple[int, bytes], /) -> bool`
  --> src/mdtest_snippet.py:6:9
   |
-4 |     return False
-5 |
 6 | target: Callable[[tuple[int, bytes]], bool] = source  # error: [invalid-assignment]
   |         -----------------------------------   ^^^^^^ Incompatible value of type `def source(x: tuple[int, str]) -> bool`
   |         |

@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `.main.MaμToMan` imported but unused
  --> F401_30.py:6:19
   |
-4 | """
-5 |
 6 | from .main import MaµToMan
   |                   ^^^^^^^^
   |

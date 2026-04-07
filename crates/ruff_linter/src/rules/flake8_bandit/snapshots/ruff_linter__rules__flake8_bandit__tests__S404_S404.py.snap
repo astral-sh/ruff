@@ -6,24 +6,18 @@ S404 `subprocess` module is possibly insecure
   |
 1 | import subprocess  # S404
   |        ^^^^^^^^^^
-2 | from subprocess import Popen  # S404
-3 | from subprocess import Popen as pop  # S404
   |
 
 S404 `subprocess` module is possibly insecure
  --> S404.py:2:6
   |
-1 | import subprocess  # S404
 2 | from subprocess import Popen  # S404
   |      ^^^^^^^^^^
-3 | from subprocess import Popen as pop  # S404
   |
 
 S404 `subprocess` module is possibly insecure
  --> S404.py:3:6
   |
-1 | import subprocess  # S404
-2 | from subprocess import Popen  # S404
 3 | from subprocess import Popen as pop  # S404
   |      ^^^^^^^^^^
   |

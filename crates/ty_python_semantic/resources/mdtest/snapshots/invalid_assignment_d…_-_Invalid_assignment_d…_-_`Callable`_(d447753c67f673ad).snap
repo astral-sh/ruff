@@ -37,31 +37,23 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `def source(x: int, y: str) -> None` is not assignable to `(int, bytes, /) -> bool`
  --> src/mdtest_snippet.py:6:9
   |
-4 |     raise NotImplementedError
-5 |
 6 | target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
   |         ----------------------------   ^^^^^^ Incompatible value of type `def source(x: int, y: str) -> None`
   |         |
   |         Declared type
-7 | def _(source: Callable[[int, str], bool]):
-8 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
   |
 
 ```
 
 ```
 error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assignable to `(int, bytes, /) -> bool`
-  --> src/mdtest_snippet.py:8:13
-   |
- 6 | target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
- 7 | def _(source: Callable[[int, str], bool]):
- 8 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
-   |             ----------------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
-   |             |
-   |             Declared type
- 9 | def _(source: Callable[[int, bytes], None]):
-10 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
-   |
+ --> src/mdtest_snippet.py:8:13
+  |
+8 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
+  |             ----------------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
+  |             |
+  |             Declared type
+  |
 
 ```
 
@@ -69,14 +61,10 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
 error[invalid-assignment]: Object of type `(int, bytes, /) -> None` is not assignable to `(int, bytes, /) -> bool`
   --> src/mdtest_snippet.py:10:13
    |
- 8 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
- 9 | def _(source: Callable[[int, bytes], None]):
 10 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
    |             ----------------------------   ^^^^^^ Incompatible value of type `(int, bytes, /) -> None`
    |             |
    |             Declared type
-11 | def _(source: Callable[[int, str], bool]):
-12 |     target: Callable[[int], bool] = source  # error: [invalid-assignment]
    |
 
 ```
@@ -85,14 +73,10 @@ error[invalid-assignment]: Object of type `(int, bytes, /) -> None` is not assig
 error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assignable to `(int, /) -> bool`
   --> src/mdtest_snippet.py:12:13
    |
-10 |     target: Callable[[int, bytes], bool] = source  # error: [invalid-assignment]
-11 | def _(source: Callable[[int, str], bool]):
 12 |     target: Callable[[int], bool] = source  # error: [invalid-assignment]
    |             ---------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
    |             |
    |             Declared type
-13 | class Number:
-14 |     def __init__(self, value: int): ...
    |
 
 ```
@@ -101,8 +85,6 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
 error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable to `(str, /) -> Any`
   --> src/mdtest_snippet.py:16:9
    |
-14 |     def __init__(self, value: int): ...
-15 |
 16 | target: Callable[[str], Any] = Number  # error: [invalid-assignment]
    |         --------------------   ^^^^^^ Incompatible value of type `<class 'Number'>`
    |         |

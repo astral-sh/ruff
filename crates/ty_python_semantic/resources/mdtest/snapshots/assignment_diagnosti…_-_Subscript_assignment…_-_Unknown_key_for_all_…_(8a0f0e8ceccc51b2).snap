@@ -35,8 +35,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:14:5
    |
-12 |     # error: [invalid-key]
-13 |     # error: [invalid-key]
 14 |     being["nane"] = "unknown"
    |     ----- ^^^^^^ Did you mean "name"?
    |     |
@@ -55,8 +53,6 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-key]: Unknown key "nane" for TypedDict `Animal`
   --> src/mdtest_snippet.py:14:5
    |
-12 |     # error: [invalid-key]
-13 |     # error: [invalid-key]
 14 |     being["nane"] = "unknown"
    |     ----- ^^^^^^ Did you mean "name"?
    |     |

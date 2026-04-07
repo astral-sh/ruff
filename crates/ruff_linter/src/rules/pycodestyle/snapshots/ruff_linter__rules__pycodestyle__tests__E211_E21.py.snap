@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E211 [*] Whitespace before '('
  --> E21.py:2:5
   |
-1 | #: E211
 2 | spam (1)
   |     ^
-3 | #: E211 E211
-4 | dict ['key'] = list [index]
   |
 help: Removed whitespace before '('
 1 | #: E211
@@ -21,12 +18,8 @@ help: Removed whitespace before '('
 E211 [*] Whitespace before '['
  --> E21.py:4:5
   |
-2 | spam (1)
-3 | #: E211 E211
 4 | dict ['key'] = list [index]
   |     ^
-5 | #: E211
-6 | dict['key'] ['subkey'] = list[index]
   |
 help: Removed whitespace before '['
 1 | #: E211
@@ -41,12 +34,8 @@ help: Removed whitespace before '['
 E211 [*] Whitespace before '['
  --> E21.py:4:20
   |
-2 | spam (1)
-3 | #: E211 E211
 4 | dict ['key'] = list [index]
   |                    ^
-5 | #: E211
-6 | dict['key'] ['subkey'] = list[index]
   |
 help: Removed whitespace before '['
 1 | #: E211
@@ -61,12 +50,8 @@ help: Removed whitespace before '['
 E211 [*] Whitespace before '['
  --> E21.py:6:12
   |
-4 | dict ['key'] = list [index]
-5 | #: E211
 6 | dict['key'] ['subkey'] = list[index]
   |            ^
-7 | #: Okay
-8 | spam(1)
   |
 help: Removed whitespace before '['
 3 | #: E211 E211
@@ -83,7 +68,6 @@ E211 [*] Whitespace before '('
    |
 17 | def fetch_name () -> Union[str, None]:
    |               ^
-18 |     """Fetch name from --person-name in sys.argv.
    |
 help: Removed whitespace before '('
 14 |     pass
@@ -98,12 +82,8 @@ help: Removed whitespace before '('
 E211 [*] Whitespace before '('
   --> E21.py:27:19
    |
-25 |     # test commented code
-26 |     # Logger.info("test code")
 27 |     for i in range (0, len (sys.argv)) :
    |                   ^
-28 |         if sys.argv[i] == "--name" :
-29 |             return sys.argv[i + 1]
    |
 help: Removed whitespace before '('
 24 |     Logger.info(test)
@@ -118,12 +98,8 @@ help: Removed whitespace before '('
 E211 [*] Whitespace before '('
   --> E21.py:27:27
    |
-25 |     # test commented code
-26 |     # Logger.info("test code")
 27 |     for i in range (0, len (sys.argv)) :
    |                           ^
-28 |         if sys.argv[i] == "--name" :
-29 |             return sys.argv[i + 1]
    |
 help: Removed whitespace before '('
 24 |     Logger.info(test)

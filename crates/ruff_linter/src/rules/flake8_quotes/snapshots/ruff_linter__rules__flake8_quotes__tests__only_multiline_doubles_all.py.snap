@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 Q001 [*] Double quote multiline found but single quotes preferred
  --> doubles_all.py:5:30
   |
-3 |   this_is_an_inline_string = "double quote string"
-4 |
 5 |   this_is_a_multiline_string = """
   |  ______________________________^
 6 | | double quote string

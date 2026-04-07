@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
  --> FURB166.py:3:5
   |
-1 | # Errors
-2 |
 3 | _ = int("0b1010"[2:], 2)
   |     ^^^^^^^^^^^^^^^^^^^^
-4 | _ = int("0o777"[2:], 8)
-5 | _ = int("0xFFFF"[2:], 16)
   |
 help: Replace with `base=0`
 1 | # Errors
@@ -24,10 +20,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
  --> FURB166.py:4:5
   |
-3 | _ = int("0b1010"[2:], 2)
 4 | _ = int("0o777"[2:], 8)
   |     ^^^^^^^^^^^^^^^^^^^
-5 | _ = int("0xFFFF"[2:], 16)
   |
 help: Replace with `base=0`
 1 | # Errors
@@ -43,12 +37,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
  --> FURB166.py:5:5
   |
-3 | _ = int("0b1010"[2:], 2)
-4 | _ = int("0o777"[2:], 8)
 5 | _ = int("0xFFFF"[2:], 16)
   |     ^^^^^^^^^^^^^^^^^^^^^
-6 |
-7 | b = "0b11"
   |
 help: Replace with `base=0`
 2 |
@@ -62,14 +52,11 @@ help: Replace with `base=0`
 note: This is an unsafe fix and may change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
-  --> FURB166.py:8:5
-   |
- 7 | b = "0b11"
- 8 | _ = int(b[2:], 2)
-   |     ^^^^^^^^^^^^^
- 9 |
-10 | _ = int("0xFFFF"[2:], base=16)
-   |
+ --> FURB166.py:8:5
+  |
+8 | _ = int(b[2:], 2)
+  |     ^^^^^^^^^^^^^
+  |
 help: Replace with `base=0`
 5  | _ = int("0xFFFF"[2:], 16)
 6  |
@@ -84,12 +71,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   --> FURB166.py:10:5
    |
- 8 | _ = int(b[2:], 2)
- 9 |
 10 | _ = int("0xFFFF"[2:], base=16)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 |
-12 | _ = int(b"0xFFFF"[2:], 16)
    |
 help: Replace with `base=0`
 7  | b = "0b11"
@@ -105,8 +88,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   --> FURB166.py:12:5
    |
-10 | _ = int("0xFFFF"[2:], base=16)
-11 |
 12 | _ = int(b"0xFFFF"[2:], 16)
    |     ^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -126,8 +107,6 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
    |
 19 | _ = int(get_str()[2:], 16)
    |     ^^^^^^^^^^^^^^^^^^^^^^
-20 |
-21 | # OK
    |
 help: Replace with `base=0`
 16 |     return "0xFFF"

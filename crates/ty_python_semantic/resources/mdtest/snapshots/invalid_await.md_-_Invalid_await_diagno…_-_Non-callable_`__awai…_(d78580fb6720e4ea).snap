@@ -26,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 error[invalid-await]: `NonCallableAwait` is not awaitable
  --> src/mdtest_snippet.py:5:11
   |
-4 | async def main() -> None:
 5 |     await NonCallableAwait()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^^^^^
   |

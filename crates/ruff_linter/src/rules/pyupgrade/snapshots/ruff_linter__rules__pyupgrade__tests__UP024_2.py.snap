@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:10:7
    |
- 8 | # Testing the modules
- 9 | import socket, mmap, select, resource
 10 | raise socket.error
    |       ^^^^^^^^^^^^
-11 | raise mmap.error
-12 | raise select.error
    |
 help: Replace `socket.error` with builtin `OSError`
 7  |
@@ -24,12 +20,8 @@ help: Replace `socket.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:11:7
    |
- 9 | import socket, mmap, select, resource
-10 | raise socket.error
 11 | raise mmap.error
    |       ^^^^^^^^^^
-12 | raise select.error
-13 | raise resource.error
    |
 help: Replace `mmap.error` with builtin `OSError`
 8  | # Testing the modules
@@ -44,11 +36,8 @@ help: Replace `mmap.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:12:7
    |
-10 | raise socket.error
-11 | raise mmap.error
 12 | raise select.error
    |       ^^^^^^^^^^^^
-13 | raise resource.error
    |
 help: Replace `select.error` with builtin `OSError`
 9  | import socket, mmap, select, resource
@@ -63,12 +52,8 @@ help: Replace `select.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:13:7
    |
-11 | raise mmap.error
-12 | raise select.error
 13 | raise resource.error
    |       ^^^^^^^^^^^^^^
-14 |
-15 | raise socket.error()
    |
 help: Replace `resource.error` with builtin `OSError`
 10 | raise socket.error
@@ -83,12 +68,8 @@ help: Replace `resource.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:15:7
    |
-13 | raise resource.error
-14 |
 15 | raise socket.error()
    |       ^^^^^^^^^^^^
-16 | raise mmap.error(1)
-17 | raise select.error(1, 2)
    |
 help: Replace `socket.error` with builtin `OSError`
 12 | raise select.error
@@ -103,11 +84,8 @@ help: Replace `socket.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:16:7
    |
-15 | raise socket.error()
 16 | raise mmap.error(1)
    |       ^^^^^^^^^^
-17 | raise select.error(1, 2)
-18 | raise resource.error(1, "strerror", "filename")
    |
 help: Replace `mmap.error` with builtin `OSError`
 13 | raise resource.error
@@ -122,11 +100,8 @@ help: Replace `mmap.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:17:7
    |
-15 | raise socket.error()
-16 | raise mmap.error(1)
 17 | raise select.error(1, 2)
    |       ^^^^^^^^^^^^
-18 | raise resource.error(1, "strerror", "filename")
    |
 help: Replace `select.error` with builtin `OSError`
 14 |
@@ -141,12 +116,8 @@ help: Replace `select.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:18:7
    |
-16 | raise mmap.error(1)
-17 | raise select.error(1, 2)
 18 | raise resource.error(1, "strerror", "filename")
    |       ^^^^^^^^^^^^^^
-19 |
-20 | raise socket.error(
    |
 help: Replace `resource.error` with builtin `OSError`
 15 | raise socket.error()
@@ -161,12 +132,8 @@ help: Replace `resource.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:20:7
    |
-18 | raise resource.error(1, "strerror", "filename")
-19 |
 20 | raise socket.error(
    |       ^^^^^^^^^^^^
-21 |     1,
-22 |     2,
    |
 help: Replace `socket.error` with builtin `OSError`
 17 | raise select.error(1, 2)
@@ -181,11 +148,8 @@ help: Replace `socket.error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:27:7
    |
-26 | from mmap import error
 27 | raise error
    |       ^^^^^
-28 |
-29 | from socket import error
    |
 help: Replace `error` with builtin `OSError`
 24 | )
@@ -200,11 +164,8 @@ help: Replace `error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:30:7
    |
-29 | from socket import error
 30 | raise error(1)
    |       ^^^^^
-31 |
-32 | from select import error
    |
 help: Replace `error` with builtin `OSError`
 27 | raise error
@@ -219,11 +180,8 @@ help: Replace `error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:33:7
    |
-32 | from select import error
 33 | raise error(1, 2)
    |       ^^^^^
-34 |
-35 | from resource import error
    |
 help: Replace `error` with builtin `OSError`
 30 | raise error(1)
@@ -238,11 +196,8 @@ help: Replace `error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:36:7
    |
-35 | from resource import error
 36 | raise error(1, "strerror", "filename")
    |       ^^^^^
-37 |
-38 | # Testing the names
    |
 help: Replace `error` with builtin `OSError`
 33 | raise error(1, 2)
@@ -257,11 +212,8 @@ help: Replace `error` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:39:7
    |
-38 | # Testing the names
 39 | raise EnvironmentError
    |       ^^^^^^^^^^^^^^^^
-40 | raise IOError
-41 | raise WindowsError
    |
 help: Replace `EnvironmentError` with builtin `OSError`
 36 | raise error(1, "strerror", "filename")
@@ -276,11 +228,8 @@ help: Replace `EnvironmentError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:40:7
    |
-38 | # Testing the names
-39 | raise EnvironmentError
 40 | raise IOError
    |       ^^^^^^^
-41 | raise WindowsError
    |
 help: Replace `IOError` with builtin `OSError`
 37 |
@@ -295,12 +244,8 @@ help: Replace `IOError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:41:7
    |
-39 | raise EnvironmentError
-40 | raise IOError
 41 | raise WindowsError
    |       ^^^^^^^^^^^^
-42 |
-43 | raise EnvironmentError()
    |
 help: Replace `WindowsError` with builtin `OSError`
 38 | # Testing the names
@@ -315,12 +260,8 @@ help: Replace `WindowsError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:43:7
    |
-41 | raise WindowsError
-42 |
 43 | raise EnvironmentError()
    |       ^^^^^^^^^^^^^^^^
-44 | raise IOError(1)
-45 | raise WindowsError(1, 2)
    |
 help: Replace `EnvironmentError` with builtin `OSError`
 40 | raise IOError
@@ -335,10 +276,8 @@ help: Replace `EnvironmentError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:44:7
    |
-43 | raise EnvironmentError()
 44 | raise IOError(1)
    |       ^^^^^^^
-45 | raise WindowsError(1, 2)
    |
 help: Replace `IOError` with builtin `OSError`
 41 | raise WindowsError
@@ -353,12 +292,8 @@ help: Replace `IOError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:45:7
    |
-43 | raise EnvironmentError()
-44 | raise IOError(1)
 45 | raise WindowsError(1, 2)
    |       ^^^^^^^^^^^^
-46 |
-47 | raise EnvironmentError(
    |
 help: Replace `WindowsError` with builtin `OSError`
 42 |
@@ -373,12 +308,8 @@ help: Replace `WindowsError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:47:7
    |
-45 | raise WindowsError(1, 2)
-46 |
 47 | raise EnvironmentError(
    |       ^^^^^^^^^^^^^^^^
-48 |     1,
-49 |     2,
    |
 help: Replace `EnvironmentError` with builtin `OSError`
 44 | raise IOError(1)
@@ -393,12 +324,8 @@ help: Replace `EnvironmentError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:53:7
    |
-51 | )
-52 |
 53 | raise WindowsError
    |       ^^^^^^^^^^^^
-54 | raise EnvironmentError(1)
-55 | raise IOError(1, 2)
    |
 help: Replace `WindowsError` with builtin `OSError`
 50 |     3,
@@ -412,10 +339,8 @@ help: Replace `WindowsError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:54:7
    |
-53 | raise WindowsError
 54 | raise EnvironmentError(1)
    |       ^^^^^^^^^^^^^^^^
-55 | raise IOError(1, 2)
    |
 help: Replace `EnvironmentError` with builtin `OSError`
 51 | )
@@ -428,8 +353,6 @@ help: Replace `EnvironmentError` with builtin `OSError`
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_2.py:55:7
    |
-53 | raise WindowsError
-54 | raise EnvironmentError(1)
 55 | raise IOError(1, 2)
    |       ^^^^^^^
    |

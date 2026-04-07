@@ -2,16 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF047 [*] Empty `else` clause
-  --> RUF072_RUF047.py:7:1
-   |
- 5 |   except Exception:
- 6 |       bar()
- 7 | / else:
- 8 | |     pass
-   | |________^
- 9 |   finally:
-10 |       pass
-   |
+ --> RUF072_RUF047.py:7:1
+  |
+7 | / else:
+8 | |     pass
+  | |________^
+  |
 help: Remove the `else` clause
 4 |     foo()
 5 | except Exception:
@@ -25,13 +21,9 @@ help: Remove the `else` clause
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:9:1
    |
- 7 |   else:
- 8 |       pass
  9 | / finally:
 10 | |     pass
    | |________^
-11 |
-12 |   # All non-body clauses are no-ops
    |
 help: Remove the `finally` clause
 6  |     bar()
@@ -46,13 +38,9 @@ help: Remove the `finally` clause
 RUF047 [*] Empty `else` clause
   --> RUF072_RUF047.py:17:1
    |
-15 |   except Exception:
-16 |       pass
 17 | / else:
 18 | |     pass
    | |________^
-19 |   finally:
-20 |       pass
    |
 help: Remove the `else` clause
 14 |     foo()
@@ -67,13 +55,9 @@ help: Remove the `else` clause
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:19:1
    |
-17 |   else:
-18 |       pass
 19 | / finally:
 20 | |     pass
    | |________^
-21 |
-22 |   # Only the `finally` is empty; `else` has real code
    |
 help: Remove the `finally` clause
 16 |     pass
@@ -88,8 +72,6 @@ help: Remove the `finally` clause
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047.py:29:1
    |
-27 |   else:
-28 |       baz()
 29 | / finally:
 30 | |     pass
    | |________^

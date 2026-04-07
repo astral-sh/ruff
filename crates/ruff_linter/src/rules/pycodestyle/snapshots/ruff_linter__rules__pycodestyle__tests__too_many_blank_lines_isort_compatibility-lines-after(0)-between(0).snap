@@ -59,8 +59,6 @@ E303 [*] Too many blank lines (2)
    |
 21 |     abcd.foo()
    |     ^^^^
-22 |
-23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
 help: Remove extraneous blank line(s)
 17 | if __name__ == "__main__":
@@ -74,7 +72,6 @@ help: Remove extraneous blank line(s)
 I001 [*] Import block is un-sorted or un-formatted
   --> E30_isort.py:26:5
    |
-25 |   if TYPE_CHECKING:
 26 | /     import os
 27 | |
 28 | |
@@ -113,8 +110,6 @@ E303 [*] Too many blank lines (2)
    |
 33 |     abcd.foo()
    |     ^^^^
-34 |
-35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
 help: Remove extraneous blank line(s)
 29 |
@@ -130,8 +125,6 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 60 | from typing import Any, Sequence
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-61 |
-62 | class MissingCommand(TypeError): ...  # noqa: N818
    |
 help: Organize imports
 58 |
@@ -143,8 +136,6 @@ help: Organize imports
 E303 [*] Too many blank lines (1)
   --> E30_isort.py:62:1
    |
-60 | from typing import Any, Sequence
-61 |
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    | ^^^^^
    |

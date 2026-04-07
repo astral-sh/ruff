@@ -6,7 +6,6 @@ RUF036 [*] `None` not at the end of the type union.
   |
 2 | def func(arg: None | int):
   |               ^^^^^^^^^^
-3 |     ...
   |
 help: Move `None` to the end of the type union
 1 |

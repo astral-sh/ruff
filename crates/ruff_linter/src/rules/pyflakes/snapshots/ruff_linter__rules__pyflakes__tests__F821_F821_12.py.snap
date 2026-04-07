@@ -6,13 +6,11 @@ F821 Undefined name `os`
    |
 20 | def f(x: Callable[[VarArg("os")], None]):  # F821
    |                            ^^
-21 |     pass
    |
 
 F821 Undefined name `Baz`
   --> F821_12.py:25:14
    |
-24 | f(Callable[["Bar"], None])
 25 | f(Callable[["Baz"], None])
    |              ^^^
    |

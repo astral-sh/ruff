@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC008 [*] Remove quotes from type alias
   --> TC008_union_syntax_pre_py310.py:10:20
    |
- 8 | if TYPE_CHECKING:
- 9 |     c: TypeAlias = 'int | None'  # OK
 10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
    |                    ^^^^^^^^^^^^^^^^^^^^^^^
-11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
-12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
    |
 help: Remove quotes
 7  |
@@ -23,11 +19,8 @@ help: Remove quotes
 TC008 [*] Remove quotes from type alias
   --> TC008_union_syntax_pre_py310.py:11:20
    |
- 9 |     c: TypeAlias = 'int | None'  # OK
-10 |     d: TypeAlias = 'Annotated[int, 1 | 2]'  # TC008
 11 |     e: TypeAlias = 'Annotated[int, 1 + 2]'  # TC008
    |                    ^^^^^^^^^^^^^^^^^^^^^^^
-12 |     f: TypeAlias = 'dict[str, int | None]'  # OK
    |
 help: Remove quotes
 8  | if TYPE_CHECKING:

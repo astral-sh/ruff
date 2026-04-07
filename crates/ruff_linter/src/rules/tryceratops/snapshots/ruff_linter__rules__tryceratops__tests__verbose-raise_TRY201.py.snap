@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:20:15
    |
-18 |     except MyException as e:
-19 |         logger.exception("process failed")
 20 |         raise e
    |               ^
    |
@@ -23,8 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:63:19
    |
-61 |         logger.exception("process failed")
-62 |         if True:
 63 |             raise e
    |                   ^
    |
@@ -42,7 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:74:23
    |
-73 |             def foo():
 74 |                 raise e
    |                       ^
    |

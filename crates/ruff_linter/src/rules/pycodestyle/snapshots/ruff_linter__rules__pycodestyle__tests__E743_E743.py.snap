@@ -6,7 +6,6 @@ E743 Ambiguous function name: `l`
   |
 1 | def l():
   |     ^
-2 |     pass
   |
 
 E743 Ambiguous function name: `I`
@@ -14,14 +13,11 @@ E743 Ambiguous function name: `I`
   |
 5 | def I():
   |     ^
-6 |     pass
   |
 
 E743 Ambiguous function name: `O`
   --> E743.py:10:9
    |
- 9 | class X:
 10 |     def O(self):
    |         ^
-11 |         pass
    |

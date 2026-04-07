@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF064 [*] Non-octal mode
  --> RUF064.py:6:17
   |
-4 | from pathlib import Path
-5 |
 6 | os.chmod("foo", 444)  # Error
   |                 ^^^
-7 | os.chmod("foo", 0o444)  # OK
-8 | os.chmod("foo", 7777)  # Error
   |
 info: Current value of 444 (0o674) sets permissions: u=rw-, g=rwx, o=r--
 info: Suggested value of 0o444 sets permissions: u=r--, g=r--, o=r--
@@ -25,50 +21,36 @@ help: Replace with octal literal
 note: This is an unsafe fix and may change runtime behavior
 
 RUF064 Non-octal mode
-  --> RUF064.py:8:17
-   |
- 6 | os.chmod("foo", 444)  # Error
- 7 | os.chmod("foo", 0o444)  # OK
- 8 | os.chmod("foo", 7777)  # Error
-   |                 ^^^^
- 9 | os.chmod("foo", 10000)  # Error
-10 | os.chmod("foo", 99999)  # Error
-   |
+ --> RUF064.py:8:17
+  |
+8 | os.chmod("foo", 7777)  # Error
+  |                 ^^^^
+  |
 info: Current value of 7777 (0o7141) sets permissions: u=--x, g=r--, o=--x
 help: Replace with octal literal
 
 RUF064 Non-octal mode
-  --> RUF064.py:9:17
-   |
- 7 | os.chmod("foo", 0o444)  # OK
- 8 | os.chmod("foo", 7777)  # Error
- 9 | os.chmod("foo", 10000)  # Error
-   |                 ^^^^^
-10 | os.chmod("foo", 99999)  # Error
-   |
+ --> RUF064.py:9:17
+  |
+9 | os.chmod("foo", 10000)  # Error
+  |                 ^^^^^
+  |
 info: Current value of 10000 (0o3420) sets permissions: u=r--, g=-w-, o=---
 help: Replace with octal literal
 
 RUF064 Non-octal mode
   --> RUF064.py:10:17
    |
- 8 | os.chmod("foo", 7777)  # Error
- 9 | os.chmod("foo", 10000)  # Error
 10 | os.chmod("foo", 99999)  # Error
    |                 ^^^^^
-11 |
-12 | os.umask(777)  # Error
    |
 help: Replace with octal literal
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:12:10
    |
-10 | os.chmod("foo", 99999)  # Error
-11 |
 12 | os.umask(777)  # Error
    |          ^^^
-13 | os.umask(0o777)  # OK
    |
 info: Current value of 777 (0o1411) sets permissions: u=r--, g=--x, o=--x
 info: Suggested value of 0o777 sets permissions: u=rwx, g=rwx, o=rwx
@@ -86,11 +68,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:15:14
    |
-13 | os.umask(0o777)  # OK
-14 |
 15 | os.fchmod(0, 400)  # Error
    |              ^^^
-16 | os.fchmod(0, 0o400)  # OK
    |
 info: Current value of 400 (0o620) sets permissions: u=rw-, g=-w-, o=---
 info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
@@ -108,11 +87,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:18:18
    |
-16 | os.fchmod(0, 0o400)  # OK
-17 |
 18 | os.lchmod("foo", 755)  # Error
    |                  ^^^
-19 | os.lchmod("foo", 0o755)  # OK
    |
 info: Current value of 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
@@ -130,11 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:21:17
    |
-19 | os.lchmod("foo", 0o755)  # OK
-20 |
 21 | os.mkdir("foo", 600)  # Error
    |                 ^^^
-22 | os.mkdir("foo", 0o600)  # OK
    |
 info: Current value of 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
 info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
@@ -152,11 +125,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:24:20
    |
-22 | os.mkdir("foo", 0o600)  # OK
-23 |
 24 | os.makedirs("foo", 644)  # Error
    |                    ^^^
-25 | os.makedirs("foo", 0o644)  # OK
    |
 info: Current value of 644 (0o1204) sets permissions: u=-w-, g=---, o=r--
 info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
@@ -174,11 +144,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:27:18
    |
-25 | os.makedirs("foo", 0o644)  # OK
-26 |
 27 | os.mkfifo("foo", 640)  # Error
    |                  ^^^
-28 | os.mkfifo("foo", 0o640)  # OK
    |
 info: Current value of 640 (0o1200) sets permissions: u=-w-, g=---, o=---
 info: Suggested value of 0o640 sets permissions: u=rw-, g=r--, o=---
@@ -196,11 +163,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:30:17
    |
-28 | os.mkfifo("foo", 0o640)  # OK
-29 |
 30 | os.mknod("foo", 660)  # Error
    |                 ^^^
-31 | os.mknod("foo", 0o660)  # OK
    |
 info: Current value of 660 (0o1224) sets permissions: u=-w-, g=-w-, o=r--
 info: Suggested value of 0o660 sets permissions: u=rw-, g=rw-, o=---
@@ -218,11 +182,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:33:28
    |
-31 | os.mknod("foo", 0o660)  # OK
-32 |
 33 | os.open("foo", os.O_CREAT, 644)  # Error
    |                            ^^^
-34 | os.open("foo", os.O_CREAT, 0o644)  # OK
    |
 info: Current value of 644 (0o1204) sets permissions: u=-w-, g=---, o=r--
 info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
@@ -240,11 +201,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:36:19
    |
-34 | os.open("foo", os.O_CREAT, 0o644)  # OK
-35 |
 36 | Path("bar").chmod(755)  # Error
    |                   ^^^
-37 | Path("bar").chmod(0o755)  # OK
    |
 info: Current value of 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
@@ -262,10 +220,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:40:12
    |
-39 | path = Path("bar")
 40 | path.chmod(755)  # Error
    |            ^^^
-41 | path.chmod(0o755)  # OK
    |
 info: Current value of 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
@@ -283,11 +239,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:43:21
    |
-41 | path.chmod(0o755)  # OK
-42 |
 43 | dbm.open("db", "r", 600)  # Error
    |                     ^^^
-44 | dbm.open("db", "r", 0o600)  # OK
    |
 info: Current value of 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
 info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
@@ -305,11 +258,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:46:25
    |
-44 | dbm.open("db", "r", 0o600)  # OK
-45 |
 46 | dbm.gnu.open("db", "r", 600)  # Error
    |                         ^^^
-47 | dbm.gnu.open("db", "r", 0o600)  # OK
    |
 info: Current value of 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
 info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
@@ -327,11 +277,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:49:26
    |
-47 | dbm.gnu.open("db", "r", 0o600)  # OK
-48 |
 49 | dbm.ndbm.open("db", "r", 600)  # Error
    |                          ^^^
-50 | dbm.ndbm.open("db", "r", 0o600)  # OK
    |
 info: Current value of 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
 info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
@@ -349,11 +296,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:52:14
    |
-50 | dbm.ndbm.open("db", "r", 0o600)  # OK
-51 |
 52 | os.fchmod(0, 256)  # 0o400
    |              ^^^
-53 | os.fchmod(0, 493)  # 0o755
    |
 info: Current value of 256 (0o400) sets permissions: u=r--, g=---, o=---
 info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
@@ -371,11 +315,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:53:14
    |
-52 | os.fchmod(0, 256)  # 0o400
 53 | os.fchmod(0, 493)  # 0o755
    |              ^^^
-54 |
-55 | # https://github.com/astral-sh/ruff/issues/19010
    |
 info: Current value of 493 (0o755) sets permissions: u=rwx, g=r-x, o=r-x
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
@@ -393,10 +334,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF064 [*] Non-octal mode
   --> RUF064.py:56:17
    |
-55 | # https://github.com/astral-sh/ruff/issues/19010
 56 | os.chmod("foo", 000)  # Error
    |                 ^^^
-57 | os.chmod("foo", 0000)  # Error
    |
 info: Current value of 000 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal
@@ -412,12 +351,8 @@ help: Replace with octal literal
 RUF064 [*] Non-octal mode
   --> RUF064.py:57:17
    |
-55 | # https://github.com/astral-sh/ruff/issues/19010
-56 | os.chmod("foo", 000)  # Error
 57 | os.chmod("foo", 0000)  # Error
    |                 ^^^^
-58 |
-59 | os.chmod("foo", 0b0)  # Error
    |
 info: Current value of 0000 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal
@@ -433,12 +368,8 @@ help: Replace with octal literal
 RUF064 Non-octal mode
   --> RUF064.py:59:17
    |
-57 | os.chmod("foo", 0000)  # Error
-58 |
 59 | os.chmod("foo", 0b0)  # Error
    |                 ^^^
-60 | os.chmod("foo", 0x0)  # Error
-61 | os.chmod("foo", 0)  # Ok
    |
 info: Current value of 0b0 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal
@@ -446,10 +377,8 @@ help: Replace with octal literal
 RUF064 Non-octal mode
   --> RUF064.py:60:17
    |
-59 | os.chmod("foo", 0b0)  # Error
 60 | os.chmod("foo", 0x0)  # Error
    |                 ^^^
-61 | os.chmod("foo", 0)  # Ok
    |
 info: Current value of 0x0 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal

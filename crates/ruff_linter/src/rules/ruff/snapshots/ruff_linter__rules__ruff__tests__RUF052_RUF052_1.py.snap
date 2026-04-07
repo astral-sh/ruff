@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:21:9
    |
-20 |     # Should detect used dummy variable
 21 |     for _item in my_list:
    |         ^^^^^
-22 |         print(_item["foo"])  # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 18 |     my_list = [{"foo": 1}, {"foo": 2}]
@@ -25,10 +23,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_index` is accessed
   --> RUF052_1.py:25:9
    |
-24 |     # Should detect used dummy variable
 25 |     for _index, _value in enumerate(my_list):
    |         ^^^^^^
-26 |         result = _index + _value["foo"]  # RUF052: Both `_index` and `_value` are accessed
    |
 help: Remove leading underscores
 22 |         print(_item["foo"])  # RUF052: Local dummy variable `_item` is accessed
@@ -46,10 +42,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_value` is accessed
   --> RUF052_1.py:25:17
    |
-24 |     # Should detect used dummy variable
 25 |     for _index, _value in enumerate(my_list):
    |                 ^^^^^^
-26 |         result = _index + _value["foo"]  # RUF052: Both `_index` and `_value` are accessed
    |
 help: Remove leading underscores
 22 |         print(_item["foo"])  # RUF052: Local dummy variable `_item` is accessed
@@ -67,11 +61,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:33:32
    |
-32 |     # Should detect used dummy variable
 33 |     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
    |                                ^^^^^
-34 |
-35 |     # Should detect used dummy variable in nested comprehension
    |
 help: Remove leading underscores
 30 |     my_list = [{"foo": 1}, {"foo": 2}]
@@ -87,10 +78,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:36:33
    |
-35 |     # Should detect used dummy variable in nested comprehension
 36 |     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
    |                                 ^^^^^
-37 |     # RUF052: Both `_item` and `_sublist` are accessed
    |
 help: Remove leading underscores
 33 |     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
@@ -106,10 +95,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_sublist` is accessed
   --> RUF052_1.py:36:56
    |
-35 |     # Should detect used dummy variable in nested comprehension
 36 |     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
    |                                                        ^^^^^^^^
-37 |     # RUF052: Both `_item` and `_sublist` are accessed
    |
 help: Remove leading underscores
 33 |     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
@@ -125,10 +112,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:40:34
    |
-39 |     # Should detect with conditions
 40 |     filtered = [_item["foo"] for _item in my_list if _item["foo"] > 0]
    |                                  ^^^^^
-41 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 37 |     # RUF052: Both `_item` and `_sublist` are accessed
@@ -144,10 +129,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:48:48
    |
-47 |     # Should detect used dummy variable
 48 |     result = {_item["key"]: _item["value"] for _item in my_list}
    |                                                ^^^^^
-49 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 45 |     my_list = [{"key": "a", "value": 1}, {"key": "b", "value": 2}]
@@ -163,10 +146,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_index` is accessed
   --> RUF052_1.py:52:43
    |
-51 |     # Should detect with enumerate
 52 |     indexed = {_index: _item["value"] for _index, _item in enumerate(my_list)}
    |                                           ^^^^^^
-53 |     # RUF052: Both `_index` and `_item` are accessed
    |
 help: Remove leading underscores
 49 |     # RUF052: Local dummy variable `_item` is accessed
@@ -182,10 +163,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:52:51
    |
-51 |     # Should detect with enumerate
 52 |     indexed = {_index: _item["value"] for _index, _item in enumerate(my_list)}
    |                                                   ^^^^^
-53 |     # RUF052: Both `_index` and `_item` are accessed
    |
 help: Remove leading underscores
 49 |     # RUF052: Local dummy variable `_item` is accessed
@@ -201,11 +180,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_inner` is accessed
   --> RUF052_1.py:56:59
    |
-55 |     # Should detect in nested dict comprehension
 56 |     nested = {_outer: {_inner["key"]: _inner["value"] for _inner in sublist}
    |                                                           ^^^^^^
-57 |               for _outer, sublist in enumerate([my_list])}
-58 |     # RUF052: `_outer`, `_inner` are accessed
    |
 help: Remove leading underscores
 53 |     # RUF052: Both `_index` and `_item` are accessed
@@ -221,11 +197,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_outer` is accessed
   --> RUF052_1.py:57:19
    |
-55 |     # Should detect in nested dict comprehension
-56 |     nested = {_outer: {_inner["key"]: _inner["value"] for _inner in sublist}
 57 |               for _outer, sublist in enumerate([my_list])}
    |                   ^^^^^^
-58 |     # RUF052: `_outer`, `_inner` are accessed
    |
 help: Remove leading underscores
 53 |     # RUF052: Both `_index` and `_item` are accessed
@@ -243,10 +216,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:65:39
    |
-64 |     # Should detect used dummy variable
 65 |     unique_values = {_item["foo"] for _item in my_list}
    |                                       ^^^^^
-66 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 62 |     my_list = [{"foo": 1}, {"foo": 2}, {"foo": 1}]  # Note: duplicate values
@@ -262,10 +233,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:69:38
    |
-68 |     # Should detect with conditions
 69 |     filtered_set = {_item["foo"] for _item in my_list if _item["foo"] > 0}
    |                                      ^^^^^
-70 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 66 |     # RUF052: Local dummy variable `_item` is accessed
@@ -281,10 +250,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:73:39
    |
-72 |     # Should detect with complex expression
 73 |     processed = {_item["foo"] * 2 for _item in my_list}
    |                                       ^^^^^
-74 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 70 |     # RUF052: Local dummy variable `_item` is accessed
@@ -300,10 +267,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:81:29
    |
-80 |     # Should detect used dummy variable
 81 |     gen = (_item["foo"] for _item in my_list)
    |                             ^^^^^
-82 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 78 |     my_list = [{"foo": 1}, {"foo": 2}]
@@ -319,10 +284,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:85:34
    |
-84 |     # Should detect when passed to function
 85 |     total = sum(_item["foo"] for _item in my_list)
    |                                  ^^^^^
-86 |     # RUF052: Local dummy variable `_item` is accessed
    |
 help: Remove leading underscores
 82 |     # RUF052: Local dummy variable `_item` is accessed
@@ -338,10 +301,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_x` is accessed
   --> RUF052_1.py:89:27
    |
-88 |     # Should detect with multiple generators
 89 |     pairs = ((_x, _y) for _x in range(3) for _y in range(3) if _x != _y)
    |                           ^^
-90 |     # RUF052: Both `_x` and `_y` are accessed
    |
 help: Remove leading underscores
 86 |     # RUF052: Local dummy variable `_item` is accessed
@@ -357,10 +318,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_y` is accessed
   --> RUF052_1.py:89:46
    |
-88 |     # Should detect with multiple generators
 89 |     pairs = ((_x, _y) for _x in range(3) for _y in range(3) if _x != _y)
    |                                              ^^
-90 |     # RUF052: Both `_x` and `_y` are accessed
    |
 help: Remove leading underscores
 86 |     # RUF052: Local dummy variable `_item` is accessed
@@ -376,10 +335,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_inner` is accessed
   --> RUF052_1.py:93:41
    |
-92 |     # Should detect in nested generator
 93 |     nested_gen = (sum(_inner["foo"] for _inner in sublist) for _sublist in [my_list] for sublist in _sublist)
    |                                         ^^^^^^
-94 |     # RUF052: `_inner` and `_sublist` are accessed
    |
 help: Remove leading underscores
 90 |     # RUF052: Both `_x` and `_y` are accessed
@@ -395,10 +352,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_sublist` is accessed
   --> RUF052_1.py:93:64
    |
-92 |     # Should detect in nested generator
 93 |     nested_gen = (sum(_inner["foo"] for _inner in sublist) for _sublist in [my_list] for sublist in _sublist)
    |                                                                ^^^^^^^^
-94 |     # RUF052: `_inner` and `_sublist` are accessed
    |
 help: Prefer using trailing underscores to avoid shadowing a variable
 90 |     # RUF052: Both `_x` and `_y` are accessed
@@ -414,12 +369,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_val` is accessed
    --> RUF052_1.py:102:30
     |
-100 |     # Should detect in mixed comprehensions
-101 |     result = [
 102 |         {_key: [_val * 2 for _val in _record["items"]] for _key in ["doubled"]}
     |                              ^^^^
-103 |         for _record in data
-104 |     ]
     |
 help: Remove leading underscores
 99  |
@@ -435,12 +386,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_key` is accessed
    --> RUF052_1.py:102:60
     |
-100 |     # Should detect in mixed comprehensions
-101 |     result = [
 102 |         {_key: [_val * 2 for _val in _record["items"]] for _key in ["doubled"]}
     |                                                            ^^^^
-103 |         for _record in data
-104 |     ]
     |
 help: Remove leading underscores
 99  |
@@ -456,12 +403,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_record` is accessed
    --> RUF052_1.py:103:13
     |
-101 |     result = [
-102 |         {_key: [_val * 2 for _val in _record["items"]] for _key in ["doubled"]}
 103 |         for _record in data
     |             ^^^^^^^
-104 |     ]
-105 |     # RUF052: `_key`, `_val`, and `_record` are all accessed
     |
 help: Remove leading underscores
 99  |
@@ -479,10 +422,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF052 [*] Local dummy variable `_item` is accessed
    --> RUF052_1.py:108:43
     |
-107 |     # Should detect in generator passed to list constructor
 108 |     gen_list = list(_item["items"][0] for _item in data)
     |                                           ^^^^^
-109 |     # RUF052: Local dummy variable `_item` is accessed
     |
 help: Remove leading underscores
 105 |     # RUF052: `_key`, `_val`, and `_record` are all accessed

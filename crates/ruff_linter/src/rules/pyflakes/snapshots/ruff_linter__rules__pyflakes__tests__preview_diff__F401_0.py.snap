@@ -13,12 +13,8 @@ Added: 2
 F401 [*] `multiprocessing.process` imported but unused
   --> F401_0.py:10:8
    |
- 8 | )
- 9 | import multiprocessing.pool
 10 | import multiprocessing.process
    |        ^^^^^^^^^^^^^^^^^^^^^^^
-11 | import logging.config
-12 | import logging.handlers
    |
 help: Remove unused import: `multiprocessing.process`
 7  |     namedtuple,
@@ -33,12 +29,8 @@ help: Remove unused import: `multiprocessing.process`
 F401 [*] `logging.config` imported but unused
   --> F401_0.py:11:8
    |
- 9 | import multiprocessing.pool
-10 | import multiprocessing.process
 11 | import logging.config
    |        ^^^^^^^^^^^^^^
-12 | import logging.handlers
-13 | from typing import (
    |
 help: Remove unused import: `logging.config`
 8  | )

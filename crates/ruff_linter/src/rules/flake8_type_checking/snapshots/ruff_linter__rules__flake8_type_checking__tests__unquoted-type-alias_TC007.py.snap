@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC007 [*] Add quotes to type alias
   --> TC007.py:15:16
    |
-13 | a: TypeAlias = int  # OK
-14 | b: TypeAlias = Dict  # OK
 15 | c: TypeAlias = Foo   # TC007
    |                ^^^
-16 | d: TypeAlias = Foo | None  # TC007
-17 | e: TypeAlias = OptStr   # TC007
    |
 help: Add quotes
 12 |
@@ -25,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:16:16
    |
-14 | b: TypeAlias = Dict  # OK
-15 | c: TypeAlias = Foo   # TC007
 16 | d: TypeAlias = Foo | None  # TC007
    |                ^^^
-17 | e: TypeAlias = OptStr   # TC007
-18 | f: TypeAlias = Bar   # TC007
    |
 help: Add quotes
 13 | a: TypeAlias = int  # OK
@@ -46,12 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:17:16
    |
-15 | c: TypeAlias = Foo   # TC007
-16 | d: TypeAlias = Foo | None  # TC007
 17 | e: TypeAlias = OptStr   # TC007
    |                ^^^^^^
-18 | f: TypeAlias = Bar   # TC007
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
    |
 help: Add quotes
 14 | b: TypeAlias = Dict  # OK
@@ -67,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:18:16
    |
-16 | d: TypeAlias = Foo | None  # TC007
-17 | e: TypeAlias = OptStr   # TC007
 18 | f: TypeAlias = Bar   # TC007
    |                ^^^
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
-20 | h: TypeAlias = Foo[str]  # TC007
    |
 help: Add quotes
 15 | c: TypeAlias = Foo   # TC007
@@ -88,12 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:19:16
    |
-17 | e: TypeAlias = OptStr   # TC007
-18 | f: TypeAlias = Bar   # TC007
 19 | g: TypeAlias = Foo | Bar  # TC007 x2
    |                ^^^
-20 | h: TypeAlias = Foo[str]  # TC007
-21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    |
 help: Add quotes
 16 | d: TypeAlias = Foo | None  # TC007
@@ -109,12 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:19:22
    |
-17 | e: TypeAlias = OptStr   # TC007
-18 | f: TypeAlias = Bar   # TC007
 19 | g: TypeAlias = Foo | Bar  # TC007 x2
    |                      ^^^
-20 | h: TypeAlias = Foo[str]  # TC007
-21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    |
 help: Add quotes
 16 | d: TypeAlias = Foo | None  # TC007
@@ -130,12 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:20:16
    |
-18 | f: TypeAlias = Bar   # TC007
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
 20 | h: TypeAlias = Foo[str]  # TC007
    |                ^^^
-21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
-22 |     Bar)
    |
 help: Add quotes
 17 | e: TypeAlias = OptStr   # TC007
@@ -151,11 +123,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:21:17
    |
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
-20 | h: TypeAlias = Foo[str]  # TC007
 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    |                 ^^^
-22 |     Bar)
    |
 help: Add quotes
 18 | f: TypeAlias = Bar   # TC007
@@ -172,12 +141,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC007 [*] Add quotes to type alias
   --> TC007.py:22:5
    |
-20 | h: TypeAlias = Foo[str]  # TC007
-21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
 22 |     Bar)
    |     ^^^
-23 |
-24 | type C = Foo   # OK
    |
 help: Add quotes
 18 | f: TypeAlias = Bar   # TC007

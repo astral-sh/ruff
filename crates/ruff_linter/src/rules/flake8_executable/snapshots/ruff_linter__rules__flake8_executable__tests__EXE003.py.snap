@@ -6,5 +6,4 @@ EXE003 Shebang should contain `python`, `pytest`, or `uv run`
   |
 1 | #!/usr/bin/bash
   | ^^^^^^^^^^^^^^^
-2 | print("hello world")
   |

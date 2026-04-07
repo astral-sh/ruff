@@ -13,8 +13,6 @@ Added: 0
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:41:22
    |
-39 |       single_line = """ {a} """  # RUF027
-40 |       # RUF027
 41 |       multi_line = a = """b { # comment
    |  ______________________^
 42 | |     c}  d
@@ -36,8 +34,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:49:9
    |
-47 |       a = 4
-48 |       # RUF027
 49 |       b = " {\
    |  _________^
 50 | |     a} \
@@ -59,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:92:11
    |
-90 | def backslash_test():
-91 |     x = "test"
 92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
    |           ^^^^^^^^^^^^^^^^^^
-93 |
-94 | # Test case for comment handling in f-string interpolations
    |
 help: Add `f` prefix
 89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
@@ -79,17 +71,13 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 RUF027 [*] Possible f-string without an `f` prefix
-   --> RUF027_0.py:98:11
-    |
- 96 |   def comment_test():
- 97 |       x = "!"
- 98 |       print("""{x  # }
-    |  ___________^
- 99 | | }""")
-    | |____^
-100 |
-101 |   # Test case for `#` inside a nested string literal in interpolation
-    |
+  --> RUF027_0.py:98:11
+   |
+98 |       print("""{x  # }
+   |  ___________^
+99 | | }""")
+   | |____^
+   |
 help: Add `f` prefix
 95  | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
 96  | def comment_test():

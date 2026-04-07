@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `re.RegexFlag` imported but unused
  --> F401_23.py:4:16
   |
-3 | from pathlib import Path
 4 | from re import RegexFlag
   |                ^^^^^^^^^
-5 | from typing import Annotated
   |
 help: Remove unused import: `re.RegexFlag`
 1 | """Test: ensure that we treat strings in `typing.Annotation` as type definitions."""

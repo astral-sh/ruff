@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
  --> PYI032.py:6:29
   |
-5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
   |                             ^^^
-7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
   |
 help: Replace with `object`
 3 |
@@ -22,8 +20,6 @@ help: Replace with `object`
 PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
  --> PYI032.py:7:29
   |
-5 | class Bad:
-6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
   |                             ^^^^^^^^^^
   |
@@ -40,10 +36,8 @@ help: Replace with `object`
 PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
   --> PYI032.py:27:28
    |
-26 | class BadStringized:
 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
    |                            ^^^^^
-28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
    |
 help: Replace with `object`
 24 |
@@ -56,8 +50,6 @@ help: Replace with `object`
 PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
   --> PYI032.py:28:28
    |
-26 | class BadStringized:
-27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
 28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
    |                            ^^^^^
    |

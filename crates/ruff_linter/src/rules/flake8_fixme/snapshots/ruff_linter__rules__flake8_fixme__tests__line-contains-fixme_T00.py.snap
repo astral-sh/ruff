@@ -4,20 +4,13 @@ source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
 FIX001 Line contains FIXME, consider resolving the issue
  --> T00.py:7:3
   |
-5 | # HACK: hack
-6 | # hack: hack
 7 | # FIXME: fixme
   |   ^^^^^
-8 | # fixme: fixme
   |
 
 FIX001 Line contains FIXME, consider resolving the issue
-  --> T00.py:8:3
-   |
- 6 | # hack: hack
- 7 | # FIXME: fixme
- 8 | # fixme: fixme
-   |   ^^^^^
- 9 |
-10 | # test # TODO: todo
-   |
+ --> T00.py:8:3
+  |
+8 | # fixme: fixme
+  |   ^^^^^
+  |

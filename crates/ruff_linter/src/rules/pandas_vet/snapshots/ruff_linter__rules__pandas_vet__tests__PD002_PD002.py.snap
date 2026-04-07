@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
  --> PD002.py:5:23
   |
-3 | x = pd.DataFrame()
-4 |
 5 | x.drop(["a"], axis=1, inplace=True)
   |                       ^^^^^^^^^^^^
-6 |
-7 | x.y.drop(["a"], axis=1, inplace=True)
   |
 help: Assign to variable; remove `inplace` arg
 2 |
@@ -25,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
  --> PD002.py:7:25
   |
-5 | x.drop(["a"], axis=1, inplace=True)
-6 |
 7 | x.y.drop(["a"], axis=1, inplace=True)
   |                         ^^^^^^^^^^^^
-8 |
-9 | x["y"].drop(["a"], axis=1, inplace=True)
   |
 help: Assign to variable; remove `inplace` arg
 4  |
@@ -44,15 +36,11 @@ help: Assign to variable; remove `inplace` arg
 note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
-  --> PD002.py:9:28
-   |
- 7 | x.y.drop(["a"], axis=1, inplace=True)
- 8 |
- 9 | x["y"].drop(["a"], axis=1, inplace=True)
-   |                            ^^^^^^^^^^^^
-10 |
-11 | x.drop(
-   |
+ --> PD002.py:9:28
+  |
+9 | x["y"].drop(["a"], axis=1, inplace=True)
+  |                            ^^^^^^^^^^^^
+  |
 help: Assign to variable; remove `inplace` arg
 6  |
 7  | x.y.drop(["a"], axis=1, inplace=True)
@@ -67,11 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:12:5
    |
-11 | x.drop(
 12 |     inplace=True,
    |     ^^^^^^^^^^^^
-13 |     columns=["a"],
-14 |     axis=1,
    |
 help: Assign to variable; remove `inplace` arg
 8  |
@@ -88,12 +73,8 @@ note: This is an unsafe fix and may change runtime behavior
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:19:9
    |
-17 | if True:
-18 |     x.drop(
 19 |         inplace=True,
    |         ^^^^^^^^^^^^
-20 |         columns=["a"],
-21 |         axis=1,
    |
 help: Assign to variable; remove `inplace` arg
 15 | )
@@ -110,12 +91,8 @@ note: This is an unsafe fix and may change runtime behavior
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:24:33
    |
-22 |     )
-23 |
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
    |                                 ^^^^^^^^^^^^
-25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
-26 | f(x.drop(["a"], axis=1, inplace=True))
    |
 help: Assign to variable; remove `inplace` arg
 21 |         axis=1,
@@ -131,45 +108,32 @@ note: This is an unsafe fix and may change runtime behavior
 PD002 `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:25:23
    |
-24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
    |                       ^^^^^^^^^^^^
-26 | f(x.drop(["a"], axis=1, inplace=True))
    |
 help: Assign to variable; remove `inplace` arg
 
 PD002 `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:26:25
    |
-24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
-25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 26 | f(x.drop(["a"], axis=1, inplace=True))
    |                         ^^^^^^^^^^^^
-27 |
-28 | x.apply(lambda x: x.sort_values("a", inplace=True))
    |
 help: Assign to variable; remove `inplace` arg
 
 PD002 `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:28:38
    |
-26 | f(x.drop(["a"], axis=1, inplace=True))
-27 |
 28 | x.apply(lambda x: x.sort_values("a", inplace=True))
    |                                      ^^^^^^^^^^^^
-29 | import torch
    |
 help: Assign to variable; remove `inplace` arg
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:33:24
    |
-31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
-32 |
 33 | (x.drop(["a"], axis=1, inplace=True))
    |                        ^^^^^^^^^^^^
-34 |
-35 | # This method doesn't take exist in Pandas, so ignore it.
    |
 help: Assign to variable; remove `inplace` arg
 30 |

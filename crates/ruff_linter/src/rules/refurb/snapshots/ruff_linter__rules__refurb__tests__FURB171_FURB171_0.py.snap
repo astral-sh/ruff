@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB171 [*] Membership test against single-item container
  --> FURB171_0.py:3:4
   |
-1 | # Errors.
-2 |
 3 | if 1 in (1,):
   |    ^^^^^^^^^
-4 |     print("Single-element tuple")
   |
 help: Convert to equality test
 1 | # Errors.
@@ -23,11 +20,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
  --> FURB171_0.py:6:4
   |
-4 |     print("Single-element tuple")
-5 |
 6 | if 1 in [1]:
   |    ^^^^^^^^
-7 |     print("Single-element list")
   |
 help: Convert to equality test
 3 | if 1 in (1,):
@@ -41,14 +35,11 @@ help: Convert to equality test
 note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
-  --> FURB171_0.py:9:4
-   |
- 7 |     print("Single-element list")
- 8 |
- 9 | if 1 in {1}:
-   |    ^^^^^^^^
-10 |     print("Single-element set")
-   |
+ --> FURB171_0.py:9:4
+  |
+9 | if 1 in {1}:
+  |    ^^^^^^^^
+  |
 help: Convert to equality test
 6  | if 1 in [1]:
 7  |     print("Single-element list")
@@ -63,11 +54,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:12:4
    |
-10 |     print("Single-element set")
-11 |
 12 | if "a" in "a":
    |    ^^^^^^^^^^
-13 |     print("Single-element string")
    |
 help: Convert to equality test
 9  | if 1 in {1}:
@@ -83,11 +71,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:15:4
    |
-13 |     print("Single-element string")
-14 |
 15 | if 1 not in (1,):
    |    ^^^^^^^^^^^^^
-16 |     print("Check `not in` membership test")
    |
 help: Convert to inequality test
 12 | if "a" in "a":
@@ -103,11 +88,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:18:8
    |
-16 |     print("Check `not in` membership test")
-17 |
 18 | if not 1 in (1,):
    |        ^^^^^^^^^
-19 |     print("Check the negated membership test")
    |
 help: Convert to equality test
 15 | if 1 not in (1,):
@@ -123,15 +105,12 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:52:5
    |
-51 |   # https://github.com/astral-sh/ruff/issues/10063
 52 |   _ = a in (
    |  _____^
 53 | |     # Foo
 54 | |     b,
 55 | | )
    | |_^
-56 |
-57 |   _ = a in (  # Foo1
    |
 help: Convert to equality test
 49 |
@@ -150,8 +129,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:57:5
    |
-55 |   )
-56 |
 57 |   _ = a in (  # Foo1
    |  _____^
 58 | |     (  # Foo2
@@ -170,8 +147,6 @@ FURB171 [*] Membership test against single-item container
 71 | |     )
 72 | | )
    | |_^
-73 |
-74 |   foo = (
    |
 help: Convert to equality test
 54 |     b,
@@ -202,8 +177,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:77:28
    |
-75 |       lorem()
-76 |           .ipsum()
 77 |           .dolor(lambda sit: sit in (
    |  ____________________________^
 78 | |             # Foo1
@@ -211,7 +184,6 @@ FURB171 [*] Membership test against single-item container
 80 | |             amet,
 81 | |         ))
    | |_________^
-82 |   )
    |
 help: Convert to equality test
 74 | foo = (
@@ -231,8 +203,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:87:28
    |
-85 |       lorem()
-86 |           .ipsum()
 87 |           .dolor(lambda sit: sit in (
    |  ____________________________^
 88 | |             (
@@ -242,7 +212,6 @@ FURB171 [*] Membership test against single-item container
 92 | |             ),
 93 | |         ))
    | |_________^
-94 |   )
    |
 help: Convert to equality test
 84 | foo = (
@@ -265,8 +234,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:98:24
     |
- 96 |   foo = lorem() \
- 97 |       .ipsum() \
  98 |       .dolor(lambda sit: sit in (
     |  ________________________^
  99 | |         # Foo1
@@ -274,8 +241,6 @@ FURB171 [*] Membership test against single-item container
 101 | |         amet,
 102 | |     ))
     | |_____^
-103 |
-104 |   def _():
     |
 help: Convert to equality test
 95  |
@@ -295,7 +260,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:105:8
     |
-104 |   def _():
 105 |       if foo not \
     |  ________^
 106 | |         in [
@@ -304,8 +268,6 @@ FURB171 [*] Membership test against single-item container
 109 | |         # After
 110 | |     ]: ...
     | |_____^
-111 |
-112 |   def _():
     |
 help: Convert to inequality test
 102 |     ))
@@ -326,7 +288,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:113:8
     |
-112 |   def _():
 113 |       if foo not \
     |  ________^
 114 | |         in [
@@ -335,7 +296,6 @@ FURB171 [*] Membership test against single-item container
 117 | |         # After
 118 | |     ] and \
     | |_____^
-119 |           0 < 1: ...
     |
 help: Convert to inequality test
 110 |     ]: ...
@@ -356,10 +316,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:125:4
     |
-124 | # NaN behavior differences
 125 | if math.nan in [math.nan]:
     |    ^^^^^^^^^^^^^^^^^^^^^^
-126 |     print("This is True")
     |
 help: Convert to equality test
 122 | import math
@@ -375,11 +333,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:128:4
     |
-126 |     print("This is True")
-127 |
 128 | if math.nan in (math.nan,):
     |    ^^^^^^^^^^^^^^^^^^^^^^^
-129 |     print("This is True")
     |
 help: Convert to equality test
 125 | if math.nan in [math.nan]:
@@ -395,11 +350,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:131:4
     |
-129 |     print("This is True")
-130 |
 131 | if math.nan in {math.nan}:
     |    ^^^^^^^^^^^^^^^^^^^^^^
-132 |     print("This is True")
     |
 help: Convert to equality test
 128 | if math.nan in (math.nan,):
@@ -415,10 +367,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:140:4
     |
-139 | obj = CustomEq()
 140 | if obj in [CustomEq()]:
     |    ^^^^^^^^^^^^^^^^^^^
-141 |     pass
     |
 help: Convert to equality test
 137 |         return "custom"
@@ -434,11 +384,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:143:4
     |
-141 |     pass
-142 |
 143 | if obj in (CustomEq(),):
     |    ^^^^^^^^^^^^^^^^^^^^
-144 |     pass
     |
 help: Convert to equality test
 140 | if obj in [CustomEq()]:
@@ -454,11 +401,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:146:4
     |
-144 |     pass
-145 |
 146 | if obj in {CustomEq()}:
     |    ^^^^^^^^^^^^^^^^^^^
-147 |     pass
     |
 help: Convert to equality test
 143 | if obj in (CustomEq(),):

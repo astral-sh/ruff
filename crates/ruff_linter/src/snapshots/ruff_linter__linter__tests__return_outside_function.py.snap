@@ -6,13 +6,11 @@ F706 `return` statement outside of a function/method
    |
 13 | return 1  # error
    | ^^^^^^^^
-14 | return  # error
    |
 
 F706 `return` statement outside of a function/method
   --> resources/test/fixtures/syntax_errors/return_outside_function.py:14:1
    |
-13 | return 1  # error
 14 | return  # error
    | ^^^^^^
    |
@@ -20,7 +18,6 @@ F706 `return` statement outside of a function/method
 F706 `return` statement outside of a function/method
   --> resources/test/fixtures/syntax_errors/return_outside_function.py:18:5
    |
-17 | class C:
 18 |     return 1  # error
    |     ^^^^^^^^
    |
@@ -28,8 +25,6 @@ F706 `return` statement outside of a function/method
 F706 `return` statement outside of a function/method
   --> resources/test/fixtures/syntax_errors/return_outside_function.py:23:9
    |
-21 | def f():
-22 |     class C:
 23 |         return 1  # error
    |         ^^^^^^^^
    |

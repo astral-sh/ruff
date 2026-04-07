@@ -28,15 +28,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/expression/yield_and_yie
 error[invalid-return-type]: Return type does not match returned value
  --> src/mdtest_snippet.py:3:18
   |
-1 | from typing import Generator
-2 |
 3 | def non_gen() -> Generator[int, int, None]:
   |                  ------------------------- Expected `Generator[int, int, None]` because of return type
 4 |     # error: [invalid-return-type]
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
-6 |
-7 | reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
   |
 
 ```

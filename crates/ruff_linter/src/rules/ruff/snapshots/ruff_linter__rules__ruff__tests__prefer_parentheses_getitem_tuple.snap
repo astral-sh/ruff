@@ -2,16 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF031 [*] Use parentheses for tuples in subscripts
-  --> RUF031_prefer_parens.py:8:5
-   |
- 6 |   )]
- 7 |   d[
- 8 | /     1,
- 9 | |     2
-   | |_____^
-10 |   ]
-11 |   d[(2,4)]
-   |
+ --> RUF031_prefer_parens.py:8:5
+  |
+8 | /     1,
+9 | |     2
+  | |_____^
+  |
 help: Parenthesize tuple
 5  |     2
 6  | )]
@@ -27,12 +23,8 @@ help: Parenthesize tuple
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:16:3
    |
-14 | d[tuple(1,2)]
-15 | d[tuple(8)]
 16 | d[1,2]
    |   ^^^
-17 | d[3,4]
-18 | d[5,6,7]
    |
 help: Parenthesize tuple
 13 | d[(8,)]
@@ -47,12 +39,8 @@ help: Parenthesize tuple
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:17:3
    |
-15 | d[tuple(8)]
-16 | d[1,2]
 17 | d[3,4]
    |   ^^^
-18 | d[5,6,7]
-19 | e = {((1,2),(3,4)):"a"}
    |
 help: Parenthesize tuple
 14 | d[tuple(1,2)]
@@ -67,12 +55,8 @@ help: Parenthesize tuple
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:18:3
    |
-16 | d[1,2]
-17 | d[3,4]
 18 | d[5,6,7]
    |   ^^^^^
-19 | e = {((1,2),(3,4)):"a"}
-20 | e[((1,2),(3,4))]
    |
 help: Parenthesize tuple
 15 | d[tuple(8)]
@@ -87,12 +71,8 @@ help: Parenthesize tuple
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:21:3
    |
-19 | e = {((1,2),(3,4)):"a"}
-20 | e[((1,2),(3,4))]
 21 | e[(1,2),(3,4)]
    |   ^^^^^^^^^^^
-22 |
-23 | token_features[
    |
 help: Parenthesize tuple
 18 | d[5,6,7]
@@ -107,12 +87,8 @@ help: Parenthesize tuple
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:26:3
    |
-24 |     (window_position, feature_name)
-25 | ] = self._extract_raw_features_from_token
 26 | d[1,]
    |   ^^
-27 | d[(1,)]
-28 | d[()] # empty tuples should be ignored
    |
 help: Parenthesize tuple
 23 | token_features[

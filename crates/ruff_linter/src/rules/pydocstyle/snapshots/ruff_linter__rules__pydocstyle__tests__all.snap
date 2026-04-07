@@ -9,23 +9,18 @@ D103 Missing docstring in public function
   |
 1 | def public_func():
   |     ^^^^^^^^^^^
-2 |     pass
   |
 
 D101 Missing docstring in public class
-  --> all.py:9:7
-   |
- 9 | class PublicClass:
-   |       ^^^^^^^^^^^
-10 |     class PublicNestedClass:
-11 |         pass
-   |
+ --> all.py:9:7
+  |
+9 | class PublicClass:
+  |       ^^^^^^^^^^^
+  |
 
 D106 Missing docstring in public nested class
   --> all.py:10:11
    |
- 9 | class PublicClass:
 10 |     class PublicNestedClass:
    |           ^^^^^^^^^^^^^^^^^
-11 |         pass
    |

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
  --> <filename>:7:5
   |
-6 | from pandas import (
 7 |     DataFrame,  # DataFrame
   |     ^^^^^^^^^
-8 |     Series,  # Series
-9 | )
   |
 help: Move into type-checking block
 3  |
@@ -32,11 +29,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
  --> <filename>:8:5
   |
-6 | from pandas import (
-7 |     DataFrame,  # DataFrame
 8 |     Series,  # Series
   |     ^^^^^^
-9 | )
   |
 help: Move into type-checking block
 3  |

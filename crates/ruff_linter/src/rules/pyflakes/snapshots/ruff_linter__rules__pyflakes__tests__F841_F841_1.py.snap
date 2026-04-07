@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F841 [*] Local variable `x` is assigned to but never used
  --> F841_1.py:6:5
   |
-5 | def f():
 6 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
   |     ^
   |
@@ -22,7 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `y` is assigned to but never used
  --> F841_1.py:6:8
   |
-5 | def f():
 6 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
   |        ^
   |
@@ -40,7 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `coords` is assigned to but never used
   --> F841_1.py:16:14
    |
-15 | def f():
 16 |     (x, y) = coords = 1, 2
    |              ^^^^^^
    |
@@ -58,7 +55,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `coords` is assigned to but never used
   --> F841_1.py:20:5
    |
-19 | def f():
 20 |     coords = (x, y) = 1, 2
    |     ^^^^^^
    |
@@ -76,7 +72,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `a` is assigned to but never used
   --> F841_1.py:24:6
    |
-23 | def f():
 24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |      ^
    |
@@ -91,7 +86,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `b` is assigned to but never used
   --> F841_1.py:24:9
    |
-23 | def f():
 24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |         ^
    |
@@ -106,7 +100,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `x` is assigned to but never used
   --> F841_1.py:24:15
    |
-23 | def f():
 24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |               ^
    |
@@ -121,7 +114,6 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `y` is assigned to but never used
   --> F841_1.py:24:18
    |
-23 | def f():
 24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |                  ^
    |

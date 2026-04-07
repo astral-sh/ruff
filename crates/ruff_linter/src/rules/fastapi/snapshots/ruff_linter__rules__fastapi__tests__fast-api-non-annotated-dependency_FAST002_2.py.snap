@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/fastapi/mod.rs
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:14:5
    |
-12 | async def test_ellipsis_query(
-13 |     # This should become: param: Annotated[str, Query(description="Test param")]
 14 |     param: str = Query(..., description="Test param"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-15 | ) -> str:
-16 |     return param
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -33,12 +29,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:22:5
    |
-20 | async def test_ellipsis_header(
-21 |     # This should become: auth: Annotated[str, Header(description="Auth header")]
 22 |     auth: str = Header(..., description="Auth header"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-23 | ) -> str:
-24 |     return auth
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -62,12 +54,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:30:5
    |
-28 | async def test_ellipsis_body(
-29 |     # This should become: data: Annotated[dict, Body(description="Request body")]
 30 |     data: dict = Body(..., description="Request body"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-31 | ) -> dict:
-32 |     return data
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -91,12 +79,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:38:5
    |
-36 | async def test_ellipsis_cookie(
-37 |     # This should become: session: Annotated[str, Cookie(description="Session ID")]
 38 |     session: str = Cookie(..., description="Session ID"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-39 | ) -> str:
-40 |     return session
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -120,12 +104,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:46:5
    |
-44 | async def test_simple_ellipsis(
-45 |     # This should become: id: Annotated[str, Query()]
 46 |     id: str = Query(...),
    |     ^^^^^^^^^^^^^^^^^^^^
-47 | ) -> str:
-48 |     return id
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -149,12 +129,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:54:5
    |
-52 | async def test_multiple_kwargs_with_ellipsis(
-53 |     # This should become: param: Annotated[str, Query(description="Test", min_length=1, max_length=10)]
 54 |     param: str = Query(..., description="Test", min_length=1, max_length=10),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | ) -> str:
-56 |     return param
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -178,12 +154,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:65:5
    |
-63 | async def test_with_default_value(
-64 |     # This should become: param: Annotated[str, Query(description="Test")] = "default"
 65 |     param: str = Query("default", description="Test"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 | ) -> str:
-67 |     return param
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -207,12 +179,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:73:5
    |
-71 | async def test_with_default_none(
-72 |     # This should become: param: Annotated[str | None, Query(description="Test")] = None
 73 |     param: str | None = Query(None, description="Test"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-74 | ) -> str:
-75 |     return param or "empty"
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -236,12 +204,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:81:5
    |
-79 | async def test_mixed_parameters(
-80 |     # First param should be fixed with default preserved  
 81 |     optional_param: str = Query("default", description="Optional"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-82 |     # Second param should not be fixed because of the preceding default
-83 |     required_param: str = Query(..., description="Required"),
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""
@@ -265,12 +229,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 FastAPI dependency without `Annotated`
   --> FAST002_2.py:83:5
    |
-81 |     optional_param: str = Query("default", description="Optional"),
-82 |     # Second param should not be fixed because of the preceding default
 83 |     required_param: str = Query(..., description="Required"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-84 |     # Third param should be fixed with default preserved
-85 |     another_optional_param: int = Query(42, description="Another optional"),
    |
 help: Replace with `typing.Annotated`
 info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
@@ -278,12 +238,8 @@ info: Automatic fix is unavailable because a required parameter would follow an 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:85:5
    |
-83 |     required_param: str = Query(..., description="Required"),
-84 |     # Third param should be fixed with default preserved
 85 |     another_optional_param: int = Query(42, description="Another optional"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-86 | ) -> str:
-87 |     return f"{required_param}-{optional_param}-{another_optional_param}"
    |
 help: Replace with `typing.Annotated`
 1  | """Test FAST002 ellipsis handling."""

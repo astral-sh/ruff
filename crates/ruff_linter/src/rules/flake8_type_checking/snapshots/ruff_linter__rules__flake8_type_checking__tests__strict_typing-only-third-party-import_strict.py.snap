@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC002 [*] Move third-party import `pkg.A` into a type-checking block
   --> strict.py:27:21
    |
-25 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
-26 |     import pkg
 27 |     from pkg import A
    |                     ^
-28 |
-29 |     def test(value: A):
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -33,12 +29,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg.A` into a type-checking block
   --> strict.py:35:21
    |
-33 | def f():
-34 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 35 |     from pkg import A, B
    |                     ^
-36 |
-37 |     def test(value: A):
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -63,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
   --> strict.py:54:25
    |
-52 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
-53 |     import pkg
 54 |     from pkg.bar import A
    |                         ^
-55 |
-56 |     def test(value: A):
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -92,11 +80,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:62:12
    |
-60 | def f():
-61 |     # In un-strict mode, this shouldn't raise an error, since `pkg.bar` is used at runtime.
 62 |     import pkg
    |            ^^^
-63 |     import pkg.bar as B
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -120,11 +105,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
   --> strict.py:71:23
    |
-69 | def f():
-70 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
 71 |     import pkg.foo as F
    |                       ^
-72 |     import pkg.foo.bar as B
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -148,11 +130,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:80:12
    |
-78 | def f():
-79 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
 80 |     import pkg
    |            ^^^
-81 |     import pkg.foo.bar as B
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -176,11 +155,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:91:12
    |
-89 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
-90 |     # testing the implementation.
 91 |     import pkg
    |            ^^^
-92 |     import pkgfoo.bar as B
    |
 help: Move into type-checking block
 1  | from __future__ import annotations
@@ -204,12 +180,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
    --> strict.py:101:23
     |
- 99 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
-100 |     import pkg.bar as B
 101 |     import pkg.foo as F
     |                       ^
-102 |
-103 |     def test(value: F.Foo):
     |
 help: Move into type-checking block
 1   | from __future__ import annotations

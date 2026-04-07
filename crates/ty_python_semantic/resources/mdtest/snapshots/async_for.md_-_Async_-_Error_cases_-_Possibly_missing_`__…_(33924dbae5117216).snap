@@ -34,10 +34,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iterable
   --> src/mdtest_snippet.py:12:20
    |
-11 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
 12 |     async for x in PossiblyUnboundAiter():
    |                    ^^^^^^^^^^^^^^^^^^^^^^
-13 |         reveal_type(x)  # revealed: int
    |
 info: Its `__aiter__` attribute (with type `bound method PossiblyUnboundAiter.__aiter__() -> AsyncIterable`) may not be callable
 

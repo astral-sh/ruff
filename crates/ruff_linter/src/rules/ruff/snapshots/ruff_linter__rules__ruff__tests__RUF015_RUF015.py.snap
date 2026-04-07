@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF015 [*] Prefer `next(iter(x))` over single element slice
  --> RUF015.py:4:1
   |
-3 | # RUF015
 4 | list(x)[0]
   | ^^^^^^^^^^
-5 | tuple(x)[0]
-6 | list(i for i in x)[0]
   |
 help: Replace with `next(iter(x))`
 1 | x = range(10)
@@ -24,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
  --> RUF015.py:5:1
   |
-3 | # RUF015
-4 | list(x)[0]
 5 | tuple(x)[0]
   | ^^^^^^^^^^^
-6 | list(i for i in x)[0]
-7 | [i for i in x][0]
   |
 help: Replace with `next(iter(x))`
 2 |
@@ -45,11 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
  --> RUF015.py:6:1
   |
-4 | list(x)[0]
-5 | tuple(x)[0]
 6 | list(i for i in x)[0]
   | ^^^^^^^^^^^^^^^^^^^^^
-7 | [i for i in x][0]
   |
 help: Replace with `next(iter(x))`
 3 | # RUF015
@@ -65,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
  --> RUF015.py:7:1
   |
-5 | tuple(x)[0]
-6 | list(i for i in x)[0]
 7 | [i for i in x][0]
   | ^^^^^^^^^^^^^^^^^
-8 |
-9 | # OK (not indexing (solely) the first element)
   |
 help: Replace with `next(iter(x))`
 4  | list(x)[0]
@@ -86,11 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
   --> RUF015.py:29:1
    |
-28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
    | ^^^^^^^^^^^^^^^^^^^^^
-30 | [i for i in x if i > 5][0]
-31 | [(i, i + 1) for i in x][0]
    |
 help: Replace with `next(i + 1 for i in x)`
 26 | [i for i in x][::]
@@ -106,11 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
   --> RUF015.py:30:1
    |
-28 | # RUF015 (doesn't mirror the underlying list)
-29 | [i + 1 for i in x][0]
 30 | [i for i in x if i > 5][0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-31 | [(i, i + 1) for i in x][0]
    |
 help: Replace with `next(i for i in x if i > 5)`
 27 |
@@ -126,12 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
   --> RUF015.py:31:1
    |
-29 | [i + 1 for i in x][0]
-30 | [i for i in x if i > 5][0]
 31 | [(i, i + 1) for i in x][0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-32 |
-33 | # RUF015 (multiple generators)
    |
 help: Replace with `next((i, i + 1) for i in x)`
 28 | # RUF015 (doesn't mirror the underlying list)
@@ -147,12 +123,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
   --> RUF015.py:35:1
    |
-33 | # RUF015 (multiple generators)
-34 | y = range(10)
 35 | [i + j for i in x for j in y][0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |
-37 | # RUF015
    |
 help: Replace with `next(i + j for i in x for j in y)`
 32 |
@@ -168,11 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
   --> RUF015.py:38:1
    |
-37 | # RUF015
 38 | list(range(10))[0]
    | ^^^^^^^^^^^^^^^^^^
-39 | list(x.y)[0]
-40 | list(x["y"])[0]
    |
 help: Replace with `next(iter(range(10)))`
 35 | [i + j for i in x for j in y][0]
@@ -188,12 +157,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x.y))` over single element slice
   --> RUF015.py:39:1
    |
-37 | # RUF015
-38 | list(range(10))[0]
 39 | list(x.y)[0]
    | ^^^^^^^^^^^^
-40 | list(x["y"])[0]
-41 | [*range(10)][0]
    |
 help: Replace with `next(iter(x.y))`
 36 |
@@ -209,12 +174,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
   --> RUF015.py:40:1
    |
-38 | list(range(10))[0]
-39 | list(x.y)[0]
 40 | list(x["y"])[0]
    | ^^^^^^^^^^^^^^^
-41 | [*range(10)][0]
-42 | [*x["y"]][0]
    |
 help: Replace with `next(iter(x["y"]))`
 37 | # RUF015
@@ -230,12 +191,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
   --> RUF015.py:41:1
    |
-39 | list(x.y)[0]
-40 | list(x["y"])[0]
 41 | [*range(10)][0]
    | ^^^^^^^^^^^^^^^
-42 | [*x["y"]][0]
-43 | [*x.y][0]
    |
 help: Replace with `next(iter(range(10)))`
 38 | list(range(10))[0]
@@ -251,12 +208,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
   --> RUF015.py:42:1
    |
-40 | list(x["y"])[0]
-41 | [*range(10)][0]
 42 | [*x["y"]][0]
    | ^^^^^^^^^^^^
-43 | [*x.y][0]
-44 | [* x.y][0]
    |
 help: Replace with `next(iter(x["y"]))`
 39 | list(x.y)[0]
@@ -272,12 +225,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x.y))` over single element slice
   --> RUF015.py:43:1
    |
-41 | [*range(10)][0]
-42 | [*x["y"]][0]
 43 | [*x.y][0]
    | ^^^^^^^^^
-44 | [* x.y][0]
-45 | [
    |
 help: Replace with `next(iter(x.y))`
 40 | list(x["y"])[0]
@@ -293,12 +242,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x.y))` over single element slice
   --> RUF015.py:44:1
    |
-42 | [*x["y"]][0]
-43 | [*x.y][0]
 44 | [* x.y][0]
    | ^^^^^^^^^^
-45 | [
-46 |     *x.y
    |
 help: Replace with `next(iter(x.y))`
 41 | [*range(10)][0]
@@ -314,14 +259,10 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x.y))` over single element slice
   --> RUF015.py:45:1
    |
-43 |   [*x.y][0]
-44 |   [* x.y][0]
 45 | / [
 46 | |     *x.y
 47 | | ][0]
    | |____^
-48 |
-49 |   # RUF015 (multi-line)
    |
 help: Replace with `next(iter(x.y))`
 42 | [*x["y"]][0]
@@ -339,7 +280,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(...)` over single element slice
   --> RUF015.py:50:26
    |
-49 |   # RUF015 (multi-line)
 50 |   revision_heads_map_ast = [
    |  __________________________^
 51 | |     a
@@ -347,8 +287,6 @@ RUF015 [*] Prefer `next(...)` over single element slice
 53 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 54 | | ][0]
    | |____^
-55 |
-56 |   # RUF015 (zip)
    |
 help: Replace with `next(...)`
 47 | ][0]
@@ -369,10 +307,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(zip(x, y))` over single element slice
   --> RUF015.py:57:1
    |
-56 | # RUF015 (zip)
 57 | list(zip(x, y))[0]
    | ^^^^^^^^^^^^^^^^^^
-58 | [*zip(x, y)][0]
    |
 help: Replace with `next(zip(x, y))`
 54 | ][0]
@@ -388,12 +324,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(zip(x, y))` over single element slice
   --> RUF015.py:58:1
    |
-56 | # RUF015 (zip)
-57 | list(zip(x, y))[0]
 58 | [*zip(x, y)][0]
    | ^^^^^^^^^^^^^^^
-59 |
-60 | # RUF015 (pop)
    |
 help: Replace with `next(zip(x, y))`
 55 |
@@ -409,11 +341,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
   --> RUF015.py:61:1
    |
-60 | # RUF015 (pop)
 61 | list(x).pop(0)
    | ^^^^^^^^^^^^^^
-62 | [i for i in x].pop(0)
-63 | list(i for i in x).pop(0)
    |
 help: Replace with `next(iter(x))`
 58 | [*zip(x, y)][0]
@@ -429,11 +358,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
   --> RUF015.py:62:1
    |
-60 | # RUF015 (pop)
-61 | list(x).pop(0)
 62 | [i for i in x].pop(0)
    | ^^^^^^^^^^^^^^^^^^^^^
-63 | list(i for i in x).pop(0)
    |
 help: Replace with `next(iter(x))`
 59 |
@@ -449,12 +375,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(x))` over single element slice
   --> RUF015.py:63:1
    |
-61 | list(x).pop(0)
-62 | [i for i in x].pop(0)
 63 | list(i for i in x).pop(0)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-64 |
-65 | # OK
    |
 help: Replace with `next(iter(x))`
 60 | # RUF015 (pop)
@@ -470,8 +392,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
   --> RUF015.py:73:5
    |
-71 | def test():
-72 |     zip = list  # Overwrite the builtin zip
 73 |     list(zip(x, y))[0]
    |     ^^^^^^^^^^^^^^^^^^
    |

@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F821 Undefined name `InnerClass`
  --> F821_5.py:5:31
   |
-4 | class RandomClass:
 5 |     def random_func(self) -> "InnerClass":
   |                               ^^^^^^^^^^
-6 |         pass
   |

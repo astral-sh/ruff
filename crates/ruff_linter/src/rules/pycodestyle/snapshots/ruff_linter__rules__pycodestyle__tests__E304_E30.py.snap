@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E304 [*] Blank lines found after function decorator (1)
    --> E30.py:765:1
     |
-763 | @decorator
-764 |
 765 | def function():
     | ^^^
-766 |     pass
-767 | # end
     |
 help: Remove extraneous blank line(s)
 761 |
@@ -23,11 +19,8 @@ help: Remove extraneous blank line(s)
 E304 [*] Blank lines found after function decorator (1)
    --> E30.py:774:1
     |
-773 | # comment    E304 not expected
 774 | def function():
     | ^^^
-775 |     pass
-776 | # end
     |
 help: Remove extraneous blank line(s)
 769 |
@@ -41,11 +34,8 @@ help: Remove extraneous blank line(s)
 E304 [*] Blank lines found after function decorator (2)
    --> E30.py:786:1
     |
-785 | # second comment  E304 not expected
 786 | def function():
     | ^^^
-787 |     pass
-788 | # end
     |
 help: Remove extraneous blank line(s)
 778 |

@@ -6,6 +6,4 @@ D101 Missing docstring in public class
    |
 15 | class class_:
    |       ^^^^^^
-16 |
-17 |     expect('meta', 'D419: Docstring is empty')
    |

@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:13:1
    |
-11 | ### Errors
-12 |
 13 | logging.exception("")
    | ^^^^^^^^^^^^^^^^^^^^^
-14 | logger.exception("")
-15 | exc("")
    |
 help: Replace with `.error()`
 10 |
@@ -25,10 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:14:1
    |
-13 | logging.exception("")
 14 | logger.exception("")
    | ^^^^^^^^^^^^^^^^^^^^
-15 | exc("")
    |
 help: Replace with `.error()`
 11 | ### Errors
@@ -44,8 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:15:1
    |
-13 | logging.exception("")
-14 | logger.exception("")
 15 | exc("")
    | ^^^^^^^
    |
@@ -54,11 +46,8 @@ help: Replace with `.error()`
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:19:5
    |
-18 | def _():
 19 |     logging.exception("")
    |     ^^^^^^^^^^^^^^^^^^^^^
-20 |     logger.exception("")
-21 |     exc("")
    |
 help: Replace with `.error()`
 16 |
@@ -74,11 +63,8 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:20:5
    |
-18 | def _():
-19 |     logging.exception("")
 20 |     logger.exception("")
    |     ^^^^^^^^^^^^^^^^^^^^
-21 |     exc("")
    |
 help: Replace with `.error()`
 17 |
@@ -94,8 +80,6 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:21:5
    |
-19 |     logging.exception("")
-20 |     logger.exception("")
 21 |     exc("")
    |     ^^^^^^^
    |
@@ -104,12 +88,8 @@ help: Replace with `.error()`
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:28:9
    |
-26 | except ...:
-27 |     def _():
 28 |         logging.exception("")
    |         ^^^^^^^^^^^^^^^^^^^^^
-29 |         logger.exception("")
-30 |         exc("")
    |
 help: Replace with `.error()`
 25 |     ...
@@ -125,11 +105,8 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:29:9
    |
-27 |     def _():
-28 |         logging.exception("")
 29 |         logger.exception("")
    |         ^^^^^^^^^^^^^^^^^^^^
-30 |         exc("")
    |
 help: Replace with `.error()`
 26 | except ...:
@@ -145,8 +122,6 @@ note: This is an unsafe fix and may change runtime behavior
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:30:9
    |
-28 |         logging.exception("")
-29 |         logger.exception("")
 30 |         exc("")
    |         ^^^^^^^
    |

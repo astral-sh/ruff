@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 PIE808 [*] Unnecessary `start` argument in `range`
  --> PIE808.py:2:7
   |
-1 | # PIE808
 2 | range(0, 10)
   |       ^
-3 |
-4 | import builtins
   |
 help: Remove `start` argument
 1 | # PIE808
@@ -21,11 +18,8 @@ help: Remove `start` argument
 PIE808 [*] Unnecessary `start` argument in `range`
  --> PIE808.py:5:16
   |
-4 | import builtins
 5 | builtins.range(0, 10)
   |                ^
-6 |
-7 | # OK
   |
 help: Remove `start` argument
 2 | range(0, 10)
@@ -40,7 +34,6 @@ help: Remove `start` argument
 PIE808 [*] Unnecessary `start` argument in `range`
   --> PIE808.py:19:8
    |
-18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
 19 | range((0), 42)
    |        ^
    |

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB145 [*] Prefer `copy` method over slicing
  --> FURB145.py:4:5
   |
-3 | # Errors.
 4 | a = l[:]
   |     ^^^^
-5 | b, c = 1, l[:]
-6 | d, e = l[:], 1
   |
 help: Replace with `copy()`
 1 | l = [1, 2, 3, 4, 5]
@@ -23,12 +20,8 @@ help: Replace with `copy()`
 FURB145 [*] Prefer `copy` method over slicing
  --> FURB145.py:5:11
   |
-3 | # Errors.
-4 | a = l[:]
 5 | b, c = 1, l[:]
   |           ^^^^
-6 | d, e = l[:], 1
-7 | m = l[::]
   |
 help: Replace with `copy()`
 2 |
@@ -43,12 +36,8 @@ help: Replace with `copy()`
 FURB145 [*] Prefer `copy` method over slicing
  --> FURB145.py:6:8
   |
-4 | a = l[:]
-5 | b, c = 1, l[:]
 6 | d, e = l[:], 1
   |        ^^^^
-7 | m = l[::]
-8 | l[:]
   |
 help: Replace with `copy()`
 3 | # Errors.
@@ -63,12 +52,8 @@ help: Replace with `copy()`
 FURB145 [*] Prefer `copy` method over slicing
  --> FURB145.py:7:5
   |
-5 | b, c = 1, l[:]
-6 | d, e = l[:], 1
 7 | m = l[::]
   |     ^^^^^
-8 | l[:]
-9 | print(l[:])
   |
 help: Replace with `copy()`
 4  | a = l[:]
@@ -83,11 +68,8 @@ help: Replace with `copy()`
 FURB145 [*] Prefer `copy` method over slicing
  --> FURB145.py:8:1
   |
-6 | d, e = l[:], 1
-7 | m = l[::]
 8 | l[:]
   | ^^^^
-9 | print(l[:])
   |
 help: Replace with `copy()`
 5  | b, c = 1, l[:]
@@ -100,15 +82,11 @@ help: Replace with `copy()`
 11 | # False negatives.
 
 FURB145 [*] Prefer `copy` method over slicing
-  --> FURB145.py:9:7
-   |
- 7 | m = l[::]
- 8 | l[:]
- 9 | print(l[:])
-   |       ^^^^
-10 |
-11 | # False negatives.
-   |
+ --> FURB145.py:9:7
+  |
+9 | print(l[:])
+  |       ^^^^
+  |
 help: Replace with `copy()`
 6  | d, e = l[:], 1
 7  | m = l[::]

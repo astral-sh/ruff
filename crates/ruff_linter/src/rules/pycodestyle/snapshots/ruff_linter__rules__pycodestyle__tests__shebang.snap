@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E265 [*] Block comment should start with `# `
  --> shebang.py:3:1
   |
-1 | #!/usr/bin/python
-2 | #
 3 | #!
   | ^^
-4 | #:
   |
 help: Format space
 1 | #!/usr/bin/python

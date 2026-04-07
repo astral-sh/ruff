@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `str` is not assignable to `bytes`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: str):
 2 |     target: bytes = source  # error: [invalid-assignment]
   |             -----   ^^^^^^ Incompatible value of type `str`
   |             |

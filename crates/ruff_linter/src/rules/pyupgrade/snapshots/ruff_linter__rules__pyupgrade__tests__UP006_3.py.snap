@@ -6,7 +6,6 @@ UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type
   |
 7 | def f(x: "typing.DefaultDict[str, str]") -> None:
   |           ^^^^^^^^^^^^^^^^^^
-8 |     ...
   |
 help: Replace with `collections.defaultdict`
 4 |     from collections import defaultdict

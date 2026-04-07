@@ -6,6 +6,5 @@ UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters
    |
 11 | class BadStr(Generic[AnyStr]):
    |              ^^^^^^^^^^^^^^^
-12 |     var: AnyStr
    |
 help: Use type parameters

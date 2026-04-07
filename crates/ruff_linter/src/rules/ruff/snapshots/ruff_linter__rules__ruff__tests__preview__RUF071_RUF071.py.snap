@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF071 [*] `os.path.commonprefix()` compares strings character-by-character
  --> RUF071.py:7:1
   |
-6 | # Errors
 7 | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])
   | ^^^^^^^^^^^^^^^^^^^^
-8 | commonprefix(["/usr/lib", "/usr/local/lib"])
-9 | path.commonprefix(["/usr/lib", "/usr/local/lib"])
   |
 help: Use `os.path.commonpath()` to compare path components
 4  | from os import path
@@ -24,11 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF071 [*] `os.path.commonprefix()` compares strings character-by-character
  --> RUF071.py:8:1
   |
-6 | # Errors
-7 | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])
 8 | commonprefix(["/usr/lib", "/usr/local/lib"])
   | ^^^^^^^^^^^^
-9 | path.commonprefix(["/usr/lib", "/usr/local/lib"])
   |
 help: Use `os.path.commonpath()` to compare path components
 5  |
@@ -42,15 +36,11 @@ help: Use `os.path.commonpath()` to compare path components
 note: This is an unsafe fix and may change runtime behavior
 
 RUF071 [*] `os.path.commonprefix()` compares strings character-by-character
-  --> RUF071.py:9:1
-   |
- 7 | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])
- 8 | commonprefix(["/usr/lib", "/usr/local/lib"])
- 9 | path.commonprefix(["/usr/lib", "/usr/local/lib"])
-   | ^^^^^^^^^^^^^^^^^
-10 |
-11 | # OK
-   |
+ --> RUF071.py:9:1
+  |
+9 | path.commonprefix(["/usr/lib", "/usr/local/lib"])
+  | ^^^^^^^^^^^^^^^^^
+  |
 help: Use `os.path.commonpath()` to compare path components
 6  | # Errors
 7  | os.path.commonprefix(["/usr/lib", "/usr/local/lib"])

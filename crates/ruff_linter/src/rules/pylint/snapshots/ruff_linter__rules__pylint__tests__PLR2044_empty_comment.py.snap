@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLR2044 [*] Line with empty comment
  --> empty_comment.py:3:1
   |
-1 | # this line has a non-empty comment and is OK
-2 |     # this line is also OK, but the three following lines are not
 3 | #
   | ^
-4 |     #
-5 |         #
   |
 help: Delete the empty comment
 1 | # this line has a non-empty comment and is OK
@@ -22,11 +18,8 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
  --> empty_comment.py:4:5
   |
-2 |     # this line is also OK, but the three following lines are not
-3 | #
 4 |     #
   |     ^
-5 |         #
   |
 help: Delete the empty comment
 1 | # this line has a non-empty comment and is OK
@@ -40,12 +33,8 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
  --> empty_comment.py:5:9
   |
-3 | #
-4 |     #
 5 |         #
   |         ^
-6 |
-7 | # this non-empty comment has trailing whitespace and is OK
   |
 help: Delete the empty comment
 2 |     # this line is also OK, but the three following lines are not
@@ -59,7 +48,6 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
   --> empty_comment.py:18:11
    |
-17 | def foo():  # this comment is OK, the one below is not
 18 |     pass  #
    |           ^
    |
@@ -76,11 +64,8 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
   --> empty_comment.py:44:1
    |
-42 | # These should be removed, despite being an empty "block comment".
-43 |
 44 | #
    | ^
-45 | #
    |
 help: Delete the empty comment
 42 | # These should be removed, despite being an empty "block comment".
@@ -94,11 +79,8 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
   --> empty_comment.py:45:1
    |
-44 | #
 45 | #
    | ^
-46 |
-47 | # These should also be removed.
    |
 help: Delete the empty comment
 42 | # These should be removed, despite being an empty "block comment".
@@ -112,7 +94,6 @@ help: Delete the empty comment
 PLR2044 [*] Line with empty comment
   --> empty_comment.py:58:2
    |
-57 | α = 1
 58 | α#
    |  ^
    |

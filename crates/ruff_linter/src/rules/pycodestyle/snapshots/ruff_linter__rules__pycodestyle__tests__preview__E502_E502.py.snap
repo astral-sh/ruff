@@ -2,15 +2,11 @@
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 E502 [*] Redundant backslash
-  --> E502.py:9:9
-   |
- 7 |     + 4
- 8 |
- 9 | a = (3 -\
-   |         ^
-10 |     2 +   \
-11 |     7)
-   |
+ --> E502.py:9:9
+  |
+9 | a = (3 -\
+  |         ^
+  |
 help: Remove redundant backslash
 6  |     3 \
 7  |     + 4
@@ -24,10 +20,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:10:11
    |
- 9 | a = (3 -\
 10 |     2 +   \
    |           ^
-11 |     7)
    |
 help: Remove redundant backslash
 7  |     + 4
@@ -42,11 +36,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:14:9
    |
-13 | z = 5 + \
 14 |     (3 -\
    |         ^
-15 |     2 +   \
-16 |     7) + \
    |
 help: Remove redundant backslash
 11 |     7)
@@ -61,12 +52,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:15:11
    |
-13 | z = 5 + \
-14 |     (3 -\
 15 |     2 +   \
    |           ^
-16 |     7) + \
-17 |     4
    |
 help: Remove redundant backslash
 12 |
@@ -81,11 +68,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:23:17
    |
-22 | b = [
 23 |     2 + 4 + 5 + \
    |                 ^
-24 |     44 \
-25 |     - 5
    |
 help: Remove redundant backslash
 20 |     2]
@@ -100,12 +84,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:24:8
    |
-22 | b = [
-23 |     2 + 4 + 5 + \
 24 |     44 \
    |        ^
-25 |     - 5
-26 | ]
    |
 help: Remove redundant backslash
 21 |
@@ -120,11 +100,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:29:11
    |
-28 | c = (True and
 29 |     False \
    |           ^
-30 |     or False \
-31 |     and True \
    |
 help: Remove redundant backslash
 26 | ]
@@ -139,12 +116,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:30:14
    |
-28 | c = (True and
-29 |     False \
 30 |     or False \
    |              ^
-31 |     and True \
-32 | )
    |
 help: Remove redundant backslash
 27 |
@@ -159,11 +132,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:31:14
    |
-29 |     False \
-30 |     or False \
 31 |     and True \
    |              ^
-32 | )
    |
 help: Remove redundant backslash
 28 | c = (True and
@@ -178,11 +148,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:44:14
    |
-43 | s = {
 44 |     'x': 2 + \
    |              ^
-45 |     2
-46 | }
    |
 help: Remove redundant backslash
 41 |
@@ -199,7 +166,6 @@ E502 [*] Redundant backslash
    |
 55 | x = {2 + 4 \
    |            ^
-56 |   + 3}
    |
 help: Remove redundant backslash
 52 | }
@@ -214,12 +180,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:61:9
    |
-59 |     2 + 2  # \
-60 |     + 3  # \
 61 |     + 4 \
    |         ^
-62 |     + 3
-63 | )
    |
 help: Remove redundant backslash
 58 | y = (
@@ -234,11 +196,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:82:12
    |
-80 |     "xyz"
-81 |
 82 | x = ("abc" \
    |            ^
-83 |     "xyz")
    |
 help: Remove redundant backslash
 79 | x = "abc" \
@@ -253,11 +212,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:86:11
    |
-85 | x = [
 86 |     "a" + \
    |           ^
-87 | f"""
-88 | b
    |
 help: Remove redundant backslash
 83 |     "xyz")
@@ -272,12 +228,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:89:7
    |
-87 | f"""
-88 | b
 89 | """ + \
    |       ^
-90 |     "c"
-91 | ]
    |
 help: Remove redundant backslash
 86 |     "a" + \
@@ -292,10 +244,8 @@ help: Remove redundant backslash
 E502 [*] Redundant backslash
   --> E502.py:95:14
    |
-94 | def foo():
 95 |     x = (a + \
    |              ^
-96 |         2)
    |
 help: Remove redundant backslash
 92 |

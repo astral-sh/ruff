@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D211 [*] No blank lines allowed before class docstring
    --> D.py:170:5
     |
-168 | class WithLeadingSpace:
-169 |
 170 |     """With leading space."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
     |
@@ -21,11 +19,8 @@ help: Remove blank line(s) before class docstring
 D211 [*] No blank lines allowed before class docstring
    --> D.py:181:5
     |
-179 | class TrailingSpace:
-180 |
 181 |     """TrailingSpace."""
     |     ^^^^^^^^^^^^^^^^^^^^
-182 |     pass
     |
 help: Remove blank line(s) before class docstring
 177 |

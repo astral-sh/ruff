@@ -6,13 +6,11 @@ S401 `telnetlib` and related modules are considered insecure. Use SSH or another
   |
 1 | import telnetlib  # S401
   |        ^^^^^^^^^
-2 | from telnetlib import Telnet  # S401
   |
 
 S401 `telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.
  --> S401.py:2:6
   |
-1 | import telnetlib  # S401
 2 | from telnetlib import Telnet  # S401
   |      ^^^^^^^^^
   |

@@ -13,10 +13,8 @@ Added: 0
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline="\r\n")`
  --> FURB101_3.py:4:6
   |
-3 | # FURB101 (newline is supported in read_text on Python 3.13+)
 4 | with open("file.txt", newline="\r\n") as f:
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-5 |     x = f.read()
   |
 help: Replace with `Path("file.txt").read_text(newline="\r\n")`
 1 | # Tests for Python 3.13+ where `pathlib.Path.read_text` supports `newline`.
@@ -34,10 +32,8 @@ help: Replace with `Path("file.txt").read_text(newline="\r\n")`
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8", newline="")`
  --> FURB101_3.py:8:6
   |
-7 | # FURB101 (newline with encoding)
 8 | with open("file.txt", encoding="utf-8", newline="") as f:
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-9 |     x = f.read()
   |
 help: Replace with `Path("file.txt").read_text(encoding="utf-8", newline="")`
 1  | # Tests for Python 3.13+ where `pathlib.Path.read_text` supports `newline`.
@@ -59,10 +55,8 @@ help: Replace with `Path("file.txt").read_text(encoding="utf-8", newline="")`
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline=None)`
   --> FURB101_3.py:12:6
    |
-11 | # FURB101 (newline=None is also valid)
 12 | with open("file.txt", newline=None) as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-13 |     x = f.read()
    |
 help: Replace with `Path("file.txt").read_text(newline=None)`
 1  | # Tests for Python 3.13+ where `pathlib.Path.read_text` supports `newline`.

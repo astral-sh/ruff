@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLW1641 Object does not implement `__hash__` method
  --> eq_without_hash.py:3:7
   |
-1 | ### Errors
-2 |
 3 | class Person:
   |       ^^^^^^
-4 |     def __init__(self):
-5 |         self.name = "monty"
   |
 
 PLW1641 Object does not implement `__hash__` method
@@ -17,8 +13,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 11 | class MaybeEqIf:
    |       ^^^^^^^^^
-12 |     if ...:
-13 |         def __eq__(self, other): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -26,8 +20,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 16 | class MaybeEqElif:
    |       ^^^^^^^^^^^
-17 |     if ...:
-18 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -35,8 +27,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 23 | class MaybeEqElse:
    |       ^^^^^^^^^^^
-24 |     if ...:
-25 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -44,8 +34,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 30 | class MaybeEqWith:
    |       ^^^^^^^^^^^
-31 |     with ...:
-32 |         def __eq__(self, other): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -53,8 +41,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 35 | class MaybeEqFor:
    |       ^^^^^^^^^^
-36 |     for _ in ...:
-37 |         def __eq__(self, other): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -62,8 +48,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 40 | class MaybeEqForElse:
    |       ^^^^^^^^^^^^^^
-41 |     for _ in ...:
-42 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -71,8 +55,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 47 | class MaybeEqWhile:
    |       ^^^^^^^^^^^^
-48 |     while ...:
-49 |         def __eq__(self, other): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -80,8 +62,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 52 | class MaybeEqWhileElse:
    |       ^^^^^^^^^^^^^^^^
-53 |     while ...:
-54 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -89,8 +69,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 59 | class MaybeEqTry:
    |       ^^^^^^^^^^
-60 |     try:
-61 |         def __eq__(self, other): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -98,8 +76,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 66 | class MaybeEqTryExcept:
    |       ^^^^^^^^^^^^^^^^
-67 |     try:
-68 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -107,8 +83,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 73 | class MaybeEqTryExceptElse:
    |       ^^^^^^^^^^^^^^^^^^^^
-74 |     try:
-75 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -116,8 +90,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 82 | class MaybeEqTryFinally:
    |       ^^^^^^^^^^^^^^^^^
-83 |     try:
-84 |         ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -125,8 +97,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 89 | class MaybeEqMatchCase:
    |       ^^^^^^^^^^^^^^^^
-90 |     match ...:
-91 |         case int():
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -134,8 +104,6 @@ PLW1641 Object does not implement `__hash__` method
    |
 95 | class MaybeEqMatchCaseWildcard:
    |       ^^^^^^^^^^^^^^^^^^^^^^^^
-96 |     match ...:
-97 |         case int(): ...
    |
 
 PLW1641 Object does not implement `__hash__` method
@@ -143,6 +111,4 @@ PLW1641 Object does not implement `__hash__` method
     |
 102 | class MaybeEqDeeplyNested:
     |       ^^^^^^^^^^^^^^^^^^^
-103 |     if ...:
-104 |         ...
     |

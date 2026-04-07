@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/type_ignore
 warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
  --> src/mdtest_snippet.py:2:39
   |
-1 | # error: [unused-type-ignore-comment] "Unused `type: ignore` directive: 'division-by-zero'"
 2 | a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
   |                                       ^^^^^^^^^^^^^^^^^^^
   |

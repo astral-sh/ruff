@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP001 [*] `__metaclass__ = type` is implied
  --> UP001.py:2:5
   |
-1 | class A:
 2 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^
   |
@@ -19,11 +18,8 @@ help: Remove `__metaclass__ = type`
 UP001 [*] `__metaclass__ = type` is implied
  --> UP001.py:6:5
   |
-5 | class B:
 6 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^
-7 |
-8 |     def __init__(self) -> None:
   |
 help: Remove `__metaclass__ = type`
 3 |

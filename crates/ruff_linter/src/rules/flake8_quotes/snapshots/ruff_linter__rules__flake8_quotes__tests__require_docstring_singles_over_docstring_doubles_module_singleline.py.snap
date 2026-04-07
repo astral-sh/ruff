@@ -6,7 +6,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
   |
 1 | """ Double quotes singleline module docstring """
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2 | """ this is not a docstring """
   |
 help: Replace double quotes docstring with single quotes
   - """ Double quotes singleline module docstring """

@@ -15,7 +15,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def f(x: typing.List[str]) -> None:
   |          ^^^^^^^^^^^
-6 |     ...
   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
@@ -26,12 +25,11 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
-  --> UP006_4.py:9:10
-   |
- 9 | def g(x: List[str]) -> None:
-   |          ^^^^
-10 |     ...
-   |
+ --> UP006_4.py:9:10
+  |
+9 | def g(x: List[str]) -> None:
+  |          ^^^^
+  |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
@@ -47,7 +45,6 @@ UP006 [*] Use `list` instead of `typing.List` for type annotation
   |
 5 | def f(x: typing.List[str]) -> None:
   |          ^^^^^^^^^^^
-6 |     ...
   |
 help: Replace with `list`
 1 + from __future__ import annotations
@@ -64,12 +61,11 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 UP006 [*] Use `list` instead of `List` for type annotation
-  --> UP006_4.py:9:10
-   |
- 9 | def g(x: List[str]) -> None:
-   |          ^^^^
-10 |     ...
-   |
+ --> UP006_4.py:9:10
+  |
+9 | def g(x: List[str]) -> None:
+  |          ^^^^
+  |
 help: Replace with `list`
 1  + from __future__ import annotations
 2  | import typing

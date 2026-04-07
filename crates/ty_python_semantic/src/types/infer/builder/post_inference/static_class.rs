@@ -19,7 +19,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type,
+        StaticClassLiteral, Type, binding_type,
         call::{Argument, CallError, CallErrorKind},
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
@@ -1059,6 +1059,23 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
+    let definition_types = infer_definition_types(db, class.definition(db));
+
+    if let Some(class_node) = class.body_scope(db).node(db).as_class()
+        && let Some(decorator) = class_node
+            .node(context.module())
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                definition_types
+                    .expression_type(&decorator.expression)
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::Final))
+            })
+    {
+        diagnostic.annotate(context.secondary(decorator));
+    }
+
     let num_abstract_methods = abstract_methods.len();
 
     if num_abstract_methods == 1 {
@@ -1116,6 +1133,13 @@ fn check_final_class_abstract_methods<'db>(
         ))
     };
     diagnostic.annotate(secondary_annotation);
+
+    if let Type::FunctionLiteral(function) = binding_type(db, *definition)
+        && let (_, Some(function)) = function.overloads_and_implementation(db)
+        && let Some(span) = function.find_known_decorator_span(db, KnownFunction::AbstractMethod)
+    {
+        diagnostic.annotate(Annotation::secondary(span));
+    }
 
     if !kind.is_explicit() {
         let mut sub = SubDiagnostic::new(

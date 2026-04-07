@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E265 [*] Block comment should start with `# `
   --> E26.py:10:1
    |
- 8 | x = y + 1  #:  Increment x
- 9 | #: E265:1:1
 10 | #Block comment
    | ^^^^^^^^^^^^^^
-11 | a = 1
-12 | #: E265:2:1
    |
 help: Format space
 7  | #: E262:1:12
@@ -24,12 +20,8 @@ help: Format space
 E265 [*] Block comment should start with `# `
   --> E26.py:14:1
    |
-12 | #: E265:2:1
-13 | m = 42
 14 | #! This is important
    | ^^^^^^^^^^^^^^^^^^^^
-15 | mx = 42 - 42
-16 | #: E266:3:5 E266:6:5
    |
 help: Format space
 11 | a = 1
@@ -44,12 +36,8 @@ help: Format space
 E265 [*] Block comment should start with `# `
   --> E26.py:25:1
    |
-23 |     return
-24 | #: E265:1:1 E266:2:1
 25 | ##if DEBUG:
    | ^^^^^^^^^^^
-26 | ##    logging.error()
-27 | #: W291:1:42
    |
 help: Format space
 22 |     ### Of course it is unused
@@ -64,11 +52,8 @@ help: Format space
 E265 [*] Block comment should start with `# `
   --> E26.py:32:1
    |
-31 | #: Okay
 32 | #!/usr/bin/env python
    | ^^^^^^^^^^^^^^^^^^^^^
-33 |
-34 | pass  # an inline comment
    |
 help: Format space
 29 | #:
@@ -83,11 +68,8 @@ help: Format space
 E265 [*] Block comment should start with `# `
   --> E26.py:73:1
    |
-71 | # F   Means test is failing (F)
-72 | # EF  Means test is giving error and Failing
 73 | #!   Means test is segfaulting
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-74 | # 8   Means test runs forever
    |
 help: Format space
 70 | # E   Means test is giving error (E)
@@ -102,12 +84,8 @@ help: Format space
 E265 [*] Block comment should start with `# `
   --> E26.py:78:1
    |
-76 | #: Colon prefix is okay
-77 |
 78 | ###This is a variable ###
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-79 |
-80 | # We should strip the space, but preserve the hashes.
    |
 help: Format space
 75 |

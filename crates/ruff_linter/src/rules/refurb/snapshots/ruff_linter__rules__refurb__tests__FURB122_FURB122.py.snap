@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:10:9
    |
- 8 |   def _():
- 9 |       with open("file", "w") as f:
 10 | /         for line in lines:
 11 | |             f.write(line)
    | |_________________________^
@@ -24,8 +22,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:17:9
    |
-15 |       other_line = "other line"
-16 |       with Path("file").open("w") as f:
 17 | /         for line in lines:
 18 | |             f.write(other_line)
    | |_______________________________^
@@ -44,8 +40,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:23:9
    |
-21 |   def _():
-22 |       with Path("file").open("w") as f:
 23 | /         for line in lines:
 24 | |             f.write(line)
    | |_________________________^
@@ -64,8 +58,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:29:9
    |
-27 |   def _():
-28 |       with Path("file").open("wb") as f:
 29 | /         for line in lines:
 30 | |             f.write(line.encode())
    | |__________________________________^
@@ -84,8 +76,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:35:9
    |
-33 |   def _():
-34 |       with Path("file").open("w") as f:
 35 | /         for line in lines:
 36 | |             f.write(line.upper())
    | |_________________________________^
@@ -104,8 +94,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:43:9
    |
-41 |           pass
-42 |
 43 | /         for line in lines:
 44 | |             f.write(line)
    | |_________________________^
@@ -124,8 +112,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:50:9
    |
-48 |       # Offer unsafe fix if it would delete comments
-49 |       with open("file","w") as f:
 50 | /         for line in lines:
 51 | |             # a really important comment
 52 | |             f.write(line)
@@ -147,8 +133,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:57:9
    |
-55 |   def _():
-56 |       with open("file", "w") as f:
 57 | /         for () in a:
 58 | |             f.write(())
    | |_______________________^
@@ -167,8 +151,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:63:9
    |
-61 |   def _():
-62 |       with open("file", "w") as f:
 63 | /         for a, b, c in d:
 64 | |             f.write((a, b))
    | |___________________________^
@@ -187,8 +169,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:69:9
    |
-67 |   def _():
-68 |       with open("file", "w") as f:
 69 | /         for [(), [a.b], (c,)] in d:
 70 | |             f.write(())
    | |_______________________^
@@ -207,8 +187,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:75:9
    |
-73 |   def _():
-74 |       with open("file", "w") as f:
 75 | /         for [([([a[b]],)],), [], (c[d],)] in e:
 76 | |             f.write(())
    | |_______________________^
@@ -227,13 +205,9 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:82:9
    |
-80 |       # https://github.com/astral-sh/ruff/issues/15936
-81 |       with open("file", "w") as f:
 82 | /         for char in "a", "b":
 83 | |             f.write(char)
    | |_________________________^
-84 |
-85 |   def _():
    |
 help: Replace with `f.writelines`
 79 | def _():
@@ -249,13 +223,9 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:88:9
    |
-86 |       # https://github.com/astral-sh/ruff/issues/15936
-87 |       with open("file", "w") as f:
 88 | /         for char in "a", "b":
 89 | |             f.write(f"{char}")
    | |______________________________^
-90 |
-91 |   def _():
    |
 help: Replace with `f.writelines`
 85 | def _():
@@ -271,8 +241,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:93:9
    |
-91 |   def _():
-92 |       with open("file", "w") as f:
 93 | /         for char in (
 94 | |             "a",  # Comment
 95 | |             "b"
@@ -299,8 +267,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:183:9
     |
-181 |   def _():
-182 |       with Path("file.txt").open("w", encoding="utf-8") as f:
 183 | /         for l in lambda: 0:
 184 | |             f.write(f"[{l}]")
     | |_____________________________^
@@ -319,8 +285,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:189:9
     |
-187 |   def _():
-188 |       with Path("file.txt").open("w", encoding="utf-8") as f:
 189 | /         for l in (1,) if True else (2,):
 190 | |             f.write(f"[{l}]")
     | |_____________________________^
@@ -339,8 +303,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:196:9
     |
-194 |   def _():
-195 |       with open("file", "w") as f:
 196 | /         for line in lambda: 0:
 197 | |             f.write(line)
     | |_________________________^
@@ -359,8 +321,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:202:9
     |
-200 |   def _():
-201 |       with open("file", "w") as f:
 202 | /         for line in (1,) if True else (2,):
 203 | |             f.write(line)
     | |_________________________^
@@ -379,8 +339,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:209:9
     |
-207 |   def _():
-208 |       with open("file", "w") as f:
 209 | /         for line in (lambda: 0):
 210 | |             f.write(f"{line}")
     | |______________________________^
@@ -399,8 +357,6 @@ help: Replace with `f.writelines`
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:215:9
     |
-213 |   def _():
-214 |       with open("file", "w") as f:
 215 | /         for line in ((1,) if True else (2,)):
 216 | |             f.write(f"{line}")
     | |______________________________^

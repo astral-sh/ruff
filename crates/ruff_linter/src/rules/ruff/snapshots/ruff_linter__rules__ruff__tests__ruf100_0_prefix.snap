@@ -2,13 +2,11 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF100 [*] Unused blanket `noqa` directive
-  --> RUF100_0.py:9:12
-   |
- 8 |     # Invalid
- 9 |     c = 1  # noqa
-   |            ^^^^^^
-10 |     print(c)
-   |
+ --> RUF100_0.py:9:12
+  |
+9 |     c = 1  # noqa
+  |            ^^^^^^
+  |
 help: Remove unused `noqa` directive
 6  |     b = 2  # noqa: F841
 7  |
@@ -22,11 +20,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:13:12
    |
-12 |     # Invalid
 13 |     d = 1  # noqa: E501
    |            ^^^^^^^^^^^^
-14 |
-15 |     # Invalid
    |
 help: Remove unused `noqa` directive
 10 |     print(c)
@@ -41,11 +36,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
   --> RUF100_0.py:16:12
    |
-15 |     # Invalid
 16 |     d = 1  # noqa: F841, E501
    |            ^^^^^^^^^^^^^^^^^^
-17 |
-18 |     # Invalid (and unimplemented or not enabled)
    |
 help: Remove unused `noqa` directive
 13 |     d = 1  # noqa: E501
@@ -60,11 +52,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
   --> RUF100_0.py:19:12
    |
-18 |     # Invalid (and unimplemented or not enabled)
 19 |     d = 1  # noqa: F841, W191, F821
    |            ^^^^^^^^^^^^^^^^^^^^^^^^
-20 |
-21 |     # Invalid (but external)
    |
 help: Remove unused `noqa` directive
 16 |     d = 1  # noqa: F841, E501
@@ -79,11 +68,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `F841`)
   --> RUF100_0.py:22:12
    |
-21 |     # Invalid (but external)
 22 |     d = 1  # noqa: F841, V101
    |            ^^^^^^^^^^^^^^^^^^
-23 |
-24 |     # Invalid (but external)
    |
 help: Remove unused `noqa` directive
 19 |     d = 1  # noqa: F841, W191, F821
@@ -98,12 +84,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:29:12
    |
-27 |     # fmt: off
-28 |     # Invalid - no space before #
 29 |     d = 1  # noqa: E501
    |            ^^^^^^^^^^^^
-30 |
-31 |     # Invalid - many spaces before #
    |
 help: Remove unused `noqa` directive
 26 |
@@ -118,10 +100,8 @@ help: Remove unused `noqa` directive
 F841 [*] Local variable `d` is assigned to but never used
   --> RUF100_0.py:32:5
    |
-31 |     # Invalid - many spaces before #
 32 |     d = 1  # noqa: E501
    |     ^
-33 |     # fmt: on
    |
 help: Remove assignment to unused variable `d`
 29 |     d = 1  # noqa: E501
@@ -136,10 +116,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:32:12
    |
-31 |     # Invalid - many spaces before #
 32 |     d = 1  # noqa: E501
    |            ^^^^^^^^^^^^
-33 |     # fmt: on
    |
 help: Remove unused `noqa` directive
 29 |     d = 1  # noqa: E501
@@ -154,11 +132,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `F841`)
   --> RUF100_0.py:58:6
    |
-57 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 58 | """  # noqa: E501, F841
    |      ^^^^^^^^^^^^^^^^^^
-59 |
-60 | # Invalid
    |
 help: Remove unused `noqa` directive
 55 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
@@ -173,11 +148,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:66:6
    |
-65 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 66 | """  # noqa: E501
    |      ^^^^^^^^^^^^
-67 |
-68 | # Invalid
    |
 help: Remove unused `noqa` directive
 63 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
@@ -192,11 +164,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused blanket `noqa` directive
   --> RUF100_0.py:74:6
    |
-73 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 74 | """  # noqa
    |      ^^^^^^
-75 |
-76 | # Valid
    |
 help: Remove unused `noqa` directive
 71 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
@@ -211,11 +180,8 @@ help: Remove unused `noqa` directive
 F401 [*] `shelve` imported but unused
   --> RUF100_0.py:88:8
    |
-86 | import collections  # noqa
-87 | import os  # noqa: F401, RUF100
 88 | import shelve  # noqa: RUF100
    |        ^^^^^^
-89 | import sys  # noqa: F401, RUF100
    |
 help: Remove unused import: `shelve`
 85 |
@@ -229,8 +195,6 @@ help: Remove unused import: `shelve`
 E501 Line too long (89 > 88)
   --> RUF100_0.py:93:89
    |
-91 | print(sys.path)
-92 |
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                         ^
    |
@@ -238,8 +202,6 @@ E501 Line too long (89 > 88)
 RUF100 [*] Unused `noqa` directive (unused: `F401`)
   --> RUF100_0.py:93:92
    |
-91 | print(sys.path)
-92 |
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                            ^^^^^^^^^^^^
    |
@@ -256,8 +218,6 @@ help: Remove unused `noqa` directive
 F841 [*] Local variable `e` is assigned to but never used
    --> RUF100_0.py:108:5
     |
-106 |     # Invalid - nonexistent error code with multibyte character
-107 |     d = 1  # noqa: F841, E50
 108 |     e = 1  # noqa: E50
     |     ^
     |
@@ -274,12 +234,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF100 [*] Unused `noqa` directive (duplicated: `F841`)
    --> RUF100_0.py:118:12
     |
-116 | # Check duplicate code detection
-117 | def f():
 118 |     x = 2  # noqa: F841, F841, X200
     |            ^^^^^^^^^^^^^^^^^^^^^^^^
-119 |
-120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |
 help: Remove unused `noqa` directive
 115 |
@@ -294,12 +250,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
    --> RUF100_0.py:120:19
     |
-118 |     x = 2  # noqa: F841, F841, X200
-119 |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-121 |
-122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |
 help: Remove unused `noqa` directive
 117 | def f():
@@ -314,12 +266,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
    --> RUF100_0.py:122:12
     |
-120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-121 |
 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-123 |
-124 |     return
     |
 help: Remove unused `noqa` directive
 119 |
@@ -334,12 +282,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
    --> RUF100_0.py:129:20
     |
-127 | # Allow code redirects
-128 | x = eval(command)  # noqa: PGH001, S307
 129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-130 | x = eval(command)  # noqa: PGH001, S307, PGH001
-131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |
 help: Remove unused `noqa` directive
 126 |
@@ -353,11 +297,8 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
    --> RUF100_0.py:130:20
     |
-128 | x = eval(command)  # noqa: PGH001, S307
-129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |
 help: Remove unused `noqa` directive
 127 | # Allow code redirects
@@ -370,8 +311,6 @@ help: Remove unused `noqa` directive
 RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
    --> RUF100_0.py:131:20
     |
-129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |

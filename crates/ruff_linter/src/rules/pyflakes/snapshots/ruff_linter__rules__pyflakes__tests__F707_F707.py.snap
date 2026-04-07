@@ -4,32 +4,20 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F707 An `except` block as not the last exception handler
  --> F707.py:3:1
   |
-1 | try:
-2 |     pass
 3 | except:
   | ^^^^^^
-4 |     pass
-5 | except ValueError:
   |
 
 F707 An `except` block as not the last exception handler
   --> F707.py:10:1
    |
- 8 | try:
- 9 |     pass
 10 | except:
    | ^^^^^^
-11 |     pass
-12 | except ValueError:
    |
 
 F707 An `except` block as not the last exception handler
   --> F707.py:19:1
    |
-17 | try:
-18 |     pass
 19 | except:
    | ^^^^^^
-20 |     pass
-21 | except ValueError:
    |

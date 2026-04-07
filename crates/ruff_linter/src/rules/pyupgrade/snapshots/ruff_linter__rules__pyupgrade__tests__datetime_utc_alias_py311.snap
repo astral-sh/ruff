@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP017 [*] Use `datetime.UTC` alias
   --> UP017.py:10:11
    |
- 8 |     from datetime import timezone
- 9 |
 10 |     print(timezone.utc)
    |           ^^^^^^^^^^^^
    |
@@ -27,8 +25,6 @@ help: Convert to `datetime.UTC` alias
 UP017 [*] Use `datetime.UTC` alias
   --> UP017.py:16:11
    |
-14 |     from datetime import timezone as tz
-15 |
 16 |     print(tz.utc)
    |           ^^^^^^
    |
@@ -50,8 +46,6 @@ help: Convert to `datetime.UTC` alias
 UP017 [*] Use `datetime.UTC` alias
   --> UP017.py:22:11
    |
-20 |     import datetime
-21 |
 22 |     print(datetime.timezone.utc)
    |           ^^^^^^^^^^^^^^^^^^^^^
    |
@@ -68,8 +62,6 @@ help: Convert to `datetime.UTC` alias
 UP017 [*] Use `datetime.UTC` alias
   --> UP017.py:28:11
    |
-26 |     import datetime as dt
-27 |
 28 |     print(dt.timezone.utc)
    |           ^^^^^^^^^^^^^^^
    |
@@ -86,12 +78,10 @@ help: Convert to `datetime.UTC` alias
 UP017 [*] Use `datetime.UTC` alias
   --> UP017.py:35:9
    |
-34 |       print((
 35 | /         datetime
 36 | |         .timezone  # text
 37 | |         .utc
    | |____________^
-38 |       ))
    |
 help: Convert to `datetime.UTC` alias
 32 |     import datetime

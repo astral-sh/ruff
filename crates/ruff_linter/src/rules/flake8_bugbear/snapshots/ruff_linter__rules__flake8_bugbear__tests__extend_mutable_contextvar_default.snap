@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 B039 Do not use mutable data structures for `ContextVar` defaults
  --> B039_extended.py:7:26
   |
-6 | from something_else import Depends
 7 | ContextVar("cv", default=Depends())
   |                          ^^^^^^^^^
   |

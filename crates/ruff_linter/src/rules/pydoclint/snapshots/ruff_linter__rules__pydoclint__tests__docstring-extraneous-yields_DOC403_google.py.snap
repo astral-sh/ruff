@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC403 Docstring has a "Yields" section but the function doesn't yield anything
   --> DOC403_google.py:14:5
    |
-12 |   # DOC403
-13 |   def foo(num: int) -> str:
 14 | /     """
 15 | |     Do something
 16 | |
@@ -16,15 +14,12 @@ DOC403 Docstring has a "Yields" section but the function doesn't yield anything
 21 | |         str: A string
 22 | |     """
    | |_______^
-23 |       print('test')
    |
 help: Remove the "Yields" section
 
 DOC403 Docstring has a "Yields" section but the function doesn't yield anything
   --> DOC403_google.py:30:9
    |
-28 |       # DOC403
-29 |       def foo(self) -> str:
 30 | /         """
 31 | |         Do something
 32 | |
@@ -35,6 +30,5 @@ DOC403 Docstring has a "Yields" section but the function doesn't yield anything
 37 | |             str: A string
 38 | |         """
    | |___________^
-39 |           print('test')
    |
 help: Remove the "Yields" section

@@ -6,8 +6,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 14 | @pytest.fixture()
    | ^^^^^^^^^^^^^^^^^
-15 | def parentheses_no_params():
-16 |     return 42
    |
 help: Remove parentheses
 11 |     return 42
@@ -26,8 +24,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 25 | |
 26 | | )
    | |_^
-27 |   def parentheses_no_params_multiline():
-28 |       return 42
    |
 help: Remove parentheses
 21 |     return 42
@@ -46,8 +42,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 39 | @fixture()
    | ^^^^^^^^^^
-40 | def imported_from_parentheses_no_params():
-41 |     return 42
    |
 help: Remove parentheses
 36 |     return 42
@@ -66,8 +60,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 50 | |
 51 | | )
    | |_^
-52 |   def imported_from_parentheses_no_params_multiline():
-53 |       return 42
    |
 help: Remove parentheses
 46 |     return 42
@@ -86,8 +78,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 64 | @aliased()
    | ^^^^^^^^^^
-65 | def aliased_parentheses_no_params():
-66 |     return 42
    |
 help: Remove parentheses
 61 |     return 42
@@ -106,8 +96,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 75 | |
 76 | | )
    | |_^
-77 |   def aliased_parentheses_no_params_multiline():
-78 |       return 42
    |
 help: Remove parentheses
 71 |     return 42
@@ -124,13 +112,11 @@ help: Remove parentheses
 PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
   --> PT001.py:81:1
    |
-80 |   # https://github.com/astral-sh/ruff/issues/18770
 81 | / @pytest.fixture(
 82 | |     # TODO: use module scope
 83 | |     # scope="module"
 84 | | )
    | |_^
-85 |   def my_fixture(): ...
    |
 help: Remove parentheses
 78 |     return 42
@@ -151,8 +137,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 88 | @(pytest.fixture())
    | ^^^^^^^^^^^^^^^^^^^
-89 | def outer_paren_fixture_no_params():
-90 |     return 42
    |
 help: Remove parentheses
 85 | def my_fixture(): ...
@@ -169,8 +153,6 @@ PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 93 | @(fixture())
    | ^^^^^^^^^^^^
-94 | def outer_paren_imported_fixture_no_params():
-95 |     return 42
    |
 help: Remove parentheses
 90 |     return 42

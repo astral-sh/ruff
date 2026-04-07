@@ -26,8 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/new_types.md
 error[invalid-base]: Cannot subclass an instance of NewType
  --> src/mdtest_snippet.py:5:11
   |
-3 | X = NewType("X", int)
-4 |
 5 | class Foo(X): ...  # error: [invalid-base]
   |           ^
   |

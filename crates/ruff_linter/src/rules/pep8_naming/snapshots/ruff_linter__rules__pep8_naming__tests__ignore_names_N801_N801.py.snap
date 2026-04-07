@@ -4,19 +4,13 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N801 Class name `stillBad` should use CapWords convention
  --> N801.py:4:7
   |
-2 |     pass
-3 |
 4 | class stillBad:
   |       ^^^^^^^^
-5 |     pass
   |
 
 N801 Class name `STILL_BAD` should use CapWords convention
   --> N801.py:10:7
    |
- 8 |     pass
- 9 |
 10 | class STILL_BAD:
    |       ^^^^^^^^^
-11 |     pass
    |

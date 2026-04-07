@@ -5,7 +5,6 @@ expression: env.render(&diagnostic)
 error[F401][*]: `os` imported but unused
  --> notebook.ipynb:cell 1:2:8
   |
-1 | # cell 1
 2 | import os
   |        ^^
   |

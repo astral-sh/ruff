@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI013 [*] Non-empty class body must not contain `...`
  --> PYI013.py:3:5
   |
-1 | class OneAttributeClass:
-2 |     value: int
 3 |     ...
   |     ^^^
   |
@@ -20,10 +18,8 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
  --> PYI013.py:7:5
   |
-6 | class OneAttributeClass2:
 7 |     ...
   |     ^^^
-8 |     value: int
   |
 help: Remove unnecessary `...`
 4 |
@@ -37,10 +33,8 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:12:5
    |
-11 | class TwoEllipsesClass:
 12 |     ...
    |     ^^^
-13 |     ...
    |
 help: Remove unnecessary `...`
 10 |
@@ -54,8 +48,6 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:13:5
    |
-11 | class TwoEllipsesClass:
-12 |     ...
 13 |     ...
    |     ^^^
    |
@@ -71,8 +63,6 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:21:5
    |
-19 |     """
-20 |
 21 |     ...
    |     ^^^
    |
@@ -88,8 +78,6 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:26:5
    |
-24 | class NonEmptyChild(Exception):
-25 |     value: int
 26 |     ...
    |     ^^^
    |
@@ -105,10 +93,8 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:30:5
    |
-29 | class NonEmptyChild2(Exception):
 30 |     ...
    |     ^^^
-31 |     value: int
    |
 help: Remove unnecessary `...`
 27 |
@@ -122,12 +108,8 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:36:5
    |
-34 | class NonEmptyWithInit:
-35 |     value: int
 36 |     ...
    |     ^^^
-37 |
-38 |     def __init__():
    |
 help: Remove unnecessary `...`
 33 |
@@ -141,8 +123,6 @@ help: Remove unnecessary `...`
 PYI013 [*] Non-empty class body must not contain `...`
   --> PYI013.py:44:5
    |
-42 | class NonEmptyChildWithInlineComment:
-43 |     value: int
 44 |     ... # preserve me
    |     ^^^
    |

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 Q001 [*] Double quote multiline found but single quotes preferred
  --> docstring_doubles_function.py:3:5
   |
-1 | def foo():
-2 |     """function without params, single line docstring"""
 3 |     """ not a docstring"""
   |     ^^^^^^^^^^^^^^^^^^^^^^
-4 |     return
   |
 help: Replace double multiline quotes with single quotes
 1 | def foo():
@@ -22,11 +19,8 @@ help: Replace double multiline quotes with single quotes
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:11:5
    |
- 9 |         function without params, multiline docstring
-10 |     """
 11 |     """ not a docstring"""
    |     ^^^^^^^^^^^^^^^^^^^^^^
-12 |     return
    |
 help: Replace double multiline quotes with single quotes
 8  |     """
@@ -46,7 +40,6 @@ Q001 [*] Double quote multiline found but single quotes preferred
 16 | |     not a
 17 | | """ """docstring"""):
    | |___^
-18 |       pass
    |
 help: Replace double multiline quotes with single quotes
 12 |     return
@@ -64,11 +57,8 @@ help: Replace double multiline quotes with single quotes
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:17:5
    |
-15 | def fun_with_params_no_docstring(a, b="""
-16 |     not a
 17 | """ """docstring"""):
    |     ^^^^^^^^^^^^^^^
-18 |     pass
    |
 help: Replace double multiline quotes with single quotes
 14 |
@@ -83,10 +73,8 @@ help: Replace double multiline quotes with single quotes
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:22:5
    |
-21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
 22 |     """ not a docstring """):
    |     ^^^^^^^^^^^^^^^^^^^^^^^
-23 |     pass
    |
 help: Replace double multiline quotes with single quotes
 19 |

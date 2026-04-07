@@ -27,8 +27,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/descriptor_protocol.md
 error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
  --> src/mdtest_snippet.py:3:9
   |
-1 | class DontAssignToMe:
-2 |     @property
 3 |     def immutable(self): ...
   |         --------- Property `DontAssignToMe.immutable` defined here with no setter
 4 |

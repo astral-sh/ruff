@@ -6,7 +6,5 @@ Q002 Double quote docstring found but single quotes preferred
   |
 1 | ""'Start with empty string' ' and lint docstring safely'
   | ^^
-2 |
-3 | def foo():
   |
 help: Replace double quotes docstring with single quotes

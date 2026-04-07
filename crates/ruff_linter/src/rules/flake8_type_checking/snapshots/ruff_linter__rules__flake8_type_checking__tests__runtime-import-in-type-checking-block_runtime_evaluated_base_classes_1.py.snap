@@ -4,14 +4,11 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
   --> runtime_evaluated_base_classes_1.py:10:12
    |
- 9 | if TYPE_CHECKING:
 10 |     import datetime  # TC004
    |            ^^^^^^^^
-11 |     from array import array  # TC004
    |
   ::: runtime_evaluated_base_classes_1.py:18:8
    |
-17 | class A(pydantic.BaseModel):
 18 |     x: datetime.datetime
    |        -------- Used at runtime here
    |
@@ -31,16 +28,11 @@ note: This is an unsafe fix and may change runtime behavior
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
   --> runtime_evaluated_base_classes_1.py:11:23
    |
- 9 | if TYPE_CHECKING:
-10 |     import datetime  # TC004
 11 |     from array import array  # TC004
    |                       ^^^^^
-12 |
-13 |     import pandas  # TC004
    |
   ::: runtime_evaluated_base_classes_1.py:38:8
    |
-37 | class G(BaseModel):
 38 |     x: array
    |        ----- Used at runtime here
    |
@@ -61,15 +53,11 @@ note: This is an unsafe fix and may change runtime behavior
 TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
   --> runtime_evaluated_base_classes_1.py:13:12
    |
-11 |     from array import array  # TC004
-12 |
 13 |     import pandas  # TC004
    |            ^^^^^^
-14 |     import pyproj
    |
   ::: runtime_evaluated_base_classes_1.py:22:8
    |
-21 | class B(BaseModel):
 22 |     x: pandas.DataFrame
    |        ------ Used at runtime here
    |

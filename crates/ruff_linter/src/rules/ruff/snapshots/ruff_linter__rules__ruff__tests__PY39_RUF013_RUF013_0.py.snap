@@ -6,7 +6,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 20 | def f(arg: int = None):  # RUF013
    |            ^^^
-21 |     pass
    |
 help: Convert to `Optional[T]`
 17 |     pass
@@ -24,7 +23,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 24 | def f(arg: str = None):  # RUF013
    |            ^^^
-25 |     pass
    |
 help: Convert to `Optional[T]`
 21 |     pass
@@ -42,7 +40,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 28 | def f(arg: Tuple[str] = None):  # RUF013
    |            ^^^^^^^^^^
-29 |     pass
    |
 help: Convert to `Optional[T]`
 25 |     pass
@@ -60,7 +57,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 58 | def f(arg: Union = None):  # RUF013
    |            ^^^^^
-59 |     pass
    |
 help: Convert to `Optional[T]`
 55 |     pass
@@ -78,7 +74,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 62 | def f(arg: Union[int] = None):  # RUF013
    |            ^^^^^^^^^^
-63 |     pass
    |
 help: Convert to `Optional[T]`
 59 |     pass
@@ -96,7 +91,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 66 | def f(arg: Union[int, str] = None):  # RUF013
    |            ^^^^^^^^^^^^^^^
-67 |     pass
    |
 help: Convert to `Optional[T]`
 63 |     pass
@@ -114,7 +108,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 85 | def f(arg: int | float = None):  # RUF013
    |            ^^^^^^^^^^^
-86 |     pass
    |
 help: Convert to `Optional[T]`
 82 |     pass
@@ -132,7 +125,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 89 | def f(arg: int | float | str | bytes = None):  # RUF013
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
-90 |     pass
    |
 help: Convert to `Optional[T]`
 86 |     pass
@@ -150,7 +142,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 108 | def f(arg: Literal[1] = None):  # RUF013
     |            ^^^^^^^^^^
-109 |     pass
     |
 help: Convert to `Optional[T]`
 105 |     pass
@@ -168,7 +159,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 112 | def f(arg: Literal[1, "foo"] = None):  # RUF013
     |            ^^^^^^^^^^^^^^^^^
-113 |     pass
     |
 help: Convert to `Optional[T]`
 109 |     pass
@@ -186,7 +176,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 131 | def f(arg: Annotated[int, ...] = None):  # RUF013
     |                      ^^^
-132 |     pass
     |
 help: Convert to `Optional[T]`
 128 |     pass
@@ -204,7 +193,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 135 | def f(arg: Annotated[Annotated[int | str, ...], ...] = None):  # RUF013
     |                                ^^^^^^^^^
-136 |     pass
     |
 help: Convert to `Optional[T]`
 132 |     pass
@@ -220,11 +208,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:151:11
     |
-150 | def f(
 151 |     arg1: int = None,  # RUF013
     |           ^^^
-152 |     arg2: Union[int, float] = None,  # RUF013
-153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
     |
 help: Convert to `Optional[T]`
 148 |
@@ -240,12 +225,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:152:11
     |
-150 | def f(
-151 |     arg1: int = None,  # RUF013
 152 |     arg2: Union[int, float] = None,  # RUF013
     |           ^^^^^^^^^^^^^^^^^
-153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
-154 | ):
     |
 help: Convert to `Optional[T]`
 149 |
@@ -261,12 +242,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:153:11
     |
-151 |     arg1: int = None,  # RUF013
-152 |     arg2: Union[int, float] = None,  # RUF013
 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
     |           ^^^^^^^^^^^^^^^^
-154 | ):
-155 |     pass
     |
 help: Convert to `Optional[T]`
 150 | def f(
@@ -284,7 +261,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 181 | def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF013
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-182 |     pass
     |
 help: Convert to `Optional[T]`
 178 |     pass
@@ -302,7 +278,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 188 | def f(arg: "int" = None):  # RUF013
     |             ^^^
-189 |     pass
     |
 help: Convert to `Optional[T]`
 185 | # Quoted
@@ -320,7 +295,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 192 | def f(arg: "str" = None):  # RUF013
     |             ^^^
-193 |     pass
     |
 help: Convert to `Optional[T]`
 189 |     pass
@@ -338,7 +312,6 @@ RUF013 PEP 484 prohibits implicit `Optional`
     |
 196 | def f(arg: "st" "r" = None):  # RUF013
     |            ^^^^^^^^
-197 |     pass
     |
 help: Convert to `Optional[T]`
 
@@ -347,7 +320,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 204 | def f(arg: Union["int", "str"] = None):  # RUF013
     |            ^^^^^^^^^^^^^^^^^^^
-205 |     pass
     |
 help: Convert to `Optional[T]`
 201 |     pass

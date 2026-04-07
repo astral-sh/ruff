@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E251 [*] Unexpected spaces around keyword / parameter equals
  --> E25.py:2:12
   |
-1 | #: E251 E251
 2 | def foo(bar = False):
   |            ^
-3 |     '''Test function with an error in declaration'''
-4 |     pass
   |
 help: Remove whitespace
 1 | #: E251 E251
@@ -21,11 +18,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
  --> E25.py:2:14
   |
-1 | #: E251 E251
 2 | def foo(bar = False):
   |              ^
-3 |     '''Test function with an error in declaration'''
-4 |     pass
   |
 help: Remove whitespace
 1 | #: E251 E251
@@ -38,12 +32,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
  --> E25.py:6:9
   |
-4 |     pass
-5 | #: E251
 6 | foo(bar= True)
   |         ^
-7 | #: E251
-8 | foo(bar =True)
   |
 help: Remove whitespace
 3 |     '''Test function with an error in declaration'''
@@ -56,15 +46,11 @@ help: Remove whitespace
 9 | #: E251 E251
 
 E251 [*] Unexpected spaces around keyword / parameter equals
-  --> E25.py:8:8
-   |
- 6 | foo(bar= True)
- 7 | #: E251
- 8 | foo(bar =True)
-   |        ^
- 9 | #: E251 E251
-10 | foo(bar = True)
-   |
+ --> E25.py:8:8
+  |
+8 | foo(bar =True)
+  |        ^
+  |
 help: Remove whitespace
 5  | #: E251
 6  | foo(bar= True)
@@ -78,12 +64,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:10:8
    |
- 8 | foo(bar =True)
- 9 | #: E251 E251
 10 | foo(bar = True)
    |        ^
-11 | #: E251
-12 | y = bar(root= "sdasd")
    |
 help: Remove whitespace
 7  | #: E251
@@ -98,12 +80,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:10:10
    |
- 8 | foo(bar =True)
- 9 | #: E251 E251
 10 | foo(bar = True)
    |          ^
-11 | #: E251
-12 | y = bar(root= "sdasd")
    |
 help: Remove whitespace
 7  | #: E251
@@ -118,12 +96,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:12:14
    |
-10 | foo(bar = True)
-11 | #: E251
 12 | y = bar(root= "sdasd")
    |              ^
-13 | #: E251:2:29
-14 | parser.add_argument('--long-option',
    |
 help: Remove whitespace
 9  | #: E251 E251
@@ -138,14 +112,10 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:15:29
    |
-13 |   #: E251:2:29
-14 |   parser.add_argument('--long-option',
 15 |                       default=
    |  _____________________________^
 16 | |                     "/rather/long/filesystem/path/here/blah/blah/blah")
    | |____________________^
-17 |   #: E251:1:45
-18 |   parser.add_argument('--long-option', default
    |
 help: Remove whitespace
 12 | y = bar(root= "sdasd")
@@ -161,14 +131,10 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:18:45
    |
-16 |                       "/rather/long/filesystem/path/here/blah/blah/blah")
-17 |   #: E251:1:45
 18 |   parser.add_argument('--long-option', default
    |  _____________________________________________^
 19 | |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
    | |____________________^
-20 |   #: E251:3:8 E251:3:10
-21 |   foo(True,
    |
 help: Remove whitespace
 15 |                     default=
@@ -184,12 +150,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:23:8
    |
-21 | foo(True,
-22 |     baz=(1, 2),
 23 |     biz = 'foo'
    |        ^
-24 |     )
-25 | #: Okay
    |
 help: Remove whitespace
 20 | #: E251:3:8 E251:3:10
@@ -204,12 +166,8 @@ help: Remove whitespace
 E251 [*] Unexpected spaces around keyword / parameter equals
   --> E25.py:23:10
    |
-21 | foo(True,
-22 |     baz=(1, 2),
 23 |     biz = 'foo'
    |          ^
-24 |     )
-25 | #: Okay
    |
 help: Remove whitespace
 20 | #: E251:3:8 E251:3:10

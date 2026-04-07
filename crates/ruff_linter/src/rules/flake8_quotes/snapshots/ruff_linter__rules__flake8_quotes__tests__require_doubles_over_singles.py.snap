@@ -6,8 +6,6 @@ Q000 [*] Single quotes found but double quotes preferred
   |
 1 | this_should_be_linted = 'single quote string'
   |                         ^^^^^^^^^^^^^^^^^^^^^
-2 | this_should_be_linted = u'double quote string'
-3 | this_should_be_linted = f'double quote string'
   |
 help: Replace single quotes with double quotes
   - this_should_be_linted = 'single quote string'
@@ -19,11 +17,8 @@ help: Replace single quotes with double quotes
 Q000 [*] Single quotes found but double quotes preferred
  --> singles.py:2:25
   |
-1 | this_should_be_linted = 'single quote string'
 2 | this_should_be_linted = u'double quote string'
   |                         ^^^^^^^^^^^^^^^^^^^^^^
-3 | this_should_be_linted = f'double quote string'
-4 | this_should_be_linted = f'double {"quote"} string'
   |
 help: Replace single quotes with double quotes
 1 | this_should_be_linted = 'single quote string'
@@ -36,11 +31,8 @@ help: Replace single quotes with double quotes
 Q000 [*] Single quotes found but double quotes preferred
  --> singles.py:3:25
   |
-1 | this_should_be_linted = 'single quote string'
-2 | this_should_be_linted = u'double quote string'
 3 | this_should_be_linted = f'double quote string'
   |                         ^^^^^^^^^^^^^^^^^^^^^^
-4 | this_should_be_linted = f'double {"quote"} string'
   |
 help: Replace single quotes with double quotes
 1 | this_should_be_linted = 'single quote string'

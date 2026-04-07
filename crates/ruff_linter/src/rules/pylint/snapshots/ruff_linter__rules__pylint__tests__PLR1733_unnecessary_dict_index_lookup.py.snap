@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLR1733 [*] Unnecessary lookup of dictionary value by key
  --> unnecessary_dict_index_lookup.py:4:6
   |
-3 | def fix_these():
 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
   |      ^^^^^^^^^^^^^^^^^^
-5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
-6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
 help: Use existing variable
 1 | FRUITS = {"apple": 1, "orange": 10, "berry": 22}
@@ -23,11 +20,8 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
  --> unnecessary_dict_index_lookup.py:5:6
   |
-3 | def fix_these():
-4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
 5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |      ^^^^^^^^^^^^^^^^^^
-6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
 help: Use existing variable
 2 |
@@ -42,12 +36,8 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
  --> unnecessary_dict_index_lookup.py:6:18
   |
-4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
-5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |                  ^^^^^^^^^^^^^^^^^^
-7 |
-8 |     for fruit_name, fruit_count in FRUITS.items():
   |
 help: Use existing variable
 3 | def fix_these():
@@ -60,14 +50,11 @@ help: Use existing variable
 9 |         print(FRUITS[fruit_name])  # PLR1733
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
-  --> unnecessary_dict_index_lookup.py:9:15
-   |
- 8 |     for fruit_name, fruit_count in FRUITS.items():
- 9 |         print(FRUITS[fruit_name])  # PLR1733
-   |               ^^^^^^^^^^^^^^^^^^
-10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
-   |
+ --> unnecessary_dict_index_lookup.py:9:15
+  |
+9 |         print(FRUITS[fruit_name])  # PLR1733
+  |               ^^^^^^^^^^^^^^^^^^
+  |
 help: Use existing variable
 6  |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 7  |
@@ -81,11 +68,8 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
   --> unnecessary_dict_index_lookup.py:10:16
    |
- 8 |     for fruit_name, fruit_count in FRUITS.items():
- 9 |         print(FRUITS[fruit_name])  # PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733
    |                ^^^^^^^^^^^^^^^^^^
-11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
 help: Use existing variable
 7  |
@@ -100,8 +84,6 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
   --> unnecessary_dict_index_lookup.py:11:16
    |
- 9 |         print(FRUITS[fruit_name])  # PLR1733
-10 |         blah = FRUITS[fruit_name]  # PLR1733
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |                ^^^^^^^^^^^^^^^^^^
    |
@@ -118,12 +100,8 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
   --> unnecessary_dict_index_lookup.py:50:51
    |
-48 |         if mapped_label in mapped_arrays:
-49 |             for i in range(len(array)):
 50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
    |                                                   ^^^^^^^^^^^^^^^^^^^
-51 |         else:
-52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
    |
 help: Use existing variable
 47 |         mapped_label = client_label_map(label)
@@ -138,11 +116,8 @@ help: Use existing variable
 PLR1733 [*] Unnecessary lookup of dictionary value by key
   --> unnecessary_dict_index_lookup.py:52:44
    |
-50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
-51 |         else:
 52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
    |                                            ^^^^^^^^^^^^^^^^^^^
-53 |     return mapped_arrays
    |
 help: Use existing variable
 49 |             for i in range(len(array)):

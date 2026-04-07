@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
  --> SIM112.py:4:12
   |
-3 | # Bad
 4 | os.environ['foo']
   |            ^^^^^
-5 |
-6 | os.environ.get('foo')
   |
 help: Replace `foo` with `FOO`
 1 | import os
@@ -24,60 +21,40 @@ note: This is an unsafe fix and may change runtime behavior
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
  --> SIM112.py:6:16
   |
-4 | os.environ['foo']
-5 |
 6 | os.environ.get('foo')
   |                ^^^^^
-7 |
-8 | os.environ.get('foo', 'bar')
   |
 help: Replace `foo` with `FOO`
 
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
-  --> SIM112.py:8:16
-   |
- 6 | os.environ.get('foo')
- 7 |
- 8 | os.environ.get('foo', 'bar')
-   |                ^^^^^
- 9 |
-10 | os.getenv('foo')
-   |
+ --> SIM112.py:8:16
+  |
+8 | os.environ.get('foo', 'bar')
+  |                ^^^^^
+  |
 help: Replace `foo` with `FOO`
 
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:10:11
    |
- 8 | os.environ.get('foo', 'bar')
- 9 |
 10 | os.getenv('foo')
    |           ^^^^^
-11 |
-12 | env = os.environ.get('foo')
    |
 help: Replace `foo` with `FOO`
 
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:12:22
    |
-10 | os.getenv('foo')
-11 |
 12 | env = os.environ.get('foo')
    |                      ^^^^^
-13 |
-14 | env = os.environ['foo']
    |
 help: Replace `foo` with `FOO`
 
 SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:14:18
    |
-12 | env = os.environ.get('foo')
-13 |
 14 | env = os.environ['foo']
    |                  ^^^^^
-15 |
-16 | if env := os.environ.get('foo'):
    |
 help: Replace `foo` with `FOO`
 11 |
@@ -93,22 +70,16 @@ note: This is an unsafe fix and may change runtime behavior
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:16:26
    |
-14 | env = os.environ['foo']
-15 |
 16 | if env := os.environ.get('foo'):
    |                          ^^^^^
-17 |     pass
    |
 help: Replace `foo` with `FOO`
 
 SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:19:22
    |
-17 |     pass
-18 |
 19 | if env := os.environ['foo']:
    |                      ^^^^^
-20 |     pass
    |
 help: Replace `foo` with `FOO`
 16 | if env := os.environ.get('foo'):

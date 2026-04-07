@@ -2,15 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
 PYI059 [*] `Generic[]` should always be the last base class
-  --> PYI059.pyi:8:17
-   |
- 6 | V = TypeVar('V')
- 7 |
- 8 | class LinkedList(Generic[T], Sized):  # PYI059
-   |                 ^^^^^^^^^^^^^^^^^^^
- 9 |     def __init__(self) -> None: ...
-10 |     def push(self, item: T) -> None: ...
-   |
+ --> PYI059.pyi:8:17
+  |
+8 | class LinkedList(Generic[T], Sized):  # PYI059
+  |                 ^^^^^^^^^^^^^^^^^^^
+  |
 help: Move `Generic[]` to the end
 5  | K = TypeVar('K')
 6  | V = TypeVar('V')
@@ -25,8 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 PYI059 [*] `Generic[]` should always be the last base class
   --> PYI059.pyi:12:16
    |
-10 |       def push(self, item: T) -> None: ...
-11 |
 12 |   class MyMapping(  # PYI059
    |  ________________^
 13 | |     t.Generic[K, V],
@@ -34,7 +28,6 @@ PYI059 [*] `Generic[]` should always be the last base class
 15 | |     Container[Tuple[K, V]],
 16 | | ):
    | |_^
-17 |       ...
    |
 help: Move `Generic[]` to the end
 10 |     def push(self, item: T) -> None: ...
@@ -52,8 +45,6 @@ note: This is an unsafe fix and may change runtime behavior
 PYI059 [*] `Generic[]` should always be the last base class
   --> PYI059.pyi:22:10
    |
-20 | # to flag this issue in this case as well, since after fixing the error
-21 | # the Generic's position issue persists.
 22 | class Foo(Generic, LinkedList): ...  # PYI059
    |          ^^^^^^^^^^^^^^^^^^^^^
    |
@@ -84,7 +75,6 @@ PYI059 [*] `Generic[]` should always be the last base class
 34 | |     # yet another comment?
 35 | | ):  # and another one for good measure
    | |_^
-36 |       ...
    |
 help: Move `Generic[]` to the end
 25 | class Foo(  # comment about the bracket
@@ -106,7 +96,6 @@ note: This is an unsafe fix and may change runtime behavior
 PYI059 `Generic[]` should always be the last base class
   --> PYI059.pyi:40:8
    |
-39 | # in case of multiple Generic[] inheritance, don't fix it.
 40 | class C(Generic[T], Generic[K, V]): ...  # PYI059
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

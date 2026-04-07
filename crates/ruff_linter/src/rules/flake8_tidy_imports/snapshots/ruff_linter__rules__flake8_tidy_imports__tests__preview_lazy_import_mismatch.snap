@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 TID254 [*] `typing` should be imported lazily
  --> TID254.py:4:8
   |
-3 | import os
 4 | import typing as t
   |        ^^^^^^^^^^^
-5 | lazy import pathlib
   |
 help: Convert to a lazy import
 1 | from __future__ import annotations
@@ -23,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 TID254 [*] `foo` should be imported lazily
  --> TID254.py:7:1
   |
-5 | lazy import pathlib
-6 |
 7 | from foo import bar
   | ^^^^^^^^^^^^^^^^^^^
-8 | lazy from foo import baz
-9 | from starry import *
   |
 help: Convert to a lazy import
 4  | import typing as t
@@ -44,11 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 TID254 [*] `email` should be imported lazily
   --> TID254.py:12:12
    |
-11 | with manager():
 12 |     import email
    |            ^^^^^
-13 |
-14 | if True:
    |
 help: Convert to a lazy import
 9  | from starry import *
@@ -64,11 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 TID254 [*] `bar` should be imported lazily
   --> TID254.py:15:5
    |
-14 | if True:
 15 |     from bar import qux
    |     ^^^^^^^^^^^^^^^^^^^
-16 |
-17 | try:
    |
 help: Convert to a lazy import
 12 |     import email
@@ -84,8 +72,6 @@ note: This is an unsafe fix and may change runtime behavior
 TID254 [*] `pkg` should be imported lazily
   --> TID254.py:28:15
    |
-26 |     import decimal
-27 |
 28 | x = 1; import pkg.submodule
    |               ^^^^^^^^^^^^^
    |

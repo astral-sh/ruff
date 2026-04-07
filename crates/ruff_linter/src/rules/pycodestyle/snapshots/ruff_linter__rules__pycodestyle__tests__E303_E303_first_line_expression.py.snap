@@ -6,7 +6,6 @@ E303 [*] Too many blank lines (3)
   |
 5 | def fn():
   | ^^^
-6 |     pass
   |
 help: Remove extraneous blank line(s)
 1 | "Test where the first line is a comment, " + "and the rule violation follows it."

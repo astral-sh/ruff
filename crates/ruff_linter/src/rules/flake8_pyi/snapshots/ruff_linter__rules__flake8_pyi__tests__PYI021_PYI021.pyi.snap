@@ -6,8 +6,6 @@ PYI021 [*] Docstrings should not be included in stubs
   |
 1 | """foo"""  # ERROR PYI021
   | ^^^^^^^^^
-2 |
-3 | def foo():
   |
 help: Remove docstring
   - """foo"""  # ERROR PYI021
@@ -20,11 +18,8 @@ note: This is an unsafe fix and may change runtime behavior
 PYI021 [*] Docstrings should not be included in stubs
  --> PYI021.pyi:4:5
   |
-3 | def foo():
 4 |     """foo"""  # ERROR PYI021
   |     ^^^^^^^^^
-5 |
-6 | class Bar:
   |
 help: Remove docstring
 1 | """foo"""  # ERROR PYI021
@@ -40,11 +35,8 @@ note: This is an unsafe fix and may change runtime behavior
 PYI021 [*] Docstrings should not be included in stubs
  --> PYI021.pyi:7:5
   |
-6 | class Bar:
 7 |     """bar"""  # ERROR PYI021
   |     ^^^^^^^^^
-8 |
-9 | class Qux:
   |
 help: Remove docstring
 4  |     """foo"""  # ERROR PYI021
@@ -60,11 +52,8 @@ note: This is an unsafe fix and may change runtime behavior
 PYI021 [*] Docstrings should not be included in stubs
   --> PYI021.pyi:10:5
    |
- 9 | class Qux:
 10 |     """qux"""  # ERROR PYI021
    |     ^^^^^^^^^
-11 |
-12 |     def __init__(self) -> None: ...
    |
 help: Remove docstring
 7  |     """bar"""  # ERROR PYI021
@@ -80,14 +69,11 @@ note: This is an unsafe fix and may change runtime behavior
 PYI021 [*] Docstrings should not be included in stubs
   --> PYI021.pyi:15:5
    |
-14 |   class Baz:
 15 | /     """Multiline docstring
 16 | |
 17 | |     Lorem ipsum dolor sit amet
 18 | |     """
    | |_______^
-19 |
-20 |       def __init__(self) -> None: ...
    |
 help: Remove docstring
 12 |     def __init__(self) -> None: ...

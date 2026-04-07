@@ -28,21 +28,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/abstract_method.md
 
 ```
 error[call-abstract-method]: Cannot call `method` on class object
- --> src/mdtest_snippet.py:9:1
+ --> src/mdtest_snippet.py:5:5
   |
+5 |     @abstractmethod
+  |     ---------------
+6 |     def method(cls) -> int: ...
+  |         ------ Method `method` defined here
+7 |
 8 | # error: [call-abstract-method] "Cannot call `method` on class object"
 9 | Foo.method()
   | ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
-  |
-info: Method `method` defined here
- --> src/mdtest_snippet.py:6:9
-  |
-4 |     @classmethod
-5 |     @abstractmethod
-6 |     def method(cls) -> int: ...
-  |         ^^^^^^
-7 |
-8 | # error: [call-abstract-method] "Cannot call `method` on class object"
   |
 
 ```

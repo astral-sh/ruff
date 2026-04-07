@@ -6,7 +6,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 17 | def f5(x=([1, ])):
    |           ^^^^^
-18 |     print(x)
    |
 help: Replace with `None`; initialize within function
 14 |     print(x)

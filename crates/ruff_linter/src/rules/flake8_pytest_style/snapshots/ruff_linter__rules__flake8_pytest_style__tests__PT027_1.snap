@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:11:14
    |
-10 |     def test_errors(self):
 11 |         with self.assertRaises(ValueError):
    |              ^^^^^^^^^^^^^^^^^
-12 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 8  |             raise ValueError
@@ -23,10 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:15:14
    |
-14 |     def test_rewrite_references(self):
 15 |         with self.assertRaises(ValueError) as e:
    |              ^^^^^^^^^^^^^^^^^
-16 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 12 |             raise ValueError
@@ -47,11 +43,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:22:14
    |
-21 |     def test_rewrite_references_multiple_items(self):
 22 |         with self.assertRaises(ValueError) as e1, \
    |              ^^^^^^^^^^^^^^^^^
-23 |             self.assertRaises(ValueError) as e2:
-24 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 19 |         print(e.exception)
@@ -73,11 +66,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:23:13
    |
-21 |     def test_rewrite_references_multiple_items(self):
-22 |         with self.assertRaises(ValueError) as e1, \
 23 |             self.assertRaises(ValueError) as e2:
    |             ^^^^^^^^^^^^^^^^^
-24 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 20 |
@@ -101,11 +91,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:33:14
    |
-32 |     def test_rewrite_references_multiple_items_nested(self):
 33 |         with self.assertRaises(ValueError) as e1, \
    |              ^^^^^^^^^^^^^^^^^
-34 |             foo(self.assertRaises(ValueError)) as e2:
-35 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 30 |         print(e2.exception)
@@ -127,11 +114,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:34:17
    |
-32 |     def test_rewrite_references_multiple_items_nested(self):
-33 |         with self.assertRaises(ValueError) as e1, \
 34 |             foo(self.assertRaises(ValueError)) as e2:
    |                 ^^^^^^^^^^^^^^^^^
-35 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 31 |

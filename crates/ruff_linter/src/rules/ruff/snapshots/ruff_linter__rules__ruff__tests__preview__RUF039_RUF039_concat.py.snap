@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF039 [*] First argument to `re.compile()` is not raw string
  --> RUF039_concat.py:5:5
   |
-4 | re.compile(
 5 |     'implicit'
   |     ^^^^^^^^^^
-6 |     'concatenation'
-7 | )
   |
 help: Replace with raw string
 2 |
@@ -23,12 +20,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.compile()` is not raw string
  --> RUF039_concat.py:6:5
   |
-4 | re.compile(
-5 |     'implicit'
 6 |     'concatenation'
   |     ^^^^^^^^^^^^^^^
-7 | )
-8 | re.findall(
   |
 help: Replace with raw string
 3 |
@@ -43,14 +36,10 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.findall()` is not raw string
   --> RUF039_concat.py:12:5
    |
-10 |       multiline
-11 |       '''
 12 | /     """
 13 | |     concatenation
 14 | |     """
    | |_______^
-15 |   )
-16 |   re.finditer(
    |
 help: Replace with raw string
 9  |     r'''
@@ -65,12 +54,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.match()` is not raw bytes literal
   --> RUF039_concat.py:26:5
    |
-24 | )
-25 | re.match(
 26 |     b'reak'
    |     ^^^^^^^
-27 |     br'eak'
-28 | )
    |
 help: Replace with raw bytes literal
 23 |     f'much?'
@@ -85,24 +70,16 @@ help: Replace with raw bytes literal
 RUF039 First argument to `re.search()` is not raw string
   --> RUF039_concat.py:30:8
    |
-28 | )
-29 | re.search(
 30 |     r''u''
    |        ^^^
-31 |     '''okay?'''
-32 | )
    |
 help: Replace with raw string
 
 RUF039 [*] First argument to `re.search()` is not raw string
   --> RUF039_concat.py:31:5
    |
-29 | re.search(
-30 |     r''u''
 31 |     '''okay?'''
    |     ^^^^^^^^^^^
-32 | )
-33 | re.split(''U"""w"""U'')
    |
 help: Replace with raw string
 28 | )
@@ -117,12 +94,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.split()` is not raw string
   --> RUF039_concat.py:33:10
    |
-31 |     '''okay?'''
-32 | )
 33 | re.split(''U"""w"""U'')
    |          ^^
-34 | re.sub(
-35 |     "I''m o"
    |
 help: Replace with raw string
 30 |     r''u''
@@ -137,36 +110,24 @@ help: Replace with raw string
 RUF039 First argument to `re.split()` is not raw string
   --> RUF039_concat.py:33:12
    |
-31 |     '''okay?'''
-32 | )
 33 | re.split(''U"""w"""U'')
    |            ^^^^^^^^
-34 | re.sub(
-35 |     "I''m o"
    |
 help: Replace with raw string
 
 RUF039 First argument to `re.split()` is not raw string
   --> RUF039_concat.py:33:20
    |
-31 |     '''okay?'''
-32 | )
 33 | re.split(''U"""w"""U'')
    |                    ^^^
-34 | re.sub(
-35 |     "I''m o"
    |
 help: Replace with raw string
 
 RUF039 [*] First argument to `re.sub()` is not raw string
   --> RUF039_concat.py:35:5
    |
-33 | re.split(''U"""w"""U'')
-34 | re.sub(
 35 |     "I''m o"
    |     ^^^^^^^^
-36 |     'utta ideas'
-37 | )
    |
 help: Replace with raw string
 32 | )
@@ -181,12 +142,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.sub()` is not raw string
   --> RUF039_concat.py:36:5
    |
-34 | re.sub(
-35 |     "I''m o"
 36 |     'utta ideas'
    |     ^^^^^^^^^^^^
-37 | )
-38 | re.subn("()"r' am I'"??")
    |
 help: Replace with raw string
 33 | re.split(''U"""w"""U'')
@@ -201,8 +158,6 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.subn()` is not raw string
   --> RUF039_concat.py:38:9
    |
-36 |     'utta ideas'
-37 | )
 38 | re.subn("()"r' am I'"??")
    |         ^^^^
    |
@@ -219,8 +174,6 @@ help: Replace with raw string
 RUF039 [*] First argument to `re.subn()` is not raw string
   --> RUF039_concat.py:38:21
    |
-36 |     'utta ideas'
-37 | )
 38 | re.subn("()"r' am I'"??")
    |                     ^^^^
    |
@@ -237,11 +190,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.compile()` is not raw string
   --> RUF039_concat.py:45:5
    |
-44 | regex.compile(
 45 |     'implicit'
    |     ^^^^^^^^^^
-46 |     'concatenation'
-47 | )
    |
 help: Replace with raw string
 42 |
@@ -256,12 +206,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.compile()` is not raw string
   --> RUF039_concat.py:46:5
    |
-44 | regex.compile(
-45 |     'implicit'
 46 |     'concatenation'
    |     ^^^^^^^^^^^^^^^
-47 | )
-48 | regex.findall(
    |
 help: Replace with raw string
 43 |
@@ -276,14 +222,10 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.findall()` is not raw string
   --> RUF039_concat.py:52:5
    |
-50 |       multiline
-51 |       '''
 52 | /     """
 53 | |     concatenation
 54 | |     """
    | |_______^
-55 |   )
-56 |   regex.finditer(
    |
 help: Replace with raw string
 49 |     r'''
@@ -298,12 +240,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.match()` is not raw bytes literal
   --> RUF039_concat.py:66:5
    |
-64 | )
-65 | regex.match(
 66 |     b'reak'
    |     ^^^^^^^
-67 |     br'eak'
-68 | )
    |
 help: Replace with raw bytes literal
 63 |     f'much?'
@@ -318,24 +256,16 @@ help: Replace with raw bytes literal
 RUF039 First argument to `regex.search()` is not raw string
   --> RUF039_concat.py:70:8
    |
-68 | )
-69 | regex.search(
 70 |     r''u''
    |        ^^^
-71 |     '''okay?'''
-72 | )
    |
 help: Replace with raw string
 
 RUF039 [*] First argument to `regex.search()` is not raw string
   --> RUF039_concat.py:71:5
    |
-69 | regex.search(
-70 |     r''u''
 71 |     '''okay?'''
    |     ^^^^^^^^^^^
-72 | )
-73 | regex.split(''U"""w"""U'')
    |
 help: Replace with raw string
 68 | )
@@ -350,12 +280,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.split()` is not raw string
   --> RUF039_concat.py:73:13
    |
-71 |     '''okay?'''
-72 | )
 73 | regex.split(''U"""w"""U'')
    |             ^^
-74 | regex.sub(
-75 |     "I''m o"
    |
 help: Replace with raw string
 70 |     r''u''
@@ -370,36 +296,24 @@ help: Replace with raw string
 RUF039 First argument to `regex.split()` is not raw string
   --> RUF039_concat.py:73:15
    |
-71 |     '''okay?'''
-72 | )
 73 | regex.split(''U"""w"""U'')
    |               ^^^^^^^^
-74 | regex.sub(
-75 |     "I''m o"
    |
 help: Replace with raw string
 
 RUF039 First argument to `regex.split()` is not raw string
   --> RUF039_concat.py:73:23
    |
-71 |     '''okay?'''
-72 | )
 73 | regex.split(''U"""w"""U'')
    |                       ^^^
-74 | regex.sub(
-75 |     "I''m o"
    |
 help: Replace with raw string
 
 RUF039 [*] First argument to `regex.sub()` is not raw string
   --> RUF039_concat.py:75:5
    |
-73 | regex.split(''U"""w"""U'')
-74 | regex.sub(
 75 |     "I''m o"
    |     ^^^^^^^^
-76 |     'utta ideas'
-77 | )
    |
 help: Replace with raw string
 72 | )
@@ -414,12 +328,8 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.sub()` is not raw string
   --> RUF039_concat.py:76:5
    |
-74 | regex.sub(
-75 |     "I''m o"
 76 |     'utta ideas'
    |     ^^^^^^^^^^^^
-77 | )
-78 | regex.subn("()"r' am I'"??")
    |
 help: Replace with raw string
 73 | regex.split(''U"""w"""U'')
@@ -434,8 +344,6 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.subn()` is not raw string
   --> RUF039_concat.py:78:12
    |
-76 |     'utta ideas'
-77 | )
 78 | regex.subn("()"r' am I'"??")
    |            ^^^^
    |
@@ -452,8 +360,6 @@ help: Replace with raw string
 RUF039 [*] First argument to `regex.subn()` is not raw string
   --> RUF039_concat.py:78:24
    |
-76 |     'utta ideas'
-77 | )
 78 | regex.subn("()"r' am I'"??")
    |                        ^^^^
    |
@@ -468,15 +374,11 @@ help: Replace with raw string
 81 | regex.template(
 
 RUF039 [*] First argument to `re.compile()` is not raw string
-   --> RUF039_concat.py:98:5
-    |
- 96 | # https://github.com/astral-sh/ruff/issues/16713
- 97 | re.compile(
- 98 |     "["
-    |     ^^^
- 99 |     "\U0001F600-\U0001F64F"  # emoticons
-100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
-    |
+  --> RUF039_concat.py:98:5
+   |
+98 |     "["
+   |     ^^^
+   |
 help: Replace with raw string
 95  |
 96  | # https://github.com/astral-sh/ruff/issues/16713
@@ -488,15 +390,11 @@ help: Replace with raw string
 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
 
 RUF039 [*] First argument to `re.compile()` is not raw string
-   --> RUF039_concat.py:99:5
-    |
- 97 | re.compile(
- 98 |     "["
- 99 |     "\U0001F600-\U0001F64F"  # emoticons
-    |     ^^^^^^^^^^^^^^^^^^^^^^^
-100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
-101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
-    |
+  --> RUF039_concat.py:99:5
+   |
+99 |     "\U0001F600-\U0001F64F"  # emoticons
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Replace with raw string
 96  | # https://github.com/astral-sh/ruff/issues/16713
 97  | re.compile(
@@ -511,12 +409,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:100:5
     |
- 98 |     "["
- 99 |     "\U0001F600-\U0001F64F"  # emoticons
 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
     |     ^^^^^^^^^^^^^^^^^^^^^^^
-101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
-102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
     |
 help: Replace with raw string
 97  | re.compile(
@@ -532,12 +426,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:101:5
     |
- 99 |     "\U0001F600-\U0001F64F"  # emoticons
-100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
     |     ^^^^^^^^^^^^^^^^^^^^^^^
-102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-103 |     "\U00002702-\U000027B0"
     |
 help: Replace with raw string
 98  |     "["
@@ -553,12 +443,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:102:5
     |
-100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
-101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
     |     ^^^^^^^^^^^^^^^^^^^^^^^
-103 |     "\U00002702-\U000027B0"
-104 |     "\U000024C2-\U0001F251"
     |
 help: Replace with raw string
 99  |     "\U0001F600-\U0001F64F"  # emoticons
@@ -574,12 +460,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:103:5
     |
-101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
-102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
 103 |     "\U00002702-\U000027B0"
     |     ^^^^^^^^^^^^^^^^^^^^^^^
-104 |     "\U000024C2-\U0001F251"
-105 |     "\u200d"  # zero width joiner
     |
 help: Replace with raw string
 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
@@ -595,12 +477,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:104:5
     |
-102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-103 |     "\U00002702-\U000027B0"
 104 |     "\U000024C2-\U0001F251"
     |     ^^^^^^^^^^^^^^^^^^^^^^^
-105 |     "\u200d"  # zero width joiner
-106 |     "\u200c"  # zero width non-joiner
     |
 help: Replace with raw string
 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
@@ -616,12 +494,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:105:5
     |
-103 |     "\U00002702-\U000027B0"
-104 |     "\U000024C2-\U0001F251"
 105 |     "\u200d"  # zero width joiner
     |     ^^^^^^^^
-106 |     "\u200c"  # zero width non-joiner
-107 |     "\\u200c" # must not be escaped in a raw string
     |
 help: Replace with raw string
 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
@@ -637,12 +511,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:106:5
     |
-104 |     "\U000024C2-\U0001F251"
-105 |     "\u200d"  # zero width joiner
 106 |     "\u200c"  # zero width non-joiner
     |     ^^^^^^^^
-107 |     "\\u200c" # must not be escaped in a raw string
-108 |     "]+",
     |
 help: Replace with raw string
 103 |     "\U00002702-\U000027B0"
@@ -658,24 +528,16 @@ note: This is an unsafe fix and may change runtime behavior
 RUF039 First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:107:5
     |
-105 |     "\u200d"  # zero width joiner
-106 |     "\u200c"  # zero width non-joiner
 107 |     "\\u200c" # must not be escaped in a raw string
     |     ^^^^^^^^^
-108 |     "]+",
-109 |     flags=re.UNICODE,
     |
 help: Replace with raw string
 
 RUF039 [*] First argument to `re.compile()` is not raw string
    --> RUF039_concat.py:108:5
     |
-106 |     "\u200c"  # zero width non-joiner
-107 |     "\\u200c" # must not be escaped in a raw string
 108 |     "]+",
     |     ^^^^
-109 |     flags=re.UNICODE,
-110 | )
     |
 help: Replace with raw string
 105 |     "\u200d"  # zero width joiner

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP031 [*] Use format specifiers instead of percent format
  --> UP031_0.py:4:7
   |
-3 | # UP031
 4 | print('%s %s' % (a, b))
   |       ^^^^^^^^^^^^^^^^
-5 |
-6 | print('%s%s' % (a, b))
   |
 help: Replace with format specifiers
 1 | a, b, x, y = 1, 2, 3, 4
@@ -24,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
  --> UP031_0.py:6:7
   |
-4 | print('%s %s' % (a, b))
-5 |
 6 | print('%s%s' % (a, b))
   |       ^^^^^^^^^^^^^^^
-7 |
-8 | print("trivial" % ())
   |
 help: Replace with format specifiers
 3 | # UP031
@@ -43,15 +36,11 @@ help: Replace with format specifiers
 note: This is an unsafe fix and may change runtime behavior
 
 UP031 [*] Use format specifiers instead of percent format
-  --> UP031_0.py:8:7
-   |
- 6 | print('%s%s' % (a, b))
- 7 |
- 8 | print("trivial" % ())
-   |       ^^^^^^^^^^^^^^
- 9 |
-10 | print("%s" % ("simple",))
-   |
+ --> UP031_0.py:8:7
+  |
+8 | print("trivial" % ())
+  |       ^^^^^^^^^^^^^^
+  |
 help: Replace with format specifiers
 5  |
 6  | print('%s%s' % (a, b))
@@ -66,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:10:7
    |
- 8 | print("trivial" % ())
- 9 |
 10 | print("%s" % ("simple",))
    |       ^^^^^^^^^^^^^^^^^^
-11 |
-12 | print("%s" % ("%s" % ("nested",),))
    |
 help: Replace with format specifiers
 7  |
@@ -87,12 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:12:7
    |
-10 | print("%s" % ("simple",))
-11 |
 12 | print("%s" % ("%s" % ("nested",),))
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-13 |
-14 | print("%s%% percent" % (15,))
    |
 help: Replace with format specifiers
 9  |
@@ -108,12 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:12:15
    |
-10 | print("%s" % ("simple",))
-11 |
 12 | print("%s" % ("%s" % ("nested",),))
    |               ^^^^^^^^^^^^^^^^^^
-13 |
-14 | print("%s%% percent" % (15,))
    |
 help: Replace with format specifiers
 9  |
@@ -129,12 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:14:7
    |
-12 | print("%s" % ("%s" % ("nested",),))
-13 |
 14 | print("%s%% percent" % (15,))
    |       ^^^^^^^^^^^^^^^^^^^^^^
-15 |
-16 | print("%f" % (15,))
    |
 help: Replace with format specifiers
 11 |
@@ -150,12 +123,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:16:7
    |
-14 | print("%s%% percent" % (15,))
-15 |
 16 | print("%f" % (15,))
    |       ^^^^^^^^^^^^
-17 |
-18 | print("%.f" % (15,))
    |
 help: Replace with format specifiers
 13 |
@@ -171,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:18:7
    |
-16 | print("%f" % (15,))
-17 |
 18 | print("%.f" % (15,))
    |       ^^^^^^^^^^^^^
-19 |
-20 | print("%.3f" % (15,))
    |
 help: Replace with format specifiers
 15 |
@@ -192,12 +157,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:20:7
    |
-18 | print("%.f" % (15,))
-19 |
 20 | print("%.3f" % (15,))
    |       ^^^^^^^^^^^^^^
-21 |
-22 | print("%3f" % (15,))
    |
 help: Replace with format specifiers
 17 |
@@ -213,12 +174,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:22:7
    |
-20 | print("%.3f" % (15,))
-21 |
 22 | print("%3f" % (15,))
    |       ^^^^^^^^^^^^^
-23 |
-24 | print("%-5f" % (5,))
    |
 help: Replace with format specifiers
 19 |
@@ -234,12 +191,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:24:7
    |
-22 | print("%3f" % (15,))
-23 |
 24 | print("%-5f" % (5,))
    |       ^^^^^^^^^^^^^
-25 |
-26 | print("%9f" % (5,))
    |
 help: Replace with format specifiers
 21 |
@@ -255,12 +208,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:26:7
    |
-24 | print("%-5f" % (5,))
-25 |
 26 | print("%9f" % (5,))
    |       ^^^^^^^^^^^^
-27 |
-28 | print("%#o" % (123,))
    |
 help: Replace with format specifiers
 23 |
@@ -276,12 +225,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:28:7
    |
-26 | print("%9f" % (5,))
-27 |
 28 | print("%#o" % (123,))
    |       ^^^^^^^^^^^^^^
-29 |
-30 | print("brace {} %s" % (1,))
    |
 help: Replace with format specifiers
 25 |
@@ -297,12 +242,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:30:7
    |
-28 | print("%#o" % (123,))
-29 |
 30 | print("brace {} %s" % (1,))
    |       ^^^^^^^^^^^^^^^^^^^^
-31 |
-32 | print((
    |
 help: Replace with format specifiers
 27 |
@@ -318,11 +259,9 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:33:5
    |
-32 |   print((
 33 | /     "foo %s "
 34 | |     "bar %s" % (x, y)
    | |_____________________^
-35 |   ))
    |
 help: Replace with format specifiers
 30 | print("brace {} %s" % (1,))
@@ -340,12 +279,10 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:38:3
    |
-37 |   print(
 38 | /   "%s" % (
 39 | |     "trailing comma",
 40 | |         )
    | |_________^
-41 |   )
    |
 help: Replace with format specifiers
 35 | ))
@@ -361,12 +298,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:43:7
    |
-41 | )
-42 |
 43 | print("foo %s " % (x,))
    |       ^^^^^^^^^^^^^^^^
-44 |
-45 | print("%(k)s" % {"k": "v"})
    |
 help: Replace with format specifiers
 40 |         )
@@ -382,12 +315,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:45:7
    |
-43 | print("foo %s " % (x,))
-44 |
 45 | print("%(k)s" % {"k": "v"})
    |       ^^^^^^^^^^^^^^^^^^^^
-46 |
-47 | print("%(k)s" % {
    |
 help: Replace with format specifiers
 42 |
@@ -403,16 +332,12 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:47:7
    |
-45 |   print("%(k)s" % {"k": "v"})
-46 |
 47 |   print("%(k)s" % {
    |  _______^
 48 | |     "k": "v",
 49 | |     "i": "j"
 50 | | })
    | |_^
-51 |
-52 |   print("%(to_list)s" % {"to_list": []})
    |
 help: Replace with format specifiers
 44 |
@@ -434,12 +359,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:52:7
    |
-50 | })
-51 |
 52 | print("%(to_list)s" % {"to_list": []})
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-53 |
-54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
    |
 help: Replace with format specifiers
 49 |     "i": "j"
@@ -455,12 +376,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:54:7
    |
-52 | print("%(to_list)s" % {"to_list": []})
-53 |
 54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 |
-56 | print("%(ab)s" % {"a" "b": 1})
    |
 help: Replace with format specifiers
 51 |
@@ -476,12 +393,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:56:7
    |
-54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
-55 |
 56 | print("%(ab)s" % {"a" "b": 1})
    |       ^^^^^^^^^^^^^^^^^^^^^^^
-57 |
-58 | print("%(a)s" % {"a"  :  1})
    |
 help: Replace with format specifiers
 53 |
@@ -497,8 +410,6 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:58:7
    |
-56 | print("%(ab)s" % {"a" "b": 1})
-57 |
 58 | print("%(a)s" % {"a"  :  1})
    |       ^^^^^^^^^^^^^^^^^^^^^
    |
@@ -516,11 +427,9 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:62:5
    |
-61 |   print(
 62 | /     "foo %(foo)s "
 63 | |     "bar %(bar)s" % {"foo": x, "bar": y}
    | |________________________________________^
-64 |   )
    |
 help: Replace with format specifiers
 59 |
@@ -538,12 +447,9 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:68:5
    |
-66 |   bar = {"bar": y}
-67 |   print(
 68 | /     "foo %(foo)s "
 69 | |     "bar %(bar)s" % {"foo": x, **bar}
    | |_____________________________________^
-70 |   )
    |
 help: Replace with format specifiers
 65 |
@@ -561,12 +467,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:72:7
    |
-70 | )
-71 |
 72 | print("%s \N{snowman}" % (a,))
    |       ^^^^^^^^^^^^^^^^^^^^^^^
-73 |
-74 | print("%(foo)s \N{snowman}" % {"foo": 1})
    |
 help: Replace with format specifiers
 69 |     "bar %(bar)s" % {"foo": x, **bar}
@@ -582,12 +484,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:74:7
    |
-72 | print("%s \N{snowman}" % (a,))
-73 |
 74 | print("%(foo)s \N{snowman}" % {"foo": 1})
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-75 |
-76 | print(("foo %s " "bar %s") % (x, y))
    |
 help: Replace with format specifiers
 71 |
@@ -603,12 +501,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:76:7
    |
-74 | print("%(foo)s \N{snowman}" % {"foo": 1})
-75 |
 76 | print(("foo %s " "bar %s") % (x, y))
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-77 |
-78 | # Single-value expressions
    |
 help: Replace with format specifiers
 73 |
@@ -624,11 +518,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:79:7
    |
-78 | # Single-value expressions
 79 | print('Hello %s' % "World")
    |       ^^^^^^^^^^^^^^^^^^^^
-80 | print('Hello %s' % f"World")
-81 | print('Hello %s (%s)' % bar)
    |
 help: Replace with format specifiers
 76 | print(("foo %s " "bar %s") % (x, y))
@@ -644,12 +535,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:80:7
    |
-78 | # Single-value expressions
-79 | print('Hello %s' % "World")
 80 | print('Hello %s' % f"World")
    |       ^^^^^^^^^^^^^^^^^^^^^
-81 | print('Hello %s (%s)' % bar)
-82 | print('Hello %s (%s)' % bar.baz)
    |
 help: Replace with format specifiers
 77 |
@@ -665,12 +552,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:81:7
    |
-79 | print('Hello %s' % "World")
-80 | print('Hello %s' % f"World")
 81 | print('Hello %s (%s)' % bar)
    |       ^^^^^^^^^^^^^^^^^^^^^
-82 | print('Hello %s (%s)' % bar.baz)
-83 | print('Hello %s (%s)' % bar['bop'])
    |
 help: Replace with format specifiers
 78 | # Single-value expressions
@@ -686,12 +569,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:82:7
    |
-80 | print('Hello %s' % f"World")
-81 | print('Hello %s (%s)' % bar)
 82 | print('Hello %s (%s)' % bar.baz)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^
-83 | print('Hello %s (%s)' % bar['bop'])
-84 | print('Hello %(arg)s' % bar)
    |
 help: Replace with format specifiers
 79 | print('Hello %s' % "World")
@@ -707,12 +586,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:83:7
    |
-81 | print('Hello %s (%s)' % bar)
-82 | print('Hello %s (%s)' % bar.baz)
 83 | print('Hello %s (%s)' % bar['bop'])
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-84 | print('Hello %(arg)s' % bar)
-85 | print('Hello %(arg)s' % bar.baz)
    |
 help: Replace with format specifiers
 80 | print('Hello %s' % f"World")
@@ -728,12 +603,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:84:7
    |
-82 | print('Hello %s (%s)' % bar.baz)
-83 | print('Hello %s (%s)' % bar['bop'])
 84 | print('Hello %(arg)s' % bar)
    |       ^^^^^^^^^^^^^^^^^^^^^
-85 | print('Hello %(arg)s' % bar.baz)
-86 | print('Hello %(arg)s' % bar['bop'])
    |
 help: Replace with format specifiers
 81 | print('Hello %s (%s)' % bar)
@@ -749,11 +620,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:85:7
    |
-83 | print('Hello %s (%s)' % bar['bop'])
-84 | print('Hello %(arg)s' % bar)
 85 | print('Hello %(arg)s' % bar.baz)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^
-86 | print('Hello %(arg)s' % bar['bop'])
    |
 help: Replace with format specifiers
 82 | print('Hello %s (%s)' % bar.baz)
@@ -769,12 +637,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:86:7
    |
-84 | print('Hello %(arg)s' % bar)
-85 | print('Hello %(arg)s' % bar.baz)
 86 | print('Hello %(arg)s' % bar['bop'])
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-87 |
-88 | # Hanging modulos
    |
 help: Replace with format specifiers
 83 | print('Hello %s (%s)' % bar['bop'])
@@ -790,14 +654,11 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:89:1
    |
-88 |   # Hanging modulos
 89 | / (
 90 | |     "foo %s "
 91 | |     "bar %s"
 92 | | ) % (x, y)
    | |__________^
-93 |
-94 |   (
    |
 help: Replace with format specifiers
 87 |
@@ -817,15 +678,11 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
   --> UP031_0.py:94:1
    |
-92 |   ) % (x, y)
-93 |
 94 | / (
 95 | |     "foo %(foo)s "
 96 | |     "bar %(bar)s"
 97 | | ) % {"foo": x, "bar": y}
    | |________________________^
-98 |
-99 |   (
    |
 help: Replace with format specifiers
 92  | ) % (x, y)
@@ -845,11 +702,9 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:100:5
     |
- 99 |   (
 100 | /     """foo %s"""
 101 | |     % (x,)
     | |__________^
-102 |   )
     |
 help: Replace with format specifiers
 97  | ) % {"foo": x, "bar": y}
@@ -866,13 +721,11 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:105:5
     |
-104 |   (
 105 | /     """
 106 | |     foo %s
 107 | |     """
 108 | |     % (x,)
     | |__________^
-109 |   )
     |
 help: Replace with format specifiers
 103 |
@@ -891,8 +744,6 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:111:1
     |
-109 |   )
-110 |
 111 | / "%s" % (
 112 | |     x,  # comment
 113 | | )
@@ -919,8 +770,6 @@ UP031 [*] Use format specifiers instead of percent format
 119 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 120 | | )
     | |_^
-121 |
-122 |   # UP031 (no longer false negatives; now offer potentially unsafe fixes)
     |
 help: Replace with format specifiers
 113 | )
@@ -936,11 +785,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:123:1
     |
-122 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
 123 | 'Hello %s' % bar
     | ^^^^^^^^^^^^^^^^
-124 |
-125 | 'Hello %s' % bar.baz
     |
 help: Replace with format specifiers
 120 | )
@@ -956,12 +802,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:125:1
     |
-123 | 'Hello %s' % bar
-124 |
 125 | 'Hello %s' % bar.baz
     | ^^^^^^^^^^^^^^^^^^^^
-126 |
-127 | 'Hello %s' % bar['bop']
     |
 help: Replace with format specifiers
 122 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
@@ -977,12 +819,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:127:1
     |
-125 | 'Hello %s' % bar.baz
-126 |
 127 | 'Hello %s' % bar['bop']
     | ^^^^^^^^^^^^^^^^^^^^^^^
-128 |
-129 | # Not a valid type annotation but this test shouldn't result in a panic.
     |
 help: Replace with format specifiers
 124 |
@@ -998,12 +836,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:131:5
     |
-129 | # Not a valid type annotation but this test shouldn't result in a panic.
-130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 131 | x: "'%s + %s' % (1, 2)"
     |     ^^^^^^^^^^^^^^^^^^
-132 |
-133 | # See: https://github.com/astral-sh/ruff/issues/12421
     |
 help: Replace with format specifiers
 128 |
@@ -1019,11 +853,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:134:7
     |
-133 | # See: https://github.com/astral-sh/ruff/issues/12421
 134 | print("%.2X" % 1)
     |       ^^^^^^^^^^
-135 | print("%.02X" % 1)
-136 | print("%02X" % 1)
     |
 help: Replace with format specifiers
 131 | x: "'%s + %s' % (1, 2)"
@@ -1039,12 +870,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:135:7
     |
-133 | # See: https://github.com/astral-sh/ruff/issues/12421
-134 | print("%.2X" % 1)
 135 | print("%.02X" % 1)
     |       ^^^^^^^^^^^
-136 | print("%02X" % 1)
-137 | print("%.00002X" % 1)
     |
 help: Replace with format specifiers
 132 |
@@ -1060,12 +887,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:136:7
     |
-134 | print("%.2X" % 1)
-135 | print("%.02X" % 1)
 136 | print("%02X" % 1)
     |       ^^^^^^^^^^
-137 | print("%.00002X" % 1)
-138 | print("%.20X" % 1)
     |
 help: Replace with format specifiers
 133 | # See: https://github.com/astral-sh/ruff/issues/12421
@@ -1081,11 +904,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:137:7
     |
-135 | print("%.02X" % 1)
-136 | print("%02X" % 1)
 137 | print("%.00002X" % 1)
     |       ^^^^^^^^^^^^^^
-138 | print("%.20X" % 1)
     |
 help: Replace with format specifiers
 134 | print("%.2X" % 1)
@@ -1101,12 +921,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:138:7
     |
-136 | print("%02X" % 1)
-137 | print("%.00002X" % 1)
 138 | print("%.20X" % 1)
     |       ^^^^^^^^^^^
-139 |
-140 | print("%2X" % 1)
     |
 help: Replace with format specifiers
 135 | print("%.02X" % 1)
@@ -1122,11 +938,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:140:7
     |
-138 | print("%.20X" % 1)
-139 |
 140 | print("%2X" % 1)
     |       ^^^^^^^^^
-141 | print("%02X" % 1)
     |
 help: Replace with format specifiers
 137 | print("%.00002X" % 1)
@@ -1142,11 +955,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:141:7
     |
-140 | print("%2X" % 1)
 141 | print("%02X" % 1)
     |       ^^^^^^^^^^
-142 |
-143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
     |
 help: Replace with format specifiers
 138 | print("%.20X" % 1)
@@ -1162,164 +972,110 @@ note: This is an unsafe fix and may change runtime behavior
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:145:1
     |
-143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
-144 |
 145 | "%d.%d" % (a, b)
     | ^^^^^^^
-146 |
-147 | "%*s" % (5, "hi")
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:147:1
     |
-145 | "%d.%d" % (a, b)
-146 |
 147 | "%*s" % (5, "hi")
     | ^^^^^
-148 |
-149 | "%d" % (flt,)
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:149:1
     |
-147 | "%*s" % (5, "hi")
-148 |
 149 | "%d" % (flt,)
     | ^^^^
-150 |
-151 | "%c" % (some_string,)
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:151:1
     |
-149 | "%d" % (flt,)
-150 |
 151 | "%c" % (some_string,)
     | ^^^^
-152 |
-153 | "%.2r" % (1.25)
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:153:1
     |
-151 | "%c" % (some_string,)
-152 |
 153 | "%.2r" % (1.25)
     | ^^^^^^
-154 |
-155 | "%.*s" % (5, "hi")
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:155:1
     |
-153 | "%.2r" % (1.25)
-154 |
 155 | "%.*s" % (5, "hi")
     | ^^^^^^
-156 |
-157 | "%i" % (flt,)
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:157:1
     |
-155 | "%.*s" % (5, "hi")
-156 |
 157 | "%i" % (flt,)
     | ^^^^
-158 |
-159 | "%()s" % {"": "empty"}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:159:1
     |
-157 | "%i" % (flt,)
-158 |
 159 | "%()s" % {"": "empty"}
     | ^^^^^^
-160 |
-161 | "%s" % {"k": "v"}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:161:1
     |
-159 | "%()s" % {"": "empty"}
-160 |
 161 | "%s" % {"k": "v"}
     | ^^^^
-162 |
-163 | "%()s" % {"": "bar"}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:163:1
     |
-161 | "%s" % {"k": "v"}
-162 |
 163 | "%()s" % {"": "bar"}
     | ^^^^^^
-164 |
-165 | "%(1)s" % {"1": "bar"}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:165:1
     |
-163 | "%()s" % {"": "bar"}
-164 |
 165 | "%(1)s" % {"1": "bar"}
     | ^^^^^^^
-166 |
-167 | "%(a)s" % {"a": 1, "a": 2}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:167:1
     |
-165 | "%(1)s" % {"1": "bar"}
-166 |
 167 | "%(a)s" % {"a": 1, "a": 2}
     | ^^^^^^^
-168 |
-169 | "%(1)s" % {1: 2, "1": 2}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:169:1
     |
-167 | "%(a)s" % {"a": 1, "a": 2}
-168 |
 169 | "%(1)s" % {1: 2, "1": 2}
     | ^^^^^^^
-170 |
-171 | "%(and)s" % {"and": 2}
     |
 help: Replace with format specifiers
 
 UP031 Use format specifiers instead of percent format
    --> UP031_0.py:171:1
     |
-169 | "%(1)s" % {1: 2, "1": 2}
-170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
     |

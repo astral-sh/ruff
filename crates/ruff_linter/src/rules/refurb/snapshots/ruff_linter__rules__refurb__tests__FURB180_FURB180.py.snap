@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
  --> FURB180.py:7:10
   |
-5 | # Errors
-6 |
 7 | class A0(metaclass=abc.ABCMeta):
   |          ^^^^^^^^^^^^^^^^^^^^^
-8 |     @abstractmethod
-9 |     def foo(self): pass
   |
 help: Replace with `abc.ABC`
 4  |
@@ -26,8 +22,6 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 12 | class A1(metaclass=ABCMeta):
    |          ^^^^^^^^^^^^^^^^^
-13 |     @abstractmethod
-14 |     def foo(self): pass
    |
 help: Replace with `abc.ABC`
 9  |     def foo(self): pass
@@ -44,8 +38,6 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 26 | class A2(B0, B1, metaclass=ABCMeta):
    |                  ^^^^^^^^^^^^^^^^^
-27 |     @abstractmethod
-28 |     def foo(self): pass
    |
 help: Replace with `abc.ABC`
 23 |     pass
@@ -63,7 +55,6 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
    |                                  ^^^^^^^^^^^^^^^^^^^^^
-32 |     pass
    |
 help: Replace with `abc.ABC`
 28 |     def foo(self): pass
@@ -79,11 +70,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   --> FURB180.py:62:19
    |
-61 | # Regression tests for https://github.com/astral-sh/ruff/issues/17162
 62 | class A8(abc.ABC, metaclass=ABCMeta):  # FURB180
    |                   ^^^^^^^^^^^^^^^^^
-63 |     @abstractmethod
-64 |     def foo(self):
    |
 help: Replace with `abc.ABC`
 59 |
@@ -99,12 +87,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   --> FURB180.py:71:19
    |
-69 |     from abc import ABC
-70 |
 71 |     class A9(ABC, metaclass=ABCMeta):  # FURB180
    |                   ^^^^^^^^^^^^^^^^^
-72 |         @abstractmethod
-73 |         def foo(self):
    |
 help: Replace with `abc.ABC`
 68 | def a9():
@@ -120,12 +104,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   --> FURB180.py:80:35
    |
-78 |     from abc import ABC as ABCAlternativeName
-79 |
 80 |     class A10(ABCAlternativeName, metaclass=ABCMeta):  # FURB180
    |                                   ^^^^^^^^^^^^^^^^^
-81 |         @abstractmethod
-82 |         def foo(self):
    |
 help: Replace with `abc.ABC`
 77 | def a10():
@@ -143,8 +123,6 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 89 | class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
    |                        ^^^^^^^^^^^^^^^^^
-90 |     @abstractmethod
-91 |     def foo(self):
    |
 help: Replace with `abc.ABC`
 86 | class MyMetaClass(abc.ABC): ...
@@ -158,15 +136,11 @@ help: Replace with `abc.ABC`
 note: This is an unsafe fix and may change runtime behavior
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-   --> FURB180.py:98:5
-    |
- 96 |     keyword_argument=1,
- 97 |     # comment
- 98 |     metaclass=abc.ABCMeta,
-    |     ^^^^^^^^^^^^^^^^^^^^^
- 99 | ):  # FURB180
-100 |     pass
-    |
+  --> FURB180.py:98:5
+   |
+98 |     metaclass=abc.ABCMeta,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Replace with `abc.ABC`
 93 |
 94 |

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP034 [*] Avoid extraneous parentheses
  --> UP034.py:2:7
   |
-1 | # UP034
 2 | print(("foo"))
   |       ^^^^^^^
-3 |
-4 | # UP034
   |
 help: Remove extraneous parentheses
 1 | # UP034
@@ -21,11 +18,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
  --> UP034.py:5:7
   |
-4 | # UP034
 5 | print(("hell((goodybe))o"))
   |       ^^^^^^^^^^^^^^^^^^^^
-6 |
-7 | # UP034
   |
 help: Remove extraneous parentheses
 2 | print(("foo"))
@@ -38,14 +32,11 @@ help: Remove extraneous parentheses
 8 | print((("foo")))
 
 UP034 [*] Avoid extraneous parentheses
-  --> UP034.py:8:7
-   |
- 7 | # UP034
- 8 | print((("foo")))
-   |       ^^^^^^^^^
- 9 |
-10 | # UP034
-   |
+ --> UP034.py:8:7
+  |
+8 | print((("foo")))
+  |       ^^^^^^^^^
+  |
 help: Remove extraneous parentheses
 5  | print(("hell((goodybe))o"))
 6  |
@@ -59,11 +50,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:11:7
    |
-10 | # UP034
 11 | print((((1))))
    |       ^^^^^^^
-12 |
-13 | # UP034
    |
 help: Remove extraneous parentheses
 8  | print((("foo")))
@@ -78,11 +66,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:14:7
    |
-13 | # UP034
 14 | print(("foo{}".format(1)))
    |       ^^^^^^^^^^^^^^^^^^^
-15 |
-16 | # UP034
    |
 help: Remove extraneous parentheses
 11 | print((((1))))
@@ -97,11 +82,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:18:5
    |
-16 | # UP034
-17 | print(
 18 |     ("foo{}".format(1))
    |     ^^^^^^^^^^^^^^^^^^^
-19 | )
    |
 help: Remove extraneous parentheses
 15 |
@@ -116,13 +98,10 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:23:5
    |
-21 |   # UP034
-22 |   print(
 23 | /     (
 24 | |         "foo"
 25 | |     )
    | |_____^
-26 |   )
    |
 help: Remove extraneous parentheses
 20 |
@@ -140,12 +119,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:30:13
    |
-28 | # UP034
-29 | def f():
 30 |     x = int(((yield 1)))
    |             ^^^^^^^^^^^
-31 |
-32 | # UP034
    |
 help: Remove extraneous parentheses
 27 |
@@ -160,11 +135,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:35:9
    |
-33 | if True:
-34 |     print(
 35 |         ("foo{}".format(1))
    |         ^^^^^^^^^^^^^^^^^^^
-36 |     )
    |
 help: Remove extraneous parentheses
 32 | # UP034
@@ -179,11 +151,8 @@ help: Remove extraneous parentheses
 UP034 [*] Avoid extraneous parentheses
   --> UP034.py:39:7
    |
-38 | # UP034
 39 | print((x for x in range(3)))
    |       ^^^^^^^^^^^^^^^^^^^^^
-40 |
-41 | # OK
    |
 help: Remove extraneous parentheses
 36 |     )

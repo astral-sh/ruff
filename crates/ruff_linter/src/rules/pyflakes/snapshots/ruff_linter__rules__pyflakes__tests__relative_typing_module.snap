@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F821 Undefined name `foo`
   --> bar.py:26:17
    |
-25 |     # F821
 26 |     x: Literal["foo"]
    |                 ^^^
    |

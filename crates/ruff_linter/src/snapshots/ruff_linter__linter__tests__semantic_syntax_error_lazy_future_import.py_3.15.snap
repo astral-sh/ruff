@@ -6,5 +6,4 @@ invalid-syntax: lazy from __future__ import is not allowed
   |
 1 | lazy from __future__ import annotations
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2 | from __future__ import generator_stop
   |

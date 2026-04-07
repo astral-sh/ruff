@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 C413 [*] Unnecessary `list()` call around `sorted()`
  --> C413.py:3:1
   |
-1 | x = [2, 3, 1]
-2 | list(x)
 3 | list(sorted(x))
   | ^^^^^^^^^^^^^^^
-4 | reversed(sorted(x))
-5 | reversed(sorted(x, key=lambda e: e))
   |
 help: Remove unnecessary `list()` call
 1 | x = [2, 3, 1]
@@ -23,12 +19,8 @@ help: Remove unnecessary `list()` call
 C413 [*] Unnecessary `reversed()` call around `sorted()`
  --> C413.py:4:1
   |
-2 | list(x)
-3 | list(sorted(x))
 4 | reversed(sorted(x))
   | ^^^^^^^^^^^^^^^^^^^
-5 | reversed(sorted(x, key=lambda e: e))
-6 | reversed(sorted(x, reverse=True))
   |
 help: Remove unnecessary `reversed()` call
 1 | x = [2, 3, 1]
@@ -44,12 +36,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
  --> C413.py:5:1
   |
-3 | list(sorted(x))
-4 | reversed(sorted(x))
 5 | reversed(sorted(x, key=lambda e: e))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-6 | reversed(sorted(x, reverse=True))
-7 | reversed(sorted(x, key=lambda e: e, reverse=True))
   |
 help: Remove unnecessary `reversed()` call
 2 | list(x)
@@ -65,12 +53,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
  --> C413.py:6:1
   |
-4 | reversed(sorted(x))
-5 | reversed(sorted(x, key=lambda e: e))
 6 | reversed(sorted(x, reverse=True))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 | reversed(sorted(x, key=lambda e: e, reverse=True))
-8 | reversed(sorted(x, reverse=True, key=lambda e: e))
   |
 help: Remove unnecessary `reversed()` call
 3 | list(sorted(x))
@@ -86,12 +70,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
  --> C413.py:7:1
   |
-5 | reversed(sorted(x, key=lambda e: e))
-6 | reversed(sorted(x, reverse=True))
 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 | reversed(sorted(x, reverse=True, key=lambda e: e))
-9 | reversed(sorted(x, reverse=False))
   |
 help: Remove unnecessary `reversed()` call
 4  | reversed(sorted(x))
@@ -105,15 +85,11 @@ help: Remove unnecessary `reversed()` call
 note: This is an unsafe fix and may change runtime behavior
 
 C413 [*] Unnecessary `reversed()` call around `sorted()`
-  --> C413.py:8:1
-   |
- 6 | reversed(sorted(x, reverse=True))
- 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
- 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- 9 | reversed(sorted(x, reverse=False))
-10 | reversed(sorted(x, reverse=x))
-   |
+ --> C413.py:8:1
+  |
+8 | reversed(sorted(x, reverse=True, key=lambda e: e))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove unnecessary `reversed()` call
 5  | reversed(sorted(x, key=lambda e: e))
 6  | reversed(sorted(x, reverse=True))
@@ -126,15 +102,11 @@ help: Remove unnecessary `reversed()` call
 note: This is an unsafe fix and may change runtime behavior
 
 C413 [*] Unnecessary `reversed()` call around `sorted()`
-  --> C413.py:9:1
-   |
- 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
- 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
- 9 | reversed(sorted(x, reverse=False))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-10 | reversed(sorted(x, reverse=x))
-11 | reversed(sorted(x, reverse=not x))
-   |
+ --> C413.py:9:1
+  |
+9 | reversed(sorted(x, reverse=False))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove unnecessary `reversed()` call
 6  | reversed(sorted(x, reverse=True))
 7  | reversed(sorted(x, key=lambda e: e, reverse=True))
@@ -149,11 +121,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:10:1
    |
- 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
- 9 | reversed(sorted(x, reverse=False))
 10 | reversed(sorted(x, reverse=x))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 | reversed(sorted(x, reverse=not x))
    |
 help: Remove unnecessary `reversed()` call
 7  | reversed(sorted(x, key=lambda e: e, reverse=True))
@@ -169,12 +138,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:11:1
    |
- 9 | reversed(sorted(x, reverse=False))
-10 | reversed(sorted(x, reverse=x))
 11 | reversed(sorted(x, reverse=not x))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-12 |
-13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
    |
 help: Remove unnecessary `reversed()` call
 8  | reversed(sorted(x, reverse=True, key=lambda e: e))
@@ -190,10 +155,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:14:1
    |
-13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 14 | reversed(sorted(i for i in range(42)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-15 | reversed(sorted((i for i in range(42)), reverse=True))
    |
 help: Remove unnecessary `reversed()` call
 11 | reversed(sorted(x, reverse=not x))
@@ -209,12 +172,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:15:1
    |
-13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
-14 | reversed(sorted(i for i in range(42)))
 15 | reversed(sorted((i for i in range(42)), reverse=True))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-16 |
-17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
    |
 help: Remove unnecessary `reversed()` call
 12 |
@@ -230,10 +189,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:18:1
    |
-17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18 | reversed(sorted([1, 2, 3], reverse=False or True))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
    |
 help: Remove unnecessary `reversed()` call
 15 | reversed(sorted((i for i in range(42)), reverse=True))
@@ -249,12 +206,8 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:19:1
    |
-17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
-18 | reversed(sorted([1, 2, 3], reverse=False or True))
 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-20 |
-21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
    |
 help: Remove unnecessary `reversed()` call
 16 |
@@ -270,13 +223,9 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `reversed()` call around `sorted()`
   --> C413.py:24:1
    |
-22 |   # changes.
-23 |   # See https://github.com/astral-sh/ruff/issues/15789
 24 | / reversed(sorted
 25 | | (""))
    | |_____^
-26 |   list(sorted
-27 |       (""))
    |
 help: Remove unnecessary `reversed()` call
 21 | # These fixes need to be parenthesized to avoid syntax errors and behavior
@@ -294,13 +243,9 @@ note: This is an unsafe fix and may change runtime behavior
 C413 [*] Unnecessary `list()` call around `sorted()`
   --> C413.py:26:1
    |
-24 |   reversed(sorted
-25 |   (""))
 26 | / list(sorted
 27 | |     (""))
    | |_________^
-28 |   list(sorted
-29 |   ("xy"))
    |
 help: Remove unnecessary `list()` call
 23 | # See https://github.com/astral-sh/ruff/issues/15789
@@ -315,8 +260,6 @@ help: Remove unnecessary `list()` call
 C413 [*] Unnecessary `list()` call around `sorted()`
   --> C413.py:28:1
    |
-26 |   list(sorted
-27 |       (""))
 28 | / list(sorted
 29 | | ("xy"))
    | |_______^

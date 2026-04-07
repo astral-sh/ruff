@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n", encoding="utf-8")`
  --> FURB103_2.py:3:6
   |
-1 | # FURB103
-2 | # should trigger
 3 | with open("file.txt", "w", encoding="utf-8") as f:
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-4 |     f.write("\n")
-5 | f = object()
   |
 help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
 1 | # FURB103
@@ -25,12 +21,8 @@ help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:16:10
    |
-14 | def _():
-15 |     # should trigger
 16 |     with open("file.txt", "w") as f:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-17 |         f.write("\n")
-18 |     return (f.name for _ in [0])
    |
 help: Replace with `Path("file.txt").write_text("\n")`
 1  | # FURB103
@@ -53,12 +45,8 @@ help: Replace with `Path("file.txt").write_text("\n")`
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:23:10
    |
-21 | def _set():
-22 |     # should trigger
 23 |     with open("file.txt", "w") as f:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-24 |         f.write("\n")
-25 |     g = {f.name for _ in [0]}
    |
 help: Replace with `Path("file.txt").write_text("\n")`
 1  | # FURB103

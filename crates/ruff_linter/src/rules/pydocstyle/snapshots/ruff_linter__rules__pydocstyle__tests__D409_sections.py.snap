@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D409 [*] Section underline should match the length of its name ("Returns")
    --> sections.py:111:5
     |
-110 |     Returns
 111 |     --
     |     ^^
-112 |     A value of some sort.
     |
 help: Adjust underline length to match "Returns"
 108 |     """Toggle the gizmo.
@@ -22,11 +20,8 @@ help: Adjust underline length to match "Returns"
 D409 [*] Section underline should match the length of its name ("Returns")
    --> sections.py:225:5
     |
-224 |     Returns
 225 |     ------
     |     ^^^^^^
-226 |     Many many wonderful things.
-227 |     Raises:
     |
 help: Adjust underline length to match "Returns"
 222 |     returns.
@@ -41,11 +36,8 @@ help: Adjust underline length to match "Returns"
 D409 [*] Section underline should match the length of its name ("Other Parameters")
    --> sections.py:589:5
     |
-588 |     Other Parameters
 589 |     ----------
     |     ^^^^^^^^^^
-590 |     other_parameters:
-591 |         A dictionary of string attributes
     |
 help: Adjust underline length to match "Other Parameters"
 586 |         A dictionary of string attributes

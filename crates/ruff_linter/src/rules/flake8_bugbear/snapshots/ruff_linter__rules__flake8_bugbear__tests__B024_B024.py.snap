@@ -6,8 +6,6 @@ B024 `Base_1` is an abstract base class, but it has no abstract methods or prope
    |
 18 | class Base_1(ABC):  # error
    |       ^^^^^^
-19 |     def method(self):
-20 |         foo()
    |
 
 B024 `MetaBase_1` is an abstract base class, but it has no abstract methods or properties
@@ -15,8 +13,6 @@ B024 `MetaBase_1` is an abstract base class, but it has no abstract methods or p
    |
 71 | class MetaBase_1(metaclass=ABCMeta):  # error
    |       ^^^^^^^^^^
-72 |     def method(self):
-73 |         foo()
    |
 
 B024 `abc_Base_1` is an abstract base class, but it has no abstract methods or properties
@@ -24,8 +20,6 @@ B024 `abc_Base_1` is an abstract base class, but it has no abstract methods or p
    |
 82 | class abc_Base_1(abc.ABC):  # error
    |       ^^^^^^^^^^
-83 |     def method(self):
-84 |         foo()
    |
 
 B024 `abc_Base_2` is an abstract base class, but it has no abstract methods or properties
@@ -33,8 +27,6 @@ B024 `abc_Base_2` is an abstract base class, but it has no abstract methods or p
    |
 87 | class abc_Base_2(metaclass=abc.ABCMeta):  # error
    |       ^^^^^^^^^^
-88 |     def method(self):
-89 |         foo()
    |
 
 B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods or properties
@@ -42,8 +34,6 @@ B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods o
    |
 92 | class notabc_Base_1(notabc.ABC):  # error
    |       ^^^^^^^^^^^^^
-93 |     def method(self):
-94 |         foo()
    |
 
 B024 `abc_set_class_variable_2` is an abstract base class, but it has no abstract methods or properties
@@ -51,7 +41,6 @@ B024 `abc_set_class_variable_2` is an abstract base class, but it has no abstrac
     |
 132 | class abc_set_class_variable_2(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^
-133 |     foo = 2
     |
 
 B024 `abc_set_class_variable_3` is an abstract base class, but it has no abstract methods or properties
@@ -59,14 +48,11 @@ B024 `abc_set_class_variable_3` is an abstract base class, but it has no abstrac
     |
 136 | class abc_set_class_variable_3(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^
-137 |     foo: int = 2
     |
 
 B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods or properties
    --> B024.py:141:7
     |
-140 | # this doesn't actually declare a class variable, it's just an expression
 141 | class abc_set_class_variable_4(ABC):  # error
     |       ^^^^^^^^^^^^^^^^^^^^^^^^
-142 |     foo
     |

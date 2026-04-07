@@ -6,7 +6,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
   |
 6 | def hello(y: dict[str, int] | None) -> None:
   |              ^^^^^^^^^^^^^^
-7 |     del y
   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
@@ -20,7 +19,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 604 union
   |
 6 | def hello(y: dict[str, int] | None) -> None:
   |              ^^^^^^^^^^^^^^^^^^^^^
-7 |     del y
   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations

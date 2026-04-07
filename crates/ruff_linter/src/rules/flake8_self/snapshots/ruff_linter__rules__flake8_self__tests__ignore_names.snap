@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_self/mod.rs
 SLF001 Private member accessed: `_asdict`
  --> SLF001_extended.py:6:5
   |
-5 | def foo(obj):
 6 |     obj._asdict  # SLF001
   |     ^^^^^^^^^^^
   |
@@ -12,7 +11,6 @@ SLF001 Private member accessed: `_asdict`
 SLF001 Private member accessed: `_bar`
   --> SLF001_extended.py:10:5
    |
- 9 | def foo(obj):
 10 |     obj._bar  # SLF001
    |     ^^^^^^^^
    |

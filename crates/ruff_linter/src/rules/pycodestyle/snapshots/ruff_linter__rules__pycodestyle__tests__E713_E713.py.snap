@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E713 [*] Test for membership should be `not in`
  --> E713.py:2:8
   |
-1 | #: E713
 2 | if not X in Y:
   |        ^^^^^^
-3 |     pass
-4 | #: E713
   |
 help: Convert to `not in`
 1 | #: E713
@@ -21,12 +18,8 @@ help: Convert to `not in`
 E713 [*] Test for membership should be `not in`
  --> E713.py:5:8
   |
-3 |     pass
-4 | #: E713
 5 | if not X.B in Y:
   |        ^^^^^^^^
-6 |     pass
-7 | #: E713
   |
 help: Convert to `not in`
 2 | if not X in Y:
@@ -39,15 +32,11 @@ help: Convert to `not in`
 8 | if not X in Y and Z == "zero":
 
 E713 [*] Test for membership should be `not in`
-  --> E713.py:8:8
-   |
- 6 |     pass
- 7 | #: E713
- 8 | if not X in Y and Z == "zero":
-   |        ^^^^^^
- 9 |     pass
-10 | #: E713
-   |
+ --> E713.py:8:8
+  |
+8 | if not X in Y and Z == "zero":
+  |        ^^^^^^
+  |
 help: Convert to `not in`
 5  | if not X.B in Y:
 6  |     pass
@@ -61,12 +50,8 @@ help: Convert to `not in`
 E713 [*] Test for membership should be `not in`
   --> E713.py:11:23
    |
- 9 |     pass
-10 | #: E713
 11 | if X == "zero" or not Y in Z:
    |                       ^^^^^^
-12 |     pass
-13 | #: E713
    |
 help: Convert to `not in`
 8  | if not X in Y and Z == "zero":
@@ -81,11 +66,8 @@ help: Convert to `not in`
 E713 [*] Test for membership should be `not in`
   --> E713.py:14:9
    |
-12 |     pass
-13 | #: E713
 14 | if not (X in Y):
    |         ^^^^^^
-15 |     pass
    |
 help: Convert to `not in`
 11 | if X == "zero" or not Y in Z:
@@ -100,8 +82,6 @@ help: Convert to `not in`
 E713 [*] Test for membership should be `not in`
   --> E713.py:40:12
    |
-38 | assert [42, not foo] in bar
-39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
 40 | assert not('name' in request)or not request['name']
    |            ^^^^^^^^^^^^^^^^^
    |

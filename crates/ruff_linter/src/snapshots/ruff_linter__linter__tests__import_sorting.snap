@@ -23,8 +23,6 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / from typing import Any
 2 | | import collections
   | |__________________^
-3 |   # Newline should be added here
-4 |   def foo():
   |
 help: Organize imports
  ::: cell 2
@@ -43,8 +41,6 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / from pathlib import Path
 2 | | import sys
   | |__________^
-3 |
-4 |   %matplotlib \
   |
 help: Organize imports
  ::: cell 3
@@ -58,8 +54,6 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:7:1
   |
-5 |       --inline
-6 |
 7 | / import math
 8 | | import abc
   | |__________^

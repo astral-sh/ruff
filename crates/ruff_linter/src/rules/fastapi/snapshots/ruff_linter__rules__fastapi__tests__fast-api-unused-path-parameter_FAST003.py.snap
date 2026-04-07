@@ -2,14 +2,11 @@
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
 ---
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
-  --> FAST003.py:9:19
-   |
- 8 | # Errors
- 9 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^
-10 | async def read_thing(query: str):
-11 |     return {"query": query}
-   |
+ --> FAST003.py:9:19
+  |
+9 | @app.get("/things/{thing_id}")
+  |                   ^^^^^^^^^^
+  |
 help: Add `thing_id` to function signature
 7  |
 8  | # Errors
@@ -26,8 +23,6 @@ FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` sign
    |
 14 | @app.get("/books/isbn-{isbn}")
    |                       ^^^^^^
-15 | async def read_thing():
-16 |     ...
    |
 help: Add `isbn` to function signature
 12 |
@@ -45,8 +40,6 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` 
    |
 19 | @app.get("/things/{thing_id:path}")
    |                   ^^^^^^^^^^^^^^^
-20 | async def read_thing(query: str):
-21 |     return {"query": query}
    |
 help: Add `thing_id` to function signature
 17 |
@@ -64,8 +57,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 29 | @app.get("/books/{author}/{title}")
    |                           ^^^^^^^
-30 | async def read_thing(author: str):
-31 |     return {"author": author}
    |
 help: Add `title` to function signature
 27 |
@@ -83,8 +74,6 @@ FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thin
    |
 34 | @app.get("/books/{author_name}/{title}")
    |                  ^^^^^^^^^^^^^
-35 | async def read_thing():
-36 |     ...
    |
 help: Add `author_name` to function signature
 32 |
@@ -102,8 +91,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 34 | @app.get("/books/{author_name}/{title}")
    |                                ^^^^^^^
-35 | async def read_thing():
-36 |     ...
    |
 help: Add `title` to function signature
 32 |
@@ -121,8 +108,6 @@ FAST003 Parameter `author` appears in route path, but only as a positional-only 
    |
 39 | @app.get("/books/{author}/{title}")
    |                  ^^^^^^^^
-40 | async def read_thing(author: str, title: str, /):
-41 |     return {"author": author, "title": title}
    |
 
 FAST003 Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
@@ -130,8 +115,6 @@ FAST003 Parameter `title` appears in route path, but only as a positional-only a
    |
 39 | @app.get("/books/{author}/{title}")
    |                           ^^^^^^^
-40 | async def read_thing(author: str, title: str, /):
-41 |     return {"author": author, "title": title}
    |
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
@@ -139,8 +122,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 44 | @app.get("/books/{author}/{title}/{page}")
    |                           ^^^^^^^
-45 | async def read_thing(
-46 |     author: str,
    |
 help: Add `title` to function signature
 44 | @app.get("/books/{author}/{title}/{page}")
@@ -158,8 +139,6 @@ FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` sign
    |
 44 | @app.get("/books/{author}/{title}/{page}")
    |                                   ^^^^^^
-45 | async def read_thing(
-46 |     author: str,
    |
 help: Add `page` to function signature
 44 | @app.get("/books/{author}/{title}/{page}")
@@ -177,8 +156,6 @@ FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` si
    |
 51 | @app.get("/books/{author}/{title}")
    |                  ^^^^^^^^
-52 | async def read_thing():
-53 |     ...
    |
 help: Add `author` to function signature
 49 |
@@ -196,8 +173,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 51 | @app.get("/books/{author}/{title}")
    |                           ^^^^^^^
-52 | async def read_thing():
-53 |     ...
    |
 help: Add `title` to function signature
 49 |
@@ -215,8 +190,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 56 | @app.get("/books/{author}/{title}")
    |                           ^^^^^^^
-57 | async def read_thing(*, author: str):
-58 |     ...
    |
 help: Add `title` to function signature
 54 |
@@ -234,8 +207,6 @@ FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` sig
    |
 61 | @app.get("/books/{author}/{title}")
    |                           ^^^^^^^
-62 | async def read_thing(hello, /, *, author: str):
-63 |     ...
    |
 help: Add `title` to function signature
 59 |
@@ -253,8 +224,6 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` 
    |
 66 | @app.get("/things/{thing_id}")
    |                   ^^^^^^^^^^
-67 | async def read_thing(
-68 |         query: str,
    |
 help: Add `thing_id` to function signature
 65 |
@@ -272,8 +241,6 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` 
    |
 73 | @app.get("/things/{thing_id}")
    |                   ^^^^^^^^^^
-74 | async def read_thing(
-75 |         query: str = "default",
    |
 help: Add `thing_id` to function signature
 72 |
@@ -291,8 +258,6 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` 
    |
 80 | @app.get("/things/{thing_id}")
    |                   ^^^^^^^^^^
-81 | async def read_thing(
-82 |         *, query: str = "default",
    |
 help: Add `thing_id` to function signature
 79 |
@@ -310,8 +275,6 @@ FAST003 [*] Parameter `name` appears in route path, but not in `read_thing` sign
    |
 87 | @app.get("/books/{name}/{title}")
    |                  ^^^^^^
-88 | async def read_thing(*, author: Annotated[str, Path(alias="author_name")], title: str):
-89 |     return {"author": author, "title": title}
    |
 help: Add `name` to function signature
 85 |
@@ -327,11 +290,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
    --> FAST003.py:160:19
     |
-158 | @app.get("/things/{thing_id}")
-159 | async def single(other: Annotated[str, Depends(something_else)]): ...
 160 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-161 | async def default(other: str = Depends(something_else)): ...
     |
 help: Add `thing_id` to function signature
 158 | @app.get("/things/{thing_id}")
@@ -347,11 +307,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature
    --> FAST003.py:203:12
     |
-201 | @app.get("/{id}")
-202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 203 | @app.get("/{id}")
     |            ^^^^
-204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
     |
 help: Add `id` to function signature
 201 | @app.get("/{id}")
@@ -367,33 +324,24 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 Parameter `import` appears in route path, but not in `get_import` signature
    --> FAST003.py:266:20
     |
-265 | # https://github.com/astral-sh/ruff/issues/20941
 266 | @app.get("/imports/{import}")
     |                    ^^^^^^^^
-267 | async def get_import():
-268 |     ...
     |
 help: Add `import` to function signature
 
 FAST003 Parameter `__debug__` appears in route path, but not in `get_debug` signature
    --> FAST003.py:270:18
     |
-268 |     ...
-269 |
 270 | @app.get("/debug/{__debug__}")
     |                  ^^^^^^^^^^^
-271 | async def get_debug():
-272 |     ...
     |
 help: Add `__debug__` to function signature
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg` signature
    --> FAST003.py:278:19
     |
-277 | # Errors: vararg-only and kwarg-only functions
 278 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-279 | async def read_thing_vararg(*query: str): ...
     |
 help: Add `thing_id` to function signature
 276 |
@@ -409,11 +357,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_kwarg` signature
    --> FAST003.py:281:19
     |
-279 | async def read_thing_vararg(*query: str): ...
-280 |
 281 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-282 | async def read_thing_kwarg(**query: str): ...
     |
 help: Add `thing_id` to function signature
 279 | async def read_thing_vararg(*query: str): ...
@@ -429,11 +374,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg_kwarg` signature
    --> FAST003.py:284:19
     |
-282 | async def read_thing_kwarg(**query: str): ...
-283 |
 284 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-285 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
     |
 help: Add `thing_id` to function signature
 282 | async def read_thing_kwarg(**query: str): ...
@@ -449,10 +391,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly` signature
    --> FAST003.py:288:19
     |
-287 | # Errors: positional-only parameter edge cases
 288 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-289 | async def read_thing_posonly(query: str, /): ...
     |
 help: Add `thing_id` to function signature
 286 |
@@ -468,11 +408,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly_trailing` signature
    --> FAST003.py:291:19
     |
-289 | async def read_thing_posonly(query: str, /): ...
-290 |
 291 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-292 | async def read_thing_posonly_trailing(query: str, /,): ...
     |
 help: Add `thing_id` to function signature
 289 | async def read_thing_posonly(query: str, /): ...
@@ -488,44 +425,32 @@ note: This is an unsafe fix and may change runtime behavior
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default` signature
    --> FAST003.py:294:19
     |
-292 | async def read_thing_posonly_trailing(query: str, /,): ...
-293 |
 294 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-295 | async def read_thing_posonly_default(query: str = "", /): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default_trailing` signature
    --> FAST003.py:297:19
     |
-295 | async def read_thing_posonly_default(query: str = "", /): ...
-296 |
 297 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_with_regular` signature
    --> FAST003.py:300:19
     |
-298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
-299 |
 300 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-301 | async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
     |
 help: Add `thing_id` to function signature
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_init_and_call_instance_default` signature
    --> FAST003.py:370:19
     |
-368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
-369 | # Error: `__call__` has `other`, not `thing_id`.
 370 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-371 | async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
     |
 help: Add `thing_id` to function signature
 368 | async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...

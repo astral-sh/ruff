@@ -33,7 +33,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `Incompatible` is not assignable to `SupportsCheck`
   --> src/mdtest_snippet.py:12:13
    |
-11 | def _(source: Incompatible):
 12 |     target: SupportsCheck = source  # error: [invalid-assignment]
    |             -------------   ^^^^^^ Incompatible value of type `Incompatible`
    |             |

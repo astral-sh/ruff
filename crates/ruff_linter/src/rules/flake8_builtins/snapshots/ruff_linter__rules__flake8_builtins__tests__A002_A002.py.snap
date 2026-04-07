@@ -6,7 +6,6 @@ A002 Function argument `str` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |           ^^^
-2 |     pass
   |
 
 A002 Function argument `type` is shadowing a Python builtin
@@ -14,7 +13,6 @@ A002 Function argument `type` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                   ^^^^
-2 |     pass
   |
 
 A002 Function argument `complex` is shadowing a Python builtin
@@ -22,7 +20,6 @@ A002 Function argument `complex` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                          ^^^^^^^
-2 |     pass
   |
 
 A002 Function argument `Exception` is shadowing a Python builtin
@@ -30,7 +27,6 @@ A002 Function argument `Exception` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                                   ^^^^^^^^^
-2 |     pass
   |
 
 A002 Function argument `getattr` is shadowing a Python builtin
@@ -38,7 +34,6 @@ A002 Function argument `getattr` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                                                ^^^^^^^
-2 |     pass
   |
 
 A002 Function argument `bytes` is shadowing a Python builtin
@@ -46,21 +41,18 @@ A002 Function argument `bytes` is shadowing a Python builtin
   |
 5 | async def func2(bytes):
   |                 ^^^^^
-6 |     pass
   |
 
 A002 Function argument `id` is shadowing a Python builtin
-  --> A002.py:9:17
-   |
- 9 | async def func3(id, dir):
-   |                 ^^
-10 |     pass
-   |
+ --> A002.py:9:17
+  |
+9 | async def func3(id, dir):
+  |                 ^^
+  |
 
 A002 Function argument `dir` is shadowing a Python builtin
-  --> A002.py:9:21
-   |
- 9 | async def func3(id, dir):
-   |                     ^^^
-10 |     pass
-   |
+ --> A002.py:9:21
+  |
+9 | async def func3(id, dir):
+  |                     ^^^
+  |

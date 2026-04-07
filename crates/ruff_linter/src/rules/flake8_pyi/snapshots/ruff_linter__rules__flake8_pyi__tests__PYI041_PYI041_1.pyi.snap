@@ -70,8 +70,6 @@ PYI041 [*] Use `float` instead of `int | float`
    |
 33 | async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
    |                        ^^^^^^^^^^^^^^^^^
-34 |
-35 | def f5(
    |
 help: Remove redundant type
 30 | def f3(arg1: int, *args: Union[int | int | float]) -> None: ...  # PYI041
@@ -86,13 +84,11 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:36:10
    |
-35 |   def f5(
 36 |       arg: Union[  # comment 
    |  __________^
 37 | |         float, # another
 38 | |         complex, int]
    | |_____________________^
-39 |       ) -> None: ...  # PYI041
    |
 help: Remove redundant type
 33 | async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
@@ -110,14 +106,10 @@ note: This is an unsafe fix and may change runtime behavior
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:43:9
    |
-41 |   def f6(
-42 |       arg: (
 43 | /         int | # comment
 44 | |         float |  # another
 45 | |         complex
    | |_______________^
-46 |       )    
-47 |       ) -> None: ... # PYI041
    |
 help: Remove redundant type
 40 |
@@ -133,8 +125,6 @@ note: This is an unsafe fix and may change runtime behavior
 PYI041 [*] Use `float` instead of `int | float`
   --> PYI041_1.pyi:49:26
    |
-47 |     ) -> None: ... # PYI041
-48 |
 49 | def f5(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
    |                          ^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -199,12 +189,8 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:64:24
    |
-62 |     def good(self, arg: int) -> None: ...
-63 |
 64 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
    |                        ^^^^^^^^^^^^^^^^^^^^^
-65 |
-66 |     def bad2(self, arg: int | Union[float, complex]) -> None: ...  # PYI041
    |
 help: Remove redundant type
 61 | class Foo:
@@ -219,12 +205,8 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:66:25
    |
-64 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
-65 |
 66 |     def bad2(self, arg: int | Union[float, complex]) -> None: ...  # PYI041
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-67 |
-68 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: ...  # PYI041
    |
 help: Remove redundant type
 63 |
@@ -239,12 +221,8 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:68:25
    |
-66 |     def bad2(self, arg: int | Union[float, complex]) -> None: ...  # PYI041
-67 |
 68 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: ...  # PYI041
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-69 |
-70 |     def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
    |
 help: Remove redundant type
 65 |
@@ -259,12 +237,8 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:70:25
    |
-68 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: ...  # PYI041
-69 |
 70 |     def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-71 |
-72 |     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
    |
 help: Remove redundant type
 67 |
@@ -279,8 +253,6 @@ help: Remove redundant type
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:72:25
    |
-70 |     def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
-71 |
 72 |     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
    |                         ^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -297,12 +269,8 @@ help: Remove redundant type
 PYI041 [*] Use `float` instead of `int | float`
   --> PYI041_1.pyi:78:23
    |
-76 | # fix must not yield runtime `None | None | ...` (TypeError)
-77 | class Issue18298:
 78 |     def f1(self, arg: None | int | None | float = None) -> None: ...  # PYI041 - with fix
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^
-79 |
-80 |     def f3(self, arg: None | float | None | int | None = None) -> None: ...  # PYI041 - with fix
    |
 help: Remove redundant type
 75 | # https://github.com/astral-sh/ruff/issues/18298
@@ -316,8 +284,6 @@ help: Remove redundant type
 PYI041 [*] Use `float` instead of `int | float`
   --> PYI041_1.pyi:80:23
    |
-78 |     def f1(self, arg: None | int | None | float = None) -> None: ...  # PYI041 - with fix
-79 |
 80 |     def f3(self, arg: None | float | None | int | None = None) -> None: ...  # PYI041 - with fix
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

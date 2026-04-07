@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N804 [*] First argument of a class method should be named `cls`
  --> N804.py:5:27
   |
-4 | class Class:
 5 |     def __init_subclass__(self, default_name, **kwargs):
   |                           ^^^^
-6 |         ...
   |
 help: Rename `self` to `cls`
 2 |
@@ -21,13 +19,11 @@ help: Rename `self` to `cls`
 note: This is an unsafe fix and may change runtime behavior
 
 N804 [*] First argument of a class method should be named `cls`
-  --> N804.py:9:20
-   |
- 8 |     @classmethod
- 9 |     def badAllowed(self, x, /, other):
-   |                    ^^^^
-10 |         ...
-   |
+ --> N804.py:9:20
+  |
+9 |     def badAllowed(self, x, /, other):
+  |                    ^^^^
+  |
 help: Rename `self` to `cls`
 6  |         ...
 7  |
@@ -42,10 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:13:18
    |
-12 |     @classmethod
 13 |     def stillBad(self, x, /, other):
    |                  ^^^^
-14 |         ...
    |
 help: Rename `self` to `cls`
 10 |         ...
@@ -61,10 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:18:20
    |
-17 | class MetaClass(ABCMeta):
 18 |     def badAllowed(self):
    |                    ^^^^
-19 |         pass
    |
 help: Rename `self` to `cls`
 15 |
@@ -80,11 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:21:18
    |
-19 |         pass
-20 |
 21 |     def stillBad(self):
    |                  ^^^^
-22 |         pass
    |
 help: Rename `self` to `cls`
 18 |     def badAllowed(self):

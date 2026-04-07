@@ -6,7 +6,6 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 1 | def f1(x=([],)):
   |          ^^^^^
-2 |     print(x)
   |
 help: Replace with `None`; initialize within function
   - def f1(x=([],)):
@@ -23,7 +22,6 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 5 | def f2(x=(x for x in "x")):
   |          ^^^^^^^^^^^^^^^^
-6 |     print(x)
   |
 help: Replace with `None`; initialize within function
 2  |     print(x)
@@ -39,12 +37,11 @@ help: Replace with `None`; initialize within function
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_9.py:9:10
-   |
- 9 | def f3(x=((x for x in "x"),)):
-   |          ^^^^^^^^^^^^^^^^^^^
-10 |     print(x)
-   |
+ --> B006_9.py:9:10
+  |
+9 | def f3(x=((x for x in "x"),)):
+  |          ^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with `None`; initialize within function
 6  |     print(x)
 7  |
@@ -63,7 +60,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 13 | def f4(x=(z := [1, ])):
    |           ^^^^^^^^^^
-14 |     print(x)
    |
 help: Replace with `None`; initialize within function
 10 |     print(x)
@@ -83,7 +79,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 17 | def f5(x=([1, ])):
    |           ^^^^^
-18 |     print(x)
    |
 help: Replace with `None`; initialize within function
 14 |     print(x)

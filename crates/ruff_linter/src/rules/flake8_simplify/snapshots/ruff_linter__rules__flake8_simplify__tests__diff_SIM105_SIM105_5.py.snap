@@ -13,14 +13,11 @@ Added: 1
 SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
  --> SIM105_5.py:4:1
   |
-3 |   # SIM105
 4 | / try:
 5 | |     pass
 6 | | except* ValueError:
 7 | |     pass
   | |________^
-8 |
-9 |   # SIM105
   |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
 1 | """Case: except* and except with py311 and higher"""

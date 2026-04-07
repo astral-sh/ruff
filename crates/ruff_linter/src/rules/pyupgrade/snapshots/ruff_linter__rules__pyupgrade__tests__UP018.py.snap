@@ -2,16 +2,12 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
-  --> UP018.py:8:1
-   |
- 6 |   str("foo", **k)
- 7 |   str("foo", encoding="UTF-8")
- 8 | / str("foo"
- 9 | |     "bar")
-   | |__________^
-10 |   str(b"foo")
-11 |   bytes("foo", encoding="UTF-8")
-   |
+ --> UP018.py:8:1
+  |
+8 | / str("foo"
+9 | |     "bar")
+  | |__________^
+  |
 help: Replace with string literal
 5  | str(**k)
 6  | str("foo", **k)
@@ -25,13 +21,9 @@ help: Replace with string literal
 UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
   --> UP018.py:15:1
    |
-13 |   bytes("foo", *a)
-14 |   bytes("foo", **a)
 15 | / bytes(b"foo"
 16 | |       b"bar")
    | |_____________^
-17 |   bytes("foo")
-18 |   bytes(1)
    |
 help: Replace with bytes literal
 12 | bytes(*a)
@@ -46,12 +38,8 @@ help: Replace with bytes literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:34:1
    |
-32 | bool(b"")
-33 | bool(1.0)
 34 | int().denominator
    | ^^^^^
-35 |
-36 | # These become literals
    |
 help: Replace with integer literal
 31 | bool("")
@@ -66,11 +54,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
   --> UP018.py:37:1
    |
-36 | # These become literals
 37 | str()
    | ^^^^^
-38 | str("foo")
-39 | str("""
    |
 help: Replace with string literal
 34 | int().denominator
@@ -85,12 +70,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
   --> UP018.py:38:1
    |
-36 | # These become literals
-37 | str()
 38 | str("foo")
    | ^^^^^^^^^^
-39 | str("""
-40 | foo""")
    |
 help: Replace with string literal
 35 |
@@ -105,13 +86,9 @@ help: Replace with string literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
   --> UP018.py:39:1
    |
-37 |   str()
-38 |   str("foo")
 39 | / str("""
 40 | | foo""")
    | |_______^
-41 |   bytes()
-42 |   bytes(b"foo")
    |
 help: Replace with string literal
 36 | # These become literals
@@ -128,12 +105,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
   --> UP018.py:41:1
    |
-39 | str("""
-40 | foo""")
 41 | bytes()
    | ^^^^^^^
-42 | bytes(b"foo")
-43 | bytes(b"""
    |
 help: Replace with bytes literal
 38 | str("foo")
@@ -148,12 +121,8 @@ help: Replace with bytes literal
 UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
   --> UP018.py:42:1
    |
-40 | foo""")
-41 | bytes()
 42 | bytes(b"foo")
    | ^^^^^^^^^^^^^
-43 | bytes(b"""
-44 | foo""")
    |
 help: Replace with bytes literal
 39 | str("""
@@ -168,13 +137,9 @@ help: Replace with bytes literal
 UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
   --> UP018.py:43:1
    |
-41 |   bytes()
-42 |   bytes(b"foo")
 43 | / bytes(b"""
 44 | | foo""")
    | |_______^
-45 |   f"{str()}"
-46 |   int()
    |
 help: Replace with bytes literal
 40 | foo""")
@@ -191,12 +156,8 @@ help: Replace with bytes literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
   --> UP018.py:45:4
    |
-43 | bytes(b"""
-44 | foo""")
 45 | f"{str()}"
    |    ^^^^^
-46 | int()
-47 | int(1)
    |
 help: Replace with string literal
 42 | bytes(b"foo")
@@ -211,12 +172,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:46:1
    |
-44 | foo""")
-45 | f"{str()}"
 46 | int()
    | ^^^^^
-47 | int(1)
-48 | float()
    |
 help: Replace with integer literal
 43 | bytes(b"""
@@ -231,12 +188,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:47:1
    |
-45 | f"{str()}"
-46 | int()
 47 | int(1)
    | ^^^^^^
-48 | float()
-49 | float(1.0)
    |
 help: Replace with integer literal
 44 | foo""")
@@ -251,12 +204,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:48:1
    |
-46 | int()
-47 | int(1)
 48 | float()
    | ^^^^^^^
-49 | float(1.0)
-50 | bool()
    |
 help: Replace with float literal
 45 | f"{str()}"
@@ -271,12 +220,8 @@ help: Replace with float literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:49:1
    |
-47 | int(1)
-48 | float()
 49 | float(1.0)
    | ^^^^^^^^^^
-50 | bool()
-51 | bool(True)
    |
 help: Replace with float literal
 46 | int()
@@ -291,12 +236,8 @@ help: Replace with float literal
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:50:1
    |
-48 | float()
-49 | float(1.0)
 50 | bool()
    | ^^^^^^
-51 | bool(True)
-52 | bool(False)
    |
 help: Replace with boolean literal
 47 | int(1)
@@ -311,11 +252,8 @@ help: Replace with boolean literal
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:51:1
    |
-49 | float(1.0)
-50 | bool()
 51 | bool(True)
    | ^^^^^^^^^^
-52 | bool(False)
    |
 help: Replace with boolean literal
 48 | float()
@@ -330,12 +268,8 @@ help: Replace with boolean literal
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:52:1
    |
-50 | bool()
-51 | bool(True)
 52 | bool(False)
    | ^^^^^^^^^^^
-53 |
-54 | # These become a literal but retain parentheses
    |
 help: Replace with boolean literal
 49 | float(1.0)
@@ -350,11 +284,8 @@ help: Replace with boolean literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:55:1
    |
-54 | # These become a literal but retain parentheses
 55 | int(1).denominator
    | ^^^^^^
-56 |
-57 | # These too are literals in spirit
    |
 help: Replace with integer literal
 52 | bool(False)
@@ -369,11 +300,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:58:1
    |
-57 | # These too are literals in spirit
 58 | int(+1)
    | ^^^^^^^
-59 | int(-1)
-60 | float(+1.0)
    |
 help: Replace with integer literal
 55 | int(1).denominator
@@ -388,12 +316,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:59:1
    |
-57 | # These too are literals in spirit
-58 | int(+1)
 59 | int(-1)
    | ^^^^^^^
-60 | float(+1.0)
-61 | float(-1.0)
    |
 help: Replace with integer literal
 56 |
@@ -408,11 +332,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:60:1
    |
-58 | int(+1)
-59 | int(-1)
 60 | float(+1.0)
    | ^^^^^^^^^^^
-61 | float(-1.0)
    |
 help: Replace with float literal
 57 | # These too are literals in spirit
@@ -427,8 +348,6 @@ help: Replace with float literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:61:1
    |
-59 | int(-1)
-60 | float(+1.0)
 61 | float(-1.0)
    | ^^^^^^^^^^^
    |
@@ -445,10 +364,8 @@ help: Replace with float literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:65:1
    |
-64 | # https://github.com/astral-sh/ruff/issues/15859
 65 | int(-1) ** 0                 # (-1) ** 0
    | ^^^^^^^
-66 | 2 ** int(-1)                 # 2 ** -1
    |
 help: Replace with integer literal
 62 |
@@ -463,12 +380,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:66:6
    |
-64 | # https://github.com/astral-sh/ruff/issues/15859
-65 | int(-1) ** 0                 # (-1) ** 0
 66 | 2 ** int(-1)                 # 2 ** -1
    |      ^^^^^^^
-67 |
-68 | int(-1)[0]                   # (-1)[0]
    |
 help: Replace with integer literal
 63 |
@@ -483,11 +396,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:68:1
    |
-66 | 2 ** int(-1)                 # 2 ** -1
-67 |
 68 | int(-1)[0]                   # (-1)[0]
    | ^^^^^^^
-69 | 2[int(-1)]                   # 2[-1]
    |
 help: Replace with integer literal
 65 | int(-1) ** 0                 # (-1) ** 0
@@ -502,11 +412,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:69:3
    |
-68 | int(-1)[0]                   # (-1)[0]
 69 | 2[int(-1)]                   # 2[-1]
    |   ^^^^^^^
-70 |
-71 | int(-1)(0)                   # (-1)(0)
    |
 help: Replace with integer literal
 66 | 2 ** int(-1)                 # 2 ** -1
@@ -521,11 +428,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:71:1
    |
-69 | 2[int(-1)]                   # 2[-1]
-70 |
 71 | int(-1)(0)                   # (-1)(0)
    | ^^^^^^^
-72 | 2(int(-1))                   # 2(-1)
    |
 help: Replace with integer literal
 68 | int(-1)[0]                   # (-1)[0]
@@ -540,11 +444,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:72:3
    |
-71 | int(-1)(0)                   # (-1)(0)
 72 | 2(int(-1))                   # 2(-1)
    |   ^^^^^^^
-73 |
-74 | float(-1.0).foo              # (-1.0).foo
    |
 help: Replace with integer literal
 69 | 2[int(-1)]                   # 2[-1]
@@ -559,12 +460,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:74:1
    |
-72 | 2(int(-1))                   # 2(-1)
-73 |
 74 | float(-1.0).foo              # (-1.0).foo
    | ^^^^^^^^^^^
-75 |
-76 | await int(-1)                # await (-1)
    |
 help: Replace with float literal
 71 | int(-1)(0)                   # (-1)(0)
@@ -579,8 +476,6 @@ help: Replace with float literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:76:7
    |
-74 | float(-1.0).foo              # (-1.0).foo
-75 |
 76 | await int(-1)                # await (-1)
    |       ^^^^^^^
    |
@@ -599,7 +494,6 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
 79 | int(+1) ** 0
    | ^^^^^^^
-80 | float(+1.0)()
    |
 help: Replace with integer literal
 76 | await int(-1)                # await (-1)
@@ -614,7 +508,6 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:80:1
    |
-79 | int(+1) ** 0
 80 | float(+1.0)()
    | ^^^^^^^^^^^
    |
@@ -636,8 +529,6 @@ UP018 [*] Unnecessary `str` call (rewrite as a literal)
 85 | |     ipsum'''  # Comment
 86 | | ).foo
    | |_^
-87 |
-88 |   # https://github.com/astral-sh/ruff/issues/17606
    |
 help: Replace with string literal
 80 | float(+1.0)()
@@ -657,11 +548,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:89:1
    |
-88 | # https://github.com/astral-sh/ruff/issues/17606
 89 | bool(True)and None
    | ^^^^^^^^^^
-90 | int(1)and None
-91 | float(1.)and None
    |
 help: Replace with boolean literal
 86 | ).foo
@@ -676,12 +564,8 @@ help: Replace with boolean literal
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
   --> UP018.py:90:1
    |
-88 | # https://github.com/astral-sh/ruff/issues/17606
-89 | bool(True)and None
 90 | int(1)and None
    | ^^^^^^
-91 | float(1.)and None
-92 | bool(True)and()
    |
 help: Replace with integer literal
 87 |
@@ -696,11 +580,8 @@ help: Replace with integer literal
 UP018 [*] Unnecessary `float` call (rewrite as a literal)
   --> UP018.py:91:1
    |
-89 | bool(True)and None
-90 | int(1)and None
 91 | float(1.)and None
    | ^^^^^^^^^
-92 | bool(True)and()
    |
 help: Replace with float literal
 88 | # https://github.com/astral-sh/ruff/issues/17606
@@ -715,8 +596,6 @@ help: Replace with float literal
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:92:1
    |
-90 | int(1)and None
-91 | float(1.)and None
 92 | bool(True)and()
    | ^^^^^^^^^^
    |
@@ -731,14 +610,11 @@ help: Replace with boolean literal
 95 | # t-strings are not native literals
 
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
-   --> UP018.py:99:1
-    |
- 98 | # UP018 - Extended detections
- 99 | str("A" "B")
-    | ^^^^^^^^^^^^
-100 | str("A" "B").lower()
-101 | str(
-    |
+  --> UP018.py:99:1
+   |
+99 | str("A" "B")
+   | ^^^^^^^^^^^^
+   |
 help: Replace with string literal
 96  | str(t"hey")
 97  |
@@ -752,12 +628,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
    --> UP018.py:100:1
     |
- 98 | # UP018 - Extended detections
- 99 | str("A" "B")
 100 | str("A" "B").lower()
     | ^^^^^^^^^^^^
-101 | str(
-102 |     "A"
     |
 help: Replace with string literal
 97  |
@@ -772,15 +644,11 @@ help: Replace with string literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
    --> UP018.py:101:1
     |
- 99 |   str("A" "B")
-100 |   str("A" "B").lower()
 101 | / str(
 102 | |     "A"
 103 | |     "B"
 104 | | )
     | |_^
-105 |   str(object="!")
-106 |   complex(1j)
     |
 help: Replace with string literal
 98  | # UP018 - Extended detections
@@ -799,12 +667,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `str` call (rewrite as a literal)
    --> UP018.py:105:1
     |
-103 |     "B"
-104 | )
 105 | str(object="!")
     | ^^^^^^^^^^^^^^^
-106 | complex(1j)
-107 | complex(real=1j)
     |
 help: Replace with string literal
 102 |     "A"
@@ -819,12 +683,8 @@ help: Replace with string literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:106:1
     |
-104 | )
-105 | str(object="!")
 106 | complex(1j)
     | ^^^^^^^^^^^
-107 | complex(real=1j)
-108 | complex()
     |
 help: Replace with complex literal
 103 |     "B"
@@ -839,12 +699,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:107:1
     |
-105 | str(object="!")
-106 | complex(1j)
 107 | complex(real=1j)
     | ^^^^^^^^^^^^^^^^
-108 | complex()
-109 | complex(0j)
     |
 help: Replace with complex literal
 104 | )
@@ -859,12 +715,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:108:1
     |
-106 | complex(1j)
-107 | complex(real=1j)
 108 | complex()
     | ^^^^^^^^^
-109 | complex(0j)
-110 | complex(real=0j)
     |
 help: Replace with complex literal
 105 | str(object="!")
@@ -879,12 +731,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:109:1
     |
-107 | complex(real=1j)
-108 | complex()
 109 | complex(0j)
     | ^^^^^^^^^^^
-110 | complex(real=0j)
-111 | (complex(0j)).real
     |
 help: Replace with complex literal
 106 | complex(1j)
@@ -899,12 +747,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:110:1
     |
-108 | complex()
-109 | complex(0j)
 110 | complex(real=0j)
     | ^^^^^^^^^^^^^^^^
-111 | (complex(0j)).real
-112 | complex(1j).real
     |
 help: Replace with complex literal
 107 | complex(real=1j)
@@ -919,12 +763,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:111:2
     |
-109 | complex(0j)
-110 | complex(real=0j)
 111 | (complex(0j)).real
     |  ^^^^^^^^^^^
-112 | complex(1j).real
-113 | complex(real=1j).real
     |
 help: Replace with complex literal
 108 | complex()
@@ -938,11 +778,8 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:112:1
     |
-110 | complex(real=0j)
-111 | (complex(0j)).real
 112 | complex(1j).real
     | ^^^^^^^^^^^
-113 | complex(real=1j).real
     |
 help: Replace with complex literal
 109 | complex(0j)
@@ -955,8 +792,6 @@ help: Replace with complex literal
 UP018 [*] Unnecessary `complex` call (rewrite as a literal)
    --> UP018.py:113:1
     |
-111 | (complex(0j)).real
-112 | complex(1j).real
 113 | complex(real=1j).real
     | ^^^^^^^^^^^^^^^^
     |

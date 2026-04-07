@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 G010 [*] Logging statement uses `warn` instead of `warning`
  --> G010.py:6:9
   |
-4 | from logging_setup import logger
-5 |
 6 | logging.warn("Hello World!")
   |         ^^^^
-7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
-8 | logger.warn("Hello world!")
   |
 help: Convert to `warning`
 3 |
@@ -22,15 +18,11 @@ help: Convert to `warning`
 9 |
 
 G010 [*] Logging statement uses `warn` instead of `warning`
-  --> G010.py:8:8
-   |
- 6 | logging.warn("Hello World!")
- 7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
- 8 | logger.warn("Hello world!")
-   |        ^^^^
- 9 |
-10 | logging . warn("Hello World!")
-   |
+ --> G010.py:8:8
+  |
+8 | logger.warn("Hello world!")
+  |        ^^^^
+  |
 help: Convert to `warning`
 5  |
 6  | logging.warn("Hello World!")
@@ -44,12 +36,8 @@ help: Convert to `warning`
 G010 [*] Logging statement uses `warn` instead of `warning`
   --> G010.py:10:11
    |
- 8 | logger.warn("Hello world!")
- 9 |
 10 | logging . warn("Hello World!")
    |           ^^^^
-11 |
-12 | from logging import warn, warning, exception
    |
 help: Convert to `warning`
 7  | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
@@ -64,11 +52,8 @@ help: Convert to `warning`
 G010 [*] Logging statement uses `warn` instead of `warning`
   --> G010.py:13:1
    |
-12 | from logging import warn, warning, exception
 13 | warn("foo")
    | ^^^^
-14 | warning("foo")
-15 | exception("foo")
    |
 help: Convert to `warning`
 10 | logging . warn("Hello World!")

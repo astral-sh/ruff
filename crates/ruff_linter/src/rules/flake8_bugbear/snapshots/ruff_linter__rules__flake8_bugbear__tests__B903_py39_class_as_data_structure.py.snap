@@ -14,30 +14,22 @@ B903 Class could be dataclass or namedtuple
 B903 Class could be dataclass or namedtuple
   --> class_as_data_structure.py:40:1
    |
-38 |           ...
-39 |
 40 | / class C:   # B903
 41 | |     c: int
 42 | |     def __init__(self,d:list):
 43 | |         self.d = d
    | |__________________^
-44 |
-45 |   class D:   # B903
    |
 
 B903 Class could be dataclass or namedtuple
   --> class_as_data_structure.py:45:1
    |
-43 |           self.d = d
-44 |
 45 | / class D:   # B903
 46 | |     """This class has a docstring."""
 47 | |     # this next method is an init
 48 | |     def __init__(self,e:dict):
 49 | |         self.e = e
    | |__________________^
-50 |
-51 |   # <--- begin flake8-bugbear tests below
    |
 
 B903 Class could be dataclass or namedtuple

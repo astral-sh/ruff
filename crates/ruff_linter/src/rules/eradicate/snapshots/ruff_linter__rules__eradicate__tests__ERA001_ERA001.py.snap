@@ -6,8 +6,6 @@ ERA001 [*] Found commented-out code
   |
 1 | #import os
   | ^^^^^^^^^^
-2 | # from foo import junk
-3 | #a = 3
   |
 help: Remove commented-out code
   - #import os
@@ -19,11 +17,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
  --> ERA001.py:2:1
   |
-1 | #import os
 2 | # from foo import junk
   | ^^^^^^^^^^^^^^^^^^^^^^
-3 | #a = 3
-4 | a = 4
   |
 help: Remove commented-out code
 1 | #import os
@@ -36,12 +31,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
  --> ERA001.py:3:1
   |
-1 | #import os
-2 | # from foo import junk
 3 | #a = 3
   | ^^^^^^
-4 | a = 4
-5 | #foo(1, 2, 3)
   |
 help: Remove commented-out code
 1 | #import os
@@ -55,12 +46,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
  --> ERA001.py:5:1
   |
-3 | #a = 3
-4 | a = 4
 5 | #foo(1, 2, 3)
   | ^^^^^^^^^^^^^
-6 |
-7 | def foo(x, y, z):
   |
 help: Remove commented-out code
 2 | # from foo import junk
@@ -75,11 +62,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:13:5
    |
-11 |     # This is a real comment.
-12 |     # # This is a (nested) comment.
 13 |     #return True
    |     ^^^^^^^^^^^^
-14 |     return False
    |
 help: Remove commented-out code
 10 |
@@ -94,8 +78,6 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:21:5
    |
-19 | class A():
-20 |     pass
 21 |     # b = c
    |     ^^^^^^^
    |
@@ -112,12 +94,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:26:5
    |
-24 | dictionary = {
-25 |     # "key1": 123,  # noqa: ERA001
 26 |     # "key2": 456,
    |     ^^^^^^^^^^^^^^
-27 |     # "key3": 789,  # test
-28 | }
    |
 help: Remove commented-out code
 23 |
@@ -132,11 +110,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:27:5
    |
-25 |     # "key1": 123,  # noqa: ERA001
-26 |     # "key2": 456,
 27 |     # "key3": 789,  # test
    |     ^^^^^^^^^^^^^^^^^^^^^^
-28 | }
    |
 help: Remove commented-out code
 24 | dictionary = {
@@ -151,12 +126,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:32:1
    |
-30 | #import os  # noqa
-31 |
 32 | # case 1:
    | ^^^^^^^^^
-33 | # try:
-34 | # try:  # with comment
    |
 help: Remove commented-out code
 29 |
@@ -171,11 +142,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:33:1
    |
-32 | # case 1:
 33 | # try:
    | ^^^^^^
-34 | # try:  # with comment
-35 | # try: print()
    |
 help: Remove commented-out code
 30 | #import os  # noqa
@@ -190,12 +158,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:34:1
    |
-32 | # case 1:
-33 | # try:
 34 | # try:  # with comment
    | ^^^^^^^^^^^^^^^^^^^^^^
-35 | # try: print()
-36 | # except:
    |
 help: Remove commented-out code
 31 |
@@ -210,12 +174,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:35:1
    |
-33 | # try:
-34 | # try:  # with comment
 35 | # try: print()
    | ^^^^^^^^^^^^^^
-36 | # except:
-37 | # except Foo:
    |
 help: Remove commented-out code
 32 | # case 1:
@@ -230,12 +190,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:36:1
    |
-34 | # try:  # with comment
-35 | # try: print()
 36 | # except:
    | ^^^^^^^^^
-37 | # except Foo:
-38 | # except Exception as e: print(e)
    |
 help: Remove commented-out code
 33 | # try:
@@ -250,11 +206,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:37:1
    |
-35 | # try: print()
-36 | # except:
 37 | # except Foo:
    | ^^^^^^^^^^^^^
-38 | # except Exception as e: print(e)
    |
 help: Remove commented-out code
 34 | # try:  # with comment
@@ -269,8 +222,6 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:38:1
    |
-36 | # except:
-37 | # except Foo:
 38 | # except Exception as e: print(e)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -287,11 +238,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:44:1
    |
-43 | # requires-python = ">=3.11"
 44 | # dependencies = [
    | ^^^^^^^^^^^^^^^^^^
-45 | #   "requests<3",
-46 | #   "rich",
    |
 help: Remove commented-out code
 41 | # Script tag without an opening tag (Error)
@@ -306,11 +254,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:47:1
    |
-45 | #   "requests<3",
-46 | #   "rich",
 47 | # ]
    | ^^^
-48 | # ///
    |
 help: Remove commented-out code
 44 | # dependencies = [
@@ -325,12 +270,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:75:1
    |
-73 | # /// script
-74 | # requires-python = ">=3.11"
 75 | # dependencies = [
    | ^^^^^^^^^^^^^^^^^^
-76 | #   "requests<3",
-77 | #   "rich",
    |
 help: Remove commented-out code
 72 |
@@ -345,12 +286,8 @@ note: This is a display-only fix and is likely to be incorrect
 ERA001 [*] Found commented-out code
   --> ERA001.py:78:1
    |
-76 | #   "requests<3",
-77 | #   "rich",
 78 | # ]
    | ^^^
-79 |
-80 | # Script tag block followed by normal block (Ok)
    |
 help: Remove commented-out code
 75 | # dependencies = [

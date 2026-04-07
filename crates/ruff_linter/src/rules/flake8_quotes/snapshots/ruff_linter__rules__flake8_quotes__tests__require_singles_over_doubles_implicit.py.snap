@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 Q000 [*] Double quotes found but single quotes preferred
  --> doubles_implicit.py:2:5
   |
-1 | x = (
 2 |     "This"
   |     ^^^^^^
-3 |     "is"
-4 |     "not"
   |
 help: Replace double quotes with single quotes
 1 | x = (
@@ -21,12 +18,8 @@ help: Replace double quotes with single quotes
 Q000 [*] Double quotes found but single quotes preferred
  --> doubles_implicit.py:3:5
   |
-1 | x = (
-2 |     "This"
 3 |     "is"
   |     ^^^^
-4 |     "not"
-5 | )
   |
 help: Replace double quotes with single quotes
 1 | x = (
@@ -40,11 +33,8 @@ help: Replace double quotes with single quotes
 Q000 [*] Double quotes found but single quotes preferred
  --> doubles_implicit.py:4:5
   |
-2 |     "This"
-3 |     "is"
 4 |     "not"
   |     ^^^^^
-5 | )
   |
 help: Replace double quotes with single quotes
 1 | x = (
@@ -57,14 +47,11 @@ help: Replace double quotes with single quotes
 7 | x = (
 
 Q000 [*] Double quotes found but single quotes preferred
-  --> doubles_implicit.py:8:5
-   |
- 7 | x = (
- 8 |     "This" \
-   |     ^^^^^^
- 9 |     "is" \
-10 |     "not"
-   |
+ --> doubles_implicit.py:8:5
+  |
+8 |     "This" \
+  |     ^^^^^^
+  |
 help: Replace double quotes with single quotes
 5  | )
 6  |
@@ -76,15 +63,11 @@ help: Replace double quotes with single quotes
 11 | )
 
 Q000 [*] Double quotes found but single quotes preferred
-  --> doubles_implicit.py:9:5
-   |
- 7 | x = (
- 8 |     "This" \
- 9 |     "is" \
-   |     ^^^^
-10 |     "not"
-11 | )
-   |
+ --> doubles_implicit.py:9:5
+  |
+9 |     "is" \
+  |     ^^^^
+  |
 help: Replace double quotes with single quotes
 6  |
 7  | x = (
@@ -98,11 +81,8 @@ help: Replace double quotes with single quotes
 Q000 [*] Double quotes found but single quotes preferred
   --> doubles_implicit.py:10:5
    |
- 8 |     "This" \
- 9 |     "is" \
 10 |     "not"
    |     ^^^^^
-11 | )
    |
 help: Replace double quotes with single quotes
 7  | x = (
@@ -117,8 +97,6 @@ help: Replace double quotes with single quotes
 Q000 [*] Double quotes found but single quotes preferred
   --> doubles_implicit.py:27:1
    |
-25 | if True:
-26 |     "This can use 'double' quotes"
 27 | "But this needs to be changed"
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

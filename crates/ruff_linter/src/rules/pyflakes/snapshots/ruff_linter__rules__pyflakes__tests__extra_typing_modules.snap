@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F821 Undefined name `Class`
  --> typing_modules.py:7:15
   |
-6 | X = Union[Literal[False], Literal["db"]]
 7 | y = Optional["Class"]
   |               ^^^^^
   |

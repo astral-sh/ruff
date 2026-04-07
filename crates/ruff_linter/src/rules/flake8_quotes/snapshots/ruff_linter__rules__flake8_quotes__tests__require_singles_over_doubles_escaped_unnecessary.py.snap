@@ -6,8 +6,6 @@ Q004 [*] Unnecessary escape on inner quote character
   |
 1 | this_should_raise_Q004 = 'This is a \"string\"'
   |                          ^^^^^^^^^^^^^^^^^^^^^^
-2 | this_should_raise_Q004 = 'This is \\ a \\\"string\"'
-3 | this_is_fine = '"This" is a \"string\"'
   |
 help: Remove backslash
   - this_should_raise_Q004 = 'This is a \"string\"'
@@ -19,11 +17,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
  --> doubles_escaped_unnecessary.py:2:26
   |
-1 | this_should_raise_Q004 = 'This is a \"string\"'
 2 | this_should_raise_Q004 = 'This is \\ a \\\"string\"'
   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 | this_is_fine = '"This" is a \"string\"'
-4 | this_is_fine = "This is a 'string'"
   |
 help: Remove backslash
 1 | this_should_raise_Q004 = 'This is a \"string\"'
@@ -36,12 +31,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
  --> doubles_escaped_unnecessary.py:3:16
   |
-1 | this_should_raise_Q004 = 'This is a \"string\"'
-2 | this_should_raise_Q004 = 'This is \\ a \\\"string\"'
 3 | this_is_fine = '"This" is a \"string\"'
   |                ^^^^^^^^^^^^^^^^^^^^^^^^
-4 | this_is_fine = "This is a 'string'"
-5 | this_is_fine = "\"This\" is a 'string'"
   |
 help: Remove backslash
 1 | this_should_raise_Q004 = 'This is a \"string\"'
@@ -55,11 +46,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:10:5
    |
- 8 | this_should_raise_Q004 = (
- 9 |     'This is a'
 10 |     '\"string\"'
    |     ^^^^^^^^^^^^
-11 | )
    |
 help: Remove backslash
 7  | this_is_fine = R'This is a \"string\"'
@@ -74,11 +62,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:14:1
    |
-13 | # Same as above, but with f-strings
 14 | f'This is a \"string\"'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^
-15 | f'This is \\ a \\\"string\"'  # Q004
-16 | f'"This" is a \"string\"'
    |
 help: Remove backslash
 11 | )
@@ -93,12 +78,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:15:1
    |
-13 | # Same as above, but with f-strings
-14 | f'This is a \"string\"'  # Q004
 15 | f'This is \\ a \\\"string\"'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-16 | f'"This" is a \"string\"'
-17 | f"This is a 'string'"
    |
 help: Remove backslash
 12 |
@@ -113,12 +94,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:16:1
    |
-14 | f'This is a \"string\"'  # Q004
-15 | f'This is \\ a \\\"string\"'  # Q004
 16 | f'"This" is a \"string\"'
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-17 | f"This is a 'string'"
-18 | f"\"This\" is a 'string'"
    |
 help: Remove backslash
 13 | # Same as above, but with f-strings
@@ -133,11 +110,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:23:5
    |
-21 | this_should_raise_Q004 = (
-22 |     f'This is a'
 23 |     f'\"string\"'  # Q004
    |     ^^^^^^^^^^^^^
-24 | )
    |
 help: Remove backslash
 20 | fR'This is a \"string\"'
@@ -152,12 +126,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:33:1
    |
-31 | #
-32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 33 | f'\"foo\" {'nested'}'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^
-34 | f'\"foo\" {f'nested'}'  # Q004
-35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    |
 help: Remove backslash
 30 | #   f"'foo' {'nested'}"
@@ -172,11 +142,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:34:1
    |
-32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
-33 | f'\"foo\" {'nested'}'  # Q004
 34 | f'\"foo\" {f'nested'}'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^
-35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    |
 help: Remove backslash
 31 | #
@@ -191,12 +158,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:35:1
    |
-33 | f'\"foo\" {'nested'}'  # Q004
-34 | f'\"foo\" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |
-37 | f'normal {f'nested'} normal'
    |
 help: Remove backslash
 32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
@@ -211,12 +174,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:35:12
    |
-33 | f'\"foo\" {'nested'}'  # Q004
-34 | f'\"foo\" {f'nested'}'  # Q004
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
    |            ^^^^^^^^^^^^^
-36 |
-37 | f'normal {f'nested'} normal'
    |
 help: Remove backslash
 32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
@@ -231,11 +190,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:38:1
    |
-37 | f'normal {f'nested'} normal'
 38 | f'\"normal\" {f'nested'} normal'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-39 | f'\"normal\" {f'nested'} "double quotes"'
-40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
    |
 help: Remove backslash
 35 | f'\"foo\" {f'\"nested\"'} \"\"'  # Q004
@@ -250,12 +206,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:39:1
    |
-37 | f'normal {f'nested'} normal'
-38 | f'\"normal\" {f'nested'} normal'  # Q004
 39 | f'\"normal\" {f'nested'} "double quotes"'
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
-41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |
 help: Remove backslash
 36 |
@@ -270,11 +222,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:40:1
    |
-38 | f'\"normal\" {f'nested'} normal'  # Q004
-39 | f'\"normal\" {f'nested'} "double quotes"'
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |
 help: Remove backslash
 37 | f'normal {f'nested'} normal'
@@ -289,11 +238,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:40:15
    |
-38 | f'\"normal\" {f'nested'} normal'  # Q004
-39 | f'\"normal\" {f'nested'} "double quotes"'
 40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |
 help: Remove backslash
 37 | f'normal {f'nested'} normal'
@@ -308,12 +254,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:41:1
    |
-39 | f'\"normal\" {f'nested'} "double quotes"'
-40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-42 |
-43 | # Make sure we do not unescape quotes
    |
 help: Remove backslash
 38 | f'\"normal\" {f'nested'} normal'  # Q004
@@ -328,12 +270,8 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:41:15
    |
-39 | f'\"normal\" {f'nested'} "double quotes"'
-40 | f'\"normal\" {f'\"nested\" {'other'} normal'} "double quotes"'  # Q004
 41 | f'\"normal\" {f'\"nested\" {'other'} "double quotes"'} normal'  # Q004
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-42 |
-43 | # Make sure we do not unescape quotes
    |
 help: Remove backslash
 38 | f'\"normal\" {f'nested'} normal'  # Q004
@@ -348,8 +286,6 @@ help: Remove backslash
 Q004 [*] Unnecessary escape on inner quote character
   --> doubles_escaped_unnecessary.py:45:26
    |
-43 | # Make sure we do not unescape quotes
-44 | this_is_fine = 'This is an \\"escaped\\" quote'
 45 | this_should_raise_Q004 = 'This is an \\\"escaped\\\" quote with an extra backslash'
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

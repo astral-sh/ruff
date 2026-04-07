@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
  --> C400.py:2:13
   |
-1 | # Cannot combine with C416. Should use list comprehension here.
 2 | even_nums = list(2 * x for x in range(3))
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 | odd_nums = list(
-4 |     2 * x + 1 for x in range(3)
   |
 help: Rewrite as a list comprehension
 1 | # Cannot combine with C416. Should use list comprehension here.
@@ -22,8 +19,6 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
  --> C400.py:3:12
   |
-1 |   # Cannot combine with C416. Should use list comprehension here.
-2 |   even_nums = list(2 * x for x in range(3))
 3 |   odd_nums = list(
   |  ____________^
 4 | |     2 * x + 1 for x in range(3)
@@ -44,14 +39,11 @@ help: Rewrite as a list comprehension
 note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite using `list()`)
-  --> C400.py:9:5
-   |
- 8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
- 9 | x = list(x for x in range(3))
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-10 | x = list(
-11 |     x for x in range(3)
-   |
+ --> C400.py:9:5
+  |
+9 | x = list(x for x in range(3))
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Rewrite using `list()`
 6  |
 7  |
@@ -66,15 +58,11 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite using `list()`)
   --> C400.py:10:5
    |
- 8 |   # Short-circuit case, combine with C416 and should produce x = list(range(3))
- 9 |   x = list(x for x in range(3))
 10 |   x = list(
    |  _____^
 11 | |     x for x in range(3)
 12 | | )
    | |_^
-13 |
-14 |   # Strip parentheses from inner generators.
    |
 help: Rewrite using `list()`
 7  |
@@ -92,11 +80,8 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:15:1
    |
-14 | # Strip parentheses from inner generators.
 15 | list((2 * x for x in range(3)))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-16 | list(((2 * x for x in range(3))))
-17 | list((((2 * x for x in range(3)))))
    |
 help: Rewrite as a list comprehension
 12 | )
@@ -112,11 +97,8 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:16:1
    |
-14 | # Strip parentheses from inner generators.
-15 | list((2 * x for x in range(3)))
 16 | list(((2 * x for x in range(3))))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-17 | list((((2 * x for x in range(3)))))
    |
 help: Rewrite as a list comprehension
 13 |
@@ -132,12 +114,8 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:17:1
    |
-15 | list((2 * x for x in range(3)))
-16 | list(((2 * x for x in range(3))))
 17 | list((((2 * x for x in range(3)))))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-18 |
-19 | # Account for trailing comma in fix
    |
 help: Rewrite as a list comprehension
 14 | # Strip parentheses from inner generators.
@@ -153,12 +131,8 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:21:1
    |
-19 | # Account for trailing comma in fix
-20 | # See https://github.com/astral-sh/ruff/issues/15852
 21 | list((0 for _ in []),)
    | ^^^^^^^^^^^^^^^^^^^^^^
-22 | list(
-23 |      (0 for _ in [])
    |
 help: Rewrite as a list comprehension
 18 |
@@ -174,8 +148,6 @@ note: This is an unsafe fix and may change runtime behavior
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:22:1
    |
-20 |   # See https://github.com/astral-sh/ruff/issues/15852
-21 |   list((0 for _ in []),)
 22 | / list(
 23 | |      (0 for _ in [])
 24 | |      # some comments

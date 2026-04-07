@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
  --> PT027_0.py:6:14
   |
-4 | class Test(unittest.TestCase):
-5 |     def test_errors(self):
 6 |         with self.assertRaises(ValueError):
   |              ^^^^^^^^^^^^^^^^^
-7 |             raise ValueError
-8 |         with self.assertRaises(expected_exception=ValueError):
   |
 help: Replace `assertRaises` with `pytest.raises`
 1  | import unittest
@@ -28,11 +24,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
  --> PT027_0.py:8:14
   |
-6 |         with self.assertRaises(ValueError):
-7 |             raise ValueError
 8 |         with self.assertRaises(expected_exception=ValueError):
   |              ^^^^^^^^^^^^^^^^^
-9 |             raise ValueError
   |
 help: Replace `assertRaises` with `pytest.raises`
 1  | import unittest
@@ -53,11 +46,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `failUnlessRaises`
   --> PT027_0.py:11:14
    |
- 9 |             raise ValueError
-10 |
 11 |         with self.failUnlessRaises(ValueError):
    |              ^^^^^^^^^^^^^^^^^^^^^
-12 |             raise ValueError
    |
 help: Replace `failUnlessRaises` with `pytest.raises`
 1  | import unittest
@@ -79,11 +69,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
   --> PT027_0.py:14:14
    |
-12 |             raise ValueError
-13 |
 14 |         with self.assertRaisesRegex(ValueError, "test"):
    |              ^^^^^^^^^^^^^^^^^^^^^^
-15 |             raise ValueError("test")
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
 1  | import unittest
@@ -105,11 +92,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
   --> PT027_0.py:17:14
    |
-15 |             raise ValueError("test")
-16 |
 17 |         with self.assertRaisesRegex(ValueError, expected_regex="test"):
    |              ^^^^^^^^^^^^^^^^^^^^^^
-18 |             raise ValueError("test")
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
 1  | import unittest
@@ -131,12 +115,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
   --> PT027_0.py:20:14
    |
-18 |             raise ValueError("test")
-19 |
 20 |         with self.assertRaisesRegex(
    |              ^^^^^^^^^^^^^^^^^^^^^^
-21 |             expected_exception=ValueError, expected_regex="test"
-22 |         ):
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
 1  | import unittest
@@ -160,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
   --> PT027_0.py:25:14
    |
-23 |             raise ValueError("test")
-24 |
 25 |         with self.assertRaisesRegex(
    |              ^^^^^^^^^^^^^^^^^^^^^^
-26 |             expected_regex="test", expected_exception=ValueError
-27 |         ):
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
 1  | import unittest
@@ -189,11 +165,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegexp`
   --> PT027_0.py:30:14
    |
-28 |             raise ValueError("test")
-29 |
 30 |         with self.assertRaisesRegexp(ValueError, "test"):
    |              ^^^^^^^^^^^^^^^^^^^^^^^
-31 |             raise ValueError("test")
    |
 help: Replace `assertRaisesRegexp` with `pytest.raises`
 1  | import unittest
@@ -215,34 +188,25 @@ note: This is an unsafe fix and may change runtime behavior
 PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_0.py:34:14
    |
-33 |     def test_unfixable_errors(self):
 34 |         with self.assertRaises(ValueError, msg="msg"):
    |              ^^^^^^^^^^^^^^^^^
-35 |             raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 
 PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_0.py:37:14
    |
-35 |             raise ValueError
-36 |
 37 |         with self.assertRaises(
    |              ^^^^^^^^^^^^^^^^^
-38 |             # comment
-39 |             ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
 
 PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_0.py:44:13
    |
-43 |           with (
 44 | /             self
 45 | |             # comment
 46 | |             .assertRaises(ValueError)
    | |_________________________^
-47 |           ):
-48 |               raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`

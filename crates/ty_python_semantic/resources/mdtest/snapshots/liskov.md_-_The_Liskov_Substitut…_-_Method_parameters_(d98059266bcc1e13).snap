@@ -110,20 +110,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:38:9
    |
-36 |     # Some calls permitted by the superclass are now no longer allowed
-37 |     # (the method can no longer be passed any arguments!)
 38 |     def method(self, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
-39 |
-40 | class Sub13(Super):
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -133,20 +126,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:43:9
    |
-41 |     # Some calls permitted by the superclass are now no longer allowed
-42 |     # (the method can no longer be passed exactly one argument!)
 43 |     def method(self, x, y, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
-44 |
-45 | class Sub14(Super):
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -156,20 +142,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:48:9
    |
-46 |     # Some calls permitted by the superclass are now no longer allowed
-47 |     # (x can no longer be passed positionally!)
 48 |     def method(self, /, *, x): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
-49 |
-50 | class Sub15(Super):
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -179,20 +158,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:53:9
    |
-51 |     # Some calls permitted by the superclass are now no longer allowed
-52 |     # (x can no longer be passed any integer -- it now requires a bool!)
 53 |     def method(self, x: bool, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
-54 |
-55 | class Super2:
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -202,15 +174,12 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method2`
   --> src/mdtest_snippet.pyi:56:9
    |
-55 | class Super2:
 56 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
 57 |
 58 | class Sub16(Super2):
 59 |     def method2(self, x, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
-60 |
-61 | class Sub17(Super2):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -220,19 +189,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method2`
   --> src/mdtest_snippet.pyi:62:9
    |
-61 | class Sub17(Super2):
 62 |     def method2(self, *, x): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
-63 |
-64 | class Super3:
    |
   ::: src/mdtest_snippet.pyi:56:9
    |
-55 | class Super2:
 56 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
-57 |
-58 | class Sub16(Super2):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -242,19 +205,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method3`
   --> src/mdtest_snippet.pyi:71:9
    |
-70 | class Sub19(Super3):
 71 |     def method3(self, x, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super3.method3`
-72 |
-73 | class Super4:
    |
   ::: src/mdtest_snippet.pyi:65:9
    |
-64 | class Super3:
 65 |     def method3(self, *, x): ...
    |         ------------------- `Super3.method3` defined here
-66 |
-67 | class Sub18(Super3):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -264,19 +221,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:80:9
    |
-79 | class Sub21(Super4):
 80 |     def method(self, *args): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
-81 |
-82 | class Sub22(Super4):
    |
   ::: src/mdtest_snippet.pyi:74:9
    |
-73 | class Super4:
 74 |     def method(self, *args: int, **kwargs: str): ...
    |         --------------------------------------- `Super4.method` defined here
-75 |
-76 | class Sub20(Super4):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -286,19 +237,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:83:9
    |
-82 | class Sub22(Super4):
 83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
-84 |
-85 | class Sub23(Super4):
    |
   ::: src/mdtest_snippet.pyi:74:9
    |
-73 | class Super4:
 74 |     def method(self, *args: int, **kwargs: str): ...
    |         --------------------------------------- `Super4.method` defined here
-75 |
-76 | class Sub20(Super4):
    |
 info: This violates the Liskov Substitution Principle
 

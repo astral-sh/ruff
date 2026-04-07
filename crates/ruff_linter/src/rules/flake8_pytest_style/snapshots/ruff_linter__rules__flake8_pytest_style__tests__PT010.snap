@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 PT010 Set the expected exception in `pytest.raises()`
  --> PT010.py:5:10
   |
-4 | def test_ok():
 5 |     with pytest.raises():
   |          ^^^^^^^^^^^^^
-6 |         pass
   |

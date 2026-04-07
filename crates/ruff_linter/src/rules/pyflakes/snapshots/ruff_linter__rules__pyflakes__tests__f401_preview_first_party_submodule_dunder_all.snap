@@ -6,8 +6,6 @@ F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all_
   |
 2 | import submodule.a
   |        ^^^^^^^^^^^
-3 | __all__ = ['FOO']
-4 | FOO = 42
   |
 help: Add `submodule` to __all__
 1 |

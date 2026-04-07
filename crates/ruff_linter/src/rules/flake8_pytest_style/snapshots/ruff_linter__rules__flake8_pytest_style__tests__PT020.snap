@@ -6,8 +6,6 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
    |
 14 | @pytest.yield_fixture()
    | ^^^^^^^^^^^^^^^^^^^^^^^
-15 | def error_without_parens():
-16 |     return 0
    |
 
 PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
@@ -15,6 +13,4 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
    |
 19 | @pytest.yield_fixture
    | ^^^^^^^^^^^^^^^^^^^^^
-20 | def error_with_parens():
-21 |     return 0
    |

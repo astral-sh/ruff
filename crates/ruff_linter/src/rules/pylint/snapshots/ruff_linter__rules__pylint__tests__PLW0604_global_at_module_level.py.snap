@@ -6,16 +6,11 @@ PLW0604 `global` at module level is redundant
   |
 1 | global price  # W0604
   | ^^^^^^^^^^^^
-2 |
-3 | price = 25
   |
 
 PLW0604 `global` at module level is redundant
  --> global_at_module_level.py:6:5
   |
-5 | if True:
 6 |     global X  # W0604
   |     ^^^^^^^^
-7 |
-8 | def no_error():
   |

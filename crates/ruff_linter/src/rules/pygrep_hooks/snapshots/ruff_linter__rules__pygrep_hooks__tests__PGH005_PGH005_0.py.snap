@@ -4,206 +4,132 @@ source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
 PGH005 Non-existent mock method: `not_called`
  --> PGH005_0.py:4:8
   |
-2 | # ============
-3 | # Errors
 4 | assert my_mock.not_called()
   |        ^^^^^^^^^^^^^^^^^^^^
-5 | assert my_mock.called_once_with()
-6 | assert my_mock.not_called
   |
 
 PGH005 Non-existent mock method: `called_once_with`
  --> PGH005_0.py:5:8
   |
-3 | # Errors
-4 | assert my_mock.not_called()
 5 | assert my_mock.called_once_with()
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-6 | assert my_mock.not_called
-7 | assert my_mock.called_once_with
   |
 
 PGH005 Non-existent mock method: `not_called`
  --> PGH005_0.py:6:8
   |
-4 | assert my_mock.not_called()
-5 | assert my_mock.called_once_with()
 6 | assert my_mock.not_called
   |        ^^^^^^^^^^^^^^^^^^
-7 | assert my_mock.called_once_with
-8 | my_mock.assert_not_called
   |
 
 PGH005 Non-existent mock method: `called_once_with`
  --> PGH005_0.py:7:8
   |
-5 | assert my_mock.called_once_with()
-6 | assert my_mock.not_called
 7 | assert my_mock.called_once_with
   |        ^^^^^^^^^^^^^^^^^^^^^^^^
-8 | my_mock.assert_not_called
-9 | my_mock.assert_called
   |
 
 PGH005 Mock method should be called: `assert_not_called`
-  --> PGH005_0.py:8:1
-   |
- 6 | assert my_mock.not_called
- 7 | assert my_mock.called_once_with
- 8 | my_mock.assert_not_called
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
- 9 | my_mock.assert_called
-10 | my_mock.assert_called_once_with
-   |
+ --> PGH005_0.py:8:1
+  |
+8 | my_mock.assert_not_called
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 
 PGH005 Mock method should be called: `assert_called`
-  --> PGH005_0.py:9:1
-   |
- 7 | assert my_mock.called_once_with
- 8 | my_mock.assert_not_called
- 9 | my_mock.assert_called
-   | ^^^^^^^^^^^^^^^^^^^^^
-10 | my_mock.assert_called_once_with
-11 | my_mock.assert_called_once_with
-   |
+ --> PGH005_0.py:9:1
+  |
+9 | my_mock.assert_called
+  | ^^^^^^^^^^^^^^^^^^^^^
+  |
 
 PGH005 Mock method should be called: `assert_called_once_with`
   --> PGH005_0.py:10:1
    |
- 8 | my_mock.assert_not_called
- 9 | my_mock.assert_called
 10 | my_mock.assert_called_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 | my_mock.assert_called_once_with
-12 | MyMock.assert_called_once_with
    |
 
 PGH005 Mock method should be called: `assert_called_once_with`
   --> PGH005_0.py:11:1
    |
- 9 | my_mock.assert_called
-10 | my_mock.assert_called_once_with
 11 | my_mock.assert_called_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-12 | MyMock.assert_called_once_with
    |
 
 PGH005 Mock method should be called: `assert_called_once_with`
   --> PGH005_0.py:12:1
    |
-10 | my_mock.assert_called_once_with
-11 | my_mock.assert_called_once_with
 12 | MyMock.assert_called_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-13 |
-14 | # Standalone
    |
 
 PGH005 Non-existent mock method: `not_awaited`
   --> PGH005_0.py:36:8
    |
-34 | # =================
-35 | # Errors
 36 | assert my_mock.not_awaited()
    |        ^^^^^^^^^^^^^^^^^^^^^
-37 | assert my_mock.awaited_once_with()
-38 | assert my_mock.not_awaited
    |
 
 PGH005 Non-existent mock method: `awaited_once_with`
   --> PGH005_0.py:37:8
    |
-35 | # Errors
-36 | assert my_mock.not_awaited()
 37 | assert my_mock.awaited_once_with()
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-38 | assert my_mock.not_awaited
-39 | assert my_mock.awaited_once_with
    |
 
 PGH005 Non-existent mock method: `not_awaited`
   --> PGH005_0.py:38:8
    |
-36 | assert my_mock.not_awaited()
-37 | assert my_mock.awaited_once_with()
 38 | assert my_mock.not_awaited
    |        ^^^^^^^^^^^^^^^^^^^
-39 | assert my_mock.awaited_once_with
-40 | my_mock.assert_not_awaited
    |
 
 PGH005 Non-existent mock method: `awaited_once_with`
   --> PGH005_0.py:39:8
    |
-37 | assert my_mock.awaited_once_with()
-38 | assert my_mock.not_awaited
 39 | assert my_mock.awaited_once_with
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
-40 | my_mock.assert_not_awaited
-41 | my_mock.assert_awaited
    |
 
 PGH005 Mock method should be called: `assert_not_awaited`
   --> PGH005_0.py:40:1
    |
-38 | assert my_mock.not_awaited
-39 | assert my_mock.awaited_once_with
 40 | my_mock.assert_not_awaited
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-41 | my_mock.assert_awaited
-42 | my_mock.assert_awaited_once_with
    |
 
 PGH005 Mock method should be called: `assert_awaited`
   --> PGH005_0.py:41:1
    |
-39 | assert my_mock.awaited_once_with
-40 | my_mock.assert_not_awaited
 41 | my_mock.assert_awaited
    | ^^^^^^^^^^^^^^^^^^^^^^
-42 | my_mock.assert_awaited_once_with
-43 | my_mock.assert_awaited_once_with
    |
 
 PGH005 Mock method should be called: `assert_awaited_once_with`
   --> PGH005_0.py:42:1
    |
-40 | my_mock.assert_not_awaited
-41 | my_mock.assert_awaited
 42 | my_mock.assert_awaited_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-43 | my_mock.assert_awaited_once_with
-44 | MyMock.assert_awaited_once_with
    |
 
 PGH005 Mock method should be called: `assert_awaited_once_with`
   --> PGH005_0.py:43:1
    |
-41 | my_mock.assert_awaited
-42 | my_mock.assert_awaited_once_with
 43 | my_mock.assert_awaited_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-44 | MyMock.assert_awaited_once_with
-45 | assert my_mock.awaited
    |
 
 PGH005 Mock method should be called: `assert_awaited_once_with`
   --> PGH005_0.py:44:1
    |
-42 | my_mock.assert_awaited_once_with
-43 | my_mock.assert_awaited_once_with
 44 | MyMock.assert_awaited_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 | assert my_mock.awaited
    |
 
 PGH005 Non-existent mock method: `awaited`
   --> PGH005_0.py:45:8
    |
-43 | my_mock.assert_awaited_once_with
-44 | MyMock.assert_awaited_once_with
 45 | assert my_mock.awaited
    |        ^^^^^^^^^^^^^^^
-46 |
-47 | # Standalone
    |

@@ -6,8 +6,6 @@ PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   |
 4 | @pytest.mark.parametrize("x", [1, 1, 2])
   |                                   ^
-5 | def test_error_literal(x):
-6 |     ...
   |
 help: Remove duplicate test case
 1 | import pytest
@@ -25,8 +23,6 @@ PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
    |                                   ^
-15 | def test_error_expr_simple(x):
-16 |     ...
    |
 help: Remove duplicate test case
 11 | c = 3
@@ -44,8 +40,6 @@ PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
    |                                         ^
-15 | def test_error_expr_simple(x):
-16 |     ...
    |
 help: Remove duplicate test case
 11 | c = 3
@@ -63,8 +57,6 @@ PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
    |                                            ^
-15 | def test_error_expr_simple(x):
-16 |     ...
    |
 help: Remove duplicate test case
 11 | c = 3
@@ -80,12 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT014 Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:24:9
    |
-22 |         (a, b),
-23 |         # comment
 24 |         (a, b),
    |         ^^^^^^
-25 |         (b, c),
-26 |     ],
    |
 help: Remove duplicate test case
 
@@ -94,8 +82,6 @@ PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
    |
 32 | @pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
    |                                       ^
-33 | def test_error_parentheses(x):
-34 |     ...
    |
 help: Remove duplicate test case
 29 |     ...
@@ -113,8 +99,6 @@ PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
    |
 32 | @pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
    |                                                ^
-33 | def test_error_parentheses(x):
-34 |     ...
    |
 help: Remove duplicate test case
 29 |     ...
@@ -130,12 +114,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:42:10
    |
-40 |         a,
-41 |         b,
 42 |         (a),
    |          ^
-43 |         c,
-44 |         ((a)),
    |
 help: Remove duplicate test case
 39 |     [
@@ -150,12 +130,8 @@ note: This is an unsafe fix and may change runtime behavior
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:44:11
    |
-42 |         (a),
-43 |         c,
 44 |         ((a)),
    |           ^
-45 |     ],
-46 | )
    |
 help: Remove duplicate test case
 41 |         b,
@@ -172,8 +148,6 @@ PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
    |
 56 | @pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
    |                                                     ^^^^^^^^^^
-57 | def test_numbers(data, spec):
-58 |     ...
    |
 help: Remove duplicate test case
 53 |     ...

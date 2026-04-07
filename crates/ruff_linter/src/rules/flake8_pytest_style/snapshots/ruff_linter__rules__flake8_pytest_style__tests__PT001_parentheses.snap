@@ -2,13 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
 PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
-  --> PT001.py:9:1
-   |
- 9 | @pytest.fixture
-   | ^^^^^^^^^^^^^^^
-10 | def no_parentheses():
-11 |     return 42
-   |
+ --> PT001.py:9:1
+  |
+9 | @pytest.fixture
+  | ^^^^^^^^^^^^^^^
+  |
 help: Add parentheses
 6  | # `import pytest`
 7  |
@@ -24,8 +22,6 @@ PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 34 | @fixture
    | ^^^^^^^^
-35 | def imported_from_no_parentheses():
-36 |     return 42
    |
 help: Add parentheses
 31 | # `from pytest import fixture`
@@ -42,8 +38,6 @@ PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 59 | @aliased
    | ^^^^^^^^
-60 | def aliased_no_parentheses():
-61 |     return 42
    |
 help: Add parentheses
 56 | # `from pytest import fixture as aliased`

@@ -6,27 +6,18 @@ F634 If test is a tuple, which is always `True`
   |
 1 | if (1, 2):
   |    ^^^^^^
-2 |     pass
   |
 
 F634 If test is a tuple, which is always `True`
  --> F634.py:4:4
   |
-2 |     pass
-3 |
 4 | if (3, 4):
   |    ^^^^^^
-5 |     pass
-6 | elif foo:
   |
 
 F634 If test is a tuple, which is always `True`
   --> F634.py:12:10
    |
-10 |     if True:
-11 |         pass
 12 |     elif (3, 4):
    |          ^^^^^^
-13 |         pass
-14 |     elif ():
    |

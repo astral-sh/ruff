@@ -6,6 +6,4 @@ EXE001 Shebang is present but file is not executable
   |
 1 | #!/usr/bin/python
   | ^^^^^^^^^^^^^^^^^
-2 |
-3 | if __name__ == '__main__':
   |

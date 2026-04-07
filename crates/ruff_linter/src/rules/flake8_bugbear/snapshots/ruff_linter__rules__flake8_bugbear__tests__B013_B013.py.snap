@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 B013 [*] A length-one tuple literal is redundant in exception handlers
  --> B013.py:5:8
   |
-3 | try:
-4 |     pass
 5 | except (ValueError,):
   |        ^^^^^^^^^^^^^
-6 |     pass
-7 | except AttributeError:
   |
 help: Replace with `except ValueError`
 2 |
@@ -24,11 +20,8 @@ help: Replace with `except ValueError`
 B013 [*] A length-one tuple literal is redundant in exception handlers
   --> B013.py:13:7
    |
-11 | except (*retriable_exceptions,):
-12 |     pass
 13 | except(ValueError,):
    |       ^^^^^^^^^^^^^
-14 |     pass
    |
 help: Replace with `except ValueError`
 10 |     pass
@@ -43,15 +36,12 @@ help: Replace with `except ValueError`
 B013 [*] A length-one tuple literal is redundant in exception handlers
   --> B013.py:25:8
    |
-23 |   try:
-24 |       ...
 25 |   except (
    |  ________^
 26 | |         ValueError,
 27 | |         # text
 28 | |         ):
    | |_________^
-29 |       ...
    |
 help: Replace with `except ValueError`
 22 |

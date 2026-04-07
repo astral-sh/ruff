@@ -55,8 +55,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |    |     |
   |    |     Has type `<class 'str'>`
   |    Has type `<class 'int'>`
-2 |
-3 | class Foo:
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
@@ -67,15 +65,11 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 error[unsupported-operator]: Unsupported `|` operation
  --> src/a.py:5:17
   |
-3 | class Foo:
-4 |     def __init__(self):
 5 |         self.x: int | str = 42  # error: [unsupported-operator]
   |                 ---^^^---
   |                 |     |
   |                 |     Has type `<class 'str'>`
   |                 Has type `<class 'int'>`
-6 |
-7 | d = {}
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
@@ -86,7 +80,6 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 error[unsupported-operator]: Unsupported `|` operation
  --> src/a.py:8:7
   |
-7 | d = {}
 8 | d[0]: int | str = 42  # error: [unsupported-operator]
   |       ---^^^---
   |       |     |
@@ -102,14 +95,11 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 error[unsupported-operator]: Unsupported `|` operation
   --> src/b.py:15:5
    |
-13 | # only stringifies *type annotations*, not arbitrary runtime expressions
-14 |
 15 | X = str | int  # error: [unsupported-operator]
    |     ---^^^---
    |     |     |
    |     |     Has type `<class 'int'>`
    |     Has type `<class 'str'>`
-16 | Y = tuple[str | int, ...]  # error: [unsupported-operator]
    |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: `from __future__ import annotations` has no effect outside type annotations
@@ -121,7 +111,6 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 error[unsupported-operator]: Unsupported `|` operation
   --> src/b.py:16:11
    |
-15 | X = str | int  # error: [unsupported-operator]
 16 | Y = tuple[str | int, ...]  # error: [unsupported-operator]
    |           ---^^^---
    |           |     |

@@ -6,6 +6,4 @@ invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous
   |
 1 | async def f(): return [[x async for x in foo(n)] for n in range(3)]
   |                           ^^^^^^^^^^^^^^^^^^^^^
-2 |
-3 | async def test(): return [[x async for x in elements(n)] async for n in range(3)]
   |

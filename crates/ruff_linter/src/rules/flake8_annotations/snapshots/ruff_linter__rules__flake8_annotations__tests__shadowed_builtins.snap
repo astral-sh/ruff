@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ANN201 [*] Missing return type annotation for public function `foo`
  --> shadowed_builtins.py:4:5
   |
-2 | from typing import override
-3 |
 4 | def foo():
   |     ^^^
-5 |     return "!"
   |
 help: Add return type annotation: `builtins.str`
 1 | from collections import UserString as str
@@ -25,11 +22,8 @@ note: This is an unsafe fix and may change runtime behavior
 ANN202 [*] Missing return type annotation for private function `_foo`
  --> shadowed_builtins.py:7:5
   |
-5 |     return "!"
-6 |
 7 | def _foo():
   |     ^^^^
-8 |     return "!"
   |
 help: Add return type annotation: `builtins.str`
 1  | from collections import UserString as str
@@ -49,11 +43,8 @@ note: This is an unsafe fix and may change runtime behavior
 ANN204 [*] Missing return type annotation for special method `__str__`
   --> shadowed_builtins.py:12:9
    |
-10 | class C:
-11 |     @override
 12 |     def __str__(self):
    |         ^^^^^^^
-13 |         return "!"
    |
 help: Add return type annotation: `str`
 1  | from collections import UserString as str
@@ -76,10 +67,8 @@ note: This is an unsafe fix and may change runtime behavior
 ANN205 [*] Missing return type annotation for staticmethod `foo`
   --> shadowed_builtins.py:16:9
    |
-15 |     @staticmethod
 16 |     def foo():
    |         ^^^
-17 |         return "!"
    |
 help: Add return type annotation: `builtins.str`
 1  | from collections import UserString as str
@@ -102,10 +91,8 @@ note: This is an unsafe fix and may change runtime behavior
 ANN206 [*] Missing return type annotation for classmethod `bar`
   --> shadowed_builtins.py:20:9
    |
-19 |     @classmethod
 20 |     def bar(cls):
    |         ^^^
-21 |         return "!"
    |
 help: Add return type annotation: `builtins.str`
 1  | from collections import UserString as str

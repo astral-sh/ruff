@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/numpy/mod.rs
 NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
  --> NPY001.py:6:1
   |
-5 | # Error
 6 | npy.float
   | ^^^^^^^^^
-7 | npy.int
   |
 help: Replace `np.float` with builtin type
 3 | import numpy
@@ -22,12 +20,8 @@ help: Replace `np.float` with builtin type
 NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
  --> NPY001.py:7:1
   |
-5 | # Error
-6 | npy.float
 7 | npy.int
   | ^^^^^^^
-8 |
-9 | if dtype == np.object:
   |
 help: Replace `np.int` with builtin type
 4  |
@@ -40,14 +34,11 @@ help: Replace `np.int` with builtin type
 10 |     ...
 
 NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
-  --> NPY001.py:9:13
-   |
- 7 | npy.int
- 8 |
- 9 | if dtype == np.object:
-   |             ^^^^^^^^^
-10 |     ...
-   |
+ --> NPY001.py:9:13
+  |
+9 | if dtype == np.object:
+  |             ^^^^^^^^^
+  |
 help: Replace `np.object` with builtin type
 6  | npy.float
 7  | npy.int
@@ -61,12 +52,8 @@ help: Replace `np.object` with builtin type
 NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
   --> NPY001.py:12:72
    |
-10 |     ...
-11 |
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
    |                                                                        ^^^^^^
-13 |
-14 | pdf = pd.DataFrame(
    |
 help: Replace `np.int` with builtin type
 9  | if dtype == np.object:
@@ -81,12 +68,8 @@ help: Replace `np.int` with builtin type
 NPY001 [*] Type alias `np.complex` is deprecated, replace with builtin type
   --> NPY001.py:12:80
    |
-10 |     ...
-11 |
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
    |                                                                                ^^^^^^^^^^
-13 |
-14 | pdf = pd.DataFrame(
    |
 help: Replace `np.complex` with builtin type
 9  | if dtype == np.object:
@@ -101,11 +84,8 @@ help: Replace `np.complex` with builtin type
 NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
   --> NPY001.py:17:11
    |
-15 |     data=[[1, 2, 3]],
-16 |     columns=["a", "b", "c"],
 17 |     dtype=numpy.object,
    |           ^^^^^^^^^^^^
-18 | )
    |
 help: Replace `np.object` with builtin type
 14 | pdf = pd.DataFrame(
@@ -120,12 +100,8 @@ help: Replace `np.object` with builtin type
 NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
   --> NPY001.py:20:16
    |
-18 | )
-19 |
 20 | _ = arr.astype(np.int)
    |                ^^^^^^
-21 |
-22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
    |
 help: Replace `np.int` with builtin type
 17 |     dtype=numpy.object,
@@ -140,8 +116,6 @@ help: Replace `np.int` with builtin type
 NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
   --> NPY001.py:25:1
    |
-23 | from numpy import float
-24 |
 25 | float(1)
    | ^^^^^
    |

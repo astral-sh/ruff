@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF017 [*] Avoid quadratic list summation
  --> RUF017_0.py:5:1
   |
-4 | # RUF017
 5 | sum([x, y], start=[])
   | ^^^^^^^^^^^^^^^^^^^^^
-6 | sum([x, y], [])
-7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
   |
 help: Replace with a starred list comprehension
 2 | y = [4, 5, 6]
@@ -24,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF017 [*] Avoid quadratic list summation
  --> RUF017_0.py:6:1
   |
-4 | # RUF017
-5 | sum([x, y], start=[])
 6 | sum([x, y], [])
   | ^^^^^^^^^^^^^^^
-7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
-8 | sum([[1, 2, 3], [4, 5, 6]], [])
   |
 help: Replace with a starred list comprehension
 3 |
@@ -45,12 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF017 [*] Avoid quadratic list summation
  --> RUF017_0.py:7:1
   |
-5 | sum([x, y], start=[])
-6 | sum([x, y], [])
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 | sum([[1, 2, 3], [4, 5, 6]], [])
-9 | sum([[1, 2, 3], [4, 5, 6]],
   |
 help: Replace with a starred list comprehension
 4  | # RUF017
@@ -64,15 +53,11 @@ help: Replace with a starred list comprehension
 note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
-  --> RUF017_0.py:8:1
-   |
- 6 | sum([x, y], [])
- 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
- 8 | sum([[1, 2, 3], [4, 5, 6]], [])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- 9 | sum([[1, 2, 3], [4, 5, 6]],
-10 |     [])
-   |
+ --> RUF017_0.py:8:1
+  |
+8 | sum([[1, 2, 3], [4, 5, 6]], [])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with a starred list comprehension
 5  | sum([x, y], start=[])
 6  | sum([x, y], [])
@@ -87,13 +72,9 @@ note: This is an unsafe fix and may change runtime behavior
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:9:1
    |
- 7 |   sum([[1, 2, 3], [4, 5, 6]], start=[])
- 8 |   sum([[1, 2, 3], [4, 5, 6]], [])
  9 | / sum([[1, 2, 3], [4, 5, 6]],
 10 | |     [])
    | |_______^
-11 |
-12 |   # OK
    |
 help: Replace with a starred list comprehension
 6  | sum([x, y], [])
@@ -110,8 +91,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:21:5
    |
-19 |     import functools, operator
-20 |
 21 |     sum([x, y], [])
    |     ^^^^^^^^^^^^^^^
    |
@@ -129,8 +108,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:26:5
    |
-24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
-25 | def func():
 26 |     sum((factor.dims for factor in bases), [])
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

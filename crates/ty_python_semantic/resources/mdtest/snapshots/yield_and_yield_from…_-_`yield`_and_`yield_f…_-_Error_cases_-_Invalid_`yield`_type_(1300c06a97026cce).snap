@@ -26,8 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/expression/yield_and_yie
 error[invalid-yield]: Yield expression type does not match annotation
  --> src/mdtest_snippet.py:3:28
   |
-1 | from typing import Generator
-2 |
 3 | def invalid_generator() -> Generator[int, None, None]:
   |                            -------------------------- Function annotated with yield type `int` here
 4 |     # error: [invalid-yield] "Yield type `Literal[""]` does not match annotated yield type `int`"

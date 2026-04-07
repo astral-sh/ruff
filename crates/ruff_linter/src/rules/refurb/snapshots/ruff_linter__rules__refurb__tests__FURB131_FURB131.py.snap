@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:11:1
    |
-10 | # FURB131
 11 | del nums[:]
    | ^^^^^^^^^^^
    |
@@ -22,7 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:15:1
    |
-14 | # FURB131
 15 | del names[:]
    | ^^^^^^^^^^^^
    |
@@ -40,7 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 Prefer `clear` over deleting a full slice
   --> FURB131.py:19:1
    |
-18 | # FURB131
 19 | del x, nums[:]
    | ^^^^^^^^^^^^^^
    |
@@ -49,7 +46,6 @@ help: Replace with `clear()`
 FURB131 Prefer `clear` over deleting a full slice
   --> FURB131.py:23:1
    |
-22 | # FURB131
 23 | del y, names[:], x
    | ^^^^^^^^^^^^^^^^^^
    |
@@ -58,8 +54,6 @@ help: Replace with `clear()`
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:28:5
    |
-26 | def yes_one(x: list[int]):
-27 |     # FURB131
 28 |     del x[:]
    |     ^^^^^^^^
    |
@@ -77,8 +71,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:33:5
    |
-31 | def yes_two(x: dict[int, str]):
-32 |     # FURB131
 33 |     del x[:]
    |     ^^^^^^^^
    |
@@ -96,8 +88,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:38:5
    |
-36 | def yes_three(x: List[int]):
-37 |     # FURB131
 38 |     del x[:]
    |     ^^^^^^^^
    |
@@ -115,8 +105,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:43:5
    |
-41 | def yes_four(x: Dict[int, str]):
-42 |     # FURB131
 43 |     del x[:]
    |     ^^^^^^^^
    |
@@ -134,12 +122,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:48:5
    |
-46 | def yes_five(x: Dict[int, str]):
-47 |     # FURB131
 48 |     del x[:]
    |     ^^^^^^^^
-49 |
-50 |     x = 1
    |
 help: Replace with `clear()`
 45 |
@@ -155,12 +139,8 @@ note: This is an unsafe fix and may change runtime behavior
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:58:1
    |
-56 | sneaky = SneakyList()
-57 | # FURB131
 58 | del sneaky[:]
    | ^^^^^^^^^^^^^
-59 |
-60 | # these should not
    |
 help: Replace with `clear()`
 55 |

@@ -5,7 +5,6 @@ expression: env.render_diagnostics(&diagnostics)
 error[F401][*]: `os` imported but unused
  --> notebook.ipynb:cell 1:2:8
   |
-1 | # cell 1
 2 | import os
   |        ^^
   |
@@ -17,11 +16,8 @@ help: Remove unused import: `os`
 error[F401][*]: `math` imported but unused
  --> notebook.ipynb:cell 2:2:8
   |
-1 | # cell 2
 2 | import math
   |        ^^^^
-3 |
-4 | print('hello world')
   |
 help: Remove unused import: `math`
  ::: cell 2
@@ -33,8 +29,6 @@ help: Remove unused import: `math`
 error[F841][*]: Local variable `x` is assigned to but never used
  --> notebook.ipynb:cell 3:4:5
   |
-2 | def foo():
-3 |     print()
 4 |     x = 1
   |     ^
   |

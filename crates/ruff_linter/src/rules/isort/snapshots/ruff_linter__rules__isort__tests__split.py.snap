@@ -4,12 +4,9 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I001 [*] Import block is un-sorted or un-formatted
   --> split.py:15:5
    |
-14 |   if True:
 15 | /     import C
 16 | |     import A
    | |____________^
-17 |
-18 |       # isort: split
    |
 help: Organize imports
 12 | import b
@@ -25,8 +22,6 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> split.py:20:5
    |
-18 |       # isort: split
-19 |
 20 | /     import D
 21 | |     import B
    | |____________^
@@ -45,8 +40,6 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> split.py:30:1
    |
-28 |   # isort: split
-29 |
 30 | / import d
 31 | | import c
    | |________^

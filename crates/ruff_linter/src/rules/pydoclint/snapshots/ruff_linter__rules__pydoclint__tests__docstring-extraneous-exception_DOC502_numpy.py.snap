@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
   --> DOC502_numpy.py:7:5
    |
- 5 |   # DOC502
- 6 |   def calculate_speed(distance: float, time: float) -> float:
  7 | /     """
  8 | |     Calculate speed as distance divided by time.
  9 | |
@@ -27,15 +25,12 @@ DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
 25 | |         If speed is greater than the speed of light.
 26 | |     """
    | |_______^
-27 |       return distance / time
    |
 help: Remove `FasterThanLightError` from the docstring
 
 DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
   --> DOC502_numpy.py:32:5
    |
-30 |   # DOC502
-31 |   def calculate_speed(distance: float, time: float) -> float:
 32 | /     """
 33 | |     Calculate speed as distance divided by time.
 34 | |
@@ -59,15 +54,12 @@ DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `Div
 52 | |         If attempting to divide by zero.
 53 | |     """
    | |_______^
-54 |       return distance / time
    |
 help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
 
 DOC502 Raised exception is not explicitly raised: `DivisionByZero`
   --> DOC502_numpy.py:59:5
    |
-57 |   # DOC502
-58 |   def calculate_speed(distance: float, time: float) -> float:
 59 | /     """
 60 | |     Calculate speed as distance divided by time.
 61 | |
@@ -91,16 +83,12 @@ DOC502 Raised exception is not explicitly raised: `DivisionByZero`
 79 | |         If attempting to divide by zero.
 80 | |     """
    | |_______^
-81 |       try:
-82 |           return distance / time
    |
 help: Remove `DivisionByZero` from the docstring
 
 DOC502 Raised exception is not explicitly raised: `ZeroDivisionError`
    --> DOC502_numpy.py:139:5
     |
-137 |   # of the exceptions
-138 |   def foo():
 139 | /     """First line.
 140 | |
 141 | |     Raises
@@ -112,6 +100,5 @@ DOC502 Raised exception is not explicitly raised: `ZeroDivisionError`
 147 | |         Will not be raised, DOC502
 148 | |     """
     | |_______^
-149 |       raise ValueError
     |
 help: Remove `ZeroDivisionError` from the docstring

@@ -6,7 +6,6 @@ UP045 [*] Use `X | None` for type annotations
   |
 5 | def f(x: Optional[str]) -> None:
   |          ^^^^^^^^^^^^^
-6 |     ...
   |
 help: Convert to `X | None`
 2 | from typing import Optional
@@ -19,12 +18,11 @@ help: Convert to `X | None`
 8 |
 
 UP045 [*] Use `X | None` for type annotations
-  --> UP045.py:9:10
-   |
- 9 | def f(x: typing.Optional[str]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^
-10 |     ...
-   |
+ --> UP045.py:9:10
+  |
+9 | def f(x: typing.Optional[str]) -> None:
+  |          ^^^^^^^^^^^^^^^^^^^^
+  |
 help: Convert to `X | None`
 6  |     ...
 7  |
@@ -38,10 +36,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:14:8
    |
-13 | def f() -> None:
 14 |     x: Optional[str]
    |        ^^^^^^^^^^^^^
-15 |     x = Optional[str]
    |
 help: Convert to `X | None`
 11 |
@@ -56,8 +52,6 @@ help: Convert to `X | None`
 UP045 Use `X | None` for type annotations
   --> UP045.py:15:9
    |
-13 | def f() -> None:
-14 |     x: Optional[str]
 15 |     x = Optional[str]
    |         ^^^^^^^^^^^^^
    |
@@ -68,7 +62,6 @@ UP045 [*] Use `X | None` for type annotations
    |
 18 | def f(x: list[Optional[int]]) -> None:
    |               ^^^^^^^^^^^^^
-19 |     ...
    |
 help: Convert to `X | None`
 15 |     x = Optional[str]
@@ -85,7 +78,6 @@ UP045 Use `X | None` for type annotations
    |
 22 | def f(x: Optional[int : float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^
-23 |     ...
    |
 help: Convert to `X | None`
 
@@ -94,7 +86,6 @@ UP045 Use `X | None` for type annotations
    |
 26 | def f(x: Optional[str, int : float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-27 |     ...
    |
 help: Convert to `X | None`
 
@@ -103,15 +94,12 @@ UP045 Use `X | None` for type annotations
    |
 30 | def f(x: Optional[int, float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^
-31 |     ...
    |
 help: Convert to `X | None`
 
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:36:28
    |
-34 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
-35 |   class ServiceRefOrValue:
 36 |       service_specification: Optional[
    |  ____________________________^
 37 | |         list[ServiceSpecificationRef]
@@ -135,8 +123,6 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:44:28
    |
-42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
-43 | class ServiceRefOrValue:
 44 |     service_specification: Optional[str]is not True = None
    |                            ^^^^^^^^^^^^^
    |
@@ -153,8 +139,6 @@ help: Convert to `X | None`
 UP045 Use `X | None` for type annotations
   --> UP045.py:49:6
    |
-47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
-48 | # Optional[None] should not be offered a fix
 49 | foo: Optional[None] = None
    |      ^^^^^^^^^^^^^^
    |
@@ -163,12 +147,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:76:18
    |
-74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
-75 | # Nested Optional types should be flattened
 76 | nested_optional: Optional[Optional[str]] = None
    |                  ^^^^^^^^^^^^^^^^^^^^^^^
-77 | nested_optional_typing: typing.Optional[Optional[int]] = None
-78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
 help: Convert to `X | None`
 73 |
@@ -183,12 +163,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:76:27
    |
-74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
-75 | # Nested Optional types should be flattened
 76 | nested_optional: Optional[Optional[str]] = None
    |                           ^^^^^^^^^^^^^
-77 | nested_optional_typing: typing.Optional[Optional[int]] = None
-78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
 help: Convert to `X | None`
 73 |
@@ -203,11 +179,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:77:25
    |
-75 | # Nested Optional types should be flattened
-76 | nested_optional: Optional[Optional[str]] = None
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
 help: Convert to `X | None`
 74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
@@ -222,11 +195,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:77:41
    |
-75 | # Nested Optional types should be flattened
-76 | nested_optional: Optional[Optional[str]] = None
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
    |                                         ^^^^^^^^^^^^^
-78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
 help: Convert to `X | None`
 74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
@@ -241,8 +211,6 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:78:25
    |
-76 | nested_optional: Optional[Optional[str]] = None
-77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -259,8 +227,6 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:78:34
    |
-76 | nested_optional: Optional[Optional[str]] = None
-77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -277,8 +243,6 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:78:43
    |
-76 | nested_optional: Optional[Optional[str]] = None
-77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                                           ^^^^^^^^^^^^^
    |
@@ -319,12 +283,8 @@ note: This is an unsafe fix and may change runtime behavior
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:89:13
    |
-87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
-88 | # Optional[None | X] should not produce None | None
 89 | bar: None | Optional[None | int] = None
    |             ^^^^^^^^^^^^^^^^^^^^
-90 | bar: Optional[None | int] = None
-91 | bar: Optional[int | None] = None
    |
 help: Convert to `X | None`
 86 |
@@ -339,12 +299,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:90:6
    |
-88 | # Optional[None | X] should not produce None | None
-89 | bar: None | Optional[None | int] = None
 90 | bar: Optional[None | int] = None
    |      ^^^^^^^^^^^^^^^^^^^^
-91 | bar: Optional[int | None] = None
-92 | bar: Optional[None | int | str] = None
    |
 help: Convert to `X | None`
 87 | # Regression test for: https://github.com/astral-sh/ruff/issues/23429
@@ -359,12 +315,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:91:6
    |
-89 | bar: None | Optional[None | int] = None
-90 | bar: Optional[None | int] = None
 91 | bar: Optional[int | None] = None
    |      ^^^^^^^^^^^^^^^^^^^^
-92 | bar: Optional[None | int | str] = None
-93 | bar: Optional[None | None] = None
    |
 help: Convert to `X | None`
 88 | # Optional[None | X] should not produce None | None
@@ -378,11 +330,8 @@ help: Convert to `X | None`
 UP045 [*] Use `X | None` for type annotations
   --> UP045.py:92:6
    |
-90 | bar: Optional[None | int] = None
-91 | bar: Optional[int | None] = None
 92 | bar: Optional[None | int | str] = None
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-93 | bar: Optional[None | None] = None
    |
 help: Convert to `X | None`
 89 | bar: None | Optional[None | int] = None
@@ -395,8 +344,6 @@ help: Convert to `X | None`
 UP045 Use `X | None` for type annotations
   --> UP045.py:93:6
    |
-91 | bar: Optional[int | None] = None
-92 | bar: Optional[None | int | str] = None
 93 | bar: Optional[None | None] = None
    |      ^^^^^^^^^^^^^^^^^^^^^
    |

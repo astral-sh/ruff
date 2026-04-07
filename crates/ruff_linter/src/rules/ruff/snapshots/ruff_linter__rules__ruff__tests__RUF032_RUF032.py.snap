@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF032 [*] `Decimal()` called with float literal argument
  --> RUF032.py:6:17
   |
-4 | decimal.Decimal(0)
-5 |
 6 | decimal.Decimal(0.0)  # Should error
   |                 ^^^
-7 |
-8 | decimal.Decimal("0.0")
   |
 help: Replace with string literal
 3 | # Tests with fully qualified import
@@ -25,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:12:17
    |
-10 | decimal.Decimal(10)
-11 |
 12 | decimal.Decimal(10.0)  # Should error
    |                 ^^^^
-13 |
-14 | decimal.Decimal("10.0")
    |
 help: Replace with string literal
 9  |
@@ -46,12 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:18:17
    |
-16 | decimal.Decimal(-10)
-17 |
 18 | decimal.Decimal(-10.0)  # Should error
    |                 ^^^^^
-19 |
-20 | decimal.Decimal("-10.0")
    |
 help: Replace with string literal
 15 |
@@ -67,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:33:15
    |
-31 | val = Decimal(0)
-32 |
 33 | val = Decimal(0.0)  # Should error
    |               ^^^
-34 |
-35 | val = Decimal("0.0")
    |
 help: Replace with string literal
 30 |
@@ -88,12 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:39:15
    |
-37 | val = Decimal(10)
-38 |
 39 | val = Decimal(10.0)  # Should error
    |               ^^^^
-40 |
-41 | val = Decimal("10.0")
    |
 help: Replace with string literal
 36 |
@@ -109,12 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:45:15
    |
-43 | val = Decimal(-10)
-44 |
 45 | val = Decimal(-10.0)  # Should error
    |               ^^^^^
-46 |
-47 | val = Decimal("-10.0")
    |
 help: Replace with string literal
 42 |
@@ -130,12 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:56:15
    |
-54 | val = Decimal(~4.0) # Skip
-55 |
 56 | val = Decimal(++4.0) # Suggest `Decimal("4.0")`
    |               ^^^^^
-57 |
-58 | val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
    |
 help: Replace with string literal
 53 | # See https://github.com/astral-sh/ruff/issues/13258
@@ -151,8 +123,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:58:15
    |
-56 | val = Decimal(++4.0) # Suggest `Decimal("4.0")`
-57 |
 58 | val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
    |               ^^^^^^^^^^^
    |
@@ -170,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:88:23
    |
-86 | # Retest with fully qualified import
-87 |
 88 | val = decimal.Decimal(0.0)  # Should error
    |                       ^^^
-89 |
-90 | val = decimal.Decimal("0.0")
    |
 help: Replace with string literal
 85 |
@@ -191,12 +157,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:92:23
    |
-90 | val = decimal.Decimal("0.0")
-91 |
 92 | val = decimal.Decimal(10.0)  # Should error
    |                       ^^^^
-93 |
-94 | val = decimal.Decimal("10.0")
    |
 help: Replace with string literal
 89 |
@@ -212,12 +174,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:96:23
    |
-94 | val = decimal.Decimal("10.0")
-95 |
 96 | val = decimal.Decimal(-10.0)  # Should error
    |                       ^^^^^
-97 |
-98 | val = decimal.Decimal("-10.0")
    |
 help: Replace with string literal
 93 |

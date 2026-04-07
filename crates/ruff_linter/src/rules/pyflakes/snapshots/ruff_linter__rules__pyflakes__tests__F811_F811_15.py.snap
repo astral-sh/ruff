@@ -6,7 +6,6 @@ F811 Redefinition of unused `fu` from line 1
   |
 4 | def fu():
   |     ^^ `fu` redefined here
-5 |     pass
   |
  ::: F811_15.py:1:8
   |

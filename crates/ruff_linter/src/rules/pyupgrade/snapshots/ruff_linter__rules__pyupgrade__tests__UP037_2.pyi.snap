@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP037 [*] Remove quotes from type annotation
  --> UP037_2.pyi:3:14
   |
-1 | # https://github.com/astral-sh/ruff/issues/7102
-2 |
 3 | def f(a: Foo['SingleLine  # Comment']): ...
   |              ^^^^^^^^^^^^^^^^^^^^^^^
   |

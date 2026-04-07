@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D413 [*] Missing blank line after last section ("Returns")
   --> sections.py:67:5
    |
-65 |     """Toggle the gizmo.
-66 |
 67 |     Returns"""
    |     ^^^^^^^
    |
@@ -24,12 +22,8 @@ help: Add blank line after "Returns"
 D413 [*] Missing blank line after last section ("Returns")
    --> sections.py:122:5
     |
-120 |     """Toggle the gizmo.
-121 |
 122 |     Returns
     |     ^^^^^^^
-123 |     -------
-124 |     A value of some sort.
     |
 help: Add blank line after "Returns"
 122 |     Returns
@@ -43,12 +37,8 @@ help: Add blank line after "Returns"
 D413 [*] Missing blank line after last section ("Returns")
    --> sections.py:172:5
     |
-170 |     """Toggle the gizmo.
-171 |
 172 |     Returns
     |     ^^^^^^^
-173 |         -------
-174 |     """
     |
 help: Add blank line after "Returns"
 171 |
@@ -62,12 +52,8 @@ help: Add blank line after "Returns"
 D413 [*] Missing blank line after last section ("Parameters")
    --> sections.py:521:5
     |
-519 |     """Equal length equals should be replaced with dashes.
-520 |
 521 |     Parameters
     |     ^^^^^^^^^^
-522 |     ==========
-523 |     """
     |
 help: Add blank line after "Parameters"
 520 |
@@ -81,12 +67,8 @@ help: Add blank line after "Parameters"
 D413 [*] Missing blank line after last section ("Parameters")
    --> sections.py:529:5
     |
-527 |     """Here, the length of equals is not the same.
-528 |
 529 |     Parameters
     |     ^^^^^^^^^^
-530 |     ===========
-531 |     """
     |
 help: Add blank line after "Parameters"
 528 |
@@ -100,11 +82,8 @@ help: Add blank line after "Parameters"
 D413 [*] Missing blank line after last section ("Args")
    --> sections.py:550:5
     |
-548 |     """Below, `returns:` should _not_ be considered a section header.
-549 |
 550 |     Args:
     |     ^^^^
-551 |         Here's a note.
     |
 help: Add blank line after "Args"
 551 |         Here's a note.
@@ -118,11 +97,8 @@ help: Add blank line after "Args"
 D413 [*] Missing blank line after last section ("Returns")
    --> sections.py:563:9
     |
-561 |         Here's a note.
-562 |
 563 |         Returns:
     |         ^^^^^^^
-564 |     """
     |
 help: Add blank line after "Returns"
 561 |         Here's a note.
@@ -136,12 +112,8 @@ help: Add blank line after "Returns"
 D413 [*] Missing blank line after last section ("returns")
    --> sections.py:573:5
     |
-571 |         arg: Here's a note.
-572 |
 573 |     returns:
     |     ^^^^^^^
-574 |         Here's another note.
-575 |     """
     |
 help: Add blank line after "returns"
 572 |
@@ -155,12 +127,8 @@ help: Add blank line after "returns"
 D413 [*] Missing blank line after last section ("Parameters")
    --> sections.py:601:5
     |
-599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-600 |
 601 |     Parameters:
     |     ^^^^^^^^^^
-602 |     ----------
-603 |     parameters:
     |
 help: Add blank line after "Parameters"
 604 |         A list of string parameters

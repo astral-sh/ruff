@@ -6,8 +6,6 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
   |
 1 | t = tuple()
   |     ^^^^^^^
-2 | l = list()
-3 | d1 = dict()
   |
 help: Rewrite as a literal
   - t = tuple()
@@ -20,11 +18,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `list()` call (rewrite as a literal)
  --> C408.py:2:5
   |
-1 | t = tuple()
 2 | l = list()
   |     ^^^^^^
-3 | d1 = dict()
-4 | d2 = dict(a=1)
   |
 help: Rewrite as a literal
 1 | t = tuple()
@@ -38,12 +33,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
  --> C408.py:3:6
   |
-1 | t = tuple()
-2 | l = list()
 3 | d1 = dict()
   |      ^^^^^^
-4 | d2 = dict(a=1)
-5 | d3 = dict(**d2)
   |
 help: Rewrite as a literal
 1 | t = tuple()
@@ -58,11 +49,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   --> C408.py:16:4
    |
-14 | f"{dict(x='y')}"
-15 | f'{dict(x="y")}'
 16 | f"{dict()}"
    |    ^^^^^^
-17 | f"a {dict()} b"
    |
 help: Rewrite as a literal
 13 |
@@ -78,12 +66,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   --> C408.py:17:6
    |
-15 | f'{dict(x="y")}'
-16 | f"{dict()}"
 17 | f"a {dict()} b"
    |      ^^^^^^
-18 |
-19 | f"{dict(x='y') | dict(y='z')}"
    |
 help: Rewrite as a literal
 14 | f"{dict(x='y')}"
@@ -99,14 +83,10 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   --> C408.py:24:1
    |
-22 |   f"a { dict(x='y') | dict(y='z') } b"
-23 |
 24 | / dict(
 25 | |     # comment
 26 | | )
    | |_^
-27 |
-28 |   tuple(  # comment
    |
 help: Rewrite as a literal
 21 | f"a {dict(x='y') | dict(y='z')} b"
@@ -125,13 +105,9 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
   --> C408.py:28:1
    |
-26 |   )
-27 |
 28 | / tuple(  # comment
 29 | | )
    | |_^
-30 |
-31 |   t"{dict(x='y')}"
    |
 help: Rewrite as a literal
 25 |     # comment
@@ -147,11 +123,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   --> C408.py:33:4
    |
-31 | t"{dict(x='y')}"
-32 | t'{dict(x="y")}'
 33 | t"{dict()}"
    |    ^^^^^^
-34 | t"a {dict()} b"
    |
 help: Rewrite as a literal
 30 |
@@ -167,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   --> C408.py:34:6
    |
-32 | t'{dict(x="y")}'
-33 | t"{dict()}"
 34 | t"a {dict()} b"
    |      ^^^^^^
-35 |
-36 | t"{dict(x='y') | dict(y='z')}"
    |
 help: Rewrite as a literal
 31 | t"{dict(x='y')}"

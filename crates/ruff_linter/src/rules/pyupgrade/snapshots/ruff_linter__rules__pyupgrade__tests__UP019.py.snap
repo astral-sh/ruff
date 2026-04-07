@@ -6,7 +6,6 @@ UP019 [*] `typing.Text` is deprecated, use `str`
   |
 7 | def print_word(word: Text) -> None:
   |                      ^^^^
-8 |     print(word)
   |
 help: Replace with `str`
 4  | from typing import Text as Goodbye
@@ -23,7 +22,6 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 11 | def print_second_word(word: typing.Text) -> None:
    |                             ^^^^^^^^^^^
-12 |     print(word)
    |
 help: Replace with `str`
 8  |     print(word)
@@ -40,7 +38,6 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 15 | def print_third_word(word: Hello.Text) -> None:
    |                            ^^^^^^^^^^
-16 |     print(word)
    |
 help: Replace with `str`
 12 |     print(word)
@@ -57,7 +54,6 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 19 | def print_fourth_word(word: Goodbye) -> None:
    |                             ^^^^^^^
-20 |     print(word)
    |
 help: Replace with `str`
 16 |     print(word)

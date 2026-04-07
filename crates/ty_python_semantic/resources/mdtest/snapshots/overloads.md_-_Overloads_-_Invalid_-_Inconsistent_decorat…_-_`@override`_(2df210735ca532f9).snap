@@ -84,10 +84,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:24:5
+  --> src/mdtest_snippet.py:23:5
    |
-22 |     def method(self, x: int) -> int: ...
 23 |     @overload
+   |     ---------
 24 |     @override
    |     ---------
 25 |     # error: [invalid-overload]
@@ -95,17 +95,16 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
    |         ^^^^^^
 27 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-28 |         return x
    |
 
 ```
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:32:5
+  --> src/mdtest_snippet.py:31:5
    |
-30 | class Sub3(Base):
 31 |     @overload
+   |     ---------
 32 |     @override
    |     ---------
 33 |     # error: [invalid-overload]
@@ -115,17 +114,16 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 36 |     def method(self, x: str) -> str: ...
 37 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-38 |         return x
    |
 
 ```
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:18:9
+  --> src/mdtest_snippet.pyi:17:5
    |
-16 | class Sub2(Base):
 17 |     @overload
+   |     ---------
 18 |     def method(self, x: int) -> int: ...
    |         ------ First overload defined here
 19 |     @overload

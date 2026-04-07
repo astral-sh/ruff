@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
  --> PYI058.pyi:5:13
   |
-4 |     class IteratorReturningSimpleGenerator1:
 5 |         def __iter__(self) -> Generator: ...  # PYI058 (use `Iterator`)
   |             ^^^^^^^^
-6 |
-7 | def scope():
   |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 1 + from collections.abc import Iterator
@@ -25,11 +22,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   --> PYI058.pyi:11:13
    |
-10 |     class IteratorReturningSimpleGenerator2:
 11 |         def __iter__(self) -> typing.Generator: ...  # PYI058 (use `Iterator`)
    |             ^^^^^^^^
-12 |
-13 | def scope():
    |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 8  |     import typing
@@ -44,11 +38,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   --> PYI058.pyi:17:13
    |
-16 |     class IteratorReturningSimpleGenerator3:
 17 |         def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
    |             ^^^^^^^^
-18 |
-19 | def scope():
    |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 14 |     import collections.abc
@@ -63,11 +54,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   --> PYI058.pyi:24:13
    |
-23 |     class IteratorReturningSimpleGenerator4:
 24 |         def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
    |             ^^^^^^^^
-25 |
-26 | def scope():
    |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 21 |     from typing import Any
@@ -82,11 +70,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   --> PYI058.pyi:31:13
    |
-30 |     class IteratorReturningSimpleGenerator5:
 31 |         def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]: ...  # PYI058 (use `Iterator`)
    |             ^^^^^^^^
-32 |
-33 | def scope():
    |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 28 |     import typing
@@ -101,11 +86,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   --> PYI058.pyi:37:13
    |
-36 |     class IteratorReturningSimpleGenerator6:
 37 |         def __iter__(self, /) -> Generator[str, None, None]: ...  # PYI058 (use `Iterator`)
    |             ^^^^^^^^
-38 |
-39 | def scope():
    |
 help: Convert the return annotation of your `__iter__` method to `Iterator`
 1  + from collections.abc import Iterator
@@ -125,11 +107,8 @@ help: Convert the return annotation of your `__iter__` method to `Iterator`
 PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
   --> PYI058.pyi:43:13
    |
-42 |     class AsyncIteratorReturningSimpleAsyncGenerator1:
 43 |         def __aiter__(self,) -> typing_extensions.AsyncGenerator: ...  # PYI058 (Use `AsyncIterator`)
    |             ^^^^^^^^^
-44 |
-45 | def scope():
    |
 help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 40 |     import typing_extensions
@@ -144,10 +123,8 @@ help: Convert the return annotation of your `__aiter__` method to `AsyncIterator
 PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
   --> PYI058.pyi:49:13
    |
-48 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 49 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]:
    |             ^^^^^^^^^
-50 |             ...  # PYI058 (Use `AsyncIterator`)
    |
 help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 46 |     import collections.abc
@@ -162,11 +139,8 @@ help: Convert the return annotation of your `__aiter__` method to `AsyncIterator
 PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
   --> PYI058.pyi:56:13
    |
-55 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 56 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: ...  # PYI058 (Use `AsyncIterator`)
    |             ^^^^^^^^^
-57 |
-58 | def scope():
    |
 help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 53 |     import collections.abc

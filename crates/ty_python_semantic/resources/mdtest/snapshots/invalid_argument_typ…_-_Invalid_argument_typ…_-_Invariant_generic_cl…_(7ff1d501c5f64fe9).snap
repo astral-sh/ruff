@@ -26,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 error[invalid-argument-type]: Argument to function `modify` is incorrect
  --> src/mdtest_snippet.py:5:8
   |
-4 | xs: list[bool] = [True, False]
 5 | modify(xs)  # error: [invalid-argument-type]
   |        ^^ Expected `list[int]`, found `list[bool]`
   |
@@ -35,7 +34,6 @@ info: Function defined here
   |
 1 | def modify(xs: list[int]):
   |     ^^^^^^ ------------- Parameter declared here
-2 |     xs.append(42)
   |
 info: `list` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`

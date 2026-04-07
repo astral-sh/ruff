@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D210 [*] No whitespaces allowed surrounding docstring text
    --> D.py:288:5
     |
-286 | @expect('D210: No whitespaces allowed surrounding docstring text')
-287 | def endswith():
 288 |     """Whitespace at the end. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
@@ -22,8 +20,6 @@ help: Trim surrounding whitespace
 D210 [*] No whitespaces allowed surrounding docstring text
    --> D.py:293:5
     |
-291 | @expect('D210: No whitespaces allowed surrounding docstring text')
-292 | def around():
 293 |     """ Whitespace at everywhere. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
@@ -40,8 +36,6 @@ help: Trim surrounding whitespace
 D210 [*] No whitespaces allowed surrounding docstring text
    --> D.py:299:5
     |
-297 |   @expect('D213: Multi-line docstring summary should start at the second line')
-298 |   def multiline():
 299 | /     """ Whitespace at the beginning.
 300 | |
 301 | |     This is the end.
@@ -61,8 +55,6 @@ help: Trim surrounding whitespace
 D210 No whitespaces allowed surrounding docstring text
    --> D.py:581:5
     |
-579 |         "or exclamation point (not '\"')")
-580 | def endswith_quote():
 581 |     """Whitespace at the end, but also a quote" """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |

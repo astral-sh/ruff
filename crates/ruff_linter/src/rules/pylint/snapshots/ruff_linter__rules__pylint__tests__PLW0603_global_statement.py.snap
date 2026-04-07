@@ -4,107 +4,69 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:17:12
    |
-15 | def fix_constant(value):
-16 |     """All this is ok, but try not to use `global` ;)"""
 17 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-18 |     print(CONSTANT)
-19 |     CONSTANT = value
    |
 
 PLW0603 Using the global statement to update `sys` is discouraged
   --> global_statement.py:24:12
    |
-22 | def global_with_import():
-23 |     """Should only warn for global-statement when using `Import` node"""
 24 |     global sys  # [global-statement]
    |            ^^^
-25 |     import sys
    |
 
 PLW0603 Using the global statement to update `namedtuple` is discouraged
   --> global_statement.py:30:12
    |
-28 | def global_with_import_from():
-29 |     """Should only warn for global-statement when using `ImportFrom` node"""
 30 |     global namedtuple  # [global-statement]
    |            ^^^^^^^^^^
-31 |     from collections import namedtuple
    |
 
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:36:12
    |
-34 | def global_del():
-35 |     """Deleting the global name prevents `global-variable-not-assigned`"""
 36 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-37 |     print(CONSTANT)
-38 |     del CONSTANT
    |
 
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:43:12
    |
-41 | def global_operator_assign():
-42 |     """Operator assigns should only throw a global statement error"""
 43 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-44 |     print(CONSTANT)
-45 |     CONSTANT += 1
    |
 
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:50:12
    |
-48 | def global_function_assign():
-49 |     """Function assigns should only throw a global statement error"""
 50 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-51 |
-52 |     def CONSTANT():
    |
 
 PLW0603 Using the global statement to update `FUNC` is discouraged
   --> global_statement.py:60:12
    |
-58 | def override_func():
-59 |     """Overriding a function should only throw a global statement error"""
 60 |     global FUNC  # [global-statement]
    |            ^^^^
-61 |
-62 |     def FUNC():
    |
 
 PLW0603 Using the global statement to update `CLASS` is discouraged
   --> global_statement.py:70:12
    |
-68 | def override_class():
-69 |     """Overriding a class should only throw a global statement error"""
 70 |     global CLASS  # [global-statement]
    |            ^^^^^
-71 |
-72 |     class CLASS:
    |
 
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:80:12
    |
-78 | def multiple_assignment():
-79 |     """Should warn on every assignment."""
 80 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-81 |     CONSTANT = 1
-82 |     CONSTANT = 2
    |
 
 PLW0603 Using the global statement to update `CONSTANT` is discouraged
   --> global_statement.py:80:12
    |
-78 | def multiple_assignment():
-79 |     """Should warn on every assignment."""
 80 |     global CONSTANT  # [global-statement]
    |            ^^^^^^^^
-81 |     CONSTANT = 1
-82 |     CONSTANT = 2
    |

@@ -42,11 +42,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 error[invalid-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:16:18
    |
-14 |     yield 42
-15 |
 16 | async def j() -> str:  # error: [invalid-return-type]
    |                  ^^^ expected `str`, found `types.AsyncGeneratorType`
-17 |     yield 42
    |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
@@ -57,8 +54,6 @@ info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator fo
 error[invalid-syntax]: `return` with value in async generator
   --> src/mdtest_snippet.py:21:5
    |
-19 | async def k() -> typing.AsyncGenerator:
-20 |     yield 42
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
    |     ^^^^^^^^
    |

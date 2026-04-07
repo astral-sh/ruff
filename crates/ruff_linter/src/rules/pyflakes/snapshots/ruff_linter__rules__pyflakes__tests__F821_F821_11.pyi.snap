@@ -6,5 +6,4 @@ F821 Undefined name `os`
    |
 15 | def f(x: Callable[[VarArg("os")], None]):  # F821
    |                            ^^
-16 |     pass
    |

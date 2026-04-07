@@ -77,8 +77,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
 error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not allowed
  --> src/mdtest_snippet.py:3:14
   |
-1 | from typing import Final
-2 |
 3 | MY_CONSTANT: Final[int] = 1
   |              ---------- Symbol declared as `Final` here
 4 |
@@ -86,7 +84,6 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
 6 |
 7 | MY_CONSTANT = 2  # error: [invalid-assignment]
   | ^^^^^^^^^^^^^^^ Symbol later reassigned here
-8 | from _stat import ST_INO
   |
 
 ```
@@ -95,11 +92,8 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
 error[invalid-assignment]: Reassignment of `Final` symbol `ST_INO` is not allowed
   --> src/mdtest_snippet.py:10:1
    |
- 8 | from _stat import ST_INO
- 9 |
 10 | ST_INO = 1  # error: [invalid-assignment]
    | ^^^^^^^^^^ Reassignment of `Final` symbol
-11 | from typing import Final
    |
 
 ```
@@ -108,14 +102,12 @@ error[invalid-assignment]: Reassignment of `Final` symbol `ST_INO` is not allowe
 error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
   --> src/mdtest_snippet.py:14:8
    |
-13 | class C:
 14 |     x: Final[int] = 1
    |        ---------- Attribute declared as `Final` here
 15 |
 16 |     def f(self):
 17 |         self.x = 2  # error: [invalid-assignment]
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
-18 | from typing import Final
    |
 
 ```
@@ -124,14 +116,12 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
 error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`
   --> src/mdtest_snippet.py:21:8
    |
-20 | class C:
 21 |     x: Final[int] = 1
    |        ---------- Attribute declared as `Final` here
 22 |
 23 | def __init__(c: C):
 24 |     c.x = 2  # error: [invalid-assignment]
    |     ^^^ `Final` attributes can only be assigned in the class body or `__init__`
-25 | from typing import Final
    |
 
 ```
@@ -140,11 +130,8 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`
 error[final-without-value]: `Final` symbol `x` is not assigned a value
   --> src/mdtest_snippet.py:28:5
    |
-27 | class C:
 28 |     x: Final[int]  # error: [final-without-value]
    |     ^^^^^^^^^^^^^
-29 |
-30 |     def f(self):
    |
 
 ```
@@ -153,14 +140,12 @@ error[final-without-value]: `Final` symbol `x` is not assigned a value
 error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
   --> src/mdtest_snippet.py:28:8
    |
-27 | class C:
 28 |     x: Final[int]  # error: [final-without-value]
    |        ---------- Attribute declared as `Final` here
 29 |
 30 |     def f(self):
 31 |         self.x = 2  # error: [invalid-assignment]
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
-32 | from typing import Final
    |
 
 ```
@@ -169,14 +154,12 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
 error[invalid-assignment]: Invalid assignment to final attribute
   --> src/mdtest_snippet.py:35:8
    |
-34 | class C:
 35 |     x: Final[int] = 1
    |        ---------- Attribute declared as `Final` here
 36 |
 37 |     def __init__(self):
 38 |         self.x = 2  # error: [invalid-assignment]
    |         ^^^^^^ `x` already has a value in the class body
-39 | from typing import Final
    |
 
 ```
@@ -185,7 +168,6 @@ error[invalid-assignment]: Invalid assignment to final attribute
 error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
   --> src/mdtest_snippet.py:42:8
    |
-41 | class Base:
 42 |     x: Final[int] = 1
    |        ---------- Attribute declared as `Final` here
 43 |
@@ -193,7 +175,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
 45 |     def f(self):
 46 |         self.x = 2  # error: [invalid-assignment]
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
-47 | from typing import Final
    |
 
 ```
@@ -202,10 +183,8 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
 error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
   --> src/mdtest_snippet.py:53:9
    |
-52 |     def f(self):
 53 |         self.x: Final[int] = 1  # error: [invalid-assignment]
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
-54 | from typing import Final
    |
 
 ```
@@ -214,8 +193,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
 error[final-without-value]: `Final` symbol `UNINITIALIZED` is not assigned a value
   --> src/mdtest_snippet.py:56:1
    |
-54 | from typing import Final
-55 |
 56 | UNINITIALIZED: Final[int]  # error: [final-without-value]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |

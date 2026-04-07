@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D400 [*] First line should end with a period
  --> D400.py:2:5
   |
-1 | def f():
 2 |     "Here's a line without a period"
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 |     ...
   |
 help: Add period
 1 | def f():
@@ -21,10 +19,8 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
  --> D400.py:7:5
   |
-6 | def f():
 7 |     """Here's a line without a period"""
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 |     ...
   |
 help: Add period
 4  |
@@ -40,13 +36,11 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:12:5
    |
-11 |   def f():
 12 | /     """
 13 | |     Here's a line without a period,
 14 | |     but here's the next line
 15 | |     """
    | |_______^
-16 |       ...
    |
 help: Add period
 11 | def f():
@@ -62,10 +56,8 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:20:5
    |
-19 | def f():
 20 |     """Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-21 |     ...
    |
 help: Add period
 17 |
@@ -81,12 +73,10 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:25:5
    |
-24 |   def f():
 25 | /     """
 26 | |     Here's a line without a period,
 27 | |     but here's the next line"""
    | |_______________________________^
-28 |       ...
    |
 help: Add period
 24 | def f():
@@ -102,12 +92,10 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:32:5
    |
-31 |   def f():
 32 | /     """
 33 | |     Here's a line without a period,
 34 | |     but here's the next line with trailing space """
    | |____________________________________________________^
-35 |       ...
    |
 help: Add period
 31 | def f():
@@ -123,10 +111,8 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:39:5
    |
-38 | def f():
 39 |     r"Here's a line without a period"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-40 |     ...
    |
 help: Add period
 36 |
@@ -142,10 +128,8 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:44:5
    |
-43 | def f():
 44 |     r"""Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |     ...
    |
 help: Add period
 41 |
@@ -161,13 +145,11 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:49:5
    |
-48 |   def f():
 49 | /     r"""
 50 | |     Here's a line without a period,
 51 | |     but here's the next line
 52 | |     """
    | |_______^
-53 |       ...
    |
 help: Add period
 48 | def f():
@@ -183,10 +165,8 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:57:5
    |
-56 | def f():
 57 |     r"""Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-58 |     ...
    |
 help: Add period
 54 |
@@ -202,12 +182,10 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:62:5
    |
-61 |   def f():
 62 | /     r"""
 63 | |     Here's a line without a period,
 64 | |     but here's the next line"""
    | |_______________________________^
-65 |       ...
    |
 help: Add period
 61 | def f():
@@ -223,12 +201,10 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
   --> D400.py:69:5
    |
-68 |   def f():
 69 | /     r"""
 70 | |     Here's a line without a period,
 71 | |     but here's the next line with trailing space """
    | |____________________________________________________^
-72 |       ...
    |
 help: Add period
 68 | def f():
@@ -244,7 +220,6 @@ note: This is an unsafe fix and may change runtime behavior
 D400 [*] First line should end with a period
    --> D400.py:97:5
     |
- 96 |   def f():
  97 | /     """
  98 | |     My example
  99 | |     ==========

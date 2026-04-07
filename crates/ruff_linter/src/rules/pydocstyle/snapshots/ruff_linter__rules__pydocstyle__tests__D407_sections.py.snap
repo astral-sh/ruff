@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D407 [*] Missing dashed underline after section ("Returns")
   --> sections.py:44:5
    |
-42 |     """Toggle the gizmo.
-43 |
 44 |     Returns
    |     ^^^^^^^
-45 |     A value of some sort.
    |
 help: Add dashed line under "Returns"
 42 |     """Toggle the gizmo.
@@ -22,12 +19,8 @@ help: Add dashed line under "Returns"
 D407 [*] Missing dashed underline after section ("Returns")
   --> sections.py:56:5
    |
-54 |     """Toggle the gizmo.
-55 |
 56 |     Returns
    |     ^^^^^^^
-57 |
-58 |     """
    |
 help: Add dashed line under "Returns"
 54 |     """Toggle the gizmo.
@@ -41,8 +34,6 @@ help: Add dashed line under "Returns"
 D407 [*] Missing dashed underline after section ("Returns")
   --> sections.py:67:5
    |
-65 |     """Toggle the gizmo.
-66 |
 67 |     Returns"""
    |     ^^^^^^^
    |
@@ -60,11 +51,8 @@ help: Add dashed line under "Returns"
 D407 [*] Missing dashed underline after section ("Raises")
    --> sections.py:227:5
     |
-225 |     ------
-226 |     Many many wonderful things.
 227 |     Raises:
     |     ^^^^^^
-228 |     My attention.
     |
 help: Add dashed line under "Raises"
 225 |     ------
@@ -78,10 +66,8 @@ help: Add dashed line under "Raises"
 D407 [*] Missing dashed underline after section ("Parameters")
    --> sections.py:522:5
     |
-521 |     Parameters
 522 |     ==========
     |     ^^^^^^^^^^
-523 |     """
     |
 help: Add dashed line under "Parameters"
 519 |     """Equal length equals should be replaced with dashes.
@@ -96,10 +82,8 @@ help: Add dashed line under "Parameters"
 D407 [*] Missing dashed underline after section ("Parameters")
    --> sections.py:530:5
     |
-529 |     Parameters
 530 |     ===========
     |     ^^^^^^^^^^^
-531 |     """
     |
 help: Add dashed line under "Parameters"
 527 |     """Here, the length of equals is not the same.
@@ -114,12 +98,8 @@ help: Add dashed line under "Parameters"
 D407 [*] Missing dashed underline after section ("Parameters")
    --> sections.py:613:4
     |
-611 |    """Test that lower case subsection header is valid even if it is of a different kind.
-612 |
 613 |    Parameters
     |    ^^^^^^^^^^
-614 |    -‐-----------------
-615 |    returns:
     |
 help: Add dashed line under "Parameters"
 611 |    """Test that lower case subsection header is valid even if it is of a different kind.

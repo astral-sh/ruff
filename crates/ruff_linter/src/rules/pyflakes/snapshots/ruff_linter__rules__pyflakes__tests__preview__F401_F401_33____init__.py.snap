@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `F401_33.other.Ham` imported but unused
  --> __init__.py:8:35
   |
-6 | class Spam:
-7 |     def __init__(self) -> None:
 8 |         from F401_33.other import Ham
   |                                   ^^^
   |

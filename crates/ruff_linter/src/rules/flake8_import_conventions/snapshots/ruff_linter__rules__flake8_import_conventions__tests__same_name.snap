@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ICN001 [*] `django.conf.settings` should be imported as `settings`
   --> same_name.py:10:41
    |
- 9 | def unconventional_alias():
 10 |     from django.conf import settings as s
    |                                         ^
    |

@@ -8,8 +8,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
 2 | | Double quotes multiline module docstring
 3 | | """
   | |___^
-4 |
-5 |   """
   |
 help: Replace double quotes docstring with single quotes
   - """
@@ -24,13 +22,10 @@ help: Replace double quotes docstring with single quotes
 Q002 [*] Double quote docstring found but single quotes preferred
   --> docstring_doubles.py:12:5
    |
-11 |   class Cls:
 12 | /     """
 13 | |     Double quotes multiline class docstring
 14 | |     """
    | |_______^
-15 |
-16 |       """
    |
 help: Replace double quotes docstring with single quotes
 9  | l = []
@@ -48,14 +43,10 @@ help: Replace double quotes docstring with single quotes
 Q002 [*] Double quote docstring found but single quotes preferred
   --> docstring_doubles.py:24:9
    |
-22 |           definitely not a docstring""",
-23 |           val=l[Cls():3]):
 24 | /         """
 25 | |         Double quotes multiline function docstring
 26 | |         """
    | |___________^
-27 |
-28 |           some_expression = 'hello world'
    |
 help: Replace double quotes docstring with single quotes
 21 |     def f(self, bar="""

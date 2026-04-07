@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/fastapi/mod.rs
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:24:5
    |
-22 | @app.get("/items/")
-23 | def get_items(
 24 |     current_user: User = Depends(get_current_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-25 |     some_security_param: str = Security(get_oauth2_user),
-26 | ):
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -33,12 +29,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:25:5
    |
-23 | def get_items(
-24 |     current_user: User = Depends(get_current_user),
 25 |     some_security_param: str = Security(get_oauth2_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-26 | ):
-27 |     pass
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -62,12 +54,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:32:5
    |
-30 | @app.post("/stuff/")
-31 | def do_stuff(
 32 |     some_path_param: str = Path(),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-33 |     some_cookie_param: str = Cookie(),
-34 |     some_file_param: UploadFile = File(),
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -91,12 +79,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:33:5
    |
-31 | def do_stuff(
-32 |     some_path_param: str = Path(),
 33 |     some_cookie_param: str = Cookie(),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-34 |     some_file_param: UploadFile = File(),
-35 |     some_form_param: str = Form(),
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -120,12 +104,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:34:5
    |
-32 |     some_path_param: str = Path(),
-33 |     some_cookie_param: str = Cookie(),
 34 |     some_file_param: UploadFile = File(),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-35 |     some_form_param: str = Form(),
-36 |     some_query_param: str | None = Query(default=None),
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -149,12 +129,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:35:5
    |
-33 |     some_cookie_param: str = Cookie(),
-34 |     some_file_param: UploadFile = File(),
 35 |     some_form_param: str = Form(),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |     some_query_param: str | None = Query(default=None),
-37 |     some_body_param: str = Body("foo"),
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -178,12 +154,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:36:5
    |
-34 |     some_file_param: UploadFile = File(),
-35 |     some_form_param: str = Form(),
 36 |     some_query_param: str | None = Query(default=None),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-37 |     some_body_param: str = Body("foo"),
-38 |     some_header_param: int = Header(default=5),
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -207,12 +179,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:37:5
    |
-35 |     some_form_param: str = Form(),
-36 |     some_query_param: str | None = Query(default=None),
 37 |     some_body_param: str = Body("foo"),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-38 |     some_header_param: int = Header(default=5),
-39 | ):
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -236,12 +204,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:38:5
    |
-36 |     some_query_param: str | None = Query(default=None),
-37 |     some_body_param: str = Body("foo"),
 38 |     some_header_param: int = Header(default=5),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-39 | ):
-40 |     # do stuff
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -265,12 +229,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:47:5
    |
-45 |     skip: int,
-46 |     limit: int,
 47 |     current_user: User = Depends(get_current_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-48 | ):
-49 |     pass
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -294,12 +254,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:53:5
    |
-51 | @app.get("/users/")
-52 | def get_users(
 53 |     current_user: User = Depends(get_current_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-54 |     skip: int = 0,
-55 |     limit: int = 10,
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -323,10 +279,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:61:25
    |
-60 | @app.get("/items/{item_id}")
 61 | async def read_items(*, item_id: int = Path(title="The ID of the item to get"), q: str):
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-62 |     pass
    |
 help: Replace with `typing.Annotated`
 12 |     Security,
@@ -350,12 +304,8 @@ note: This is an unsafe fix and may change runtime behavior
 FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:70:5
    |
-68 |     skip: int = 0,
-69 |     limit: int = 10,
 70 |     current_user: User = Depends(get_current_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-71 | ):
-72 |     pass
    |
 help: Replace with `typing.Annotated`
 info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.

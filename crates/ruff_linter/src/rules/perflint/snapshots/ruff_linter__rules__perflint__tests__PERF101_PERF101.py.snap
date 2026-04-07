@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/perflint/mod.rs
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
  --> PERF101.py:7:10
   |
-5 | foo_int = 123
-6 |
 7 | for i in list(foo_tuple):  # PERF101
   |          ^^^^^^^^^^^^^^^
-8 |     pass
   |
 help: Remove `list()` cast
 4  | foo_dict = {1: 2, 3: 4}
@@ -23,11 +20,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:10:10
    |
- 8 |     pass
- 9 |
 10 | for i in list(foo_list):  # PERF101
    |          ^^^^^^^^^^^^^^
-11 |     pass
    |
 help: Remove `list()` cast
 7  | for i in list(foo_tuple):  # PERF101
@@ -42,11 +36,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:13:10
    |
-11 |     pass
-12 |
 13 | for i in list(foo_set):  # PERF101
    |          ^^^^^^^^^^^^^
-14 |     pass
    |
 help: Remove `list()` cast
 10 | for i in list(foo_list):  # PERF101
@@ -61,11 +52,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:16:10
    |
-14 |     pass
-15 |
 16 | for i in list((1, 2, 3)):  # PERF101
    |          ^^^^^^^^^^^^^^^
-17 |     pass
    |
 help: Remove `list()` cast
 13 | for i in list(foo_set):  # PERF101
@@ -80,11 +68,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:19:10
    |
-17 |     pass
-18 |
 19 | for i in list([1, 2, 3]):  # PERF101
    |          ^^^^^^^^^^^^^^^
-20 |     pass
    |
 help: Remove `list()` cast
 16 | for i in list((1, 2, 3)):  # PERF101
@@ -99,11 +84,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:22:10
    |
-20 |     pass
-21 |
 22 | for i in list({1, 2, 3}):  # PERF101
    |          ^^^^^^^^^^^^^^^
-23 |     pass
    |
 help: Remove `list()` cast
 19 | for i in list([1, 2, 3]):  # PERF101
@@ -118,8 +100,6 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:25:10
    |
-23 |       pass
-24 |
 25 |   for i in list(
    |  __________^
 26 | |     {
@@ -129,7 +109,6 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 30 | |     }
 31 | | ):
    | |_^
-32 |       pass
    |
 help: Remove `list()` cast
 22 | for i in list({1, 2, 3}):  # PERF101
@@ -151,14 +130,11 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:34:10
    |
-32 |       pass
-33 |
 34 |   for i in list( # Comment
    |  __________^
 35 | |     {1, 2, 3}
 36 | | ):  # PERF101
    | |_^
-37 |       pass
    |
 help: Remove `list()` cast
 31 | ):
@@ -176,12 +152,8 @@ note: This is an unsafe fix and may change runtime behavior
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:57:10
    |
-55 |     foo_list.append(i + 1)
-56 |
 57 | for i in list(foo_list):  # PERF101
    |          ^^^^^^^^^^^^^^
-58 |     # Make sure we match the correct list
-59 |     other_list.append(i + 1)
    |
 help: Remove `list()` cast
 54 | for i in list(foo_list):  # OK
@@ -196,11 +168,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:69:10
    |
-67 | x, y, nested_tuple = (1, 2, (3, 4, 5))
-68 |
 69 | for i in list(nested_tuple):  # PERF101
    |          ^^^^^^^^^^^^^^^^^^
-70 |     pass
    |
 help: Remove `list()` cast
 66 |
@@ -215,11 +184,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:86:10
    |
-84 | import builtins
-85 |
 86 | for i in builtins.list(nested_tuple):  # PERF101
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-87 |     pass
    |
 help: Remove `list()` cast
 83 |
@@ -234,11 +200,8 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:91:9
    |
-89 | # https://github.com/astral-sh/ruff/issues/18783
-90 | items = (1, 2, 3)
 91 | for i in(list)(items):
    |         ^^^^^^^^^^^^^
-92 |     print(i)
    |
 help: Remove `list()` cast
 88 |
@@ -253,8 +216,6 @@ help: Remove `list()` cast
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
    --> PERF101.py:96:10
     |
- 94 |   # https://github.com/astral-sh/ruff/issues/18784
- 95 |   items = (1, 2, 3)
  96 |   for i in (  # 1
     |  __________^
  97 | |     list  # 2
@@ -264,7 +225,6 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 101 | |     # 6
 102 | | ):
     | |_^
-103 |       print(i)
     |
 help: Remove `list()` cast
 93 |

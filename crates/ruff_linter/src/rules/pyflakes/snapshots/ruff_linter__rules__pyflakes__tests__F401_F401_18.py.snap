@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `__future__` imported but unused
  --> F401_18.py:5:12
   |
-4 | def f():
 5 |     import __future__
   |            ^^^^^^^^^^
   |

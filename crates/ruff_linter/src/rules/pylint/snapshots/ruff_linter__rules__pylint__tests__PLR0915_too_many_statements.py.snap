@@ -6,6 +6,4 @@ PLR0915 Too many statements (51 > 50)
   |
 5 | async def f():  # Too many statements (52/50)
   |           ^
-6 |     print()
-7 |     print()
   |

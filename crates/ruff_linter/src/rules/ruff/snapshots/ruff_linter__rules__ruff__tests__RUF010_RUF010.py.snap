@@ -2,13 +2,11 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF010 [*] Use explicit conversion flag
-  --> RUF010.py:9:4
-   |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |    ^^^^^^^^
-10 |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |
+ --> RUF010.py:9:4
+  |
+9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  |    ^^^^^^^^
+  |
 help: Replace with conversion flag
 6  |     pass
 7  |
@@ -20,13 +18,11 @@ help: Replace with conversion flag
 12 |
 
 RUF010 [*] Use explicit conversion flag
-  --> RUF010.py:9:16
-   |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |                ^^^^^^^^^
-10 |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |
+ --> RUF010.py:9:16
+  |
+9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  |                ^^^^^^^^^
+  |
 help: Replace with conversion flag
 6  |     pass
 7  |
@@ -38,13 +34,11 @@ help: Replace with conversion flag
 12 |
 
 RUF010 [*] Use explicit conversion flag
-  --> RUF010.py:9:29
-   |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |                             ^^^^^^^^^^
-10 |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |
+ --> RUF010.py:9:29
+  |
+9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  |                             ^^^^^^^^^^
+  |
 help: Replace with conversion flag
 6  |     pass
 7  |
@@ -58,12 +52,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:11:4
    |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |    ^^^^^^^^^^^
-12 |
-13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 8  |
@@ -78,12 +68,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:11:19
    |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                   ^^^^^^^^^^^^
-12 |
-13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 8  |
@@ -98,12 +84,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:11:35
    |
- 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                                   ^^^^^^^^^^^^^
-12 |
-13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 8  |
@@ -118,12 +100,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:13:5
    |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |     ^^^^^^^^
-14 |
-15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 10 |
@@ -138,12 +116,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:13:19
    |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                   ^^^^^^^^^
-14 |
-15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 10 |
@@ -158,12 +132,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:13:34
    |
-11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                                  ^^^^^^^^^^
-14 |
-15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
 help: Replace with conversion flag
 10 |
@@ -178,12 +148,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:15:14
    |
-13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |              ^^^^^^^^^
-16 |
-17 | f"{foo(bla)}"  # OK
    |
 help: Replace with conversion flag
 12 |
@@ -198,12 +164,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:15:29
    |
-13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                             ^^^^^^^^^^
-16 |
-17 | f"{foo(bla)}"  # OK
    |
 help: Replace with conversion flag
 12 |
@@ -218,11 +180,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:35:20
    |
-33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
-34 |     " intermediary content "
 35 |     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
    |                    ^^^^^^^^^
-36 | )
    |
 help: Replace with conversion flag
 32 | (
@@ -237,11 +196,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:40:4
    |
-39 | # https://github.com/astral-sh/ruff/issues/16325
 40 | f"{str({})}"
    |    ^^^^^^^
-41 |
-42 | f"{str({} | {})}"
    |
 help: Replace with conversion flag
 37 |
@@ -256,12 +212,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:42:4
    |
-40 | f"{str({})}"
-41 |
 42 | f"{str({} | {})}"
    |    ^^^^^^^^^^^^
-43 |
-44 | import builtins
    |
 help: Replace with conversion flag
 39 | # https://github.com/astral-sh/ruff/issues/16325
@@ -276,12 +228,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:46:4
    |
-44 | import builtins
-45 |
 46 | f"{builtins.repr(1)}"
    |    ^^^^^^^^^^^^^^^^
-47 |
-48 | f"{repr(1)=}"
    |
 help: Replace with conversion flag
 43 |
@@ -296,12 +244,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:50:4
    |
-48 | f"{repr(1)=}"
-49 |
 50 | f"{repr(lambda: 1)}"
    |    ^^^^^^^^^^^^^^^
-51 |
-52 | f"{repr(x := 2)}"
    |
 help: Replace with conversion flag
 47 |
@@ -316,12 +260,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:52:4
    |
-50 | f"{repr(lambda: 1)}"
-51 |
 52 | f"{repr(x := 2)}"
    |    ^^^^^^^^^^^^
-53 |
-54 | f"{str(object=3)}"
    |
 help: Replace with conversion flag
 49 |
@@ -336,12 +276,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:54:4
    |
-52 | f"{repr(x := 2)}"
-53 |
 54 | f"{str(object=3)}"
    |    ^^^^^^^^^^^^^
-55 |
-56 | f"{str(x for x in [])}"
    |
 help: Replace with conversion flag
 51 |
@@ -356,12 +292,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:56:4
    |
-54 | f"{str(object=3)}"
-55 |
 56 | f"{str(x for x in [])}"
    |    ^^^^^^^^^^^^^^^^^^
-57 |
-58 | f"{str((x for x in []))}"
    |
 help: Replace with conversion flag
 53 |
@@ -376,12 +308,8 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:58:4
    |
-56 | f"{str(x for x in [])}"
-57 |
 58 | f"{str((x for x in []))}"
    |    ^^^^^^^^^^^^^^^^^^^^
-59 |
-60 | # Debug text cases - should not trigger RUF010
    |
 help: Replace with conversion flag
 55 |
@@ -396,15 +324,12 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:69:4
    |
-68 |   # Fix should be unsafe when it deletes a comment (https://github.com/astral-sh/ruff/issues/19745)
 69 |   f"{ascii(
    |  ____^
 70 | |     # comment
 71 | |     1
 72 | | )}"
    | |_^
-73 |
-74 |   f"{repr(
    |
 help: Replace with conversion flag
 66 | f"{repr('hello')=}"
@@ -423,16 +348,12 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:74:4
    |
-72 |   )}"
-73 |
 74 |   f"{repr(
    |  ____^
 75 | |     # comment
 76 | |     1
 77 | | )}"
    | |_^
-78 |
-79 |   f"{str(
    |
 help: Replace with conversion flag
 71 |     1
@@ -451,16 +372,12 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:79:4
    |
-77 |   )}"
-78 |
 79 |   f"{str(
    |  ____^
 80 | |     # comment
 81 | |     1
 82 | | )}"
    | |_^
-83 |
-84 |   # Fix should be unsafe when it deletes comments after the argument
    |
 help: Replace with conversion flag
 76 |     1
@@ -479,13 +396,10 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:85:4
    |
-84 |   # Fix should be unsafe when it deletes comments after the argument
 85 |   f"{ascii(1  # comment
    |  ____^
 86 | | )}"
    | |_^
-87 |
-88 |   f"{repr((
    |
 help: Replace with conversion flag
 82 | )}"
@@ -502,16 +416,12 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:88:4
    |
-86 |   )}"
-87 |
 88 |   f"{repr((
    |  ____^
 89 | |     1
 90 | | )  # comment
 91 | | )}"
    | |_^
-92 |
-93 |   f"{str((
    |
 help: Replace with conversion flag
 85 | f"{ascii(1  # comment
@@ -531,8 +441,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
   --> RUF010.py:93:4
    |
-91 |   )}"
-92 |
 93 |   f"{str((
    |  ____^
 94 | |     1
@@ -540,8 +448,6 @@ RUF010 [*] Use explicit conversion flag
 96 | |     # comment
 97 | | )}"
    | |_^
-98 |
-99 |   # Fix should be safe when the comment is preserved inside extra parentheses
    |
 help: Replace with conversion flag
 90 | )  # comment
@@ -562,15 +468,12 @@ note: This is an unsafe fix and may change runtime behavior
 RUF010 [*] Use explicit conversion flag
    --> RUF010.py:100:4
     |
- 99 |   # Fix should be safe when the comment is preserved inside extra parentheses
 100 |   f"{ascii((
     |  ____^
 101 | |     # comment
 102 | |     1
 103 | | ))}"
     | |__^
-104 |
-105 |   f"{repr((
     |
 help: Replace with conversion flag
 97  | )}"
@@ -589,15 +492,11 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
    --> RUF010.py:105:4
     |
-103 |   ))}"
-104 |
 105 |   f"{repr((
     |  ____^
 106 | |     1  # comment
 107 | | ))}"
     | |__^
-108 |
-109 |   f"{repr((
     |
 help: Replace with conversion flag
 102 |     1
@@ -615,16 +514,12 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
    --> RUF010.py:109:4
     |
-107 |   ))}"
-108 |
 109 |   f"{repr((
     |  ____^
 110 | |     1
 111 | |     # comment
 112 | | ))}"
     | |__^
-113 |
-114 |   f"{repr((
     |
 help: Replace with conversion flag
 106 |     1  # comment
@@ -643,16 +538,12 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
    --> RUF010.py:114:4
     |
-112 |   ))}"
-113 |
 114 |   f"{repr((
     |  ____^
 115 | |     # comment
 116 | |     1
 117 | | ))}"
     | |__^
-118 |
-119 |   f"{str((
     |
 help: Replace with conversion flag
 111 |     # comment
@@ -671,8 +562,6 @@ help: Replace with conversion flag
 RUF010 [*] Use explicit conversion flag
    --> RUF010.py:119:4
     |
-117 |   ))}"
-118 |
 119 |   f"{str((
     |  ____^
 120 | |     # comment

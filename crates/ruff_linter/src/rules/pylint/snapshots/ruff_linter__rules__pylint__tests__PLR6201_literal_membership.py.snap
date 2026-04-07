@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLR6201 [*] Use a set literal when testing for membership
  --> literal_membership.py:2:6
   |
-1 | # Errors
 2 | 1 in [1, 2, 3]
   |      ^^^^^^^^^
-3 | 1 in (1, 2, 3)
-4 | 1 in (
   |
 help: Convert to `set`
 1 | # Errors
@@ -22,12 +19,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLR6201 [*] Use a set literal when testing for membership
  --> literal_membership.py:3:6
   |
-1 | # Errors
-2 | 1 in [1, 2, 3]
 3 | 1 in (1, 2, 3)
   |      ^^^^^^^^^
-4 | 1 in (
-5 |     1, 2, 3
   |
 help: Convert to `set`
 1 | # Errors
@@ -42,15 +35,11 @@ note: This is an unsafe fix and may change runtime behavior
 PLR6201 [*] Use a set literal when testing for membership
  --> literal_membership.py:4:6
   |
-2 |   1 in [1, 2, 3]
-3 |   1 in (1, 2, 3)
 4 |   1 in (
   |  ______^
 5 | |     1, 2, 3
 6 | | )
   | |_^
-7 |   fruits = ["cherry", "grapes"]
-8 |   "cherry" in fruits
   |
 help: Convert to `set`
 1 | # Errors
@@ -67,15 +56,11 @@ help: Convert to `set`
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
-  --> literal_membership.py:9:70
-   |
- 7 | fruits = ["cherry", "grapes"]
- 8 | "cherry" in fruits
- 9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
-   |                                                                      ^^^^^^^^^^
-10 |
-11 | # OK
-   |
+ --> literal_membership.py:9:70
+  |
+9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
+  |                                                                      ^^^^^^^^^^
+  |
 help: Convert to `set`
 6  | )
 7  | fruits = ["cherry", "grapes"]

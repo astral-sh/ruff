@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
  --> TD006.py:5:3
   |
-3 | # Todoism is a word which starts with todo, but is not a todo
-4 | # TDO006 - error
 5 | # ToDo (evanrittenhouse): invalid capitalization
   |   ^^^^
-6 | # todo (evanrittenhouse): another invalid capitalization
-7 | # foo # todo: invalid capitalization
   |
 help: Replace `ToDo` with `TODO`
 2 | # TODO (evanrittenhouse): this is a valid TODO
@@ -23,11 +19,8 @@ help: Replace `ToDo` with `TODO`
 TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
  --> TD006.py:6:3
   |
-4 | # TDO006 - error
-5 | # ToDo (evanrittenhouse): invalid capitalization
 6 | # todo (evanrittenhouse): another invalid capitalization
   |   ^^^^
-7 | # foo # todo: invalid capitalization
   |
 help: Replace `todo` with `TODO`
 3 | # Todoism is a word which starts with todo, but is not a todo
@@ -40,8 +33,6 @@ help: Replace `todo` with `TODO`
 TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
  --> TD006.py:7:9
   |
-5 | # ToDo (evanrittenhouse): invalid capitalization
-6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
   |         ^^^^
   |

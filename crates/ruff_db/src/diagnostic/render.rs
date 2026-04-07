@@ -312,6 +312,13 @@ impl<'a> ResolvedDiagnostic<'a> {
             anns.sort_by_key(|ann1| ann1.range.start());
         }
 
+        // The merge window determines how close two annotations need
+        // to be (in lines) to be rendered inside a single snippet.
+        // This is independent of `context`, which controls how many
+        // extra padding lines appear before and after each snippet.
+        const MERGE_WINDOW: usize = 2;
+        let merge_window = MERGE_WINDOW.max(context);
+
         let mut snippet_by_path: BTreeMap<&'a str, Vec<Vec<&ResolvedAnnotation<'a>>>> =
             BTreeMap::new();
         for (path, anns) in ann_by_path {
@@ -324,14 +331,14 @@ impl<'a> ResolvedDiagnostic<'a> {
 
                 let prev_context_ends = context_after(
                     &prev.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     prev.line_end,
                     prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     ann.line_start,
                     ann.notebook_index.as_ref(),
                 )
@@ -648,7 +655,7 @@ impl<'r> RenderableSnippet<'r> {
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
         let content_start_index = anns.iter().map(|ann| ann.line_start).min().unwrap();
-        let line_start = context_before(&source, context, content_start_index, notebook_index);
+        let mut line_start = context_before(&source, context, content_start_index, notebook_index);
 
         let start = source.line_column(anns[0].range.start());
         let cell_index = notebook_index
@@ -656,6 +663,15 @@ impl<'r> RenderableSnippet<'r> {
 
         let content_end_index = anns.iter().map(|ann| ann.line_end).max().unwrap();
         let line_end = context_after(&source, context, content_end_index, notebook_index);
+
+        // If the snippet would contain only empty lines (e.g. for an
+        // end-of-file annotation), include the preceding line so that
+        // the annotation has visible source context.
+        let snippet_start = source.line_start(line_start);
+        let snippet_end = source.line_end(line_end);
+        if snippet_start == snippet_end && line_start > OneIndexed::MIN {
+            line_start = line_start.saturating_sub(1);
+        }
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
@@ -1211,12 +1227,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 | canary
-        4 | dog
         5 | elephant
           | ^^^^^^^^
-        6 | finch
-        7 | gorilla
           |
         ",
         );
@@ -1235,12 +1247,8 @@ watermelon
         warning[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 | canary
-        4 | dog
         5 | elephant
           | ^^^^^^^^
-        6 | finch
-        7 | gorilla
           |
         ",
         );
@@ -1255,12 +1263,8 @@ watermelon
         info[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 | canary
-        4 | dog
         5 | elephant
           | ^^^^^^^^
-        6 | finch
-        7 | gorilla
           |
         ",
         );
@@ -1284,8 +1288,6 @@ watermelon
           |
         1 | aardvark
           | ^
-        2 | beetle
-        3 | canary
           |
         ",
         );
@@ -1303,8 +1305,6 @@ watermelon
           |
         1 | aardvark
           | ^ primary annotation message
-        2 | beetle
-        3 | canary
           |
         ",
         );
@@ -1322,12 +1322,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:5:1
           |
-        3 | ΔΔΔΔΔΔΔΔΔΔΔΔ
-        4 | ββββββββββββ
         5 | ΣΣΣΣΣΣΣΣΣΣΣΣ
           | ^^^^^^^^^^^^
-        6 | ξξξξξξξξξξξξ
-        7 | ππππππππππππ
           |
         ",
         );
@@ -1341,11 +1337,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:2:2
           |
-        1 | ☃☃☃☃☃☃☃☃☃☃☃☃
         2 | 💩💩💩💩💩💩💩💩💩💩💩💩
           |   ^^
-        3 | ΔΔΔΔΔΔΔΔΔΔΔΔ
-        4 | ββββββββββββ
           |
         ",
         );
@@ -1466,13 +1459,9 @@ watermelon
            |
          1 | aardvark
            | ^^^^^^^^
-         2 | beetle
-         3 | canary
            |
           ::: animals:11:1
            |
-         9 | inchworm
-        10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
            |
@@ -1564,9 +1553,7 @@ watermelon
         1 | aardvark
           | ^^^^^^^^
         2 | beetle
-          |
-         ::: animals:5:1
-          |
+        3 | canary
         4 | dog
         5 | elephant
           | ^^^^^^^^
@@ -1760,9 +1747,7 @@ watermelon
           |
         3 | beetle
           | ^^^^^^
-          |
-         ::: spacey-animals:5:1
-          |
+        4 |
         5 | canary
           | ^^^^^^
           |
@@ -1787,21 +1772,13 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
          ::: fruits:3:1
           |
-        1 | apple
-        2 | banana
         3 | cantaloupe
           | ^^^^^^^^^^
-        4 | lime
-        5 | orange
           |
         ",
         );
@@ -1824,12 +1801,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         info: this is a helpful note
         ",
@@ -1861,12 +1834,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         info: this is a helpful note
         info: another helpful note
@@ -1889,22 +1858,14 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
-        1 | apple
-        2 | banana
         3 | cantaloupe
           | ^^^^^^^^^^
-        4 | lime
-        5 | orange
           |
         ",
         );
@@ -1925,28 +1886,18 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
-        1 | apple
-        2 | banana
         3 | cantaloupe
           | ^^^^^^^^^^
-        4 | lime
-        5 | orange
           |
         warning: sub-diagnostic message
           --> animals:11:1
            |
-         9 | inchworm
-        10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
            |
@@ -1964,30 +1915,20 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         warning: sub-diagnostic message
           --> animals:11:1
            |
-         9 | inchworm
-        10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
            |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
-        1 | apple
-        2 | banana
         3 | cantaloupe
           | ^^^^^^^^^^
-        4 | lime
-        5 | orange
           |
         ",
         );
@@ -2012,22 +1953,14 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ^^^^^^
-        4 | dog
-        5 | elephant
           |
         warning: sub-diagnostic message
          --> animals:3:1
           |
-        1 | aardvark
-        2 | beetle
         3 | canary
           | ------
-        4 | dog
-        5 | elephant
           |
         ",
         );
@@ -2048,13 +1981,9 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |   canary
-        4 |   dog
         5 | / elephant
         6 | | finch
           | |_____^
-        7 |   gorilla
-        8 |   hippopotamus
           |
         ",
         );
@@ -2071,13 +2000,9 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |   canary
-        4 |   dog
         5 | / elephant
         6 | | finch
           | |______^
-        7 |   gorilla
-        8 |   hippopotamus
           |
         ",
         );
@@ -2091,14 +2016,10 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |   canary
-        4 |   dog
         5 | / elephant
         6 | | finch
         7 | | gorilla
           | |_^
-        8 |   hippopotamus
-        9 |   inchworm
           |
         ",
         );
@@ -2109,19 +2030,15 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:5:4
-           |
-         3 |   canary
-         4 |   dog
-         5 |   elephant
-           |  ____^
-         6 | | finch
-         7 | | gorilla
-         8 | | hippopotamus
-           | |________^
-         9 |   inchworm
-        10 |   jackrabbit
-           |
+         --> animals:5:4
+          |
+        5 |   elephant
+          |  ____^
+        6 | | finch
+        7 | | gorilla
+        8 | | hippopotamus
+          | |________^
+          |
         ",
         );
 
@@ -2131,19 +2048,15 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:5:4
-           |
-         3 |   canary
-         4 |   dog
-         5 |   elephant
-           |  ____-
-         6 | | finch
-         7 | | gorilla
-         8 | | hippopotamus
-           | |________-
-         9 |   inchworm
-        10 |   jackrabbit
-           |
+         --> animals:5:4
+          |
+        5 |   elephant
+          |  ____-
+        6 | | finch
+        7 | | gorilla
+        8 | | hippopotamus
+          | |________-
+          |
         ",
         );
     }
@@ -2165,8 +2078,6 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
-        2 |    beetle
-        3 |    canary
         4 |    dog
           |  __^
         5 | |  elephant
@@ -2175,8 +2086,6 @@ watermelon
           | ||_____^
         7 | |  gorilla
           | |________^
-        8 |    hippopotamus
-        9 |    inchworm
           |
         ",
         );
@@ -2194,8 +2103,6 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
-        2 |    beetle
-        3 |    canary
         4 |    dog
           |  __^
         5 | |  elephant
@@ -2204,8 +2111,6 @@ watermelon
           | ||_____^
         7 | |  gorilla
           | |________^
-        8 |    hippopotamus
-        9 |    inchworm
           |
         ",
         );
@@ -2225,8 +2130,6 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |    canary
-        4 |    dog
         5 |    elephant
           |  __^
         6 | |  finch
@@ -2235,8 +2138,6 @@ watermelon
           | ||_______^
           |  |_______|
           |
-        8 |    hippopotamus
-        9 |    inchworm
           |
         ",
         );
@@ -2260,8 +2161,6 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |    canary
-        4 |    dog
         5 |    elephant
           |   _^
           |  |_|
@@ -2269,8 +2168,6 @@ watermelon
           | ||_____^
         7 |  | gorilla
           |  |_______^
-        8 |    hippopotamus
-        9 |    inchworm
           |
         ",
         );
@@ -2288,8 +2185,6 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
-        3 |    canary
-        4 |    dog
         5 |    elephant
           |  __^
         6 | |  finch
@@ -2298,8 +2193,6 @@ watermelon
           |  |
         7 |  | gorilla
           |  |_______^
-        8 |    hippopotamus
-        9 |    inchworm
           |
         ",
         );
@@ -2320,12 +2213,8 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
-        3 | canary
-        4 | dog
         5 | elephant
           |   ^^^^ giant land mammal
-        6 | finch
-        7 | gorilla
           |
         ",
         );
@@ -2342,15 +2231,11 @@ watermelon
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
-        3 | canary
-        4 | dog
         5 | elephant
           |   ----
           |   |
           |   giant land mammal
           |   but afraid of mice
-        6 | finch
-        7 | gorilla
           |
         ",
         );
@@ -2373,22 +2258,16 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:8:1
-           |
-         6 | finch
-         7 | gorilla
-         8 | hippopotamus
-           | ^^^^^^^^^^^^ primary
-         9 | inchworm
-        10 | jackrabbit
-           |
-          ::: animals:1:1
-           |
-         1 | aardvark
-           | -------- secondary
-         2 | beetle
-         3 | canary
-           |
+         --> animals:8:1
+          |
+        8 | hippopotamus
+          | ^^^^^^^^^^^^ primary
+          |
+         ::: animals:1:1
+          |
+        1 | aardvark
+          | -------- secondary
+          |
         ",
         );
 
@@ -2413,30 +2292,22 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-         --> animals:5:1
-          |
-        5 | elephant
-          | ^^^^^^^^ primary 5
-          |
-         ::: animals:9:1
-          |
-        9 | inchworm
-          | ^^^^^^^^ primary 9
-          |
-         ::: animals:1:1
+         --> animals:1:1
           |
         1 | aardvark
           | -------- secondary 1
-          |
-         ::: animals:3:1
-          |
+        2 | beetle
         3 | canary
           | ------ secondary 3
-          |
-         ::: animals:7:1
-          |
+        4 | dog
+        5 | elephant
+          | ^^^^^^^^ primary 5
+        6 | finch
         7 | gorilla
           | ------- secondary 7
+        8 | hippopotamus
+        9 | inchworm
+          | ^^^^^^^^ primary 9
           |
         ",
         );
@@ -2461,15 +2332,11 @@ watermelon
           |
         1 | apple
           | ^^^^^ primary
-        2 | banana
-        3 | cantaloupe
           |
          ::: animals:1:1
           |
         1 | aardvark
           | -------- secondary
-        2 | beetle
-        3 | canary
           |
         ",
         );
@@ -2492,25 +2359,23 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:11:1
-           |
-        11 | kangaroo
-           | ^^^^^^^^ primary animals 11
-           |
-          ::: animals:1:1
+          --> animals:1:1
            |
          1 | aardvark
            | -------- secondary animals 1
-           |
-          ::: animals:3:1
-           |
+         2 | beetle
          3 | canary
            | ------ secondary animals 3
-           |
-          ::: animals:7:1
-           |
+         4 | dog
+         5 | elephant
+         6 | finch
          7 | gorilla
            | ------- secondary animals 7
+         8 | hippopotamus
+         9 | inchworm
+        10 | jackrabbit
+        11 | kangaroo
+           | ^^^^^^^^ primary animals 11
            |
           ::: fruits:10:1
            |

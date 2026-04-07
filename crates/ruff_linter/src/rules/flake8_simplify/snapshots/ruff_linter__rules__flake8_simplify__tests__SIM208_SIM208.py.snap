@@ -6,7 +6,6 @@ SIM208 [*] Use `a` instead of `not (not a)`
   |
 1 | if not (not a):  # SIM208
   |    ^^^^^^^^^^^
-2 |     pass
   |
 help: Replace with `a`
   - if not (not a):  # SIM208
@@ -18,11 +17,8 @@ help: Replace with `a`
 SIM208 [*] Use `a == b` instead of `not (not a == b)`
  --> SIM208.py:4:4
   |
-2 |     pass
-3 |
 4 | if not (not (a == b)):  # SIM208
   |    ^^^^^^^^^^^^^^^^^^
-5 |     pass
   |
 help: Replace with `a == b`
 1 | if not (not a):  # SIM208
@@ -37,12 +33,8 @@ help: Replace with `a == b`
 SIM208 [*] Use `b` instead of `not (not b)`
   --> SIM208.py:16:5
    |
-14 |     pass
-15 |
 16 | a = not not b  # SIM208
    |     ^^^^^^^^^
-17 |
-18 | f(not not a)  # SIM208
    |
 help: Replace with `b`
 13 | if not a != b:  # OK
@@ -57,12 +49,8 @@ help: Replace with `b`
 SIM208 [*] Use `a` instead of `not (not a)`
   --> SIM208.py:18:3
    |
-16 | a = not not b  # SIM208
-17 |
 18 | f(not not a)  # SIM208
    |   ^^^^^^^^^
-19 |
-20 | if 1 + (not (not a)):  # SIM208
    |
 help: Replace with `a`
 15 |
@@ -77,11 +65,8 @@ help: Replace with `a`
 SIM208 [*] Use `a` instead of `not (not a)`
   --> SIM208.py:20:9
    |
-18 | f(not not a)  # SIM208
-19 |
 20 | if 1 + (not (not a)):  # SIM208
    |         ^^^^^^^^^^^
-21 |     pass
    |
 help: Replace with `a`
 17 |

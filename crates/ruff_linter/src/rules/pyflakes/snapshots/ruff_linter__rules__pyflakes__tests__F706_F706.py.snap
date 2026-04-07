@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F706 `return` statement outside of a function/method
  --> F706.py:6:5
   |
-5 | class Foo:
 6 |     return 2
   |     ^^^^^^^^
   |

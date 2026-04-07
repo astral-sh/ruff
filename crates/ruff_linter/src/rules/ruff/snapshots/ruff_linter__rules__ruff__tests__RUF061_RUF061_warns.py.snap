@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF061 [*] Use context-manager form of `pytest.warns()`
   --> RUF061_warns.py:16:5
    |
-15 | def test_error_trivial():
 16 |     pytest.warns(UserWarning, raise_user_warning, "warning")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -23,10 +22,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF061 [*] Use context-manager form of `pytest.warns()`
   --> RUF061_warns.py:20:9
    |
-19 | def test_error_assign():
 20 |     s = pytest.warns(UserWarning, raise_user_warning, "warning")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-21 |     print(s)
    |
 help: Use `pytest.warns()` as a context-manager
 17 |
@@ -43,7 +40,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF061 [*] Use context-manager form of `pytest.warns()`
   --> RUF061_warns.py:25:5
    |
-24 | def test_error_lambda():
 25 |     pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

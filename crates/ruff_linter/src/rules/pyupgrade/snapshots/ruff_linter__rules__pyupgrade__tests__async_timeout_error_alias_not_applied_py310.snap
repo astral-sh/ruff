@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP041 [*] Replace aliased errors with `TimeoutError`
   --> UP041.py:10:8
    |
- 8 | try:
- 9 |     pass
 10 | except socket.timeout:
    |        ^^^^^^^^^^^^^^
-11 |     pass
    |
 help: Replace `socket.timeout` with builtin `TimeoutError`
 7  |
@@ -23,11 +20,8 @@ help: Replace `socket.timeout` with builtin `TimeoutError`
 UP041 [*] Replace aliased errors with `TimeoutError`
   --> UP041.py:22:8
    |
-20 | try:
-21 |     pass
 22 | except (socket.timeout,):
    |        ^^^^^^^^^^^^^^^^^
-23 |     pass
    |
 help: Replace with builtin `TimeoutError`
 19 |
@@ -42,11 +36,8 @@ help: Replace with builtin `TimeoutError`
 UP041 [*] Replace aliased errors with `TimeoutError`
   --> UP041.py:27:8
    |
-25 | try:
-26 |     pass
 27 | except (asyncio.TimeoutError, socket.timeout,):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-28 |     pass
    |
 help: Replace with builtin `TimeoutError`
 24 |
@@ -61,11 +52,8 @@ help: Replace with builtin `TimeoutError`
 UP041 [*] Replace aliased errors with `TimeoutError`
   --> UP041.py:34:8
    |
-32 | try:
-33 |     pass
 34 | except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-35 |     pass
    |
 help: Replace with builtin `TimeoutError`
 31 |

@@ -35,12 +35,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/type_ignore
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
   --> src/mdtest_snippet.py:10:9
    |
- 8 | a = (3
- 9 |   # error: [unused-ignore-comment]
 10 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 |
-12 | a = (3
    |
 help: Remove the unused suppression comment
 7  |
@@ -58,8 +54,6 @@ help: Remove the unused suppression comment
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
   --> src/mdtest_snippet.py:14:21
    |
-12 | a = (3
-13 |   # error: [unused-ignore-comment]
 14 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

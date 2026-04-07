@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I001 [*] Import block is un-sorted or un-formatted
   --> trailing_comment.py:8:1
    |
- 6 |   pass
- 7 |
  8 | / from mylib import (
  9 | |     MyClient,
 10 | |     MyMgmtClient,
@@ -13,8 +11,6 @@ I001 [*] Import block is un-sorted or un-formatted
 12 | |     bar
 13 | | )# some comment
    | |_^
-14 |
-15 |   pass
    |
 help: Organize imports
 5  |
@@ -35,8 +31,6 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> trailing_comment.py:17:1
    |
-15 |   pass
-16 |
 17 | / from foo import (
 18 | |     bar
 19 | | )
@@ -46,8 +40,6 @@ I001 [*] Import block is un-sorted or un-formatted
 23 | |     # some comment
 24 | | )
    | |_^
-25 |
-26 |   pass
    |
 help: Organize imports
 14 |
@@ -64,15 +56,11 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> trailing_comment.py:35:1
    |
-33 |   pass
-34 |
 35 | / from mylib import (
 36 | |     MyClient
 37 | |     # some comment
 38 | | )
    | |_^
-39 |
-40 |   pass
    |
 help: Organize imports
 32 |
@@ -90,15 +78,11 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> trailing_comment.py:42:1
    |
-40 |   pass
-41 |
 42 | / from mylib import (
 43 | |     # some comment
 44 | |     MyClient
 45 | | )
    | |_^
-46 |
-47 |   pass
    |
 help: Organize imports
 39 |
@@ -116,7 +100,6 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> trailing_comment.py:50:1
    |
-49 |   # a
 50 | / from mylib import ( # b
 51 | |     # c
 52 | |     MyClient # d

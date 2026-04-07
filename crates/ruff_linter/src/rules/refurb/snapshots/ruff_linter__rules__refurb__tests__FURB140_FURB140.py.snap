@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB140 [*] Use `itertools.starmap` instead of the generator
  --> FURB140.py:7:1
   |
-6 | # FURB140
 7 | [print(x, y) for x, y in zipped()]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 |
-9 | # FURB140
   |
 help: Replace with `itertools.starmap`
 1  + from itertools import starmap
@@ -27,11 +24,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:10:1
    |
- 9 | # FURB140
 10 | (print(x, y) for x, y in zipped())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 |
-12 | # FURB140
    |
 help: Replace with `itertools.starmap`
 1  + from itertools import starmap
@@ -51,7 +45,6 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:13:1
    |
-12 | # FURB140
 13 | {print(x, y) for x, y in zipped()}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -73,11 +66,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:19:1
    |
-18 | # FURB140
 19 | [print(x, y) for x, y in zipped()]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-20 |
-21 | # FURB140
    |
 help: Replace with `itertools.starmap`
 16 | from itertools import starmap as sm
@@ -92,11 +82,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:22:1
    |
-21 | # FURB140
 22 | (print(x, y) for x, y in zipped())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-23 |
-24 | # FURB140
    |
 help: Replace with `itertools.starmap`
 19 | [print(x, y) for x, y in zipped()]
@@ -111,11 +98,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:25:1
    |
-24 | # FURB140
 25 | {print(x, y) for x, y in zipped()}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-26 |
-27 | # FURB140 (check it still flags starred arguments).
    |
 help: Replace with `itertools.starmap`
 22 | (print(x, y) for x, y in zipped())
@@ -130,12 +114,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:29:1
    |
-27 | # FURB140 (check it still flags starred arguments).
-28 | # See https://github.com/astral-sh/ruff/issues/7636
 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-30 | (foo(*t) for t in [(85, 60), (100, 80)])
-31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    |
 help: Replace with `itertools.starmap`
 26 |
@@ -150,11 +130,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:30:1
    |
-28 | # See https://github.com/astral-sh/ruff/issues/7636
-29 | [foo(*t) for t in [(85, 60), (100, 80)]]
 30 | (foo(*t) for t in [(85, 60), (100, 80)])
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    |
 help: Replace with `itertools.starmap`
 27 | # FURB140 (check it still flags starred arguments).
@@ -169,12 +146,8 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:31:1
    |
-29 | [foo(*t) for t in [(85, 60), (100, 80)]]
-30 | (foo(*t) for t in [(85, 60), (100, 80)])
 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-32 |
-33 | # Non-errors.
    |
 help: Replace with `itertools.starmap`
 28 | # See https://github.com/astral-sh/ruff/issues/7636
@@ -189,14 +162,12 @@ help: Replace with `itertools.starmap`
 FURB140 [*] Use `itertools.starmap` instead of the generator
   --> FURB140.py:62:5
    |
-61 |   all(
 62 | /     predicate(a, b)
 63 | |     # text
 64 | |     for a, b
 65 | |     # text
 66 | |     in some_iterable
    | |____________________^
-67 |   )
    |
 help: Replace with `itertools.starmap`
 59 | [" ".join(x)(*x) for x in zipped()]

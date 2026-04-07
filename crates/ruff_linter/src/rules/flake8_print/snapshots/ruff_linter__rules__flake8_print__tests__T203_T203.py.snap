@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_print/mod.rs
 T203 [*] `pprint` found
  --> T203.py:5:1
   |
-3 | from pprint import pprint
-4 |
 5 | pprint("Hello, world!")  # T203
   | ^^^^^^
-6 | pprint("Hello, world!", stream=None)  # T203
-7 | pprint("Hello, world!", stream=sys.stdout)  # T203
   |
 help: Remove `pprint`
 2 | import tempfile
@@ -24,11 +20,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
  --> T203.py:6:1
   |
-5 | pprint("Hello, world!")  # T203
 6 | pprint("Hello, world!", stream=None)  # T203
   | ^^^^^^
-7 | pprint("Hello, world!", stream=sys.stdout)  # T203
-8 | pprint("Hello, world!", stream=sys.stderr)  # T203
   |
 help: Remove `pprint`
 3 | from pprint import pprint
@@ -43,11 +36,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
  --> T203.py:7:1
   |
-5 | pprint("Hello, world!")  # T203
-6 | pprint("Hello, world!", stream=None)  # T203
 7 | pprint("Hello, world!", stream=sys.stdout)  # T203
   | ^^^^^^
-8 | pprint("Hello, world!", stream=sys.stderr)  # T203
   |
 help: Remove `pprint`
 4 |
@@ -60,15 +50,11 @@ help: Remove `pprint`
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
-  --> T203.py:8:1
-   |
- 6 | pprint("Hello, world!", stream=None)  # T203
- 7 | pprint("Hello, world!", stream=sys.stdout)  # T203
- 8 | pprint("Hello, world!", stream=sys.stderr)  # T203
-   | ^^^^^^
- 9 |
-10 | with tempfile.NamedTemporaryFile() as fp:
-   |
+ --> T203.py:8:1
+  |
+8 | pprint("Hello, world!", stream=sys.stderr)  # T203
+  | ^^^^^^
+  |
 help: Remove `pprint`
 5  | pprint("Hello, world!")  # T203
 6  | pprint("Hello, world!", stream=None)  # T203
@@ -82,12 +68,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
   --> T203.py:15:1
    |
-13 | import pprint
-14 |
 15 | pprint.pprint("Hello, world!")  # T203
    | ^^^^^^^^^^^^^
-16 | pprint.pprint("Hello, world!", stream=None)  # T203
-17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
    |
 help: Remove `pprint`
 12 |
@@ -102,11 +84,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
   --> T203.py:16:1
    |
-15 | pprint.pprint("Hello, world!")  # T203
 16 | pprint.pprint("Hello, world!", stream=None)  # T203
    | ^^^^^^^^^^^^^
-17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
-18 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    |
 help: Remove `pprint`
 13 | import pprint
@@ -121,11 +100,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
   --> T203.py:17:1
    |
-15 | pprint.pprint("Hello, world!")  # T203
-16 | pprint.pprint("Hello, world!", stream=None)  # T203
 17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
    | ^^^^^^^^^^^^^
-18 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    |
 help: Remove `pprint`
 14 |
@@ -140,12 +116,8 @@ note: This is an unsafe fix and may change runtime behavior
 T203 [*] `pprint` found
   --> T203.py:18:1
    |
-16 | pprint.pprint("Hello, world!", stream=None)  # T203
-17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
 18 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    | ^^^^^^^^^^^^^
-19 |
-20 | with tempfile.NamedTemporaryFile() as fp:
    |
 help: Remove `pprint`
 15 | pprint.pprint("Hello, world!")  # T203

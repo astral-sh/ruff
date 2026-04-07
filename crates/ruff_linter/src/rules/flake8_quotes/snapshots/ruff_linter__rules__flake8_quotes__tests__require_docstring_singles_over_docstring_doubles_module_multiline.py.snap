@@ -8,8 +8,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
 2 | | Double quotes multiline module docstring
 3 | | """
   | |___^
-4 |   """
-5 |   this is not a docstring
   |
 help: Replace double quotes docstring with single quotes
   - """

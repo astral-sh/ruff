@@ -2,14 +2,11 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
-  --> RUF024.py:9:1
-   |
- 8 | # Errors.
- 9 | dict.fromkeys(pierogi_fillings, [])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-10 | dict.fromkeys(pierogi_fillings, list())
-11 | dict.fromkeys(pierogi_fillings, {})
-   |
+ --> RUF024.py:9:1
+  |
+9 | dict.fromkeys(pierogi_fillings, [])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with comprehension
 6  | ]
 7  |
@@ -24,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:10:1
    |
- 8 | # Errors.
- 9 | dict.fromkeys(pierogi_fillings, [])
 10 | dict.fromkeys(pierogi_fillings, list())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 | dict.fromkeys(pierogi_fillings, {})
-12 | dict.fromkeys(pierogi_fillings, set())
    |
 help: Replace with comprehension
 7  |
@@ -45,12 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:11:1
    |
- 9 | dict.fromkeys(pierogi_fillings, [])
-10 | dict.fromkeys(pierogi_fillings, list())
 11 | dict.fromkeys(pierogi_fillings, {})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-12 | dict.fromkeys(pierogi_fillings, set())
-13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
    |
 help: Replace with comprehension
 8  | # Errors.
@@ -66,12 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:12:1
    |
-10 | dict.fromkeys(pierogi_fillings, list())
-11 | dict.fromkeys(pierogi_fillings, {})
 12 | dict.fromkeys(pierogi_fillings, set())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-14 | dict.fromkeys(pierogi_fillings, dict())
    |
 help: Replace with comprehension
 9  | dict.fromkeys(pierogi_fillings, [])
@@ -87,12 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:13:1
    |
-11 | dict.fromkeys(pierogi_fillings, {})
-12 | dict.fromkeys(pierogi_fillings, set())
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-14 | dict.fromkeys(pierogi_fillings, dict())
-15 | import builtins
    |
 help: Replace with comprehension
 10 | dict.fromkeys(pierogi_fillings, list())
@@ -108,12 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:14:1
    |
-12 | dict.fromkeys(pierogi_fillings, set())
-13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 14 | dict.fromkeys(pierogi_fillings, dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-15 | import builtins
-16 | builtins.dict.fromkeys(pierogi_fillings, dict())
    |
 help: Replace with comprehension
 11 | dict.fromkeys(pierogi_fillings, {})
@@ -129,12 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:16:1
    |
-14 | dict.fromkeys(pierogi_fillings, dict())
-15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-17 |
-18 | # Okay.
    |
 help: Replace with comprehension
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
@@ -150,8 +123,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
   --> RUF024.py:39:1
    |
-37 | key = "xy"
-38 | key_0 = "z"
 39 | dict.fromkeys("ABC", list(key))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I001 [*] Import block is un-sorted or un-formatted
   --> import_heading_already_present.py:2:1
    |
- 1 |   # Future imports
  2 | / from __future__ import annotations
  3 | |
  4 | | # Standard library imports

@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 TC008 [*] Remove quotes from type alias
  --> <filename>:6:16
   |
-4 | from typing import TypeAlias
-5 |
 6 | a: TypeAlias = 'int | None'  # TC008
   |                ^^^^^^^^^^^^
-7 | b: TypeAlias = 'int' | None  # TC010
   |
 help: Remove quotes
 3 |
@@ -21,7 +18,6 @@ help: Remove quotes
 TC010 Invalid string member in `X | Y`-style union type
  --> <filename>:7:16
   |
-6 | a: TypeAlias = 'int | None'  # TC008
 7 | b: TypeAlias = 'int' | None  # TC010
   |                ^^^^^
   |

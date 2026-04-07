@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 Q002 [*] Double quote docstring found but single quotes preferred
  --> docstring_doubles_class.py:2:5
   |
-1 | class SingleLineDocstrings():
 2 |     """ Double quotes single line class docstring """
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 |     """ Not a docstring """
   |
 help: Replace double quotes docstring with single quotes
 1 | class SingleLineDocstrings():
@@ -20,10 +18,8 @@ help: Replace double quotes docstring with single quotes
 Q002 [*] Double quote docstring found but single quotes preferred
  --> docstring_doubles_class.py:6:9
   |
-5 |     def foo(self, bar="""not a docstring"""):
 6 |         """ Double quotes single line method docstring"""
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 |         pass
   |
 help: Replace double quotes docstring with single quotes
 3 |     """ Not a docstring """
@@ -38,8 +34,6 @@ help: Replace double quotes docstring with single quotes
 Q002 [*] Double quote docstring found but single quotes preferred
  --> docstring_doubles_class.py:9:29
   |
-7 |         pass
-8 |
 9 |     class Nested(foo()[:]): """ inline docstring """; pass
   |                             ^^^^^^^^^^^^^^^^^^^^^^^^
   |

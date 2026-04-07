@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 DOC202 Docstring should not have a returns section because the function doesn't return anything
   --> DOC202_numpy.py:16:5
    |
-14 |   # DOC202
-15 |   def foo(num: int) -> str:
 16 | /     """
 17 | |     Do something
 18 | |
@@ -20,15 +18,12 @@ DOC202 Docstring should not have a returns section because the function doesn't 
 27 | |         A string
 28 | |     """
    | |_______^
-29 |       print('test')
    |
 help: Remove the "Returns" section
 
 DOC202 Docstring should not have a returns section because the function doesn't return anything
   --> DOC202_numpy.py:36:9
    |
-34 |       # DOC202
-35 |       def foo(self) -> str:
 36 | /         """
 37 | |         Do something
 38 | |
@@ -43,6 +38,5 @@ DOC202 Docstring should not have a returns section because the function doesn't 
 47 | |             A string
 48 | |         """
    | |___________^
-49 |           print('test')
    |
 help: Remove the "Returns" section

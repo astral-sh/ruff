@@ -6,6 +6,4 @@ PLR0914 Too many local variables (16/15)
    |
 20 | def func() -> None:  # PLR0914
    |     ^^^^
-21 |     first = 1
-22 |     second = 2
    |

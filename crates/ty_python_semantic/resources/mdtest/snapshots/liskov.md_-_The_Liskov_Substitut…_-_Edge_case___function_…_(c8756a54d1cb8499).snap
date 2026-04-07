@@ -40,15 +40,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 error[invalid-method-override]: Invalid override of method `x`
  --> src/bar.pyi:4:9
   |
-3 | class A:
 4 |     def x(self, y: int): ...
   |         --------------- `A.x` defined here
 5 |
 6 | class B(A):
 7 |     x = foo.x  # error: [invalid-method-override]
   |     ^^^^^^^^^ Definition is incompatible with `A.x`
-8 |
-9 | class C:
   |
  ::: src/foo.pyi:1:5
   |
@@ -63,7 +60,6 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `x`
   --> src/bar.pyi:10:5
    |
- 9 | class C:
 10 |     x = foo.x
    |     --------- `C.x` defined here
 11 |

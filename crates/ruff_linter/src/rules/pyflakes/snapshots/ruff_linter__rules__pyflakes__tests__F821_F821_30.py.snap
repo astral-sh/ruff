@@ -4,51 +4,34 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F821 Undefined name `qux`
   --> F821_30.py:13:18
    |
-11 | multiple: TypedDict[{
-12 |     "bar": str,
 13 |     "baz": list["qux"],
    |                  ^^^
-14 | }]
    |
 
 F821 Undefined name `dolor`
   --> F821_30.py:19:19
    |
-17 | nested: TypedDict[
-18 |     "lorem": TypedDict[{
 19 |         "ipsum": "dolor"
    |                   ^^^^^
-20 |     }],
-21 |     "sit": Literal["amet"]
    |
 
 F821 Undefined name `adipiscing`
   --> F821_30.py:26:31
    |
-24 | # Error at `adipiscing`, `eiusmod`, `tempor`
-25 | unpack: TypedDict[{
 26 |     "consectetur": Annotated["adipiscing", "elit"]
    |                               ^^^^^^^^^^
-27 |     **{"sed do": str, int: "eiusmod", **tempor}
-28 | }]
    |
 
 F821 Undefined name `eiusmod`
   --> F821_30.py:27:29
    |
-25 | unpack: TypedDict[{
-26 |     "consectetur": Annotated["adipiscing", "elit"]
 27 |     **{"sed do": str, int: "eiusmod", **tempor}
    |                             ^^^^^^^
-28 | }]
    |
 
 F821 Undefined name `tempor`
   --> F821_30.py:27:41
    |
-25 | unpack: TypedDict[{
-26 |     "consectetur": Annotated["adipiscing", "elit"]
 27 |     **{"sed do": str, int: "eiusmod", **tempor}
    |                                         ^^^^^^
-28 | }]
    |

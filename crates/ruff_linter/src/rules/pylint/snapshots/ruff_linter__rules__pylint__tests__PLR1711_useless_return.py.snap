@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 PLR1711 [*] Useless `return` statement at end of function
  --> useless_return.py:6:5
   |
-4 | def print_python_version():
-5 |     print(sys.version)
 6 |     return None  # [useless-return]
   |     ^^^^^^^^^^^
   |
@@ -21,8 +19,6 @@ help: Remove useless `return` statement
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:11:5
    |
- 9 | def print_python_version():
-10 |     print(sys.version)
 11 |     return None  # [useless-return]
    |     ^^^^^^^^^^^
    |
@@ -38,8 +34,6 @@ help: Remove useless `return` statement
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:16:5
    |
-14 | def print_python_version():
-15 |     print(sys.version)
 16 |     return None  # [useless-return]
    |     ^^^^^^^^^^^
    |
@@ -55,8 +49,6 @@ help: Remove useless `return` statement
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:22:9
    |
-20 |     def print_python_version(self):
-21 |         print(sys.version)
 22 |         return None  # [useless-return]
    |         ^^^^^^^^^^^
    |
@@ -72,8 +64,6 @@ help: Remove useless `return` statement
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:50:5
    |
-48 |     """This function returns None."""
-49 |     print(sys.version)
 50 |     return None  # [useless-return]
    |     ^^^^^^^^^^^
    |
@@ -89,8 +79,6 @@ help: Remove useless `return` statement
 PLR1711 [*] Useless `return` statement at end of function
   --> useless_return.py:60:9
    |
-58 |     def get(self, key: str) -> None:
-59 |         print(f"{key} not found")
 60 |         return None
    |         ^^^^^^^^^^^
    |

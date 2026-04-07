@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I001 [*] Import block is un-sorted or un-formatted
  --> forced_separate.py:3:1
   |
-1 |   # office_helper and tests are both first-party,
-2 |   # but we want tests and experiments to be separated, in that order
 3 | / from office_helper.core import CoreState
 4 | | import tests.common.foo as tcf
 5 | | from tests.common import async_mock_service

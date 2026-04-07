@@ -6,29 +6,20 @@ FBT003 Boolean positional value in function call
    |
 41 | used("a", True)
    |           ^^^^
-42 | used(do=True)
    |
 
 FBT003 Boolean positional value in function call
   --> FBT.py:56:11
    |
-54 | {}.pop(True, False)
-55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
    |           ^^^^
-57 | getattr(someobj, attrname, False)
-58 | mylist.index(True)
    |
 
 FBT003 Boolean positional value in function call
   --> FBT.py:56:17
    |
-54 | {}.pop(True, False)
-55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
    |                 ^^^^^
-57 | getattr(someobj, attrname, False)
-58 | mylist.index(True)
    |
 
 FBT003 Boolean positional value in function call

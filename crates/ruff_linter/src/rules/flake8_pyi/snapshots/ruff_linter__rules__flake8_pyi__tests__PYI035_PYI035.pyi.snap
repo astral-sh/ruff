@@ -6,27 +6,18 @@ PYI035 `__all__` in a stub file must have a value, as it has the same semantics 
   |
 1 | __all__: list[str]  # Error: PYI035
   | ^^^^^^^^^^^^^^^^^^
-2 |
-3 | __all__: list[str] = ["foo"]
   |
 
 PYI035 `__match_args__` in a stub file must have a value, as it has the same semantics as `__match_args__` at runtime
  --> PYI035.pyi:7:5
   |
-5 | class Foo:
-6 |     __all__: list[str]
 7 |     __match_args__: tuple[str, ...]  # Error: PYI035
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 |     __slots__: tuple[str, ...]  # Error: PYI035
   |
 
 PYI035 `__slots__` in a stub file must have a value, as it has the same semantics as `__slots__` at runtime
-  --> PYI035.pyi:8:5
-   |
- 6 |     __all__: list[str]
- 7 |     __match_args__: tuple[str, ...]  # Error: PYI035
- 8 |     __slots__: tuple[str, ...]  # Error: PYI035
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
- 9 |
-10 | class Bar:
-   |
+ --> PYI035.pyi:8:5
+  |
+8 |     __slots__: tuple[str, ...]  # Error: PYI035
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |

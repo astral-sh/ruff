@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D301 [*] Use `r"""` if any backslashes in a docstring
  --> D301.py:2:5
   |
-1 | def double_quotes_backslash():
 2 |     """Sum\\mary."""
   |     ^^^^^^^^^^^^^^^^
   |
@@ -20,7 +19,6 @@ note: This is an unsafe fix and may change runtime behavior
 D301 Use `r"""` if any backslashes in a docstring
   --> D301.py:37:5
    |
-36 | def shouldnt_add_raw_here2():
 37 |     u"Sum\\mary."
    |     ^^^^^^^^^^^^^
    |
@@ -29,7 +27,6 @@ help: Add `r` prefix
 D301 [*] Use `r"""` if any backslashes in a docstring
   --> D301.py:93:5
    |
-92 |   def should_add_raw_for_single_double_quote_escape():
 93 | /     """
 94 | |     This is single quote escape \".
 95 | |     """
@@ -49,7 +46,6 @@ note: This is an unsafe fix and may change runtime behavior
 D301 [*] Use `r"""` if any backslashes in a docstring
    --> D301.py:99:5
     |
- 98 |   def should_add_raw_for_single_single_quote_escape():
  99 | /     '''
 100 | |     This is single quote escape \'.
 101 | |     '''

@@ -6,8 +6,6 @@ PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 17 | @pytest.mark.foo
    | ^^^^^^^^^^^^^^^^
-18 | def test_something():
-19 |     pass
    |
 help: Add parentheses
 14 | # Without parentheses
@@ -24,8 +22,6 @@ PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 22 | @pytest.mark.foo
    | ^^^^^^^^^^^^^^^^
-23 | class TestClass:
-24 |     def test_something():
    |
 help: Add parentheses
 19 |     pass
@@ -40,11 +36,8 @@ help: Add parentheses
 PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
   --> PT023.py:29:5
    |
-28 | class TestClass:
 29 |     @pytest.mark.foo
    |     ^^^^^^^^^^^^^^^^
-30 |     def test_something():
-31 |         pass
    |
 help: Add parentheses
 26 |
@@ -59,11 +52,8 @@ help: Add parentheses
 PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
   --> PT023.py:35:5
    |
-34 | class TestClass:
 35 |     @pytest.mark.foo
    |     ^^^^^^^^^^^^^^^^
-36 |     class TestNestedClass:
-37 |         def test_something():
    |
 help: Add parentheses
 32 |
@@ -78,12 +68,8 @@ help: Add parentheses
 PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
   --> PT023.py:43:9
    |
-41 | class TestClass:
-42 |     class TestNestedClass:
 43 |         @pytest.mark.foo
    |         ^^^^^^^^^^^^^^^^
-44 |         def test_something():
-45 |             pass
    |
 help: Add parentheses
 40 |

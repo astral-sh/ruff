@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ICN001 [*] `pandas` should be imported as `pd`
  --> tricky.py:7:16
   |
-5 |     try:
-6 |         global pandas
 7 |         import pandas
   |                ^^^^^^
-8 |     except ImportError:
-9 |         return False
   |
 help: Alias `pandas` to `pd`
 3 |

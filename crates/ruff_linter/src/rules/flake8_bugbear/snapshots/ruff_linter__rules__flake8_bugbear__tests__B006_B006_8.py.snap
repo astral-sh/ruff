@@ -6,7 +6,6 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 1 | def foo(a: list = []):
   |                   ^^
-2 |     raise NotImplementedError("")
   |
 help: Replace with `None`; initialize within function
   - def foo(a: list = []):
@@ -21,8 +20,6 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 5 | def bar(a: dict = {}):
   |                   ^^
-6 |     """ This one also has a docstring"""
-7 |     raise NotImplementedError("and has some text in here")
   |
 help: Replace with `None`; initialize within function
 2 |     raise NotImplementedError("")
@@ -40,8 +37,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 10 | def baz(a: list = []):
    |                   ^^
-11 |     """This one raises a different exception"""
-12 |     raise IndexError()
    |
 help: Replace with `None`; initialize within function
 7  |     raise NotImplementedError("and has some text in here")
@@ -62,7 +57,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 15 | def qux(a: list = []):
    |                   ^^
-16 |     raise NotImplementedError
    |
 help: Replace with `None`; initialize within function
 12 |     raise IndexError()
@@ -80,7 +74,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 19 | def quux(a: list = []):
    |                    ^^
-20 |     raise NotImplemented
    |
 help: Replace with `None`; initialize within function
 16 |     raise NotImplementedError

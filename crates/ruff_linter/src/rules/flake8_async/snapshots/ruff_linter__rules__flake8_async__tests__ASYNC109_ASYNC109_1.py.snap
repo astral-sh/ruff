@@ -6,15 +6,13 @@ ASYNC109 Async function definition with a `timeout` parameter
   |
 5 | async def func(timeout):
   |                ^^^^^^^
-6 |     ...
   |
 help: Use `asyncio.timeout` instead
 
 ASYNC109 Async function definition with a `timeout` parameter
-  --> ASYNC109_1.py:9:16
-   |
- 9 | async def func(timeout=10):
-   |                ^^^^^^^^^^
-10 |     ...
-   |
+ --> ASYNC109_1.py:9:16
+  |
+9 | async def func(timeout=10):
+  |                ^^^^^^^^^^
+  |
 help: Use `asyncio.timeout` instead

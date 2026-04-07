@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `hvplot.pandas_alias.scatter_matrix` imported but unused
   --> F401_31.py:12:33
    |
-11 | # Errors
 12 | from hvplot.pandas_alias import scatter_matrix
    |                                 ^^^^^^^^^^^^^^
    |

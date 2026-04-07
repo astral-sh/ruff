@@ -6,7 +6,6 @@ S107 Possible hardcoded password assigned to function default: "password"
   |
 5 | def default(first, password="default"):
   |                             ^^^^^^^^^
-6 |     pass
   |
 
 S107 Possible hardcoded password assigned to function default: "password"
@@ -14,7 +13,6 @@ S107 Possible hardcoded password assigned to function default: "password"
    |
 13 | def default_posonly(first, /, pos, password="posonly"):
    |                                             ^^^^^^^^^
-14 |     pass
    |
 
 S107 Possible hardcoded password assigned to function default: "password"
@@ -22,7 +20,6 @@ S107 Possible hardcoded password assigned to function default: "password"
    |
 21 | def default_kwonly(first, *, password="kwonly"):
    |                                       ^^^^^^^^
-22 |     pass
    |
 
 S107 Possible hardcoded password assigned to function default: "secret"
@@ -30,7 +27,6 @@ S107 Possible hardcoded password assigned to function default: "secret"
    |
 29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
    |                                       ^^^^^^^^^
-30 |     pass
    |
 
 S107 Possible hardcoded password assigned to function default: "password"
@@ -38,5 +34,4 @@ S107 Possible hardcoded password assigned to function default: "password"
    |
 29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
    |                                                              ^^^^^^^^
-30 |     pass
    |

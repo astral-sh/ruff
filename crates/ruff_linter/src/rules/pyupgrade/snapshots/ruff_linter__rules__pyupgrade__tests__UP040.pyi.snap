@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
  --> UP040.pyi:6:1
   |
-4 | # UP040
-5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
 6 | x: typing.TypeAlias = int
   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-7 | x: TypeAlias = int
   |
 help: Use the `type` keyword
 3 |
@@ -23,8 +20,6 @@ help: Use the `type` keyword
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
  --> UP040.pyi:7:1
   |
-5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
-6 | x: typing.TypeAlias = int
 7 | x: TypeAlias = int
   | ^^^^^^^^^^^^^^^^^^
   |
@@ -41,14 +36,11 @@ help: Use the `type` keyword
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.pyi:11:1
    |
-10 |   # comments in the value are preserved
 11 | / x: TypeAlias = tuple[
 12 | |     int,  # preserved
 13 | |     float,
 14 | | ]
    | |_^
-15 |
-16 |   T: TypeAlias = ( # comment0
    |
 help: Use the `type` keyword
 8  |
@@ -63,8 +55,6 @@ help: Use the `type` keyword
 UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.pyi:16:1
    |
-14 |   ]
-15 |
 16 | / T: TypeAlias = ( # comment0
 17 | |     # comment1
 18 | |     int  # comment2

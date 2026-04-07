@@ -6,29 +6,20 @@ FBT003 Boolean positional value in function call
    |
 41 | used("a", True)
    |           ^^^^
-42 | used(do=True)
    |
 
 FBT003 Boolean positional value in function call
   --> FBT.py:56:11
    |
-54 | {}.pop(True, False)
-55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
    |           ^^^^
-57 | getattr(someobj, attrname, False)
-58 | mylist.index(True)
    |
 
 FBT003 Boolean positional value in function call
   --> FBT.py:56:17
    |
-54 | {}.pop(True, False)
-55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
    |                 ^^^^^
-57 | getattr(someobj, attrname, False)
-58 | mylist.index(True)
    |
 
 FBT003 Boolean positional value in function call
@@ -41,28 +32,20 @@ FBT003 Boolean positional value in function call
 FBT003 Boolean positional value in function call
    --> FBT.py:147:20
     |
-145 |     is_foo_or_bar=Case(
-146 |         When(Q(is_foo=True) | Q(is_bar=True)),
 147 |         then=Value(True),
     |                    ^^^^
-148 |     ),
-149 |     default=Value(False),
     |
 
 FBT003 Boolean positional value in function call
    --> FBT.py:149:19
     |
-147 |         then=Value(True),
-148 |     ),
 149 |     default=Value(False),
     |                   ^^^^^
-150 | )
     |
 
 FBT003 Boolean positional value in function call
    --> FBT.py:159:23
     |
-158 | class Settings(BaseSettings):
 159 |     foo: bool = Field(True, exclude=True)
     |                       ^^^^
     |

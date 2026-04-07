@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/linter.rs
 F401 [*] `os` imported but unused
  --> ipy_escape_command.ipynb:cell 1:5:8
   |
-3 | %matplotlib inline
-4 |
 5 | import os
   |        ^^
-6 |
-7 | _ = math.pi
   |
 help: Remove unused import: `os`
  ::: cell 1
@@ -23,7 +19,6 @@ help: Remove unused import: `os`
 F401 [*] `sys` imported but unused
  --> ipy_escape_command.ipynb:cell 2:2:8
   |
-1 | %%timeit
 2 | import sys
   |        ^^^
   |

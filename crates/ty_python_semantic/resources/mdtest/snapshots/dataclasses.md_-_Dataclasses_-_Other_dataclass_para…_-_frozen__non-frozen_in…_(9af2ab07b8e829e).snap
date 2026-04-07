@@ -70,56 +70,44 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.
 
 ```
 error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
-  --> src/a.py:7:1
-   |
- 5 |     x: int
- 6 |
- 7 | @dataclass
-   | ---------- `Child` dataclass parameters
- 8 | # error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
- 9 | class Child(FrozenBase):
-   |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
-10 |     y: int
-   |
+ --> src/a.py:7:1
+  |
+7 | @dataclass
+  | ---------- `Child` dataclass parameters
+8 | # error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+9 | class Child(FrozenBase):
+  |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
+  |
 info: This causes the class creation to fail
 info: Base class definition
  --> src/a.py:3:1
   |
-1 | from dataclasses import dataclass
-2 |
 3 | @dataclass(frozen=True)
   | ----------------------- `FrozenBase` dataclass parameters
 4 | class FrozenBase:
   |       ^^^^^^^^^^ `FrozenBase` definition
-5 |     x: int
   |
 
 ```
 
 ```
 error[invalid-frozen-dataclass-subclass]: Frozen dataclass cannot inherit from non-frozen dataclass
-  --> src/b.py:7:1
-   |
- 5 |     x: int
- 6 |
- 7 | @dataclass(frozen=True)
-   | ----------------------- `FrozenChild` dataclass parameters
- 8 | # error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
- 9 | class FrozenChild(Base):
-   |       ^^^^^^^^^^^^----^ Subclass `FrozenChild` is frozen but base class `Base` is not
-10 |     y: int
-   |
+ --> src/b.py:7:1
+  |
+7 | @dataclass(frozen=True)
+  | ----------------------- `FrozenChild` dataclass parameters
+8 | # error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+9 | class FrozenChild(Base):
+  |       ^^^^^^^^^^^^----^ Subclass `FrozenChild` is frozen but base class `Base` is not
+  |
 info: This causes the class creation to fail
 info: Base class definition
  --> src/b.py:3:1
   |
-1 | from dataclasses import dataclass
-2 |
 3 | @dataclass
   | ---------- `Base` dataclass parameters
 4 | class Base:
   |       ^^^^ `Base` definition
-5 |     x: int
   |
 
 ```
@@ -128,12 +116,10 @@ info: Base class definition
 error[invalid-total-ordering]: Class decorated with `@total_ordering` must define at least one ordering method
   --> src/main.py:9:1
    |
- 7 | @final
- 8 | @dataclass(frozen=True)
  9 | @total_ordering  # error: [invalid-total-ordering]
    | ^^^^^^^^^^^^^^^ `FrozenChild` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
 10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
-11 |     y: str
+   |       --------------------------
    |
 info: The decorator will raise `ValueError` at runtime
 
@@ -143,25 +129,20 @@ info: The decorator will raise `ValueError` at runtime
 error[invalid-frozen-dataclass-subclass]: Frozen dataclass cannot inherit from non-frozen dataclass
   --> src/main.py:8:1
    |
- 7 | @final
  8 | @dataclass(frozen=True)
    | ----------------------- `FrozenChild` dataclass parameters
  9 | @total_ordering  # error: [invalid-total-ordering]
 10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
    |       ^^^^^^^^^^^^-------------^ Subclass `FrozenChild` is frozen but base class `NotFrozenBase` is not
-11 |     y: str
    |
 info: This causes the class creation to fail
 info: Base class definition
  --> src/module.py:3:1
   |
-1 | import dataclasses
-2 |
 3 | @dataclasses.dataclass(frozen=False)
   | ------------------------------------ `NotFrozenBase` dataclass parameters
 4 | class NotFrozenBase:
   |       ^^^^^^^^^^^^^ `NotFrozenBase` definition
-5 |     x: int
   |
 
 ```

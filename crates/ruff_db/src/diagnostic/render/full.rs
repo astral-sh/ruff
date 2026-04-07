@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
@@ -329,12 +329,8 @@ mod tests {
         error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
           |
-        4 | def fibonacci(n):
-        5 |     """Compute the nth number in the Fibonacci sequence."""
         6 |     x = 1
           |     ^
-        7 |     if n == 0:
-        8 |         return 0
           |
         help: Remove assignment to unused variable `x`
 
@@ -348,8 +344,6 @@ mod tests {
         error[F821]: Undefined name `fibonaccii`
           --> fib.py:12:16
            |
-        10 |         return 1
-        11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
            |
@@ -360,34 +354,26 @@ mod tests {
           |     ^^^^^^^^^ `fibonacci` is defined here
         5 |     """Compute the nth number in the Fibonacci sequence."""
           |     ------------------------------------------------------- `fibonacci` is documented here
-        6 |     x = 1
-        7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[invalid-syntax]: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
         1 | from os import
           |               ^
-        2 |
-        3 | if call(foo
           |
 
         error[invalid-syntax]: Expected ')', found newline
          --> syntax_errors.py:3:12
           |
-        1 | from os import
-        2 |
         3 | if call(foo
           |            ^
-        4 |     def bar():
-        5 |         pass
           |
         ");
     }
@@ -411,12 +397,8 @@ mod tests {
         F841 [*] Local variable `x` is assigned to but never used
          --> fib.py:6:5
           |
-        4 | def fibonacci(n):
-        5 |     """Compute the nth number in the Fibonacci sequence."""
         6 |     x = 1
           |     ^
-        7 |     if n == 0:
-        8 |         return 0
           |
         help: Remove assignment to unused variable `x`
 
@@ -430,8 +412,6 @@ mod tests {
         F821 Undefined name `fibonaccii`
           --> fib.py:12:16
            |
-        10 |         return 1
-        11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
            |
@@ -442,8 +422,6 @@ mod tests {
           |     ^^^^^^^^^ `fibonacci` is defined here
         5 |     """Compute the nth number in the Fibonacci sequence."""
           |     ------------------------------------------------------- `fibonacci` is documented here
-        6 |     x = 1
-        7 |     if n == 0:
           |
         "#);
     }
@@ -453,25 +431,19 @@ mod tests {
         let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         invalid-syntax: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
         1 | from os import
           |               ^
-        2 |
-        3 | if call(foo
           |
 
         invalid-syntax: Expected ')', found newline
          --> syntax_errors.py:3:12
           |
-        1 | from os import
-        2 |
         3 | if call(foo
           |            ^
-        4 |     def bar():
-        5 |         pass
           |
         ");
     }
@@ -512,11 +484,10 @@ print()
             .primary("example.py", "3:0", "3:0", "")
             .build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[no-indented-block]: Expected an indented block
          --> example.py:3:1
           |
-        2 | if False:
         3 | print()
           | ^
           |
@@ -600,11 +571,10 @@ print()
 
         let diagnostic = env.err().primary("example.py", "2:1", "2:9", "").build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:2:2
           |
-        1 | def foo():
         2 |     return 1
           |     ^^^^^^^^
           |
@@ -636,11 +606,10 @@ print()
     fn notebook_output() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_status(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[F401][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
-        1 | # cell 1
         2 | import os
           |        ^^
           |
@@ -649,24 +618,19 @@ print()
         error[F401][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
           |
-        1 | # cell 2
         2 | import math
           |        ^^^^
-        3 |
-        4 | print('hello world')
           |
         help: Remove unused import: `math`
 
         error[F841]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
           |
-        2 | def foo():
-        3 |     print()
         4 |     x = 1
           |     ^
           |
         help: Remove assignment to unused variable `x`
-        "###);
+        ");
     }
 
     /// Check notebook handling for multiple annotations in a single diagnostic that span cells.
@@ -696,35 +660,28 @@ print()
                 .build(),
         ];
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[unused-import]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
-        1 | # cell 1
         2 | import os
           |        ^^
           |
          ::: notebook.ipynb:cell 2:2:8
           |
-        1 | # cell 2
         2 | import math
           |        ---- second cell
-        3 |
-        4 | print('hello world')
           |
         help: Remove unused import: `os`
 
         error[unused-import]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
-        1 | # cell 1
         2 | import os
           |        ^^
           |
          ::: notebook.ipynb:cell 3:4:5
           |
-        2 | def foo():
-        3 |     print()
         4 |     x = 1
           |     - second cell
           |
@@ -733,7 +690,6 @@ print()
         error[test-diagnostic]: main diagnostic message
          --> notebook.ipynb:cell 2:2:8
           |
-        1 | # cell 2
         2 | import math
           |        ^^^^ second cell
         3 |
@@ -793,15 +749,12 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:2:1
           |
-        1 | # Keep parenthesis around preserved CR
         2 | int(-
           | ^
-        3 |     1)
-        4 | int(+
           |
         ");
     }
@@ -925,16 +878,12 @@ line 10
             range,
         )));
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic][*]: main diagnostic message
          --> example.py:3:1
           |
-        1 | line 1
-        2 | line 2
         3 | line 3
           | ^^^^^^ label
-        4 | line 4
-        5 | line 5
           |
         help: Start of diff:
         4  | line 4

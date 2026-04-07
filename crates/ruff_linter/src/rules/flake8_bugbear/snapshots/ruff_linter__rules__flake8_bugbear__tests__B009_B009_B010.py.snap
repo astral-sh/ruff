@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:19:1
    |
-18 | # Invalid usage
 19 | getattr(foo, "bar")
    | ^^^^^^^^^^^^^^^^^^^
-20 | getattr(foo, "_123abc")
-21 | getattr(foo, "__123abc__")
    |
 help: Replace `getattr` with attribute access
 16 | getattr(foo, "__123abc")
@@ -23,12 +20,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:20:1
    |
-18 | # Invalid usage
-19 | getattr(foo, "bar")
 20 | getattr(foo, "_123abc")
    | ^^^^^^^^^^^^^^^^^^^^^^^
-21 | getattr(foo, "__123abc__")
-22 | getattr(foo, "abc123")
    |
 help: Replace `getattr` with attribute access
 17 |
@@ -43,12 +36,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:21:1
    |
-19 | getattr(foo, "bar")
-20 | getattr(foo, "_123abc")
 21 | getattr(foo, "__123abc__")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-22 | getattr(foo, "abc123")
-23 | getattr(foo, r"abc123")
    |
 help: Replace `getattr` with attribute access
 18 | # Invalid usage
@@ -63,12 +52,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:22:1
    |
-20 | getattr(foo, "_123abc")
-21 | getattr(foo, "__123abc__")
 22 | getattr(foo, "abc123")
    | ^^^^^^^^^^^^^^^^^^^^^^
-23 | getattr(foo, r"abc123")
-24 | _ = lambda x: getattr(x, "bar")
    |
 help: Replace `getattr` with attribute access
 19 | getattr(foo, "bar")
@@ -83,12 +68,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:23:1
    |
-21 | getattr(foo, "__123abc__")
-22 | getattr(foo, "abc123")
 23 | getattr(foo, r"abc123")
    | ^^^^^^^^^^^^^^^^^^^^^^^
-24 | _ = lambda x: getattr(x, "bar")
-25 | if getattr(x, "bar"):
    |
 help: Replace `getattr` with attribute access
 20 | getattr(foo, "_123abc")
@@ -103,12 +84,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:24:15
    |
-22 | getattr(foo, "abc123")
-23 | getattr(foo, r"abc123")
 24 | _ = lambda x: getattr(x, "bar")
    |               ^^^^^^^^^^^^^^^^^
-25 | if getattr(x, "bar"):
-26 |     pass
    |
 help: Replace `getattr` with attribute access
 21 | getattr(foo, "__123abc__")
@@ -123,12 +100,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:25:4
    |
-23 | getattr(foo, r"abc123")
-24 | _ = lambda x: getattr(x, "bar")
 25 | if getattr(x, "bar"):
    |    ^^^^^^^^^^^^^^^^^
-26 |     pass
-27 | getattr(1, "real")
    |
 help: Replace `getattr` with attribute access
 22 | getattr(foo, "abc123")
@@ -143,12 +116,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:27:1
    |
-25 | if getattr(x, "bar"):
-26 |     pass
 27 | getattr(1, "real")
    | ^^^^^^^^^^^^^^^^^^
-28 | getattr(1., "real")
-29 | getattr(1.0, "real")
    |
 help: Replace `getattr` with attribute access
 24 | _ = lambda x: getattr(x, "bar")
@@ -163,12 +132,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:28:1
    |
-26 |     pass
-27 | getattr(1, "real")
 28 | getattr(1., "real")
    | ^^^^^^^^^^^^^^^^^^^
-29 | getattr(1.0, "real")
-30 | getattr(1j, "real")
    |
 help: Replace `getattr` with attribute access
 25 | if getattr(x, "bar"):
@@ -183,12 +148,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:29:1
    |
-27 | getattr(1, "real")
-28 | getattr(1., "real")
 29 | getattr(1.0, "real")
    | ^^^^^^^^^^^^^^^^^^^^
-30 | getattr(1j, "real")
-31 | getattr(True, "real")
    |
 help: Replace `getattr` with attribute access
 26 |     pass
@@ -203,12 +164,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:30:1
    |
-28 | getattr(1., "real")
-29 | getattr(1.0, "real")
 30 | getattr(1j, "real")
    | ^^^^^^^^^^^^^^^^^^^
-31 | getattr(True, "real")
-32 | getattr(x := 1, "real")
    |
 help: Replace `getattr` with attribute access
 27 | getattr(1, "real")
@@ -223,12 +180,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:31:1
    |
-29 | getattr(1.0, "real")
-30 | getattr(1j, "real")
 31 | getattr(True, "real")
    | ^^^^^^^^^^^^^^^^^^^^^
-32 | getattr(x := 1, "real")
-33 | getattr(x + y, "real")
    |
 help: Replace `getattr` with attribute access
 28 | getattr(1., "real")
@@ -243,12 +196,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:32:1
    |
-30 | getattr(1j, "real")
-31 | getattr(True, "real")
 32 | getattr(x := 1, "real")
    | ^^^^^^^^^^^^^^^^^^^^^^^
-33 | getattr(x + y, "real")
-34 | getattr("foo"
    |
 help: Replace `getattr` with attribute access
 29 | getattr(1.0, "real")
@@ -263,12 +212,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:33:1
    |
-31 | getattr(True, "real")
-32 | getattr(x := 1, "real")
 33 | getattr(x + y, "real")
    | ^^^^^^^^^^^^^^^^^^^^^^
-34 | getattr("foo"
-35 |         "bar", "real")
    |
 help: Replace `getattr` with attribute access
 30 | getattr(1j, "real")
@@ -283,8 +228,6 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:34:1
    |
-32 |   getattr(x := 1, "real")
-33 |   getattr(x + y, "real")
 34 | / getattr("foo"
 35 | |         "bar", "real")
    | |______________________^
@@ -304,11 +247,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:58:8
    |
-57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 | assert getattr(func, '_rpc')is True
    |        ^^^^^^^^^^^^^^^^^^^^^
-59 |
-60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
    |
 help: Replace `getattr` with attribute access
 55 | setattr(foo.bar, r"baz", None)
@@ -323,12 +263,9 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:65:1
    |
-64 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
 65 | / getattr(self.
 66 | |    registration.registry, '__name__')
    | |_____________________________________^
-67 |
-68 |   import builtins
    |
 help: Replace `getattr` with attribute access
 62 | setattr(*foo, "bar", None)
@@ -345,11 +282,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:69:1
    |
-68 | import builtins
 69 | builtins.getattr(foo, "bar")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-70 |
-71 | # Regression test for: https://github.com/astral-sh/ruff/issues/18353
    |
 help: Replace `getattr` with attribute access
 66 |    registration.registry, '__name__')
@@ -364,11 +298,8 @@ help: Replace `getattr` with attribute access
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:80:1
    |
-78 | # `ns.ſ` would be interpreted as `ns.s` at runtime, changing behavior.
-79 | # Example: the long s character "ſ" normalizes to "s" under NFKC.
 80 | getattr(foo, "ſ")
    | ^^^^^^^^^^^^^^^^^
-81 | setattr(foo, "ſ", 1)
    |
 help: Replace `getattr` with attribute access
 77 | # arguments passed to getattr/setattr. Rewriting `getattr(ns, "ſ")` to

@@ -7,15 +7,12 @@ I001 Import block is un-sorted or un-formatted
 1 | / import sys
 2 | | import os; x = 1
   | |_________^
-3 |
-4 |   if True:
   |
 help: Organize imports
 
 I001 Import block is un-sorted or un-formatted
  --> trailing_suffix.py:5:5
   |
-4 |   if True:
 5 | /     import sys
 6 | |     import os; x = 1
   | |_____________^

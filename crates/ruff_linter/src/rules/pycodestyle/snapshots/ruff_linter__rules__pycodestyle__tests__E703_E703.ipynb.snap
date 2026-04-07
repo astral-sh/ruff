@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E703 [*] Statement ends with an unnecessary semicolon
  --> E703.ipynb:5:2
   |
-3 | x;
-4 | # Only skip the last expression
 5 | x;  # E703
   |  ^
-6 | x;
-7 | # Nested expressions isn't relevant
   |
 help: Remove unnecessary semicolon
 2 | # Simple case
@@ -22,15 +18,11 @@ help: Remove unnecessary semicolon
 8 | if True:
 
 E703 [*] Statement ends with an unnecessary semicolon
-  --> E703.ipynb:9:6
-   |
- 7 | # Nested expressions isn't relevant
- 8 | if True:
- 9 |     x;
-   |      ^
-10 | # Semicolons with multiple expressions
-11 | x; x;
-   |
+ --> E703.ipynb:9:6
+  |
+9 |     x;
+  |      ^
+  |
 help: Remove unnecessary semicolon
 6  | x;
 7  | # Nested expressions isn't relevant

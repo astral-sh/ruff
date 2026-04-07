@@ -6,7 +6,6 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 1 | _ = lambda: print()  # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^
-2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
   |
 help: Inline function call
   - _ = lambda: print()  # [unnecessary-lambda]
@@ -19,11 +18,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:2:5
   |
-1 | _ = lambda: print()  # [unnecessary-lambda]
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^
-3 |
-4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
   |
 help: Inline function call
 1 | _ = lambda: print()  # [unnecessary-lambda]
@@ -37,12 +33,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:4:5
   |
-2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
-3 |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^
-5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
-6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
   |
 help: Inline function call
 1 | _ = lambda: print()  # [unnecessary-lambda]
@@ -58,11 +50,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:5:5
   |
-4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
-7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |
 help: Inline function call
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
@@ -78,11 +67,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:6:5
   |
-4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
-5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |
 help: Inline function call
 3 |
@@ -98,12 +84,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:7:5
   |
-5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
-6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-8 |
-9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
   |
 help: Inline function call
 4  | _ = lambda *args: f(*args) # [unnecessary-lambda]
@@ -117,14 +99,11 @@ help: Inline function call
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
-  --> unnecessary_lambda.py:9:5
-   |
- 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
- 8 |
- 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
-   |
+ --> unnecessary_lambda.py:9:5
+  |
+9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Inline function call
 6  | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7  | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
@@ -139,11 +118,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:10:5
    |
- 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 |
-12 | # default value in lambda parameters
    |
 help: Inline function call
 7  | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
@@ -159,10 +135,8 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:62:5
    |
-61 | # https://github.com/astral-sh/ruff/issues/18675
 62 | _ = lambda x: (string := str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-63 | _ = lambda x: ((x := 1) and str)(x)
    |
 help: Inline function call
 59 | _ = lambda *args: f(*args, y=x)
@@ -176,8 +150,6 @@ note: This is an unsafe fix and may change runtime behavior
 PLW0108 Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:63:5
    |
-61 | # https://github.com/astral-sh/ruff/issues/18675
-62 | _ = lambda x: (string := str)(x)
 63 | _ = lambda x: ((x := 1) and str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

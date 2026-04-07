@@ -6,8 +6,6 @@ tinycss2>=1.1.0<1.2
         ^^^^^^^^^^^
  --> pyproject.toml:5:16
   |
-3 |   version = "0.1.0"
-4 |   # There's a comma missing here
 5 |   dependencies = [
   |  ________________^
 6 | |   "tinycss2>=1.1.0<1.2",

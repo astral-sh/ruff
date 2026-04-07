@@ -6,8 +6,6 @@ UP045 [*] Use `X | None` for type annotations
    |
 40 | x: Optional[int] = None
    |    ^^^^^^^^^^^^^
-41 |
-42 | MyList: TypeAlias = Union[List[int], List[str]]
    |
 help: Convert to `X | None`
 37 |     return y

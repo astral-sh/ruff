@@ -24,8 +24,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.m
 error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Number`
  --> src/mdtest_snippet.py:3:4
   |
-1 | from numbers import Number
-2 |
 3 | a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
   |    ------   ^ Incompatible value of type `Literal[1]`
   |    |

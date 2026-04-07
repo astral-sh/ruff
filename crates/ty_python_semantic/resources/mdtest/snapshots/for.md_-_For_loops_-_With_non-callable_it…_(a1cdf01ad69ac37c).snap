@@ -33,13 +33,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error[not-iterable]: Object of type `NotIterable` is not iterable
-  --> src/mdtest_snippet.py:9:14
-   |
- 8 |     # error: [not-iterable]
- 9 |     for x in NotIterable():
-   |              ^^^^^^^^^^^^^
-10 |         pass
-   |
+ --> src/mdtest_snippet.py:9:14
+  |
+9 |     for x in NotIterable():
+  |              ^^^^^^^^^^^^^
+  |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
 
 ```
@@ -48,8 +46,6 @@ info: Its `__iter__` attribute has type `int | None`, which is not callable
 info[possibly-unresolved-reference]: Name `x` used when possibly not defined
   --> src/mdtest_snippet.py:14:17
    |
-12 |     # revealed: Unknown
-13 |     # error: [possibly-unresolved-reference]
 14 |     reveal_type(x)
    |                 ^
    |

@@ -6,8 +6,6 @@ TC003 [*] Move standard library import `collections.Counter` into a type-checkin
   |
 1 | from collections import Counter
   |                         ^^^^^^^
-2 |
-3 | from elsewhere import third_party
   |
 help: Move into type-checking block
    - from collections import Counter
@@ -27,12 +25,8 @@ note: This is an unsafe fix and may change runtime behavior
 TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
  --> TC001-3_future.py:3:23
   |
-1 | from collections import Counter
-2 |
 3 | from elsewhere import third_party
   |                       ^^^^^^^^^^^
-4 |
-5 | from . import first_party
   |
 help: Move into type-checking block
 1  | from collections import Counter
@@ -52,8 +46,6 @@ note: This is an unsafe fix and may change runtime behavior
 TC001 [*] Move application import `.first_party` into a type-checking block
  --> TC001-3_future.py:5:15
   |
-3 | from elsewhere import third_party
-4 |
 5 | from . import first_party
   |               ^^^^^^^^^^^
   |

@@ -6,5 +6,4 @@ SLOT000 Subclasses of `str` should define `__slots__`
   |
 1 | class Bad(str):  # SLOT000
   |       ^^^
-2 |     pass
   |

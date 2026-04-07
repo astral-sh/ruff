@@ -1570,7 +1570,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 report_cannot_delete_typed_dict_key(
                                                     &self.context,
                                                     (&*target.slice).into(),
-                                                    object_ty,
+                                                    typed_dict,
                                                     key,
                                                     Some(field),
                                                     TypedDictDeleteErrorKind::RequiredKey,
@@ -1580,7 +1580,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 report_cannot_delete_typed_dict_key(
                                                     &self.context,
                                                     (&*target.slice).into(),
-                                                    object_ty,
+                                                    typed_dict,
                                                     key,
                                                     None,
                                                     TypedDictDeleteErrorKind::UnknownKey,

@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB187 [*] Use of assignment of `reversed` on list `l`
  --> FURB187.py:6:5
   |
-4 | def a():
-5 |     l = []
 6 |     l = reversed(l)
   |     ^^^^^^^^^^^^^^^
   |
@@ -23,8 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB187 [*] Use of assignment of `reversed` on list `l`
   --> FURB187.py:11:5
    |
- 9 | def b():
-10 |     l = []
 11 |     l = list(reversed(l))
    |     ^^^^^^^^^^^^^^^^^^^^^
    |
@@ -42,8 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB187 [*] Use of assignment of `reversed` on list `l`
   --> FURB187.py:16:5
    |
-14 | def c():
-15 |     l = []
 16 |     l = l[::-1]
    |     ^^^^^^^^^^^
    |

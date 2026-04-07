@@ -7,8 +7,6 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / import a
 2 | | import b
   | |________^
-3 |   x = 1
-4 |   import os
   |
 help: Organize imports
 1 | import a
@@ -21,13 +19,9 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
  --> insert_empty_lines.py:4:1
   |
-2 |   import b
-3 |   x = 1
 4 | / import os
 5 | | import sys
   | |__________^
-6 |   def f():
-7 |       pass
   |
 help: Organize imports
 3  | x = 1
@@ -42,12 +36,9 @@ help: Organize imports
 I001 [*] Import block is un-sorted or un-formatted
   --> insert_empty_lines.py:14:1
    |
-12 |   class X: pass
-13 |   y = 1
 14 | / import os
 15 | | import sys
    | |__________^
-16 |   """Docstring"""
    |
 help: Organize imports
 13 | y = 1
@@ -63,8 +54,6 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 52 | import os
    | ^^^^^^^^^
-53 |
-54 | # Comment goes here.
    |
 help: Organize imports
 51 |

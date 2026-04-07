@@ -2,15 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
 RET508 [*] Unnecessary `elif` after `break` statement
-  --> RET508.py:8:9
-   |
- 6 |         if i > y:  # [no-else-break]
- 7 |             break
- 8 |         elif i > w:
-   |         ^^^^
- 9 |             break
-10 |         else:
-   |
+ --> RET508.py:8:9
+  |
+8 |         elif i > w:
+  |         ^^^^
+  |
 help: Remove unnecessary `elif`
 5  |     for i in x:
 6  |         if i > y:  # [no-else-break]
@@ -24,12 +20,8 @@ help: Remove unnecessary `elif`
 RET508 [*] Unnecessary `elif` after `break` statement
   --> RET508.py:22:9
    |
-20 |                 b = 2
-21 |             break
 22 |         elif z:
    |         ^^^^
-23 |             c = 2
-24 |         else:
    |
 help: Remove unnecessary `elif`
 19 |             else:
@@ -44,11 +36,8 @@ help: Remove unnecessary `elif`
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:33:9
    |
-31 |         if i > y:  # [no-else-break]
-32 |             break
 33 |         else:
    |         ^^^^
-34 |             a = z
    |
 help: Remove unnecessary `else`
 30 |     for i in x:
@@ -64,12 +53,8 @@ help: Remove unnecessary `else`
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:44:13
    |
-42 |                 b = 2
-43 |                 break
 44 |             else:
    |             ^^^^
-45 |                 c = 3
-46 |                 break
    |
 help: Remove unnecessary `else`
 41 |             if z:  # [no-else-break]
@@ -87,12 +72,8 @@ help: Remove unnecessary `else`
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:60:9
    |
-58 |                 b = 2
-59 |             break
 60 |         else:
    |         ^^^^
-61 |             c = 3
-62 |         break
    |
 help: Remove unnecessary `else`
 57 |             else:
@@ -108,12 +89,8 @@ help: Remove unnecessary `else`
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:71:13
    |
-69 |                 a = 4
-70 |                 break
 71 |             else:
    |             ^^^^
-72 |                 b = 2
-73 |         else:
    |
 help: Remove unnecessary `else`
 68 |             if y:  # [no-else-break]
@@ -129,12 +106,8 @@ help: Remove unnecessary `else`
 RET508 [*] Unnecessary `else` after `break` statement
   --> RET508.py:82:9
    |
-80 |         if x:  # [no-else-break]
-81 |             break
 82 |         else:
    |         ^^^^
-83 |             try:
-84 |                 return
    |
 help: Remove unnecessary `else`
 79 |     for i in range(10):
@@ -156,11 +129,8 @@ help: Remove unnecessary `else`
 RET508 [*] Unnecessary `else` after `break` statement
    --> RET508.py:158:13
     |
-156 |             if i > w:
-157 |                 break
 158 |             else:
     |             ^^^^
-159 |                 a = z
     |
 help: Remove unnecessary `else`
 155 |         else:

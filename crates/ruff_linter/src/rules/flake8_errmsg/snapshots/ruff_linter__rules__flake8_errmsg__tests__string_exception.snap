@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
 EM101 [*] Exception must not use a string literal, assign to variable first
  --> EM101_byte_string.py:2:24
   |
-1 | def f_byte():
 2 |     raise RuntimeError(b"This is an example exception")
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
@@ -21,7 +20,6 @@ note: This is an unsafe fix and may change runtime behavior
 EM101 [*] Exception must not use a string literal, assign to variable first
  --> EM101_byte_string.py:6:24
   |
-5 | def f_byte_empty():
 6 |     raise RuntimeError(b"")
   |                        ^^^
   |

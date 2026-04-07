@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF059 [*] Unpacked variable `c` is never used
   --> RUF059_0.py:24:6
    |
-23 |     bar = (1, 2)
 24 |     (c, d) = bar
    |      ^
-25 |
-26 |     (x, y) = baz = bar
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 21 |     (a, b) = (1, 2)
@@ -24,11 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `d` is never used
   --> RUF059_0.py:24:9
    |
-23 |     bar = (1, 2)
 24 |     (c, d) = bar
    |         ^
-25 |
-26 |     (x, y) = baz = bar
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 21 |     (a, b) = (1, 2)
@@ -44,8 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_0.py:26:6
    |
-24 |     (c, d) = bar
-25 |
 26 |     (x, y) = baz = bar
    |      ^
    |
@@ -63,8 +55,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_0.py:26:9
    |
-24 |     (c, d) = bar
-25 |
 26 |     (x, y) = baz = bar
    |         ^
    |
@@ -82,11 +72,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `connection` is never used
   --> RUF059_0.py:66:24
    |
-64 |         return None, None
-65 |
 66 |     with connect() as (connection, cursor):
    |                        ^^^^^^^^^^
-67 |         cursor.execute("SELECT * FROM users")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 63 |     def connect():
@@ -102,11 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `connection` is never used
   --> RUF059_0.py:74:24
    |
-72 |         return None, None
-73 |
 74 |     with connect() as (connection, cursor):
    |                        ^^^^^^^^^^
-75 |         cursor.execute("SELECT * FROM users")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 71 |     def connect():
@@ -122,10 +106,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `this` is never used
   --> RUF059_0.py:79:49
    |
-78 | def f():
 79 |     with open("file") as my_file, open("") as ((this, that)):
    |                                                 ^^^^
-80 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 76 |
@@ -141,10 +123,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `that` is never used
   --> RUF059_0.py:79:55
    |
-78 | def f():
 79 |     with open("file") as my_file, open("") as ((this, that)):
    |                                                       ^^^^
-80 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 76 |
@@ -160,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `this` is never used
   --> RUF059_0.py:86:23
    |
-84 |     with (
-85 |         open("file") as my_file,
 86 |         open("") as ((this, that)),
    |                       ^^^^
-87 |     ):
-88 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 83 | def f():
@@ -181,12 +157,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 [*] Unpacked variable `that` is never used
   --> RUF059_0.py:86:29
    |
-84 |     with (
-85 |         open("file") as my_file,
 86 |         open("") as ((this, that)),
    |                             ^^^^
-87 |     ):
-88 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
 83 | def f():
@@ -202,10 +174,7 @@ note: This is an unsafe fix and may change runtime behavior
 RUF059 Unpacked variable `x` is never used
    --> RUF059_0.py:101:5
     |
- 99 | # see: https://github.com/astral-sh/ruff/issues/18507
-100 | def f(_x):
 101 |     x, = "1"
     |     ^
-102 |     print(_x)
     |
 help: Prefix it with an underscore or any other dummy variable pattern

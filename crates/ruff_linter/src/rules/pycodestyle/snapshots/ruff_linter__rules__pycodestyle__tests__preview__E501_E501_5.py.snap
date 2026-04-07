@@ -4,17 +4,13 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E501 Line too long (89 > 88)
  --> E501_5.py:5:89
   |
-4 | # Error - trailing noqa after another comment (89 characters before noqa pragma)
 5 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa"  # comment  # noqa: F401
   |                                                                                         ^
-6 |
-7 | # OK - double hash before noqa (80 characters before noqa pragma)
   |
 
 E501 Line too long (89 > 88)
   --> E501_5.py:14:89
    |
-13 | # Error - trailing type: ignore after another comment (89 characters before pragma)
 14 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa"  # comment  # type: ignore
    |                                                                                         ^
    |

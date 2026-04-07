@@ -6,7 +6,6 @@ SIM220 [*] Use `False` instead of `a and not a`
   |
 1 | if a and not a:
   |    ^^^^^^^^^^^
-2 |     pass
   |
 help: Replace with `False`
   - if a and not a:
@@ -19,11 +18,8 @@ note: This is an unsafe fix and may change runtime behavior
 SIM220 [*] Use `False` instead of `a and not a`
  --> SIM220.py:4:5
   |
-2 |     pass
-3 |
 4 | if (a and not a) and b:
   |     ^^^^^^^^^^^
-5 |     pass
   |
 help: Replace with `False`
 1 | if a and not a:
@@ -39,11 +35,8 @@ note: This is an unsafe fix and may change runtime behavior
 SIM220 [*] Use `False` instead of `a and not a`
  --> SIM220.py:7:5
   |
-5 |     pass
-6 |
 7 | if (a and not a) or b:
   |     ^^^^^^^^^^^
-8 |     pass
   |
 help: Replace with `False`
 4  | if (a and not a) and b:

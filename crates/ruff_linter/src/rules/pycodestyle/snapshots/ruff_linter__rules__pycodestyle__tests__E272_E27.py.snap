@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E272 [*] Multiple spaces before keyword
   --> E27.py:21:2
    |
-19 | a and  2
-20 | #: E271 E272
 21 | 1  and  b
    |  ^^
-22 | #: E271 E272
-23 | a  and  2
    |
 help: Replace with single space
 18 | #: E271
@@ -24,12 +20,8 @@ help: Replace with single space
 E272 [*] Multiple spaces before keyword
   --> E27.py:23:2
    |
-21 | 1  and  b
-22 | #: E271 E272
 23 | a  and  2
    |  ^^
-24 | #: E272
-25 | this  and False
    |
 help: Replace with single space
 20 | #: E271 E272
@@ -44,12 +36,8 @@ help: Replace with single space
 E272 [*] Multiple spaces before keyword
   --> E27.py:25:5
    |
-23 | a  and  2
-24 | #: E272
 25 | this  and False
    |     ^^
-26 | #: E273
-27 | a and    b
    |
 help: Replace with single space
 22 | #: E271 E272

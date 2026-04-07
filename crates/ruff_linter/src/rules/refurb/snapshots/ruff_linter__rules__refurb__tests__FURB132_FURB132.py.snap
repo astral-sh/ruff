@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB132 [*] Use `s.discard("x")` instead of check and `remove`
   --> FURB132.py:12:1
    |
-11 |   # FURB132
 12 | / if "x" in s:
 13 | |     s.remove("x")
    | |_________________^
@@ -24,7 +23,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
   --> FURB132.py:22:1
    |
-21 |   # FURB132
 22 | / if "x" in s3:
 23 | |     s3.remove("x")
    | |__________________^
@@ -44,8 +42,6 @@ note: This is an unsafe fix and may change runtime behavior
 FURB132 [*] Use `s.discard(var)` instead of check and `remove`
   --> FURB132.py:28:1
    |
-26 |   var = "y"
-27 |   # FURB132
 28 | / if var in s:
 29 | |     s.remove(var)
    | |_________________^

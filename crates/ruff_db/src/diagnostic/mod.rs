@@ -1387,7 +1387,7 @@ impl DisplayDiagnosticConfig {
             program,
             format: DiagnosticFormat::default(),
             color: false,
-            context: 2,
+            context: 0,
             preview: false,
             hide_severity: false,
             show_fix_status: false,

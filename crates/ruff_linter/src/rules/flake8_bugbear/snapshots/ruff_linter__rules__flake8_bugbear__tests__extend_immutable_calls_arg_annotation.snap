@@ -6,7 +6,6 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 17 | def error_due_to_missing_import(foo: ImmutableTypeA = []):
    |                                                       ^^
-18 |     ...
    |
 help: Replace with `None`; initialize within function
 14 |     ...

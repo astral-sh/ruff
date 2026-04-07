@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 W293 [*] Blank line contains whitespace
  --> W293.py:4:1
   |
-2 | class Chassis(RobotModuleTemplate):
-3 |     """底盘信息推送控制
 4 |     
   | ^^^^
-5 |     """\
   |
 help: Remove whitespace from blank line
 1 | # See: https://github.com/astral-sh/ruff/issues/9323
@@ -24,8 +21,6 @@ note: This is an unsafe fix and may change runtime behavior
 W293 [*] Blank line contains whitespace
   --> W293.py:10:1
    |
- 8 | """""" \
- 9 |     \
 10 |     
    | ^^^^
    |
@@ -44,11 +39,8 @@ help: Remove whitespace from blank line
 W293 [*] Blank line contains whitespace
   --> W293.py:16:1
    |
-14 |  " \
-15 |     \
 16 |     
    | ^^^^
-17 | '''blank line with whitespace
    |
 help: Remove whitespace from blank line
 11 |
@@ -65,10 +57,8 @@ help: Remove whitespace from blank line
 W293 [*] Blank line contains whitespace
   --> W293.py:18:1
    |
-17 | '''blank line with whitespace
 18 |  
    | ^
-19 | inside a multiline string'''
    |
 help: Remove whitespace from blank line
 15 |     \

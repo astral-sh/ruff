@@ -6,10 +6,6 @@ RUF200 Failed to parse pyproject.toml: URL requirement must be preceded by a pac
 ^^^
   --> pyproject.toml:10:16
    |
- 8 | requires-python = ">=3.8"
- 9 | requires-dist = [ "maturin>=0.14", "...",]
 10 | dependencies = [ "packaging", "...",]
    |                ^^^^^^^^^^^^^^^^^^^^^^
-11 | zip-safe = false
-12 | version = "..."
    |

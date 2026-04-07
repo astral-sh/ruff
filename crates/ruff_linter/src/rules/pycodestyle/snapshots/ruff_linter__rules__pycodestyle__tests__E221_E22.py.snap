@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E221 [*] Multiple spaces before operator
  --> E22.py:3:6
   |
-1 | #: E221
-2 | a = 12 + 3
 3 | b = 4  + 5
   |      ^^
-4 | #: E221 E221
-5 | x             = 1
   |
 help: Replace with single space
 1 | #: E221
@@ -23,12 +19,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
  --> E22.py:5:2
   |
-3 | b = 4  + 5
-4 | #: E221 E221
 5 | x             = 1
   |  ^^^^^^^^^^^^^
-6 | y             = 2
-7 | long_variable = 3
   |
 help: Replace with single space
 2 | a = 12 + 3
@@ -43,12 +35,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
  --> E22.py:6:2
   |
-4 | #: E221 E221
-5 | x             = 1
 6 | y             = 2
   |  ^^^^^^^^^^^^^
-7 | long_variable = 3
-8 | #: E221 E221
   |
 help: Replace with single space
 3 | b = 4  + 5
@@ -61,15 +49,11 @@ help: Replace with single space
 9 | x[0]          = 1
 
 E221 [*] Multiple spaces before operator
-  --> E22.py:9:5
-   |
- 7 | long_variable = 3
- 8 | #: E221 E221
- 9 | x[0]          = 1
-   |     ^^^^^^^^^^
-10 | x[1]          = 2
-11 | long_variable = 3
-   |
+ --> E22.py:9:5
+  |
+9 | x[0]          = 1
+  |     ^^^^^^^^^^
+  |
 help: Replace with single space
 6  | y             = 2
 7  | long_variable = 3
@@ -83,12 +67,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
   --> E22.py:10:5
    |
- 8 | #: E221 E221
- 9 | x[0]          = 1
 10 | x[1]          = 2
    |     ^^^^^^^^^^
-11 | long_variable = 3
-12 | #: E221 E221
    |
 help: Replace with single space
 7  | long_variable = 3
@@ -103,12 +83,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
   --> E22.py:13:9
    |
-11 | long_variable = 3
-12 | #: E221 E221
 13 | x = f(x)          + 1
    |         ^^^^^^^^^^
-14 | y = long_variable + 2
-15 | z = x[0]          + 3
    |
 help: Replace with single space
 10 | x[1]          = 2
@@ -123,12 +99,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
   --> E22.py:15:9
    |
-13 | x = f(x)          + 1
-14 | y = long_variable + 2
 15 | z = x[0]          + 3
    |         ^^^^^^^^^^
-16 | #: E221:3:14
-17 | text = """
    |
 help: Replace with single space
 12 | #: E221 E221
@@ -143,12 +115,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
   --> E22.py:19:14
    |
-17 | text = """
-18 |     bar
 19 |     foo %s"""  % rofl
    |              ^^
-20 | #: Okay
-21 | x = 1
    |
 help: Replace with single space
 16 | #: E221:3:14
@@ -163,11 +131,8 @@ help: Replace with single space
 E221 [*] Multiple spaces before operator
    --> E22.py:184:5
     |
-182 | #:
-183 |
 184 | if a  ==  1:
     |     ^^
-185 |     print(a)
     |
 help: Replace with single space
 181 |     pass

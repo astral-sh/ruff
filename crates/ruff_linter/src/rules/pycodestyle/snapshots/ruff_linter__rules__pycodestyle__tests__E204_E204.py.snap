@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E204 [*] Whitespace after decorator
   --> E204.py:14:2
    |
-13 | # E204
 14 | @ foo
    |  ^
-15 | def baz():
-16 |     print('baz')
    |
 help: Remove whitespace
 11 |     print('bar')
@@ -23,11 +20,8 @@ help: Remove whitespace
 E204 [*] Whitespace after decorator
   --> E204.py:25:6
    |
-24 |     # E204
 25 |     @ foo
    |      ^
-26 |     def baz(self):
-27 |         print('baz')
    |
 help: Remove whitespace
 22 |         print('bar')
@@ -42,11 +36,8 @@ help: Remove whitespace
 E204 [*] Whitespace after decorator
   --> E204.py:31:2
    |
-30 | # E204
 31 | @ \
    |  ^^
-32 | foo
-33 | def baz():
    |
 help: Remove whitespace
 28 |

@@ -6,8 +6,6 @@ SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
 1 | a = False if b else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^
-2 |
-3 | a = False if b != c else True  # SIM211
   |
 help: Replace with `not ...`
   - a = False if b else True  # SIM211
@@ -20,12 +18,8 @@ note: This is an unsafe fix and may change runtime behavior
 SIM211 [*] Use `not ...` instead of `False if ... else True`
  --> SIM211.py:3:5
   |
-1 | a = False if b else True  # SIM211
-2 |
 3 | a = False if b != c else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-4 |
-5 | a = False if b + c else True  # SIM211
   |
 help: Replace with `not ...`
 1 | a = False if b else True  # SIM211
@@ -40,12 +34,8 @@ note: This is an unsafe fix and may change runtime behavior
 SIM211 [*] Use `not ...` instead of `False if ... else True`
  --> SIM211.py:5:5
   |
-3 | a = False if b != c else True  # SIM211
-4 |
 5 | a = False if b + c else True  # SIM211
   |     ^^^^^^^^^^^^^^^^^^^^^^^^
-6 |
-7 | a = True if b else False  # OK
   |
 help: Replace with `not ...`
 2 |

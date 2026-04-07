@@ -2,14 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
 B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
-  --> B011.py:8:8
-   |
- 7 | assert 1 != 2
- 8 | assert False
-   |        ^^^^^
- 9 | assert 1 != 2, "message"
-10 | assert False, "message"
-   |
+ --> B011.py:8:8
+  |
+8 | assert False
+  |        ^^^^^
+  |
 help: Replace `assert False`
 5  | """
 6  |
@@ -23,8 +20,6 @@ note: This is an unsafe fix and may change runtime behavior
 B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
   --> B011.py:10:8
    |
- 8 | assert False
- 9 | assert 1 != 2, "message"
 10 | assert False, "message"
    |        ^^^^^
    |

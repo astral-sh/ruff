@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/numpy/mod.rs
 NPY201 [*] `np.add_docstring` will be removed in NumPy 2.0. Use `numpy.lib.add_docstring` instead.
  --> NPY201.py:4:5
   |
-2 |     import numpy as np
-3 |
 4 |     np.add_docstring
   |     ^^^^^^^^^^^^^^^^
-5 |
-6 |     np.add_newdoc
   |
 help: Replace with `numpy.lib.add_docstring`
 1 + from numpy.lib import add_docstring
@@ -25,12 +21,8 @@ help: Replace with `numpy.lib.add_docstring`
 NPY201 [*] `np.add_newdoc` will be removed in NumPy 2.0. Use `numpy.lib.add_newdoc` instead.
  --> NPY201.py:6:5
   |
-4 |     np.add_docstring
-5 |
 6 |     np.add_newdoc
   |     ^^^^^^^^^^^^^
-7 |
-8 |     np.add_newdoc_ufunc
   |
 help: Replace with `numpy.lib.add_newdoc`
 1  + from numpy.lib import add_newdoc
@@ -46,36 +38,24 @@ help: Replace with `numpy.lib.add_newdoc`
 10 |
 
 NPY201 `np.add_newdoc_ufunc` will be removed in NumPy 2.0. `add_newdoc_ufunc` is an internal function.
-  --> NPY201.py:8:5
-   |
- 6 |     np.add_newdoc
- 7 |
- 8 |     np.add_newdoc_ufunc
-   |     ^^^^^^^^^^^^^^^^^^^
- 9 |
-10 |     np.asfarray([1,2,3])
-   |
+ --> NPY201.py:8:5
+  |
+8 |     np.add_newdoc_ufunc
+  |     ^^^^^^^^^^^^^^^^^^^
+  |
 
 NPY201 `np.asfarray` will be removed in NumPy 2.0. Use `np.asarray` with a `float` dtype instead.
   --> NPY201.py:10:5
    |
- 8 |     np.add_newdoc_ufunc
- 9 |
 10 |     np.asfarray([1,2,3])
    |     ^^^^^^^^^^^
-11 |
-12 |     np.byte_bounds(np.array([1,2,3]))
    |
 
 NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `numpy.lib.array_utils.byte_bounds` on NumPy 2.0, or ignore this warning on earlier versions.
   --> NPY201.py:12:5
    |
-10 |     np.asfarray([1,2,3])
-11 |
 12 |     np.byte_bounds(np.array([1,2,3]))
    |     ^^^^^^^^^^^^^^
-13 |
-14 |     np.cast
    |
 help: Replace with `numpy.lib.array_utils.byte_bounds` (requires NumPy 2.0 or greater)
 1  + from numpy.lib.array_utils import byte_bounds
@@ -96,23 +76,15 @@ note: This is an unsafe fix and may change runtime behavior
 NPY201 `np.cast` will be removed in NumPy 2.0. Use `np.asarray(arr, dtype=dtype)` instead.
   --> NPY201.py:14:5
    |
-12 |     np.byte_bounds(np.array([1,2,3]))
-13 |
 14 |     np.cast
    |     ^^^^^^^
-15 |
-16 |     np.cfloat(12+34j)
    |
 
 NPY201 [*] `np.cfloat` will be removed in NumPy 2.0. Use `numpy.complex128` instead.
   --> NPY201.py:16:5
    |
-14 |     np.cast
-15 |
 16 |     np.cfloat(12+34j)
    |     ^^^^^^^^^
-17 |
-18 |     np.clongfloat(12+34j)
    |
 help: Replace with `numpy.complex128`
 13 |
@@ -127,12 +99,8 @@ help: Replace with `numpy.complex128`
 NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
   --> NPY201.py:18:5
    |
-16 |     np.cfloat(12+34j)
-17 |
 18 |     np.clongfloat(12+34j)
    |     ^^^^^^^^^^^^^
-19 |
-20 |     np.compat
    |
 help: Replace with `numpy.clongdouble`
 15 |
@@ -147,23 +115,15 @@ help: Replace with `numpy.clongdouble`
 NPY201 `np.compat` will be removed in NumPy 2.0. Python 2 is no longer supported.
   --> NPY201.py:20:5
    |
-18 |     np.clongfloat(12+34j)
-19 |
 20 |     np.compat
    |     ^^^^^^^^^
-21 |
-22 |     np.complex_(12+34j)
    |
 
 NPY201 [*] `np.complex_` will be removed in NumPy 2.0. Use `numpy.complex128` instead.
   --> NPY201.py:22:5
    |
-20 |     np.compat
-21 |
 22 |     np.complex_(12+34j)
    |     ^^^^^^^^^^^
-23 |
-24 |     np.DataSource
    |
 help: Replace with `numpy.complex128`
 19 |
@@ -178,12 +138,8 @@ help: Replace with `numpy.complex128`
 NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `numpy.lib.npyio.DataSource` instead.
   --> NPY201.py:24:5
    |
-22 |     np.complex_(12+34j)
-23 |
 24 |     np.DataSource
    |     ^^^^^^^^^^^^^
-25 |
-26 |     np.deprecate
    |
 help: Replace with `numpy.lib.npyio.DataSource`
 1  + from numpy.lib.npyio import DataSource
@@ -203,78 +159,50 @@ help: Replace with `numpy.lib.npyio.DataSource`
 NPY201 `np.deprecate` will be removed in NumPy 2.0. Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.
   --> NPY201.py:26:5
    |
-24 |     np.DataSource
-25 |
 26 |     np.deprecate
    |     ^^^^^^^^^^^^
-27 |
-28 |     np.deprecate_with_doc
    |
 
 NPY201 `np.deprecate_with_doc` will be removed in NumPy 2.0. Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.
   --> NPY201.py:28:5
    |
-26 |     np.deprecate
-27 |
 28 |     np.deprecate_with_doc
    |     ^^^^^^^^^^^^^^^^^^^^^
-29 |
-30 |     np.disp(10)
    |
 
 NPY201 `np.disp` will be removed in NumPy 2.0. Use a dedicated print function instead.
   --> NPY201.py:30:5
    |
-28 |     np.deprecate_with_doc
-29 |
 30 |     np.disp(10)
    |     ^^^^^^^
-31 |
-32 |     np.fastCopyAndTranspose
    |
 
 NPY201 `np.fastCopyAndTranspose` will be removed in NumPy 2.0. Use `arr.T.copy()` instead.
   --> NPY201.py:32:5
    |
-30 |     np.disp(10)
-31 |
 32 |     np.fastCopyAndTranspose
    |     ^^^^^^^^^^^^^^^^^^^^^^^
-33 |
-34 |     np.find_common_type
    |
 
 NPY201 `np.find_common_type` will be removed in NumPy 2.0. Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`.
   --> NPY201.py:34:5
    |
-32 |     np.fastCopyAndTranspose
-33 |
 34 |     np.find_common_type
    |     ^^^^^^^^^^^^^^^^^^^
-35 |
-36 |     np.get_array_wrap
    |
 
 NPY201 `np.get_array_wrap` will be removed without replacement in NumPy 2.0
   --> NPY201.py:36:5
    |
-34 |     np.find_common_type
-35 |
 36 |     np.get_array_wrap
    |     ^^^^^^^^^^^^^^^^^
-37 |
-38 |     np.float_
    |
 
 NPY201 [*] `np.float_` will be removed in NumPy 2.0. Use `numpy.float64` instead.
   --> NPY201.py:38:5
    |
-36 |     np.get_array_wrap
-37 |
 38 |     np.float_
    |     ^^^^^^^^^
-39 |
-40 |     np.geterrobj
    |
 help: Replace with `numpy.float64`
 35 |
@@ -289,23 +217,15 @@ help: Replace with `numpy.float64`
 NPY201 `np.geterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
   --> NPY201.py:40:5
    |
-38 |     np.float_
-39 |
 40 |     np.geterrobj
    |     ^^^^^^^^^^^^
-41 |
-42 |     np.Inf
    |
 
 NPY201 [*] `np.Inf` will be removed in NumPy 2.0. Use `numpy.inf` instead.
   --> NPY201.py:42:5
    |
-40 |     np.geterrobj
-41 |
 42 |     np.Inf
    |     ^^^^^^
-43 |
-44 |     np.Infinity
    |
 help: Replace with `numpy.inf`
 39 |
@@ -320,12 +240,8 @@ help: Replace with `numpy.inf`
 NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `numpy.inf` instead.
   --> NPY201.py:44:5
    |
-42 |     np.Inf
-43 |
 44 |     np.Infinity
    |     ^^^^^^^^^^^
-45 |
-46 |     np.infty
    |
 help: Replace with `numpy.inf`
 41 |
@@ -340,12 +256,8 @@ help: Replace with `numpy.inf`
 NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.inf` instead.
   --> NPY201.py:46:5
    |
-44 |     np.Infinity
-45 |
 46 |     np.infty
    |     ^^^^^^^^
-47 |
-48 |     np.issctype
    |
 help: Replace with `numpy.inf`
 43 |
@@ -360,23 +272,15 @@ help: Replace with `numpy.inf`
 NPY201 `np.issctype` will be removed without replacement in NumPy 2.0
   --> NPY201.py:48:5
    |
-46 |     np.infty
-47 |
 48 |     np.issctype
    |     ^^^^^^^^^^^
-49 |
-50 |     np.issubclass_(np.int32, np.integer)
    |
 
 NPY201 [*] `np.issubclass_` will be removed in NumPy 2.0. Use `issubclass` instead.
   --> NPY201.py:50:5
    |
-48 |     np.issctype
-49 |
 50 |     np.issubclass_(np.int32, np.integer)
    |     ^^^^^^^^^^^^^^
-51 |
-52 |     np.issubsctype
    |
 help: Replace with `issubclass`
 47 |
@@ -391,12 +295,8 @@ help: Replace with `issubclass`
 NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `numpy.issubdtype` instead.
   --> NPY201.py:52:5
    |
-50 |     np.issubclass_(np.int32, np.integer)
-51 |
 52 |     np.issubsctype
    |     ^^^^^^^^^^^^^^
-53 |
-54 |     np.mat
    |
 help: Replace with `numpy.issubdtype`
 49 |
@@ -411,12 +311,8 @@ help: Replace with `numpy.issubdtype`
 NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asmatrix` instead.
   --> NPY201.py:54:5
    |
-52 |     np.issubsctype
-53 |
 54 |     np.mat
    |     ^^^^^^
-55 |
-56 |     np.maximum_sctype
    |
 help: Replace with `numpy.asmatrix`
 51 |
@@ -431,23 +327,15 @@ help: Replace with `numpy.asmatrix`
 NPY201 `np.maximum_sctype` will be removed without replacement in NumPy 2.0
   --> NPY201.py:56:5
    |
-54 |     np.mat
-55 |
 56 |     np.maximum_sctype
    |     ^^^^^^^^^^^^^^^^^
-57 |
-58 |     np.NaN
    |
 
 NPY201 [*] `np.NaN` will be removed in NumPy 2.0. Use `numpy.nan` instead.
   --> NPY201.py:58:5
    |
-56 |     np.maximum_sctype
-57 |
 58 |     np.NaN
    |     ^^^^^^
-59 |
-60 |     np.nbytes[np.int64]
    |
 help: Replace with `numpy.nan`
 55 |
@@ -462,23 +350,15 @@ help: Replace with `numpy.nan`
 NPY201 `np.nbytes` will be removed in NumPy 2.0. Use `np.dtype(<dtype>).itemsize` instead.
   --> NPY201.py:60:5
    |
-58 |     np.NaN
-59 |
 60 |     np.nbytes[np.int64]
    |     ^^^^^^^^^
-61 |
-62 |     np.NINF
    |
 
 NPY201 [*] `np.NINF` will be removed in NumPy 2.0. Use `-np.inf` instead.
   --> NPY201.py:62:5
    |
-60 |     np.nbytes[np.int64]
-61 |
 62 |     np.NINF
    |     ^^^^^^^
-63 |
-64 |     np.NZERO
    |
 help: Replace with `-np.inf`
 59 |
@@ -493,12 +373,8 @@ help: Replace with `-np.inf`
 NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` instead.
   --> NPY201.py:64:5
    |
-62 |     np.NINF
-63 |
 64 |     np.NZERO
    |     ^^^^^^^^
-65 |
-66 |     np.longcomplex(12+34j)
    |
 help: Replace with `-0.0`
 61 |
@@ -513,12 +389,8 @@ help: Replace with `-0.0`
 NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
   --> NPY201.py:66:5
    |
-64 |     np.NZERO
-65 |
 66 |     np.longcomplex(12+34j)
    |     ^^^^^^^^^^^^^^
-67 |
-68 |     np.longfloat(12+34j)
    |
 help: Replace with `numpy.clongdouble`
 63 |
@@ -533,12 +405,8 @@ help: Replace with `numpy.clongdouble`
 NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `numpy.longdouble` instead.
   --> NPY201.py:68:5
    |
-66 |     np.longcomplex(12+34j)
-67 |
 68 |     np.longfloat(12+34j)
    |     ^^^^^^^^^^^^
-69 |
-70 |     np.lookfor
    |
 help: Replace with `numpy.longdouble`
 65 |
@@ -553,23 +421,15 @@ help: Replace with `numpy.longdouble`
 NPY201 `np.lookfor` will be removed in NumPy 2.0. Search NumPy’s documentation directly.
   --> NPY201.py:70:5
    |
-68 |     np.longfloat(12+34j)
-69 |
 70 |     np.lookfor
    |     ^^^^^^^^^^
-71 |
-72 |     np.NAN
    |
 
 NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan` instead.
   --> NPY201.py:72:5
    |
-70 |     np.lookfor
-71 |
 72 |     np.NAN
    |     ^^^^^^
-73 |
-74 |     try:
    |
 help: Replace with `numpy.nan`
 69 |

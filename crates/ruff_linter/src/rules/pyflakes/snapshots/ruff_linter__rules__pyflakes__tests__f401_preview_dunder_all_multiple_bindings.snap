@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F401 [*] `submodule.baz` imported but unused
  --> __init__.py:3:8
   |
-2 | import submodule.bar
 3 | import submodule.baz
   |        ^^^^^^^^^^^^^
-4 | __all__ = ['submodule']
-5 | FOO = 42
   |
 help: Remove unused import: `submodule.baz`
 1 |

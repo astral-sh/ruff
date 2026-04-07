@@ -4,21 +4,13 @@ source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
 FIX003 Line contains XXX, consider resolving the issue
  --> T00.py:3:3
   |
-1 | # TODO: todo
-2 | # todo: todo
 3 | # XXX: xxx
   |   ^^^
-4 | # xxx: xxx
-5 | # HACK: hack
   |
 
 FIX003 Line contains XXX, consider resolving the issue
  --> T00.py:4:3
   |
-2 | # todo: todo
-3 | # XXX: xxx
 4 | # xxx: xxx
   |   ^^^
-5 | # HACK: hack
-6 | # hack: hack
   |

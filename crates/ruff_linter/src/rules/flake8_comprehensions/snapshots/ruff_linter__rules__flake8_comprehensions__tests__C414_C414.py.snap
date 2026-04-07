@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 C414 [*] Unnecessary `list()` call within `list()`
  --> C414.py:2:1
   |
-1 | x = [1, 2, 3]
 2 | list(list(x))
   | ^^^^^^^^^^^^^
-3 | list(tuple(x))
-4 | tuple(list(x))
   |
 help: Remove the inner `list()` call
 1 | x = [1, 2, 3]
@@ -22,12 +19,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `tuple()` call within `list()`
  --> C414.py:3:1
   |
-1 | x = [1, 2, 3]
-2 | list(list(x))
 3 | list(tuple(x))
   | ^^^^^^^^^^^^^^
-4 | tuple(list(x))
-5 | tuple(tuple(x))
   |
 help: Remove the inner `tuple()` call
 1 | x = [1, 2, 3]
@@ -42,12 +35,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `tuple()`
  --> C414.py:4:1
   |
-2 | list(list(x))
-3 | list(tuple(x))
 4 | tuple(list(x))
   | ^^^^^^^^^^^^^^
-5 | tuple(tuple(x))
-6 | set(set(x))
   |
 help: Remove the inner `list()` call
 1 | x = [1, 2, 3]
@@ -63,12 +52,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `tuple()` call within `tuple()`
  --> C414.py:5:1
   |
-3 | list(tuple(x))
-4 | tuple(list(x))
 5 | tuple(tuple(x))
   | ^^^^^^^^^^^^^^^
-6 | set(set(x))
-7 | set(list(x))
   |
 help: Remove the inner `tuple()` call
 2 | list(list(x))
@@ -84,12 +69,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `set()` call within `set()`
  --> C414.py:6:1
   |
-4 | tuple(list(x))
-5 | tuple(tuple(x))
 6 | set(set(x))
   | ^^^^^^^^^^^
-7 | set(list(x))
-8 | set(tuple(x))
   |
 help: Remove the inner `set()` call
 3 | list(tuple(x))
@@ -105,12 +86,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `set()`
  --> C414.py:7:1
   |
-5 | tuple(tuple(x))
-6 | set(set(x))
 7 | set(list(x))
   | ^^^^^^^^^^^^
-8 | set(tuple(x))
-9 | set(sorted(x))
   |
 help: Remove the inner `list()` call
 4  | tuple(list(x))
@@ -124,15 +101,11 @@ help: Remove the inner `list()` call
 note: This is an unsafe fix and may change runtime behavior
 
 C414 [*] Unnecessary `tuple()` call within `set()`
-  --> C414.py:8:1
-   |
- 6 | set(set(x))
- 7 | set(list(x))
- 8 | set(tuple(x))
-   | ^^^^^^^^^^^^^
- 9 | set(sorted(x))
-10 | set(sorted(x, key=lambda y: y))
-   |
+ --> C414.py:8:1
+  |
+8 | set(tuple(x))
+  | ^^^^^^^^^^^^^
+  |
 help: Remove the inner `tuple()` call
 5  | tuple(tuple(x))
 6  | set(set(x))
@@ -145,15 +118,11 @@ help: Remove the inner `tuple()` call
 note: This is an unsafe fix and may change runtime behavior
 
 C414 [*] Unnecessary `sorted()` call within `set()`
-  --> C414.py:9:1
-   |
- 7 | set(list(x))
- 8 | set(tuple(x))
- 9 | set(sorted(x))
-   | ^^^^^^^^^^^^^^
-10 | set(sorted(x, key=lambda y: y))
-11 | set(reversed(x))
-   |
+ --> C414.py:9:1
+  |
+9 | set(sorted(x))
+  | ^^^^^^^^^^^^^^
+  |
 help: Remove the inner `sorted()` call
 6  | set(set(x))
 7  | set(list(x))
@@ -168,12 +137,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `sorted()` call within `set()`
   --> C414.py:10:1
    |
- 8 | set(tuple(x))
- 9 | set(sorted(x))
 10 | set(sorted(x, key=lambda y: y))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 | set(reversed(x))
-12 | sorted(list(x))
    |
 help: Remove the inner `sorted()` call
 7  | set(list(x))
@@ -189,12 +154,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `reversed()` call within `set()`
   --> C414.py:11:1
    |
- 9 | set(sorted(x))
-10 | set(sorted(x, key=lambda y: y))
 11 | set(reversed(x))
    | ^^^^^^^^^^^^^^^^
-12 | sorted(list(x))
-13 | sorted(tuple(x))
    |
 help: Remove the inner `reversed()` call
 8  | set(tuple(x))
@@ -210,12 +171,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `sorted()`
   --> C414.py:12:1
    |
-10 | set(sorted(x, key=lambda y: y))
-11 | set(reversed(x))
 12 | sorted(list(x))
    | ^^^^^^^^^^^^^^^
-13 | sorted(tuple(x))
-14 | sorted(sorted(x))
    |
 help: Remove the inner `list()` call
 9  | set(sorted(x))
@@ -231,12 +188,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `tuple()` call within `sorted()`
   --> C414.py:13:1
    |
-11 | set(reversed(x))
-12 | sorted(list(x))
 13 | sorted(tuple(x))
    | ^^^^^^^^^^^^^^^^
-14 | sorted(sorted(x))
-15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
    |
 help: Remove the inner `tuple()` call
 10 | set(sorted(x, key=lambda y: y))
@@ -252,12 +205,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `sorted()` call within `sorted()`
   --> C414.py:14:1
    |
-12 | sorted(list(x))
-13 | sorted(tuple(x))
 14 | sorted(sorted(x))
    | ^^^^^^^^^^^^^^^^^
-15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
-16 | sorted(sorted(x, reverse=True), reverse=True)
    |
 help: Remove the inner `sorted()` call
 11 | set(reversed(x))
@@ -273,12 +222,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `sorted()` call within `sorted()`
   --> C414.py:15:1
    |
-13 | sorted(tuple(x))
-14 | sorted(sorted(x))
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-16 | sorted(sorted(x, reverse=True), reverse=True)
-17 | sorted(reversed(x))
    |
 help: Remove the inner `sorted()` call
 12 | sorted(list(x))
@@ -294,12 +239,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `sorted()` call within `sorted()`
   --> C414.py:16:1
    |
-14 | sorted(sorted(x))
-15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 16 | sorted(sorted(x, reverse=True), reverse=True)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-17 | sorted(reversed(x))
-18 | sorted(list(x), key=lambda y: y)
    |
 help: Remove the inner `sorted()` call
 13 | sorted(tuple(x))
@@ -315,12 +256,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `reversed()` call within `sorted()`
   --> C414.py:17:1
    |
-15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
-16 | sorted(sorted(x, reverse=True), reverse=True)
 17 | sorted(reversed(x))
    | ^^^^^^^^^^^^^^^^^^^
-18 | sorted(list(x), key=lambda y: y)
-19 | tuple(
    |
 help: Remove the inner `reversed()` call
 14 | sorted(sorted(x))
@@ -336,12 +273,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `sorted()`
   --> C414.py:18:1
    |
-16 | sorted(sorted(x, reverse=True), reverse=True)
-17 | sorted(reversed(x))
 18 | sorted(list(x), key=lambda y: y)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-19 | tuple(
-20 |     list(
    |
 help: Remove the inner `list()` call
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
@@ -357,8 +290,6 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `tuple()`
   --> C414.py:19:1
    |
-17 |   sorted(reversed(x))
-18 |   sorted(list(x), key=lambda y: y)
 19 | / tuple(
 20 | |     list(
 21 | |         [x, 3, "hell"\
@@ -366,8 +297,6 @@ C414 [*] Unnecessary `list()` call within `tuple()`
 23 | |     )
 24 | | )
    | |_^
-25 |   set(set())
-26 |   set(list())
    |
 help: Remove the inner `list()` call
 17 | sorted(reversed(x))
@@ -386,12 +315,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `set()` call within `set()`
   --> C414.py:25:1
    |
-23 |     )
-24 | )
 25 | set(set())
    | ^^^^^^^^^^
-26 | set(list())
-27 | set(tuple())
    |
 help: Remove the inner `set()` call
 22 |         "o"]
@@ -407,12 +332,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `set()`
   --> C414.py:26:1
    |
-24 | )
-25 | set(set())
 26 | set(list())
    | ^^^^^^^^^^^
-27 | set(tuple())
-28 | sorted(reversed())
    |
 help: Remove the inner `list()` call
 23 |     )
@@ -428,11 +349,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `tuple()` call within `set()`
   --> C414.py:27:1
    |
-25 | set(set())
-26 | set(list())
 27 | set(tuple())
    | ^^^^^^^^^^^^
-28 | sorted(reversed())
    |
 help: Remove the inner `tuple()` call
 24 | )
@@ -448,12 +366,8 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `reversed()` call within `sorted()`
   --> C414.py:28:1
    |
-26 | set(list())
-27 | set(tuple())
 28 | sorted(reversed())
    | ^^^^^^^^^^^^^^^^^^
-29 |
-30 | # Nested sorts with differing keyword arguments. Not flagged.
    |
 help: Remove the inner `reversed()` call
 25 | set(set())
@@ -469,7 +383,6 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `sorted()`
   --> C414.py:37:27
    |
-36 |   # Preserve trailing comments.
 37 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |  ___________________________^
 38 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),
@@ -478,8 +391,6 @@ C414 [*] Unnecessary `list()` call within `sorted()`
 41 | |     key=lambda xxxxx: xxxxx or "",
 42 | | )
    | |_^
-43 |
-44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |
 help: Remove the inner `list()` call
 35 |
@@ -495,8 +406,6 @@ note: This is an unsafe fix and may change runtime behavior
 C414 [*] Unnecessary `list()` call within `sorted()`
   --> C414.py:44:27
    |
-42 |   )
-43 |
 44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |  ___________________________^
 45 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx

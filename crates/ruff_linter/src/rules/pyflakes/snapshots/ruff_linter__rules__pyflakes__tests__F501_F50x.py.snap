@@ -6,6 +6,4 @@ F501 `%`-format string has invalid format string: incomplete format
   |
 1 | '%(foo)' % {'foo': 'bar'}  # F501
   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
-3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
   |

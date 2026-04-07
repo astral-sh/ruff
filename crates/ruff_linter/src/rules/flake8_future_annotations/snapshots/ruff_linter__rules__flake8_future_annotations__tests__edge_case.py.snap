@@ -6,8 +6,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def main(_: List[int]) -> None:
   |             ^^^^
-6 |     a_list: t.List[str] = []
-7 |     a_list.append("hello")
   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
@@ -19,10 +17,8 @@ note: This is an unsafe fix and may change runtime behavior
 FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
  --> edge_case.py:6:13
   |
-5 | def main(_: List[int]) -> None:
 6 |     a_list: t.List[str] = []
   |             ^^^^^^
-7 |     a_list.append("hello")
   |
 help: Add `from __future__ import annotations`
 1 + from __future__ import annotations

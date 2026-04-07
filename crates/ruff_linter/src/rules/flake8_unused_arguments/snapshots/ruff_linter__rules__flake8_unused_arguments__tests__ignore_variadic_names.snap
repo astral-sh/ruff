@@ -6,7 +6,6 @@ ARG001 Unused function argument: `a`
   |
 1 | def f(a, b):
   |       ^
-2 |     print("Hello, world!")
   |
 
 ARG001 Unused function argument: `b`
@@ -14,7 +13,6 @@ ARG001 Unused function argument: `b`
   |
 1 | def f(a, b):
   |          ^
-2 |     print("Hello, world!")
   |
 
 ARG001 Unused function argument: `a`
@@ -22,7 +20,6 @@ ARG001 Unused function argument: `a`
   |
 5 | def f(a, b, *args, **kwargs):
   |       ^
-6 |     print("Hello, world!")
   |
 
 ARG001 Unused function argument: `b`
@@ -30,43 +27,32 @@ ARG001 Unused function argument: `b`
   |
 5 | def f(a, b, *args, **kwargs):
   |          ^
-6 |     print("Hello, world!")
   |
 
 ARG002 Unused method argument: `a`
   --> ignore_variadic_names.py:10:17
    |
- 9 | class C:
 10 |     def f(self, a, b):
    |                 ^
-11 |         print("Hello, world!")
    |
 
 ARG002 Unused method argument: `b`
   --> ignore_variadic_names.py:10:20
    |
- 9 | class C:
 10 |     def f(self, a, b):
    |                    ^
-11 |         print("Hello, world!")
    |
 
 ARG002 Unused method argument: `a`
   --> ignore_variadic_names.py:13:17
    |
-11 |         print("Hello, world!")
-12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                 ^
-14 |         print("Hello, world!")
    |
 
 ARG002 Unused method argument: `b`
   --> ignore_variadic_names.py:13:20
    |
-11 |         print("Hello, world!")
-12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                    ^
-14 |         print("Hello, world!")
    |

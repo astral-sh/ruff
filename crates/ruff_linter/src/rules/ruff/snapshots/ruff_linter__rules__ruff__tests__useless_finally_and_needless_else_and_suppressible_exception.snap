@@ -2,16 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF047 [*] Empty `else` clause
-  --> RUF072_RUF047_SIM105.py:7:1
-   |
- 5 |   except Exception:
- 6 |       pass
- 7 | / else:
- 8 | |     pass
-   | |________^
- 9 |   finally:
-10 |       pass
-   |
+ --> RUF072_RUF047_SIM105.py:7:1
+  |
+7 | / else:
+8 | |     pass
+  | |________^
+  |
 help: Remove the `else` clause
 4 |     foo()
 5 | except Exception:
@@ -24,8 +20,6 @@ help: Remove the `else` clause
 RUF072 [*] Empty `finally` clause
   --> RUF072_RUF047_SIM105.py:9:1
    |
- 7 |   else:
- 8 |       pass
  9 | / finally:
 10 | |     pass
    | |________^

@@ -4,19 +4,13 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N807 Function name should not start and end with `__`
  --> N807.py:4:5
   |
-2 |     pass
-3 |
 4 | def __stillBad__():
   |     ^^^^^^^^^^^^
-5 |     pass
   |
 
 N807 Function name should not start and end with `__`
   --> N807.py:12:9
    |
-10 |         pass
-11 |
 12 |     def __stillBad__():
    |         ^^^^^^^^^^^^
-13 |         pass
    |

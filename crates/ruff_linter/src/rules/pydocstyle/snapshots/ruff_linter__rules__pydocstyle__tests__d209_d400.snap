@@ -4,7 +4,6 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 D209 [*] Multi-line docstring closing quotes should be on a separate line
  --> D209_D400.py:2:5
   |
-1 |   def lorem():
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
   | |________________________________________________________________________^
@@ -19,7 +18,6 @@ help: Move closing quotes to new line
 D400 [*] First line should end with a period
  --> D209_D400.py:2:5
   |
-1 |   def lorem():
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
   | |________________________________________________________________________^

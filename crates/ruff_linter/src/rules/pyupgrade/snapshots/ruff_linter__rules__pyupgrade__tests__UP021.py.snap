@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP021 [*] `universal_newlines` is deprecated, use `text`
  --> UP021.py:5:25
   |
-4 | # Errors
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
   |                         ^^^^^^^^^^^^^^^^^^
-6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-7 | run(["foo"], universal_newlines=True, check=False)
   |
 help: Replace with `text` keyword argument
 2 | from subprocess import run
@@ -23,11 +20,8 @@ help: Replace with `text` keyword argument
 UP021 [*] `universal_newlines` is deprecated, use `text`
  --> UP021.py:6:25
   |
-4 | # Errors
-5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
   |                         ^^^^^^^^^^^^^^^^^^
-7 | run(["foo"], universal_newlines=True, check=False)
   |
 help: Replace with `text` keyword argument
 3 |
@@ -42,12 +36,8 @@ help: Replace with `text` keyword argument
 UP021 [*] `universal_newlines` is deprecated, use `text`
  --> UP021.py:7:14
   |
-5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
   |              ^^^^^^^^^^^^^^^^^^
-8 |
-9 | # OK
   |
 help: Replace with `text` keyword argument
 4  | # Errors

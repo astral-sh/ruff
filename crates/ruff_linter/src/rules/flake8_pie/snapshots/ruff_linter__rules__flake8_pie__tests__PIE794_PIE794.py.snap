@@ -4,12 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 PIE794 [*] Class field `name` is defined multiple times
  --> PIE794.py:4:5
   |
-2 |     name = StringField()
-3 |     # ....
 4 |     name = StringField()  # PIE794
   |     ^^^^^^^^^^^^^^^^^^^^
-5 |
-6 |     def remove(self) -> None:
   |
 help: Remove duplicate field definition for `name`
 1 | class Foo(BaseModel):
@@ -24,12 +20,8 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:13:5
    |
-11 |     name: str = StringField()
-12 |     # ....
 13 |     name = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^^
-14 |
-15 |     def foo(self) -> None:
    |
 help: Remove duplicate field definition for `name`
 10 | class Foo(BaseModel):
@@ -44,8 +36,6 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `bar` is defined multiple times
   --> PIE794.py:23:5
    |
-21 |     foo: bool = BooleanField()
-22 |     # ...
 23 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^
    |
@@ -62,8 +52,6 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `bar` is defined multiple times
   --> PIE794.py:40:5
    |
-38 |     foo: bool = BooleanField()
-39 |     # ...
 40 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^
    |
@@ -80,8 +68,6 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:46:5
    |
-44 |     name = "Foo"
-45 |     name = name + " Bar"
 46 |     name = "Bar"  # PIE794
    |     ^^^^^^^^^^^^
    |
@@ -98,8 +84,6 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:52:5
    |
-50 |     name: str = "Foo"
-51 |     name: str = name + " Bar"
 52 |     name: str = "Bar"  # PIE794
    |     ^^^^^^^^^^^^^^^^^
    |
@@ -116,8 +100,6 @@ note: This is an unsafe fix and may change runtime behavior
 PIE794 [*] Class field `start_line` is defined multiple times
   --> PIE794.py:57:5
    |
-55 | class TextEdit:
-56 |     start_line: int
 57 |     start_line: int  # PIE794
    |     ^^^^^^^^^^^^^^^
    |

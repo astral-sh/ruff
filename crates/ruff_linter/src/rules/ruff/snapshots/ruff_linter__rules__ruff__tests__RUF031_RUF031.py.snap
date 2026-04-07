@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF031 [*] Avoid parentheses for tuples in subscripts
  --> RUF031.py:2:3
   |
-1 | d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
 2 | d[(1,2)]
   |   ^^^^^
-3 | d[(
-4 |     1,
   |
 help: Remove parentheses
 1 | d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
@@ -21,16 +18,12 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
  --> RUF031.py:3:3
   |
-1 |   d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
-2 |   d[(1,2)]
 3 |   d[(
   |  ___^
 4 | |     1,
 5 | |     2
 6 | | )]
   | |_^
-7 |   d[
-8 |       1,
   |
 help: Remove parentheses
 1 | d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
@@ -48,12 +41,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:11:3
    |
- 9 |     2
-10 | ]
 11 | d[(2,4)]
    |   ^^^^^
-12 | d[(5,6,7)]
-13 | d[(8,)]
    |
 help: Remove parentheses
 8  |     1,
@@ -68,12 +57,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:12:3
    |
-10 | ]
-11 | d[(2,4)]
 12 | d[(5,6,7)]
    |   ^^^^^^^
-13 | d[(8,)]
-14 | d[tuple(1,2)]
    |
 help: Remove parentheses
 9  |     2
@@ -88,12 +73,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:13:3
    |
-11 | d[(2,4)]
-12 | d[(5,6,7)]
 13 | d[(8,)]
    |   ^^^^
-14 | d[tuple(1,2)]
-15 | d[tuple(8)]
    |
 help: Remove parentheses
 10 | ]
@@ -108,11 +89,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:20:3
    |
-18 | d[5,6,7]
-19 | e = {((1,2),(3,4)):"a"}
 20 | e[((1,2),(3,4))]
    |   ^^^^^^^^^^^^^
-21 | e[(1,2),(3,4)]
    |
 help: Remove parentheses
 17 | d[3,4]
@@ -128,10 +106,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:24:5
    |
-23 | token_features[
 24 |     (window_position, feature_name)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-25 | ] = self._extract_raw_features_from_token
    |
 help: Remove parentheses
 21 | e[(1,2),(3,4)]
@@ -146,11 +122,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:28:3
    |
-27 | d[1,]
 28 | d[(1,)]
    |   ^^^^
-29 | d[()] # empty tuples should be ignored
-30 | d[:,] # slices in the subscript lead to syntax error if parens are added
    |
 help: Remove parentheses
 25 | ] = self._extract_raw_features_from_token
@@ -165,12 +138,8 @@ help: Remove parentheses
 RUF031 [*] Avoid parentheses for tuples in subscripts
   --> RUF031.py:36:3
    |
-34 | # Python <=3.10 to avoid syntax error.
-35 | # https://github.com/astral-sh/ruff/issues/12776
 36 | d[(*foo,bar)]
    |   ^^^^^^^^^^
-37 |
-38 | x: dict[str, int]  # tuples inside type annotations should never be altered
    |
 help: Remove parentheses
 33 | # Should keep these parentheses in

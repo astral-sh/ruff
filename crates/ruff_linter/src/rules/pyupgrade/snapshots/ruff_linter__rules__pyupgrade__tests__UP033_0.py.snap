@@ -6,8 +6,6 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   |
 4 | @functools.lru_cache(maxsize=None)
   |                     ^^^^^^^^^^^^^^
-5 | def fixme():
-6 |     pass
   |
 help: Rewrite with `@functools.cache
 1 | import functools
@@ -22,11 +20,8 @@ help: Rewrite with `@functools.cache
 UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   --> UP033_0.py:10:21
    |
- 9 | @other_decorator
 10 | @functools.lru_cache(maxsize=None)
    |                     ^^^^^^^^^^^^^^
-11 | def fixme():
-12 |     pass
    |
 help: Rewrite with `@functools.cache
 7  |
@@ -43,8 +38,6 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
 15 | @functools.lru_cache(maxsize=None)
    |                     ^^^^^^^^^^^^^^
-16 | @other_decorator
-17 | def fixme():
    |
 help: Rewrite with `@functools.cache
 12 |     pass
@@ -64,8 +57,6 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 51 | |     maxsize=None,  # text
 52 | | )
    | |_^
-53 |   def fixme_unsafe():
-54 |       pass
    |
 help: Rewrite with `@functools.cache
 47 |

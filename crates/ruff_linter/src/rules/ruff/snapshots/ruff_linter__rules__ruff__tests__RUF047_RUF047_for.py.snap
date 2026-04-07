@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF047 [*] Empty `else` clause
  --> RUF047_for.py:6:1
   |
-4 |       loop_body_is_not_checked()
-5 |       break
 6 | / else:
 7 | |     pass
   | |________^
@@ -23,8 +21,6 @@ help: Remove the `else` clause
 RUF047 [*] Empty `else` clause
   --> RUF047_for.py:12:1
    |
-10 |   for this in comment:
-11 |       belongs_to()  # `for`
 12 | / else:
 13 | |     ...
    | |_______^

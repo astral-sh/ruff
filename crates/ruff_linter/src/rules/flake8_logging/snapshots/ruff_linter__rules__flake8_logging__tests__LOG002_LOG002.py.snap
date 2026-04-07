@@ -4,10 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:11:11
    |
-10 | # LOG002
 11 | getLogger(__file__)
    |           ^^^^^^^^
-12 | logging.getLogger(name=__file__)
    |
 help: Replace with `__name__`
 8  | logging.getLogger(name="custom")
@@ -23,12 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:12:24
    |
-10 | # LOG002
-11 | getLogger(__file__)
 12 | logging.getLogger(name=__file__)
    |                        ^^^^^^^^
-13 |
-14 | logging.getLogger(__cached__)
    |
 help: Replace with `__name__`
 9  |
@@ -44,11 +38,8 @@ note: This is an unsafe fix and may change runtime behavior
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:14:19
    |
-12 | logging.getLogger(name=__file__)
-13 |
 14 | logging.getLogger(__cached__)
    |                   ^^^^^^^^^^
-15 | getLogger(name=__cached__)
    |
 help: Replace with `__name__`
 11 | getLogger(__file__)
@@ -64,7 +55,6 @@ note: This is an unsafe fix and may change runtime behavior
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:15:16
    |
-14 | logging.getLogger(__cached__)
 15 | getLogger(name=__cached__)
    |                ^^^^^^^^^^
    |

@@ -25,13 +25,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assignable to `tuple[int, bytes, bool]`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: tuple[int, str, bool]):
 2 |     target: tuple[int, bytes, bool] = source  # error: [invalid-assignment]
   |             -----------------------   ^^^^^^ Incompatible value of type `tuple[int, str, bool]`
   |             |
   |             Declared type
-3 | def _(source: tuple[int, str]):
-4 |     target: tuple[int, str, bool] = source  # error: [invalid-assignment]
   |
 
 ```
@@ -40,8 +37,6 @@ error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assigna
 error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to `tuple[int, str, bool]`
  --> src/mdtest_snippet.py:4:13
   |
-2 |     target: tuple[int, bytes, bool] = source  # error: [invalid-assignment]
-3 | def _(source: tuple[int, str]):
 4 |     target: tuple[int, str, bool] = source  # error: [invalid-assignment]
   |             ---------------------   ^^^^^^ Incompatible value of type `tuple[int, str]`
   |             |

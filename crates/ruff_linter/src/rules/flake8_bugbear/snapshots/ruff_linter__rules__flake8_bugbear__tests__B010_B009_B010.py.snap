@@ -4,11 +4,8 @@ source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:50:1
    |
-49 | # Invalid usage
 50 | setattr(foo, "bar", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-51 | setattr(foo, "_123abc", None)
-52 | setattr(foo, "__123abc__", None)
    |
 help: Replace `setattr` with assignment
 47 |     pass
@@ -23,12 +20,8 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:51:1
    |
-49 | # Invalid usage
-50 | setattr(foo, "bar", None)
 51 | setattr(foo, "_123abc", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-52 | setattr(foo, "__123abc__", None)
-53 | setattr(foo, "abc123", None)
    |
 help: Replace `setattr` with assignment
 48 |
@@ -43,12 +36,8 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:52:1
    |
-50 | setattr(foo, "bar", None)
-51 | setattr(foo, "_123abc", None)
 52 | setattr(foo, "__123abc__", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-53 | setattr(foo, "abc123", None)
-54 | setattr(foo, r"abc123", None)
    |
 help: Replace `setattr` with assignment
 49 | # Invalid usage
@@ -63,12 +52,8 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:53:1
    |
-51 | setattr(foo, "_123abc", None)
-52 | setattr(foo, "__123abc__", None)
 53 | setattr(foo, "abc123", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-54 | setattr(foo, r"abc123", None)
-55 | setattr(foo.bar, r"baz", None)
    |
 help: Replace `setattr` with assignment
 50 | setattr(foo, "bar", None)
@@ -83,11 +68,8 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:54:1
    |
-52 | setattr(foo, "__123abc__", None)
-53 | setattr(foo, "abc123", None)
 54 | setattr(foo, r"abc123", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | setattr(foo.bar, r"baz", None)
    |
 help: Replace `setattr` with assignment
 51 | setattr(foo, "_123abc", None)
@@ -102,12 +84,8 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:55:1
    |
-53 | setattr(foo, "abc123", None)
-54 | setattr(foo, r"abc123", None)
 55 | setattr(foo.bar, r"baz", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-56 |
-57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
    |
 help: Replace `setattr` with assignment
 52 | setattr(foo, "__123abc__", None)
@@ -122,8 +100,6 @@ help: Replace `setattr` with assignment
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
   --> B009_B010.py:81:1
    |
-79 | # Example: the long s character "ſ" normalizes to "s" under NFKC.
-80 | getattr(foo, "ſ")
 81 | setattr(foo, "ſ", 1)
    | ^^^^^^^^^^^^^^^^^^^^
    |

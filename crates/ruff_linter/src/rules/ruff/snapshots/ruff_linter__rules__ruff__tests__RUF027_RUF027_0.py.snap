@@ -4,8 +4,6 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF027 [*] Possible f-string without an `f` prefix
  --> RUF027_0.py:5:7
   |
-3 | "always ignore this: {val}"
-4 |
 5 | print("but don't ignore this: {val}")  # RUF027
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
@@ -23,11 +21,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:10:9
    |
- 8 | def simple_cases():
- 9 |     a = 4
 10 |     b = "{a}"  # RUF027
    |         ^^^^^
-11 |     c = "{a} {b} f'{val}' "  # RUF027
    |
 help: Add `f` prefix
 7  |
@@ -43,8 +38,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:11:9
    |
- 9 |     a = 4
-10 |     b = "{a}"  # RUF027
 11 |     c = "{a} {b} f'{val}' "  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^
    |
@@ -62,11 +55,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:21:9
    |
-19 | def raw_string():
-20 |     a = 4
 21 |     b = r"raw string with formatting: {a}"  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
    |
 help: Add `f` prefix
 18 |
@@ -82,8 +72,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:22:9
    |
-20 |     a = 4
-21 |     b = r"raw string with formatting: {a}"  # RUF027
 22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -101,11 +89,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:27:11
    |
-25 | def print_name(name: str):
-26 |     a = 4
 27 |     print("Hello, {name}!")  # RUF027
    |           ^^^^^^^^^^^^^^^^
-28 |     print("The test value we're using today is {a}")  # RUF027
    |
 help: Add `f` prefix
 24 |
@@ -121,8 +106,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:28:11
    |
-26 |     a = 4
-27 |     print("Hello, {name}!")  # RUF027
 28 |     print("The test value we're using today is {a}")  # RUF027
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -140,8 +123,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:33:33
    |
-31 | def nested_funcs():
-32 |     a = 4
 33 |     print(do_nothing(do_nothing("{a}")))  # RUF027
    |                                 ^^^^^
    |
@@ -159,12 +140,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:39:19
    |
-37 |     a = 4
-38 |     c = a
 39 |     single_line = """ {a} """  # RUF027
    |                   ^^^^^^^^^^^
-40 |     # RUF027
-41 |     multi_line = a = """b { # comment
    |
 help: Add `f` prefix
 36 | def tripled_quoted():
@@ -180,8 +157,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:41:22
    |
-39 |       single_line = """ {a} """  # RUF027
-40 |       # RUF027
 41 |       multi_line = a = """b { # comment
    |  ______________________^
 42 | |     c}  d
@@ -202,8 +177,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:49:9
    |
-47 |       a = 4
-48 |       # RUF027
 49 |       b = " {\
    |  _________^
 50 | |     a} \
@@ -224,11 +197,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:56:9
    |
-54 | def implicit_concat():
-55 |     a = 4
 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
    |         ^^^^^
-57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
    |
 help: Add `f` prefix
 53 |
@@ -244,8 +214,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:57:18
    |
-55 |     a = 4
-56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
 57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
    |                  ^^^^^
    |
@@ -263,8 +231,6 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:62:9
    |
-60 | def escaped_chars():
-61 |     a = 4
 62 |     b = "\"not escaped:\" '{a}' \"escaped:\": '{{c}}'"  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
@@ -282,12 +248,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:70:18
    |
-68 |     first = "Wendy"
-69 |     last = "Appleseed"
 70 |     value.method("{first} {last}")  # RUF027
    |                  ^^^^^^^^^^^^^^^^
-71 |
-72 | def format_specifiers():
    |
 help: Add `f` prefix
 67 |     value.method = print_name
@@ -303,12 +265,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:74:9
    |
-72 | def format_specifiers():
-73 |     a = 4
 74 |     b = "{a:b} {a:^5}"
    |         ^^^^^^^^^^^^^^
-75 |
-76 | # fstrings are never correct as type definitions
    |
 help: Add `f` prefix
 71 |
@@ -324,12 +282,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:92:11
    |
-90 | def backslash_test():
-91 |     x = "test"
 92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
    |           ^^^^^^^^^^^^^^^^^^
-93 |
-94 | # Test case for comment handling in f-string interpolations
    |
 help: Add `f` prefix
 89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
@@ -343,17 +297,13 @@ help: Add `f` prefix
 note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
-   --> RUF027_0.py:98:11
-    |
- 96 |   def comment_test():
- 97 |       x = "!"
- 98 |       print("""{x  # }
-    |  ___________^
- 99 | | }""")
-    | |____^
-100 |
-101 |   # Test case for `#` inside a nested string literal in interpolation
-    |
+  --> RUF027_0.py:98:11
+   |
+98 |       print("""{x  # }
+   |  ___________^
+99 | | }""")
+   | |____^
+   |
 help: Add `f` prefix
 95  | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
 96  | def comment_test():
@@ -368,11 +318,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
    --> RUF027_0.py:105:11
     |
-103 | def hash_in_string_test():
-104 |     x = "world"
 105 |     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
     |           ^^^^^^^^^^^^^^^^
-106 |     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
     |
 help: Add `f` prefix
 102 | # `#` inside a string is NOT a comment — should trigger RUF027 even on Python < 3.12
@@ -388,11 +335,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
    --> RUF027_0.py:112:11
     |
-110 | def hash_in_format_spec_test():
-111 |     n = 255
 112 |     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
     |           ^^^^^^^^^^^^^
-113 |     print("Oct: {n:#o}")   # RUF027: same
     |
 help: Add `f` prefix
 109 | # `#` in a format spec is NOT a comment — should trigger RUF027 even on Python < 3.12
@@ -408,12 +352,8 @@ note: This is an unsafe fix and may change runtime behavior
 RUF027 [*] Possible f-string without an `f` prefix
    --> RUF027_0.py:113:11
     |
-111 |     n = 255
-112 |     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
 113 |     print("Oct: {n:#o}")   # RUF027: same
     |           ^^^^^^^^^^^^^
-114 |
-115 | # Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
     |
 help: Add `f` prefix
 110 | def hash_in_format_spec_test():

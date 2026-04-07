@@ -2,15 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
 RET505 [*] Unnecessary `elif` after `return` statement
-  --> RET505.py:8:5
-   |
- 6 |         a = 1
- 7 |         return y
- 8 |     elif z:
-   |     ^^^^
- 9 |         b = 2
-10 |         return w
-   |
+ --> RET505.py:8:5
+  |
+8 |     elif z:
+  |     ^^^^
+  |
 help: Remove unnecessary `elif`
 5  |     if x:  # [no-else-return]
 6  |         a = 1
@@ -24,12 +20,8 @@ help: Remove unnecessary `elif`
 RET505 [*] Unnecessary `elif` after `return` statement
   --> RET505.py:23:5
    |
-21 |             b = 2
-22 |         return
 23 |     elif z:
    |     ^^^^
-24 |         c = 2
-25 |     else:
    |
 help: Remove unnecessary `elif`
 20 |         else:
@@ -44,12 +36,8 @@ help: Remove unnecessary `elif`
 RET505 [*] Unnecessary `elif` after `return` statement
   --> RET505.py:41:5
    |
-39 |         a = 1
-40 |         return y
 41 |     elif z:
    |     ^^^^
-42 |         b = 2
-43 |         return w
    |
 help: Remove unnecessary `elif`
 38 |     if x:  # [no-else-return]
@@ -64,12 +52,8 @@ help: Remove unnecessary `elif`
 RET505 [*] Unnecessary `else` after `return` statement
   --> RET505.py:53:5
    |
-51 |         a = 1
-52 |         return y
 53 |     else:
    |     ^^^^
-54 |         b = 2
-55 |         return z
    |
 help: Remove unnecessary `else`
 50 |     if x:  # [no-else-return]
@@ -87,12 +71,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
   --> RET505.py:64:9
    |
-62 |             b = 2
-63 |             return y
 64 |         else:
    |         ^^^^
-65 |             c = 3
-66 |             return x
    |
 help: Remove unnecessary `else`
 61 |         if y:  # [no-else-return]
@@ -110,12 +90,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
   --> RET505.py:79:5
    |
-77 |             b = 2
-78 |         return
 79 |     else:
    |     ^^^^
-80 |         c = 3
-81 |     return
    |
 help: Remove unnecessary `else`
 76 |         else:
@@ -131,12 +107,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
   --> RET505.py:89:9
    |
-87 |             a = 4
-88 |             return
 89 |         else:
    |         ^^^^
-90 |             b = 2
-91 |     else:
    |
 help: Remove unnecessary `else`
 86 |         if y:  # [no-else-return]
@@ -150,15 +122,11 @@ help: Remove unnecessary `else`
 92 |     return
 
 RET505 [*] Unnecessary `else` after `return` statement
-   --> RET505.py:99:5
-    |
- 97 |     if x:  # [no-else-return]
- 98 |         return True
- 99 |     else:
-    |     ^^^^
-100 |         try:
-101 |             return False
-    |
+  --> RET505.py:99:5
+   |
+99 |     else:
+   |     ^^^^
+   |
 help: Remove unnecessary `else`
 96  | def bar4(x):
 97  |     if x:  # [no-else-return]
@@ -179,12 +147,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:109:5
     |
-107 |     if n<2:
-108 |         return n;
 109 |     else:
     |     ^^^^
-110 |         last = 1;
-111 |         last2 = 0;
     |
 help: Remove unnecessary `else`
 106 | def fibo(n):
@@ -202,12 +166,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:145:5
     |
-143 |     if True:
-144 |         return
 145 |     else:
     |     ^^^^
-146 |         # comment
-147 |         pass
     |
 help: Remove unnecessary `else`
 142 | def bar4(x):
@@ -225,11 +185,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:153:5
     |
-151 |     if True:
-152 |         return
 153 |     else:  # comment
     |     ^^^^
-154 |         pass
     |
 help: Remove unnecessary `else`
 150 | def bar5():
@@ -246,12 +203,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:160:5
     |
-158 |     if True:
-159 |         return
 160 |     else\
     |     ^^^^
-161 |         :\
-162 |         # comment
     |
 help: Remove unnecessary `else`
 157 | def bar6():
@@ -270,12 +223,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:169:5
     |
-167 |     if True:
-168 |         return
 169 |     else\
     |     ^^^^
-170 |         :  # comment
-171 |         pass
     |
 help: Remove unnecessary `else`
 166 | def bar7():
@@ -293,8 +242,6 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:177:5
     |
-175 |     if True:
-176 |         return
 177 |     else: pass
     |     ^^^^
     |
@@ -311,11 +258,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:183:5
     |
-181 |     if True:
-182 |         return
 183 |     else:\
     |     ^^^^
-184 |         pass
     |
 help: Remove unnecessary `else`
 180 | def bar9():
@@ -331,8 +275,6 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:200:5
     |
-198 | def sb(self):
-199 |     if self._sb is not None: return self._sb
 200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
     |     ^^^^
     |
@@ -349,12 +291,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:207:5
     |
-205 |         a = 1
-206 |         return y
 207 |     else:
     |     ^^^^
-208 |
-209 |         c = 3
     |
 help: Remove unnecessary `else`
 204 |     if x:  # [no-else-return]
@@ -373,12 +311,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:217:5
     |
-215 |         a = 1
-216 |         return y
 217 |     else:
     |     ^^^^
-218 |         # comment
-219 |         c = 3
     |
 help: Remove unnecessary `else`
 214 |     if x:  # [no-else-return]
@@ -398,12 +332,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:227:5
     |
-225 |         a = 1
-226 |         return y
 227 |     else:
     |     ^^^^
-228 |           # comment
-229 |         c = 3
     |
 help: Remove unnecessary `else`
 224 |     if x:  # [no-else-return]
@@ -423,12 +353,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:237:5
     |
-235 |         a = 1
-236 |         return y
 237 |     else:
     |     ^^^^
-238 |   # comment
-239 |         c = 3
     |
 help: Remove unnecessary `else`
 234 |     if x:  # [no-else-return]
@@ -447,11 +373,8 @@ help: Remove unnecessary `else`
 RET505 [*] Unnecessary `else` after `return` statement
    --> RET505.py:245:2
     |
-243 |     if True:
-244 |      return True
 245 |     else:
     |     ^^^^
-246 |      return False
     |
 help: Remove unnecessary `else`
 242 | def f():
@@ -467,11 +390,7 @@ help: Remove unnecessary `else`
 RET505 Unnecessary `else` after `return` statement
    --> RET505.py:252:5
     |
-250 |     if b'Untracked files' in result.stdout:
-251 |         return True
 252 |     else:
     |     ^^^^
-253 | \
-254 |         return False
     |
 help: Remove unnecessary `else`

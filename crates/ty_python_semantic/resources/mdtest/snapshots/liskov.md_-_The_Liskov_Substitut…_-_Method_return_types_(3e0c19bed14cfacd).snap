@@ -35,19 +35,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:11:9
    |
-10 | class Sub3(Super):
 11 |     def method(self) -> object: ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
-12 |
-13 | class Sub4(Super):
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 
@@ -57,17 +51,13 @@ info: This violates the Liskov Substitution Principle
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:14:9
    |
-13 | class Sub4(Super):
 14 |     def method(self) -> str: ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
- 1 | class Super:
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
- 3 |
- 4 | class Sub1(Super):
    |
 info: This violates the Liskov Substitution Principle
 

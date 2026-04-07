@@ -6,7 +6,6 @@ B008 Do not perform function call `Depends` in argument defaults; instead, perfo
    |
 24 | def error_due_to_missing_import(data: List[str] = Depends(None)):
    |                                                   ^^^^^^^^^^^^^
-25 |     ...
    |
 
 B008 Do not perform function call `OtherClass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
@@ -14,13 +13,11 @@ B008 Do not perform function call `OtherClass` in argument defaults; instead, pe
    |
 36 | def error(obj=OtherClass()):
    |               ^^^^^^^^^^^^
-37 |     ...
    |
 
 B008 Do not perform function call `L` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
   --> B008_extended.py:48:17
    |
-47 | def okay(obj = N()): ...
 48 | def error(obj = L()): ...
    |                 ^^^
    |
