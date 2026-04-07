@@ -3118,19 +3118,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "memchr",
  "ruff_cache",
  "ruff_db",
  "ruff_linter",
  "ruff_macros",
  "ruff_python_ast",
- "ruff_python_parser",
- "salsa",
+ "ruff_python_imports",
  "schemars",
  "serde",
- "ty_module_resolver",
- "ty_site_packages",
- "zip",
 ]
 
 [[package]]
@@ -3357,6 +3352,25 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
+]
+
+[[package]]
+name = "ruff_python_imports"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "memchr",
+ "ruff_cache",
+ "ruff_db",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "salsa",
+ "tempfile",
+ "ty_module_resolver",
+ "ty_site_packages",
+ "zip",
 ]
 
 [[package]]

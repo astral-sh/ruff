@@ -1,5 +1,5 @@
 [package]
-name = "ruff_graph"
+name = "ruff_python_imports"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -15,20 +15,24 @@ ignored = ["ruff_cache"]
 
 [dependencies]
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["serde"] }
-ruff_linter = { workspace = true }
+ruff_db = { workspace = true, features = ["serde", "os"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_imports = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_text_size = { workspace = true }
+ty_module_resolver = { workspace = true }
+ty_site_packages = { workspace = true }
 
 anyhow = { workspace = true }
-clap = { workspace = true, optional = true }
-schemars = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
+memchr = { workspace = true }
+salsa = { workspace = true }
+zip = { workspace = true, features = [] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
 
 [lib]
-test = false
 doctest = false

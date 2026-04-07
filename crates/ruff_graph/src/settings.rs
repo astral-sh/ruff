@@ -2,6 +2,7 @@ use ruff_linter::display_settings;
 use ruff_linter::settings::types::{ExtensionMapping, FilePatternSet, PreviewMode};
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
+use ruff_python_imports::StringImports;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -48,31 +49,6 @@ impl fmt::Display for AnalyzeSettings {
             ]
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Copy, Clone, CacheKey)]
-pub struct StringImports {
-    pub enabled: bool,
-    pub min_dots: usize,
-}
-
-impl Default for StringImports {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            min_dots: 2,
-        }
-    }
-}
-
-impl fmt::Display for StringImports {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.enabled {
-            write!(f, "enabled (min_dots: {})", self.min_dots)
-        } else {
-            write!(f, "disabled")
-        }
     }
 }
 

@@ -1,34 +1,39 @@
-use crate::StringImports;
+use ruff_db::system::SystemPath;
+use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, walk_expr, walk_module, walk_stmt,
 };
 use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
+use ruff_text_size::Ranged;
 use ty_module_resolver::ModuleName;
 
+use crate::{ImportKind, RawImportOccurrence, StringImports};
+
 /// Collect all imports for a given Python file.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub(crate) struct Collector<'a> {
-    /// The path to the current module.
+    importer: &'a SystemPath,
     module_path: Option<&'a [String]>,
-    /// Whether to detect imports from string literals.
     string_imports: StringImports,
-    /// The collected imports from the Python AST.
     imports: Vec<CollectedImport>,
-    /// Whether to detect type checking imports
     type_checking_imports: bool,
+    type_checking_nesting: usize,
 }
 
 impl<'a> Collector<'a> {
     pub(crate) fn new(
+        importer: &'a SystemPath,
         module_path: Option<&'a [String]>,
         string_imports: StringImports,
         type_checking_imports: bool,
     ) -> Self {
         Self {
+            importer,
             module_path,
             string_imports,
             imports: Vec::new(),
             type_checking_imports,
+            type_checking_nesting: 0,
         }
     }
 
@@ -36,6 +41,39 @@ impl<'a> Collector<'a> {
     pub(crate) fn collect(mut self, module: &Mod) -> Vec<CollectedImport> {
         walk_module(&mut self, module);
         self.imports
+    }
+
+    fn push_import(
+        &mut self,
+        requested: ModuleName,
+        range: ruff_text_size::TextRange,
+        kind: ImportKind,
+        is_relative: bool,
+    ) {
+        self.imports.push(CollectedImport {
+            occurrence: RawImportOccurrence {
+                importer: self.importer.to_path_buf(),
+                kind,
+                requested,
+                range,
+                in_type_checking: self.type_checking_nesting > 0,
+                is_relative,
+            },
+        });
+    }
+
+    fn visit_body_with_type_checking(&mut self, body: &[Stmt], in_type_checking: bool) {
+        if in_type_checking {
+            self.type_checking_nesting += 1;
+        }
+        self.visit_body(body);
+        if in_type_checking {
+            self.type_checking_nesting -= 1;
+        }
+    }
+
+    fn in_type_checking(&self) -> bool {
+        self.type_checking_nesting > 0
     }
 }
 
@@ -56,15 +94,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     let mut components = vec![];
 
                     if level > 0 {
-                        // If we're resolving a relative import, we must have a module path.
                         let Some(module_path) = self.module_path else {
                             return;
                         };
 
-                        // Start with the containing module.
                         components.extend(module_path.iter().map(String::as_str));
 
-                        // Remove segments based on the number of dots.
                         for _ in 0..level {
                             if components.is_empty() {
                                 return;
@@ -73,18 +108,21 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                         }
                     }
 
-                    // Add the module path.
                     if let Some(module) = module {
                         components.extend(module.split('.'));
                     }
 
-                    // Add the alias name, unless it's a wildcard import.
                     if alias.name.as_str() != "*" {
                         components.push(alias.name.as_str());
                     }
 
                     if let Some(module_name) = ModuleName::from_components(components) {
-                        self.imports.push(CollectedImport::ImportFrom(module_name));
+                        self.push_import(
+                            module_name,
+                            alias.name.range(),
+                            ImportKind::ImportFrom,
+                            level > 0,
+                        );
                     }
                 }
             }
@@ -96,7 +134,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             }) => {
                 for alias in names {
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
-                        self.imports.push(CollectedImport::Import(module_name));
+                        self.push_import(
+                            module_name,
+                            alias.name.range(),
+                            ImportKind::Import,
+                            false,
+                        );
                     }
                 }
             }
@@ -107,13 +150,38 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 range: _,
                 node_index: _,
             }) => {
-                // Skip TYPE_CHECKING blocks if not requested
-                if self.type_checking_imports || !is_type_checking_condition(test) {
-                    self.visit_body(body);
+                self.visit_expr(test);
+
+                let outer_in_type_checking = self.in_type_checking();
+                let mut in_not_type_checking_chain = is_not_type_checking_condition(test);
+                let body_is_type_checking =
+                    outer_in_type_checking || is_type_checking_condition(test);
+                if self.type_checking_imports || !body_is_type_checking {
+                    self.visit_body_with_type_checking(body, body_is_type_checking);
                 }
 
                 for clause in elif_else_clauses {
-                    self.visit_elif_else_clause(clause);
+                    if let Some(test) = clause.test.as_ref() {
+                        self.visit_expr(test);
+                    }
+
+                    let clause_is_type_checking = if let Some(test) = clause.test.as_ref() {
+                        if is_type_checking_condition(test) {
+                            true
+                        } else if is_not_type_checking_condition(test) {
+                            in_not_type_checking_chain = true;
+                            false
+                        } else {
+                            in_not_type_checking_chain
+                        }
+                    } else {
+                        in_not_type_checking_chain
+                    };
+
+                    let body_is_type_checking = outer_in_type_checking || clause_is_type_checking;
+                    if self.type_checking_imports || !body_is_type_checking {
+                        self.visit_body_with_type_checking(&clause.body, body_is_type_checking);
+                    }
                 }
             }
             Stmt::FunctionDef(_)
@@ -123,10 +191,8 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             | Stmt::Match(_)
             | Stmt::Try(_)
             | Stmt::For(_) => {
-                // Always traverse into compound statements.
                 walk_stmt(self, stmt);
             }
-
             Stmt::Return(_)
             | Stmt::Delete(_)
             | Stmt::Assign(_)
@@ -142,7 +208,6 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             | Stmt::Break(_)
             | Stmt::Continue(_)
             | Stmt::IpyEscapeCommand(_) => {
-                // Only traverse simple statements when string imports is enabled.
                 if self.string_imports.enabled {
                     walk_stmt(self, stmt);
                 }
@@ -154,22 +219,24 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
         if self.string_imports.enabled {
             if let Expr::StringLiteral(ast::ExprStringLiteral {
                 value,
-                range: _,
+                range,
                 node_index: _,
             }) = expr
             {
                 let value = value.to_str();
-                // Determine whether the string literal "looks like" an import statement: contains
-                // the requisite number of dots, and consists solely of valid Python identifiers.
                 if self.string_imports.min_dots == 0
                     || memchr::memchr_iter(b'.', value.as_bytes()).count()
                         >= self.string_imports.min_dots
                 {
                     if let Some(module_name) = ModuleName::new(value) {
-                        self.imports.push(CollectedImport::StringImport(
+                        self.push_import(
                             module_name,
-                            self.string_imports.min_dots,
-                        ));
+                            *range,
+                            ImportKind::StringImport {
+                                min_dots: self.string_imports.min_dots,
+                            },
+                            false,
+                        );
                     }
                 }
             }
@@ -179,39 +246,28 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     }
 }
 
-/// Check if an expression is a `TYPE_CHECKING` condition.
-///
-/// Returns `true` for:
-/// - `TYPE_CHECKING`
-/// - `typing.TYPE_CHECKING`
-///
-/// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
-/// will not be detected!
 fn is_type_checking_condition(expr: &Expr) -> bool {
     match expr {
-        // `if TYPE_CHECKING:`
         Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
-        // `if typing.TYPE_CHECKING:`
         Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-            attr.as_str() == "TYPE_CHECKING"
-                && matches!(
-                    value.as_ref(),
-                    Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
-                )
+            attr.as_str() == "TYPE_CHECKING" && is_dotted_name(value)
         }
         _ => false,
     }
 }
 
+fn is_not_type_checking_condition(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if is_type_checking_condition(operand)
+    )
+}
+
 #[derive(Debug)]
-pub(crate) enum CollectedImport {
-    /// The import was part of an `import` statement.
-    Import(ModuleName),
-    /// The import was part of an `import from` statement.
-    ImportFrom(ModuleName),
-    /// The import was detected from a string literal (e.g., `"a.b.c.MyClass"`).
-    ///
-    /// Unlike regular imports, the trailing components may refer to attributes rather than
-    /// modules. The resolver will try progressively shorter prefixes until one resolves.
-    StringImport(ModuleName, usize),
+pub(crate) struct CollectedImport {
+    pub(crate) occurrence: RawImportOccurrence,
 }
