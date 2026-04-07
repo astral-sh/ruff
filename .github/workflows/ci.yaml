@@ -1193,3 +1193,28 @@ jobs:
         with:
           mode: walltime
           run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
+
+  required-checks-passed:
+    name: "all required checks passed"
+    if: always()
+    needs:
+      - cargo-fmt
+      - cargo-clippy
+      - cargo-test-linux
+      - cargo-test-wasm
+      - cargo-build-msrv
+      - scripts
+      - prek
+      - docs
+      - python-package
+    runs-on: ubuntu-slim
+    steps:
+      - name: "Check required jobs passed"
+        run: |
+          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
+          if [ -n "$failing" ]; then
+            echo "$failing"
+            exit 1
+          fi
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
