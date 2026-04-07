@@ -689,6 +689,22 @@ def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
 ```
 
+Optional source keys should not satisfy required constructor keys when unpacking:
+
+```py
+from typing import TypedDict
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+class NeedsName(TypedDict):
+    name: str
+
+def f(maybe: MaybeName) -> NeedsName:
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
+    return NeedsName(**maybe)
+```
+
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
 behavior when passing all keys as explicit keyword arguments:
 

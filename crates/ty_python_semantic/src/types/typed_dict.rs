@@ -18,7 +18,7 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers,
+    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers,
     definition_expression_type, visitor,
 };
 use crate::Db;
@@ -816,22 +816,37 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     !has_missing_key
 }
 
-/// Extracts `TypedDict` keys and their types from a type, resolving type aliases and handling
-/// intersections.
+#[derive(Debug, Clone, Copy)]
+struct UnpackedTypedDictKey<'db> {
+    value_ty: Type<'db>,
+    is_required: bool,
+}
+
+/// Extracts `TypedDict` keys, their value types, and whether they are required when unpacked as
+/// `**kwargs`, resolving type aliases and handling intersections.
 ///
-/// For intersections, returns ALL keys from ALL `TypedDict` types (union of keys), because a
-/// value of an intersection type must satisfy all `TypedDict`s and therefore has all their keys.
-/// For keys that appear in multiple `TypedDict`s, the types are intersected.
-fn extract_typed_dict_keys<'db>(
+/// For intersections, returns ALL declared keys from ALL `TypedDict` types (union of keys),
+/// because unpacking a value of an intersection type may expose any key declared by any
+/// constituent `TypedDict`. For keys that appear in multiple `TypedDict`s, the value types are
+/// intersected, and the key is considered required if any constituent `TypedDict` requires it.
+fn extract_unpacked_typed_dict_keys<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-) -> Option<BTreeMap<Name, Type<'db>>> {
+) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
     match ty {
         Type::TypedDict(td) => {
             let keys = td
                 .items(db)
                 .iter()
-                .map(|(name, field)| (name.clone(), field.declared_ty))
+                .map(|(name, field)| {
+                    (
+                        name.clone(),
+                        UnpackedTypedDictKey {
+                            value_ty: field.declared_ty,
+                            is_required: field.is_required(),
+                        },
+                    )
+                })
                 .collect();
             Some(keys)
         }
@@ -840,28 +855,29 @@ fn extract_typed_dict_keys<'db>(
             let all_key_maps: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| extract_typed_dict_keys(db, *element))
+                .filter_map(|element| extract_unpacked_typed_dict_keys(db, *element))
                 .collect();
 
             if all_key_maps.is_empty() {
                 return None;
             }
 
-            // Union all keys from all TypedDicts, intersecting types for shared keys
-            let mut result: BTreeMap<Name, Type<'db>> = BTreeMap::new();
+            // Union all keys from all TypedDicts, intersecting value types for shared keys.
+            let mut result: BTreeMap<Name, UnpackedTypedDictKey<'db>> = BTreeMap::new();
 
             for key_map in all_key_maps {
-                for (key, ty) in key_map {
+                for (key, unpacked_key) in key_map {
                     result
                         .entry(key)
-                        .and_modify(|existing_ty| {
-                            // Key exists in multiple TypedDicts - intersect the types
-                            *existing_ty = IntersectionBuilder::new(db)
-                                .add_positive(*existing_ty)
-                                .add_positive(ty)
-                                .build();
+                        .and_modify(|existing| {
+                            existing.value_ty = IntersectionType::from_two_elements(
+                                db,
+                                existing.value_ty,
+                                unpacked_key.value_ty,
+                            );
+                            existing.is_required |= unpacked_key.is_required;
                         })
-                        .or_insert(ty);
+                        .or_insert(unpacked_key);
                 }
             }
 
@@ -869,7 +885,7 @@ fn extract_typed_dict_keys<'db>(
         }
         // TODO: handle unions by checking all TypedDict elements separately
         Type::Union(_) => None,
-        Type::TypeAlias(alias) => extract_typed_dict_keys(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => extract_unpacked_typed_dict_keys(db, alias.value_type(db)),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -1051,15 +1067,18 @@ fn validate_from_keywords<'db, 'ast>(
                         provided_keys.insert(key_name.clone());
                     }
                 }
-            } else if let Some(unpacked_keys) = extract_typed_dict_keys(db, unpacked_type) {
-                for (key_name, value_ty) in &unpacked_keys {
-                    provided_keys.insert(key_name.clone());
+            } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type)
+            {
+                for (key_name, unpacked_key) in &unpacked_keys {
+                    if unpacked_key.is_required {
+                        provided_keys.insert(key_name.clone());
+                    }
                     TypedDictKeyAssignment {
                         context,
                         typed_dict,
                         full_object_ty: None,
                         key: key_name.as_str(),
-                        value_ty: *value_ty,
+                        value_ty: unpacked_key.value_ty,
                         typed_dict_node,
                         key_node: keyword.into(),
                         value_node: (&keyword.value).into(),
