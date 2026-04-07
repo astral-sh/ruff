@@ -21,6 +21,16 @@ def _():
     exc("")
 
 
+### No errors
+
+try:
+    ...
+except ...:
+    logging.exception("")
+    logger.exception("")
+    exc("")
+
+
 try:
     ...
 except ...:
@@ -30,14 +40,12 @@ except ...:
         exc("")
 
 
-### No errors
-
 try:
     ...
 except ...:
-    logging.exception("")
-    logger.exception("")
-    exc("")
+    def on_failure():
+        logging.exception("closure called within except")
+    on_failure()
 
 
 def _():
