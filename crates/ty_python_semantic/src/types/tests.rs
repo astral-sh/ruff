@@ -490,3 +490,39 @@ cast(val="", typ=int)
 
     Ok(())
 }
+
+#[test]
+fn variadic_call_argument_forms_are_unknown_when_matched_to_multiple_parameters()
+-> anyhow::Result<()> {
+    let db = TestDbBuilder::new()
+        .with_file(
+            "/src/foo.py",
+            r#"
+from typing import cast
+
+args: tuple[str, type[int]] = ("", int)
+cast(*args)
+"#,
+        )
+        .build()?;
+
+    let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+    let parsed = parsed_module(&db, file).load(&db);
+    let call = parsed
+        .suite()
+        .last()
+        .unwrap()
+        .as_expr_stmt()
+        .unwrap()
+        .value
+        .as_call_expr()
+        .unwrap();
+    let model = SemanticModel::new(&db, file);
+
+    assert_eq!(
+        call_argument_forms(&model, call),
+        [CallArgumentForm::Unknown]
+    );
+
+    Ok(())
+}

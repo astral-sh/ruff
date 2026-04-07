@@ -906,27 +906,46 @@ fn full_type_bindings_for_call<'db>(
     )
 }
 
-/// Returns the form of each argument in a call, in source order.
+/// Returns the form of each call-site argument in source order.
 ///
-/// `CallArgumentForm::Unknown` indicates that the argument form is unknown or conflicting across
-/// overloads.
+/// `CallArgumentForm::Unknown` indicates that an argument is unmatched or its form cannot be
+/// determined unambiguously, for example because a variadic argument maps to multiple parameters.
 pub fn call_argument_forms(
     model: &SemanticModel<'_>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallArgumentForm> {
+    let argument_count = call_expr.arguments.arguments_source_order().count();
     let Some(bindings) = full_type_bindings_for_call(model, call_expr) else {
         return Vec::new();
     };
 
-    bindings
-        .non_conflicting_argument_forms()
-        .map(|form| {
-            form.map_or(CallArgumentForm::Unknown, |form| match form {
-                crate::types::signatures::ParameterForm::Value => CallArgumentForm::Value,
-                crate::types::signatures::ParameterForm::Type => CallArgumentForm::Type,
-            })
-        })
-        .collect()
+    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
+    for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
+        let Some(argument_form) = argument_forms.get_mut(arg_index) else {
+            break;
+        };
+        *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
+            crate::types::signatures::ParameterForm::Value => CallArgumentForm::Value,
+            crate::types::signatures::ParameterForm::Type => CallArgumentForm::Type,
+        });
+    }
+
+    let Some(resolved) = resolve_call_signature(model, call_expr) else {
+        return argument_forms;
+    };
+
+    for (arg_index, arg_mapping) in resolved.argument_to_parameter_mapping.iter().enumerate() {
+        if arg_mapping.matched && arg_mapping.parameters.len() == 1 {
+            continue;
+        }
+
+        let Some(argument_form) = argument_forms.get_mut(arg_index) else {
+            break;
+        };
+        *argument_form = CallArgumentForm::Unknown;
+    }
+
+    argument_forms
 }
 
 /// Given a call expression that has overloads, and whose overload is resolved to a
