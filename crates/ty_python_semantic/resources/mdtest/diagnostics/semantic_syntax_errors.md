@@ -328,7 +328,7 @@ def _():
 
 def _():
     # error: [invalid-type-alias] "`type` statements are not allowed in function scopes"
-    # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+    # error: [invalid-type-form] "`yield` expressions are not allowed in type alias values"
     # error: [invalid-syntax] "yield expression cannot be used within a type alias"
     type Y = (yield 1)
 

@@ -39,7 +39,6 @@ error[invalid-type-alias]: Type alias `Redeclared` is already defined in this sc
   |      ^^^^^^^^^^
 4 | from random import random
   |
-info: rule `invalid-type-alias` is enabled by default
 
 ```
 
@@ -56,6 +55,5 @@ error[invalid-type-alias]: Type alias `BranchRedeclared` is already defined in t
 11 |     type BranchRedeclared = str
    |          ^^^^^^^^^^^^^^^^
    |
-info: rule `invalid-type-alias` is enabled by default
 
 ```
