@@ -413,6 +413,9 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     assert_effective_variance(&db, contravariant, TypeVarVariance::Contravariant);
     assert_effective_variance(&db, invariant, TypeVarVariance::Invariant);
     assert_effective_variance(&db, bivariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, paramspec_contravariant, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, paramspec_concatenate, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, paramspec_bivariant, TypeVarVariance::Covariant);
     assert_effective_variance(&db, recursive, TypeVarVariance::Covariant);
     assert_effective_variance(&db, recursive2, TypeVarVariance::Invariant);
 
