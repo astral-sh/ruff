@@ -165,9 +165,9 @@ isinstance("", t.Callable | t.Deque)
 issubclass(list, t.Any)
 issubclass(list, t.Any | t.Dict)
 
-# The same works in tuples
-isinstance("", (int, t.Dict))
-isinstance("", (int, t.Callable))
+# `Dict` and `Callable` are only accepted directly, not when nested inside tuples
+isinstance("", (int, t.Dict))  # error: [invalid-argument-type]
+isinstance("", (int, t.Callable))  # error: [invalid-argument-type]
 issubclass(list, (int, t.Any))
 ```
 
