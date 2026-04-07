@@ -103,7 +103,7 @@ pub(crate) fn unnecessary_if(checker: &Checker, stmt: &StmtIf) {
     }
 
     let has_side_effects = contains_effect(test, |id| checker.semantic().has_builtin_binding(id))
-        || any_over_expr(test, &|expr| matches!(expr, Expr::Named(_)));
+        || any_over_expr(test, |expr| matches!(expr, Expr::Named(_)));
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryIf, stmt.range());
 

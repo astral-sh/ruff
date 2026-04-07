@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     for iterable in iterables {
         // For example, (x+1 for x in (c:=a)) is invalid syntax
         // so we can't suggest it.
-        if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
+        if any_over_expr(iterable, ruff_python_ast::Expr::is_named_expr) {
             return;
         }
 
@@ -193,7 +193,7 @@ fn map_lambda_and_iterables<'a>(
 
 /// Returns true if the expression tree contains a `yield` or `yield from` expression.
 fn lambda_contains_yield(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| {
+    any_over_expr(expr, |expr| {
         matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_))
     })
 }
