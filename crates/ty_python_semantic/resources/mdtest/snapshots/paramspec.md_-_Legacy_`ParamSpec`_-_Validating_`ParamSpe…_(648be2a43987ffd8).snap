@@ -108,7 +108,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -129,7 +128,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -150,7 +148,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -171,7 +168,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -192,7 +188,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -213,7 +208,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -234,7 +228,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -255,7 +248,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -272,7 +264,6 @@ error[invalid-type-form]: The first argument to `Callable` must be either a list
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -288,7 +279,6 @@ error[invalid-type-form]: The first argument to `Callable` must be either a list
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -307,7 +297,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -328,7 +317,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -349,7 +337,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -368,7 +355,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -389,7 +375,6 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -408,6 +393,5 @@ info:  - as the last argument to `Concatenate`
 info:  - as the default type for another ParamSpec
 info:  - as part of a type parameter list when defining a generic class
 info:  - or as part of an argument list when specializing a generic class
-info: rule `invalid-type-form` is enabled by default
 
 ```

@@ -32,6 +32,5 @@ error[invalid-assignment]: Cannot assign to a subscript on an object of type `Re
   | ^^^^^^^^^^^^^^^^^
   |
 help: Consider adding a `__setitem__` method to `ReadOnlyDict`.
-info: rule `invalid-assignment` is enabled by default
 
 ```

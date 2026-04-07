@@ -65,7 +65,6 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
  5 |
  6 | class OnlyTypeVar(Generic[T]):
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -77,6 +76,5 @@ error[invalid-type-arguments]: Type argument for `ParamSpec` must be either a li
 26 | def func3(c: ParamSpecAndTypeVar[T, int], other: T): ...
    |                                  ^
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```

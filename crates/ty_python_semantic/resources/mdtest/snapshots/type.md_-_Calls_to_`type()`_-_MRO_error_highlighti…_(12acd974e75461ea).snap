@@ -29,6 +29,5 @@ error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
 3 | Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
   |       ^^^^^^^^^^^^^^^^^^^^^^^
   |
-info: rule `duplicate-base` is enabled by default
 
 ```

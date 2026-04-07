@@ -51,6 +51,5 @@ info: Function defined here
    |     ^^ ----------------------------------------------------------- Parameter declared here
 11 |     return 0
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

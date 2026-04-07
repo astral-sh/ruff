@@ -86,7 +86,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
  9 |
 10 | NAME_KEY: Final = "nane"
    |
-info: rule `invalid-key` is enabled by default
 5  |     age: int | None
 6  |
 7  | def access_invalid_literal_string_key(person: Person):
@@ -111,7 +110,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 14 |
 15 | def access_with_str_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -125,7 +123,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
 17 |
 18 | def write_to_key_with_wrong_type(person: Person):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -152,7 +149,6 @@ info: Item declaration
 6 |
 7 | def access_invalid_literal_string_key(person: Person):
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -168,7 +164,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 23 |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 19 |     person["age"] = "42"  # error: [invalid-assignment]
 20 |
 21 | def write_to_non_existing_key(person: Person):
@@ -191,7 +186,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
 26 |
 27 | def create_with_invalid_string_key():
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -209,7 +203,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
 30 |
 31 |     # error: [invalid-key]
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -222,7 +215,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
    |           ------ TypedDict `Person`  ^^^^^^^^^^^^^ Unknown key "unknown"
 33 | from typing_extensions import ReadOnly
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -246,7 +238,6 @@ info: Item declaration
    |     ----------------- Read-only item declared here
 37 |     name: str
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -263,7 +254,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 44 | class MovieBase(TypedDict):
 45 |     name: str
    |
-info: rule `invalid-key` is enabled by default
 40 |     employee["id"] = 42  # error: [invalid-assignment]
 41 | def write_to_non_existing_key_single_quotes(person: Person):
 42 |     # error: [invalid-key]
@@ -296,7 +286,6 @@ info: Field declaration
 46 |
 47 | class BadMovie(MovieBase):
    |
-info: rule `invalid-typed-dict-field` is enabled by default
 
 ```
 
@@ -328,6 +317,5 @@ info: Field declaration
 55 |
 56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
    |
-info: rule `invalid-typed-dict-field` is enabled by default
 
 ```

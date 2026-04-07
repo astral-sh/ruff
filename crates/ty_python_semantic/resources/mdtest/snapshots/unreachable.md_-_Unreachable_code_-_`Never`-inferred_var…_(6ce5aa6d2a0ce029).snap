@@ -41,6 +41,5 @@ error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter
   |          ^^^^^^^^^^^^^^^^^
   |
 help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
-info: rule `invalid-type-form` is enabled by default
 
 ```

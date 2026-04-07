@@ -353,22 +353,34 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // once.
         let mut diag = self.diag.take().unwrap();
 
-        diag.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            match self.source {
-                LintSource::Default => format!("rule `{}` is enabled by default", diag.id()),
-                LintSource::Cli => format!("rule `{}` was selected on the command line", diag.id()),
-                LintSource::File => {
+        match self.source {
+            LintSource::Default => {
+                // We previously added a subdiagnostic hint in this case as well,
+                // but it was overly verbose, given that it is attached to almost
+                // every diagnostic.
+            }
+            LintSource::Cli => {
+                diag.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("rule `{}` was selected on the command line", diag.id()),
+                ));
+            }
+            LintSource::File => {
+                diag.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
                     format!(
                         "rule `{}` was selected in the configuration file",
                         diag.id()
-                    )
-                }
-                LintSource::Editor => {
-                    format!("rule `{}` was selected in the editor settings", diag.id())
-                }
-            },
-        ));
+                    ),
+                ));
+            }
+            LintSource::Editor => {
+                diag.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("rule `{}` was selected in the editor settings", diag.id()),
+                ));
+            }
+        }
 
         self.ctx.diagnostics.borrow_mut().push(diag);
     }

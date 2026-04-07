@@ -193,7 +193,6 @@ info: `P.still_abstractmethod` is implicitly abstract because `P` is a `Protocol
 5 |     # class were to be instantiated without the method having been overridden:
   |
 help: Change the body of `still_abstractmethod` to `return` or `return None` if it was not intended to be abstract
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -223,7 +222,6 @@ info: `R.also_still_abstractmethod` is implicitly abstract because `R` is a `Pro
 18 |     def also_still_abstractmethod(self) -> None: ...
    |
 help: Change the body of `also_still_abstractmethod` to `return` or `return None` if it was not intended to be abstract
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -254,7 +252,6 @@ info: `Raises.even_this_is_abstract` is implicitly abstract because `Raises` is 
 24 |     def even_this_is_abstract(self):
 25 |         raise NotImplementedError
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -285,7 +282,6 @@ info: `AlsoRaises.also_abstractmethod` is implicitly abstract because `AlsoRaise
 31 |     def also_abstractmethod(self) -> Never:
 32 |         raise NotImplementedError
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -316,7 +312,6 @@ info: `Strange.weird_abstractmethod` is implicitly abstract because `Strange` is
 41 |         def weird_abstractmethod(self):
 42 |             raise x
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -345,7 +340,6 @@ info: `HasOverloads.foo` is implicitly abstract because `HasOverloads` is a `Pro
 48 |     @overload
 49 |     def foo(self) -> int: ...
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -376,7 +370,6 @@ info: `HasAbstract.a` is implicitly abstract because `HasAbstract` is a `Protoco
    |       --------------------- `HasAbstract` declared here
 72 |     def a(self) -> int: ...
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -407,7 +400,6 @@ info: `HasAbstract2.a` is implicitly abstract because `HasAbstract2` is a `Proto
 75 |     def a(self) -> int:
 76 |         pass
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -439,7 +431,6 @@ info: `HasAbstract4.a` is implicitly abstract because `HasAbstract4` is a `Proto
 83 |     def a(self) -> int:
 84 |         """My awesome docs"""
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -471,7 +462,6 @@ info: `HasAbstract4.a` is implicitly abstract because `HasAbstract4` is a `Proto
 83 |     def a(self) -> int:
 84 |         """My awesome docs"""
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -503,7 +493,6 @@ info: `HasAbstract5.a` is implicitly abstract because `HasAbstract5` is a `Proto
 88 |     def a(self) -> int:
 89 |         """My awesome docs"""
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -535,7 +524,6 @@ info: `HasAbstract6.a` is implicitly abstract because `HasAbstract6` is a `Proto
 93 |     def a(self) -> int:
 94 |         """My awesome docs"""
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -566,7 +554,6 @@ info: `HasAbstract7.a` is implicitly abstract because `HasAbstract7` is a `Proto
 105 |     def a(self) -> int:
 106 |         raise NotImplementedError
     |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -597,7 +584,6 @@ info: `HasAbstract8.a` is implicitly abstract because `HasAbstract8` is a `Proto
 109 |     def a(self) -> int:
 110 |         raise NotImplementedError()
     |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -629,7 +615,6 @@ info: `HasAbstract9.a` is implicitly abstract because `HasAbstract9` is a `Proto
 113 |     def a(self) -> int:
 114 |         """My awesome docs"""
     |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -659,6 +644,5 @@ info: `HasAbstract10.a` is implicitly abstract because `HasAbstract10` is a `Pro
 118 |     def a(self) -> int:
 119 |         """My awesome docs"""
     |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

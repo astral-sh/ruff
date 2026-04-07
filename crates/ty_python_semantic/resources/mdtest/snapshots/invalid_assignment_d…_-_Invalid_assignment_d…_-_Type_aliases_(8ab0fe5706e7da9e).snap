@@ -40,6 +40,5 @@ error[invalid-assignment]: Object of type `HasName` is not assignable to `Suppor
    |             |
    |             Declared type
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -173,7 +173,6 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -213,7 +212,6 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -253,7 +251,6 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 

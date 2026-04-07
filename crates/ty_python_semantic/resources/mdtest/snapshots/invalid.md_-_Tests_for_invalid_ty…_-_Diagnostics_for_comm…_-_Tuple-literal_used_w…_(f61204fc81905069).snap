@@ -41,7 +41,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -58,7 +57,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -75,7 +73,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -92,7 +89,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -109,7 +105,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -125,6 +120,5 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
    |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```

@@ -36,6 +36,5 @@ error[invalid-await]: `Literal[1]` is not awaitable
 350 |     int(x, base=10) -> integer
     |
 info: `__await__` is missing
-info: rule `invalid-await` is enabled by default
 
 ```

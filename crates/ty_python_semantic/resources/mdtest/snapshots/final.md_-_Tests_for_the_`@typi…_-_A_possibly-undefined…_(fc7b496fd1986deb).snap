@@ -113,7 +113,6 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
 11 |     else:
    |
 help: Remove the override of `method1`
-info: rule `override-of-final-method` is enabled by default
 37 |         def method4(self) -> None: ...
 38 |
 39 | class B(A):
@@ -148,7 +147,6 @@ info: `A.method2` is decorated with `@final`, forbidding overrides
 21 |     if coinflip():
    |
 help: Remove the override of `method2`
-info: rule `override-of-final-method` is enabled by default
 38 |
 39 | class B(A):
 40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
@@ -184,7 +182,6 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
 25 |     else:
    |
 help: Remove the override of `method3`
-info: rule `override-of-final-method` is enabled by default
 39 | class B(A):
 40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
@@ -219,7 +216,6 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
 36 |     else:
    |
 help: Remove the override of `method4`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -247,7 +243,6 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
 11 |     else:
    |
 help: Remove the override of `method1`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -273,7 +268,6 @@ info: `A.method2` is decorated with `@final`, forbidding overrides
 21 |     if coinflip():
    |
 help: Remove the override of `method2`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -299,7 +293,6 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
 25 |     else:
    |
 help: Remove the override of `method3`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -326,6 +319,5 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
 36 |     else:
    |
 help: Remove the override of `method4`
-info: rule `override-of-final-method` is enabled by default
 
 ```

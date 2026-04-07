@@ -30,7 +30,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -103,7 +102,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -113,7 +111,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     9 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -197,7 +194,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     7 | prin(x)  # unresolved-reference
       | ^^^^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 

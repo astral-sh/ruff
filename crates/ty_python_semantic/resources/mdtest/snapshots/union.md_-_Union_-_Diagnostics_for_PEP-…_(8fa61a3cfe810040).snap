@@ -60,7 +60,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -80,7 +79,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -97,7 +95,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -117,7 +114,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: `from __future__ import annotations` has no effect outside type annotations
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -135,6 +131,5 @@ error[unsupported-operator]: Unsupported `|` operation
 info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
 info: `from __future__ import annotations` has no effect outside type annotations
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```

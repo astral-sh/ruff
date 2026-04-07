@@ -40,6 +40,5 @@ error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iter
 13 |         reveal_type(x)  # revealed: int
    |
 info: Its `__aiter__` attribute (with type `bound method PossiblyUnboundAiter.__aiter__() -> AsyncIterable`) may not be callable
-info: rule `not-iterable` is enabled by default
 
 ```

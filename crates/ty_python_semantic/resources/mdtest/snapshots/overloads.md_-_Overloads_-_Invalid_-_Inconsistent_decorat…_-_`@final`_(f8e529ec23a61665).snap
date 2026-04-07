@@ -90,7 +90,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         ------- Implementation defined here
 19 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -109,7 +108,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         ------- Implementation defined here
 28 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -130,7 +128,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 15 |     @overload
 16 |     def method3(self, x: int) -> int: ...
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -150,7 +147,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 20 |     @overload
 21 |     @final
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -173,6 +169,5 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 23 |     @overload
 24 |     def method3(self, x: bytearray) -> bytearray: ...
    |
-info: rule `invalid-overload` is enabled by default
 
 ```

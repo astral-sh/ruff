@@ -35,7 +35,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 

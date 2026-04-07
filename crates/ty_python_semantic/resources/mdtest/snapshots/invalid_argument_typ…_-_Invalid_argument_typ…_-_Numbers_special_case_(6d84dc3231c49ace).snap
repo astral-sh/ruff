@@ -48,7 +48,6 @@ info: Function defined here
   |
 info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -72,6 +71,5 @@ info: Function defined here
   |
 info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
