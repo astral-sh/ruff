@@ -3519,6 +3519,11 @@ impl<'db> CallableBinding<'db> {
                             "First overload defined here",
                         );
                         sub.annotate(Annotation::primary(overload.spans(context.db()).signature));
+                        if let Some(decorator) = overload
+                            .find_known_decorator_span(context.db(), KnownFunction::Overload)
+                        {
+                            sub.annotate(Annotation::secondary(decorator));
+                        }
                         diag.sub(sub);
                     }
 

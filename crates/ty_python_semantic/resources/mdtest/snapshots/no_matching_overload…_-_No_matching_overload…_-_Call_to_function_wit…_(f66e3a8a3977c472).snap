@@ -154,8 +154,10 @@ error[no-matching-overload]: No overload of function `foo` matches arguments
     | ^^^^^^^^^^^^^^^^^
     |
 info: First overload defined here
- --> src/mdtest_snippet.py:6:5
+ --> src/mdtest_snippet.py:5:1
   |
+5 | @overload
+  | ---------
 6 | def foo(a: int, b: int, c: int): ...
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
