@@ -2760,6 +2760,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
+            | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
+            | Type::SubclassOf(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
@@ -2815,7 +2818,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => {
+                        if self.validate_final_attribute_deletion(
+                            target,
+                            object_ty,
+                            attribute,
+                            emit_diagnostics,
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    }
                     Err(CallDunderError::CallError(kind, _bindings)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
@@ -2831,6 +2844,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Err(CallDunderError::MethodNotAvailable) => {}
                 }
 
+                if self.validate_final_attribute_deletion(
+                    target,
+                    object_ty,
+                    attribute,
+                    emit_diagnostics,
+                ) {
+                    return false;
+                }
+
                 if let Some(PlaceAndQualifiers {
                     place:
                         Place::Defined(DefinedPlace {
@@ -2844,12 +2866,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|(meta_attr, _)| meta_attr)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
-                    match attr_ty.try_call_dunder(
+                    let delete_dunder_call_result = attr_ty.try_call_dunder(
                         db,
                         "__delete__",
                         CallArguments::positional([object_ty]),
                         TypeContext::default(),
-                    ) {
+                    );
+
+                    match &delete_dunder_call_result {
+                        Ok(result) if result.return_type(db).is_never() => {
+                            if emit_diagnostics
+                                && let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot delete attribute `{attribute}` on type `{}` \
+                                     whose `__delete__` method returns `Never`/`NoReturn`",
+                                    object_ty.display(db),
+                                ));
+                            }
+                            return false;
+                        }
+                        Err(err) if err.return_type(db).is_some_and(|ty| ty.is_never()) => {
+                            if emit_diagnostics
+                                && let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot delete attribute `{attribute}` on type `{}` \
+                                     whose `__delete__` method returns `Never`/`NoReturn`",
+                                    object_ty.display(db),
+                                ));
+                            }
+                            return false;
+                        }
+                        _ => {}
+                    }
+
+                    match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
                         Err(CallDunderError::CallError(kind, bindings)) => {
                             if emit_diagnostics {
@@ -2871,10 +2925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 true
             }
 
-            Type::ClassLiteral(..)
-            | Type::GenericAlias(..)
-            | Type::SubclassOf(..)
-            | Type::Dynamic(..)
+            Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never
             | Type::ModuleLiteral(..)

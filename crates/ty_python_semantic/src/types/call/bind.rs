@@ -1251,12 +1251,16 @@ impl<'db> Bindings<'db> {
                             overload.parameter_types()
                         {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    overload.set_return_type(return_ty);
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1289,12 +1293,16 @@ impl<'db> Bindings<'db> {
                     )) => {
                         if let [Some(instance), ..] = overload.parameter_types() {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    overload.set_return_type(return_ty);
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload

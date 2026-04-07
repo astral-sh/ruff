@@ -172,7 +172,7 @@ reveal_type(c.x)  # revealed: int
 ### Custom deleters
 
 ```py
-from typing import NamedTuple, NoReturn
+from typing import Final, NamedTuple, NoReturn
 
 class ReadOnlyProperty:
     @property
@@ -204,6 +204,15 @@ class RejectsDelete:
     def __delattr__(self, name: str) -> NoReturn:
         raise AttributeError(name)
 
+class RejectsDescriptorDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.deleter
+    def x(self) -> NoReturn:
+        raise AttributeError("x")
+
 class DeletableNamedTuple(NamedTuple):
     x: int
 
@@ -217,6 +226,20 @@ class Weird:
 class FallbackInstanceAttribute:
     def __init__(self) -> None:
         self.x = Weird()
+
+class FinalAttribute:
+    def __init__(self) -> None:
+        self.x: Final[int] = 1
+
+class RejectsClassDeleteMeta(type):
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class RejectsClassDelete(metaclass=RejectsClassDeleteMeta):
+    x: int = 1
+
+class FinalClassAttribute:
+    x: Final[int] = 1
 
 class BadDelAttr:
     x: int = 1
@@ -239,8 +262,22 @@ rejects_delete = RejectsDelete()
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDelete` whose `__delattr__` method returns `Never`/`NoReturn`"
 del rejects_delete.x
 
+rejects_descriptor_delete = RejectsDescriptorDelete()
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
+del rejects_descriptor_delete.x
+
 fallback_instance_attribute = FallbackInstanceAttribute()
 del fallback_instance_attribute.x
+
+final_attribute = FinalAttribute()
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttribute`"
+del final_attribute.x
+
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
+del RejectsClassDelete.x
+
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `<class 'FinalClassAttribute'>`"
+del FinalClassAttribute.x
 
 bad_delattr = BadDelAttr()
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method."
