@@ -40,36 +40,118 @@ where
     matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
-/// Whether an expression definitely has no side effects, maybe has side effects,
-/// or definitely has side effects.
+/// Whether an expression has no side effects, may have side effects,
+/// or is assumed to have side effects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SideEffect {
     /// The expression is definitely side-effect-free.
-    No,
+    Absent,
     /// The expression may have side effects (e.g., f-string interpolation
     /// may invoke `__format__` or `__str__`).
-    Maybe,
-    /// The expression definitely has side effects.
-    Yes,
+    Possible,
+    /// The expression is assumed to have side effects.
+    Present,
 }
 
 impl SideEffect {
-    pub const fn is_yes(self) -> bool {
-        matches!(self, Self::Yes)
+    pub const fn is_present(self) -> bool {
+        matches!(self, Self::Present)
     }
 
-    pub const fn is_no(self) -> bool {
-        matches!(self, Self::No)
+    pub const fn is_absent(self) -> bool {
+        matches!(self, Self::Absent)
     }
 
     #[must_use]
     pub const fn merge(self, other: Self) -> Self {
         match (self, other) {
-            (Self::Yes, _) | (_, Self::Yes) => Self::Yes,
-            (Self::Maybe, _) | (_, Self::Maybe) => Self::Maybe,
-            _ => Self::No,
+            (Self::Present, _) | (_, Self::Present) => Self::Present,
+            (Self::Possible, _) | (_, Self::Possible) => Self::Possible,
+            _ => Self::Absent,
         }
     }
+
+    /// Classify a single expression node's side effect.
+    ///
+    /// Returns `Some(effect)` if this node determines the side effect level,
+    /// or `None` to continue walking child expressions.
+    fn from_expr(expr: &Expr, is_builtin: &dyn Fn(&str) -> bool) -> Option<Self> {
+        match expr {
+            // Empty initializers for known builtins are side-effect-free.
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) if arguments.is_empty() => {
+                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        return None;
+                    }
+                }
+                Some(Self::Present)
+            }
+
+            // Overloaded operators: only side-effect-free if both sides are literals.
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+                if is_known_safe_binop_operand(left) && is_known_safe_binop_operand(right) {
+                    None
+                } else {
+                    Some(Self::Present)
+                }
+            }
+
+            // Non-literal f-string interpolation may invoke `__format__`/`__str__`.
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                if value.elements().any(has_uncertain_interpolation) {
+                    Some(Self::Possible)
+                } else {
+                    None
+                }
+            }
+            Expr::TString(ast::ExprTString { value, .. }) => {
+                if value.elements().any(has_uncertain_interpolation) {
+                    Some(Self::Possible)
+                } else {
+                    None
+                }
+            }
+
+            // Named expressions (walrus operator) are assignments.
+            Expr::Named(_) => Some(Self::Present),
+
+            // Complex expressions that are assumed to have side effects.
+            Expr::Await(_)
+            | Expr::Call(_)
+            | Expr::DictComp(_)
+            | Expr::Generator(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::Subscript(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::IpyEscapeCommand(_) => Some(Self::Present),
+
+            _ => None,
+        }
+    }
+}
+
+fn is_known_safe_binop_operand(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::FString(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::Dict(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_)
+    )
 }
 
 fn is_definitely_side_effect_free_interpolation_expr(expr: &Expr) -> bool {
@@ -105,7 +187,7 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    side_effect(expr, is_builtin).is_yes()
+    side_effect(expr, is_builtin).is_present()
 }
 
 /// Return whether `expr` has no side effects, maybe has side effects, or definitely
@@ -119,105 +201,19 @@ pub fn side_effect<F>(expr: &Expr, is_builtin: F) -> SideEffect
 where
     F: Fn(&str) -> bool,
 {
-    let mut effect = SideEffect::No;
+    let mut effect = SideEffect::Absent;
     any_over_expr(expr, |expr| {
-        // Accept empty initializers.
-        if let Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range: _,
-            node_index: _,
-        }) = expr
-        {
-            if arguments.is_empty() {
-                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        effect = SideEffect::Yes;
-                        return true;
-                    }
-                    return false;
-                }
+        match SideEffect::from_expr(expr, &is_builtin) {
+            Some(SideEffect::Present) => {
+                effect = SideEffect::Present;
+                true
             }
-        }
-
-        // Avoid false positive for overloaded operators.
-        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
-            if !matches!(
-                left.as_ref(),
-                Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::FString(_)
-                    | Expr::List(_)
-                    | Expr::Tuple(_)
-                    | Expr::Set(_)
-                    | Expr::Dict(_)
-                    | Expr::ListComp(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
-            ) {
-                effect = SideEffect::Yes;
-                return true;
+            Some(SideEffect::Possible) => {
+                effect = effect.merge(SideEffect::Possible);
+                false
             }
-            if !matches!(
-                right.as_ref(),
-                Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::FString(_)
-                    | Expr::List(_)
-                    | Expr::Tuple(_)
-                    | Expr::Set(_)
-                    | Expr::Dict(_)
-                    | Expr::ListComp(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
-            ) {
-                effect = SideEffect::Yes;
-                return true;
-            }
-            return false;
+            Some(SideEffect::Absent) | None => false,
         }
-
-        // Non-literal f-string interpolation may invoke `__format__`/`__str__`.
-        if let Expr::FString(ast::ExprFString { value, .. }) = expr {
-            if value.elements().any(has_uncertain_interpolation) {
-                effect = effect.merge(SideEffect::Maybe);
-            }
-            return false;
-        }
-        if let Expr::TString(ast::ExprTString { value, .. }) = expr {
-            if value.elements().any(has_uncertain_interpolation) {
-                effect = effect.merge(SideEffect::Maybe);
-            }
-            return false;
-        }
-
-        // Otherwise, avoid all complex expressions.
-        if matches!(
-            expr,
-            Expr::Await(_)
-                | Expr::Call(_)
-                | Expr::DictComp(_)
-                | Expr::Generator(_)
-                | Expr::ListComp(_)
-                | Expr::SetComp(_)
-                | Expr::Subscript(_)
-                | Expr::Yield(_)
-                | Expr::YieldFrom(_)
-                | Expr::IpyEscapeCommand(_)
-        ) {
-            effect = SideEffect::Yes;
-            return true;
-        }
-
-        false
     });
     effect
 }

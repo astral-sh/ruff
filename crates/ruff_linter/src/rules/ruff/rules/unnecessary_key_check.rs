@@ -105,13 +105,13 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     let obj_effect = side_effect(obj_left, |id| checker.semantic().has_builtin_binding(id));
     let key_effect = side_effect(key_left, |id| checker.semantic().has_builtin_binding(id));
     let combined = obj_effect.merge(key_effect);
-    if combined.is_yes() {
+    if combined.is_present() {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
 
-    let applicability = if !combined.is_no() || checker.comment_ranges().intersects(expr.range()) {
+    let applicability = if !combined.is_absent() || checker.comment_ranges().intersects(expr.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
