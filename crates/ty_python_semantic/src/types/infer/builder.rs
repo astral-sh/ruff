@@ -69,13 +69,14 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_set_call,
-    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_class_match_pattern, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
-    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
     report_possibly_unresolved_reference, report_unsupported_augmented_assignment,
@@ -2714,6 +2715,175 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     false
                 }
             }
+        }
+    }
+
+    fn validate_attribute_deletion(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.db();
+
+        match object_ty {
+            Type::Union(union) => {
+                for element_ty in union.elements(db) {
+                    if !self.validate_attribute_deletion(target, *element_ty, attribute, false) {
+                        if emit_diagnostics {
+                            self.validate_attribute_deletion(target, *element_ty, attribute, true);
+                        }
+                        return false;
+                    }
+                }
+                true
+            }
+
+            Type::Intersection(intersection) => {
+                if intersection.positive(db).iter().any(|element_ty| {
+                    self.validate_attribute_deletion(target, *element_ty, attribute, false)
+                }) {
+                    true
+                } else {
+                    if emit_diagnostics && let Some(element_ty) = intersection.positive(db).first()
+                    {
+                        self.validate_attribute_deletion(target, *element_ty, attribute, true);
+                    }
+                    false
+                }
+            }
+
+            Type::TypeAlias(alias) => self.validate_attribute_deletion(
+                target,
+                alias.value_type(db),
+                attribute,
+                emit_diagnostics,
+            ),
+
+            Type::NominalInstance(..)
+            | Type::ProtocolInstance(_)
+            | Type::LiteralValue(..)
+            | Type::SpecialForm(..)
+            | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
+            | Type::FunctionLiteral(..)
+            | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::TypeVar(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => {
+                let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__delattr__",
+                    &mut CallArguments::positional([Type::string_literal(db, attribute)]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+
+                match &delattr_dunder_call_result {
+                    Ok(result) if result.return_type(db).is_never() => {
+                        if emit_diagnostics
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot delete attribute `{attribute}` on type `{}` \
+                                 whose `__delattr__` method returns `Never`/`NoReturn`",
+                                object_ty.display(db),
+                            ));
+                        }
+                        return false;
+                    }
+                    Err(err) if err.return_type(db).is_some_and(|ty| ty.is_never()) => {
+                        if emit_diagnostics
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot delete attribute `{attribute}` on type `{}` \
+                                 whose `__delattr__` method returns `Never`/`NoReturn`",
+                                object_ty.display(db),
+                            ));
+                        }
+                        return false;
+                    }
+                    _ => {}
+                }
+
+                match delattr_dunder_call_result {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                    Err(CallDunderError::CallError(kind, _bindings)) => {
+                        if emit_diagnostics {
+                            report_bad_dunder_delattr_call(
+                                &self.context,
+                                attribute,
+                                object_ty,
+                                target,
+                                kind == CallErrorKind::BindingError,
+                            );
+                        }
+                        return false;
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {}
+                }
+
+                if let Some(PlaceAndQualifiers {
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: attr_ty,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }),
+                    ..
+                }) = self
+                    .assignment_attribute_members(object_ty, attribute)
+                    .map(|(meta_attr, _)| meta_attr)
+                {
+                    let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
+                    match attr_ty.try_call_dunder(
+                        db,
+                        "__delete__",
+                        CallArguments::positional([object_ty]),
+                        TypeContext::default(),
+                    ) {
+                        Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                        Err(CallDunderError::CallError(kind, bindings)) => {
+                            if emit_diagnostics {
+                                let failure = CallError(kind, bindings);
+                                report_bad_dunder_delete_call(
+                                    &self.context,
+                                    &failure,
+                                    attribute,
+                                    object_ty,
+                                    target,
+                                );
+                            }
+                            return false;
+                        }
+                        Err(CallDunderError::MethodNotAvailable) => {}
+                    }
+                }
+
+                true
+            }
+
+            Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
+            | Type::SubclassOf(..)
+            | Type::Dynamic(..)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::ModuleLiteral(..)
+            | Type::BoundSuper(..) => true,
         }
     }
 
@@ -8115,7 +8285,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
             value,
-            attr: _,
+            attr,
             range: _,
             node_index: _,
             ctx,
@@ -8129,6 +8299,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ExprContext::Del => {
                 self.infer_attribute_load(attribute);
+                self.validate_attribute_deletion(
+                    attribute,
+                    self.expression_type(value),
+                    attr.as_str(),
+                    true,
+                );
                 Type::Never
             }
             ExprContext::Invalid => {

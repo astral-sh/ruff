@@ -579,6 +579,6 @@ fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db>
         field_ty,
     );
     let property_getter = Type::single_callable(db, property_getter_signature);
-    let property = PropertyInstanceType::new(db, Some(property_getter), None);
+    let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
     Type::PropertyInstance(property)
 }
