@@ -1481,7 +1481,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if self.is_rule_enabled(Rule::RedundantNumericUnion) {
                     flake8_pyi::rules::check_annotation(self, annotation);
                 }
-
+                
                 match AnnotationContext::from_model(
                     &self.semantic,
                     self.settings(),
