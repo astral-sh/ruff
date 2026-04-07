@@ -18,8 +18,8 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers, UnionBuilder,
-    definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, UnionBuilder, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::semantic_index::definition::Definition;
@@ -817,9 +817,53 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
 }
 
 #[derive(Debug, Clone, Copy)]
-struct UnpackedTypedDictKey<'db> {
-    value_ty: Type<'db>,
-    is_required: bool,
+pub(crate) struct UnpackedTypedDictKey<'db> {
+    pub(crate) value_ty: Type<'db>,
+    pub(crate) is_required: bool,
+}
+
+/// Merges unpacked `TypedDict` key maps using union semantics.
+///
+/// This is used for both `A | B` and constrained `TypeVar`s whose constraints are all
+/// `TypedDict`-shaped: a key is present if any arm provides it, its value type is the union of
+/// the arm-specific value types, and it is only required if every arm requires it.
+fn merge_union_unpacked_typed_dict_key_maps<'db>(
+    db: &'db dyn Db,
+    key_maps: &[BTreeMap<Name, UnpackedTypedDictKey<'db>>],
+) -> BTreeMap<Name, UnpackedTypedDictKey<'db>> {
+    let all_keys: OrderSet<Name> = key_maps
+        .iter()
+        .flat_map(|key_map| key_map.keys().cloned())
+        .collect();
+    let mut result = BTreeMap::new();
+
+    for key in all_keys {
+        let mut value_ty = UnionBuilder::new(db);
+        let mut is_required = true;
+        let mut saw_key = false;
+
+        for key_map in key_maps {
+            if let Some(unpacked_key) = key_map.get(&key) {
+                saw_key = true;
+                value_ty = value_ty.add(unpacked_key.value_ty);
+                is_required &= unpacked_key.is_required;
+            } else {
+                is_required = false;
+            }
+        }
+
+        if saw_key {
+            result.insert(
+                key,
+                UnpackedTypedDictKey {
+                    value_ty: value_ty.build(),
+                    is_required,
+                },
+            );
+        }
+    }
+
+    result
 }
 
 /// Extracts `TypedDict` keys, their value types, and whether they are required when unpacked as
@@ -831,7 +875,7 @@ struct UnpackedTypedDictKey<'db> {
 /// intersected, and the key is considered required if any constituent `TypedDict` requires it.
 /// For unions, returns all keys that may appear in any arm, unioning value types for shared keys,
 /// and a key is only considered required if every arm requires it.
-fn extract_unpacked_typed_dict_keys<'db>(
+pub(crate) fn unpacked_typed_dict_keys<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
@@ -857,7 +901,7 @@ fn extract_unpacked_typed_dict_keys<'db>(
             let all_key_maps: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| extract_unpacked_typed_dict_keys(db, *element))
+                .filter_map(|element| unpacked_typed_dict_keys(db, *element))
                 .collect();
 
             if all_key_maps.is_empty() {
@@ -889,44 +933,27 @@ fn extract_unpacked_typed_dict_keys<'db>(
             let key_maps: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_keys(db, *element))
+                .map(|element| unpacked_typed_dict_keys(db, *element))
                 .collect::<Option<_>>()?;
 
-            let all_keys: OrderSet<Name> = key_maps
-                .iter()
-                .flat_map(|key_map| key_map.keys().cloned())
-                .collect();
-            let mut result = BTreeMap::new();
-
-            for key in all_keys {
-                let mut value_ty = UnionBuilder::new(db);
-                let mut is_required = true;
-                let mut saw_key = false;
-
-                for key_map in &key_maps {
-                    if let Some(unpacked_key) = key_map.get(&key) {
-                        saw_key = true;
-                        value_ty = value_ty.add(unpacked_key.value_ty);
-                        is_required &= unpacked_key.is_required;
-                    } else {
-                        is_required = false;
-                    }
-                }
-
-                if saw_key {
-                    result.insert(
-                        key,
-                        UnpackedTypedDictKey {
-                            value_ty: value_ty.build(),
-                            is_required,
-                        },
-                    );
-                }
-            }
-
-            Some(result)
+            Some(merge_union_unpacked_typed_dict_key_maps(db, &key_maps))
         }
-        Type::TypeAlias(alias) => extract_unpacked_typed_dict_keys(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => unpacked_typed_dict_keys(db, alias.value_type(db)),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                unpacked_typed_dict_keys(db, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                let key_maps: Vec<_> = constraints
+                    .elements(db)
+                    .iter()
+                    .map(|constraint| unpacked_typed_dict_keys(db, *constraint))
+                    .collect::<Option<_>>()?;
+
+                Some(merge_union_unpacked_typed_dict_key_maps(db, &key_maps))
+            }
+            None => None,
+        },
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -950,11 +977,33 @@ fn extract_unpacked_typed_dict_keys<'db>(
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)
-        | Type::TypeVar(_)
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => None,
+    }
+}
+
+/// Returns the key and value types of an object unpacked using `**`.
+///
+/// For `TypedDict`-shaped values, preserve the exact unpacked schema before falling back to the
+/// generic mapping model based on `keys()` and `__getitem__`.
+pub(crate) fn double_starred_key_and_value_types<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    if let Some(unpacked_keys) = unpacked_typed_dict_keys(db, ty) {
+        let mut key_tys = UnionBuilder::new(db);
+        let mut value_tys = UnionBuilder::new(db);
+
+        for (key, unpacked_key) in unpacked_keys {
+            key_tys = key_tys.add(Type::string_literal(db, key.as_str()));
+            value_tys = value_tys.add(unpacked_key.value_ty);
+        }
+
+        Some((key_tys.build(), value_tys.build()))
+    } else {
+        ty.unpack_keys_and_items(db)
     }
 }
 
@@ -997,7 +1046,7 @@ fn collect_guaranteed_keyword_keys<'db>(
         .collect();
 
     for unpacked_type in unpacked_keyword_types.iter().copied().flatten() {
-        if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type) {
+        if let Some(unpacked_keys) = unpacked_typed_dict_keys(db, unpacked_type) {
             provided_keys.extend(
                 unpacked_keys
                     .into_iter()
@@ -1253,8 +1302,7 @@ fn validate_from_keywords<'db, 'ast>(
                         provided_keys.insert(key_name.clone());
                     }
                 }
-            } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type)
-            {
+            } else if let Some(unpacked_keys) = unpacked_typed_dict_keys(db, unpacked_type) {
                 for (key_name, unpacked_key) in &unpacked_keys {
                     if unpacked_key.is_required {
                         provided_keys.insert(key_name.clone());

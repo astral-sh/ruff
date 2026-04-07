@@ -96,7 +96,10 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{validate_typed_dict_constructor, validate_typed_dict_dict_literal};
+use crate::types::typed_dict::{
+    double_starred_key_and_value_types, validate_typed_dict_constructor,
+    validate_typed_dict_dict_literal,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
@@ -5779,7 +5782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
-                    unpack_ty.unpack_keys_and_items(self.db())
+                    double_starred_key_and_value_types(self.db(), unpack_ty)
                 else {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_expr)
@@ -6550,7 +6553,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mapping_type = self.expression_type(&keyword.value);
 
             if mapping_type.as_paramspec_typevar(self.db()).is_some()
-                || mapping_type.unpack_keys_and_items(self.db()).is_some()
+                || double_starred_key_and_value_types(self.db(), mapping_type).is_some()
             {
                 continue;
             }

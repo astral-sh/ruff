@@ -48,6 +48,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::typed_dict::{double_starred_key_and_value_types, unpacked_typed_dict_keys};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
@@ -3538,9 +3539,36 @@ impl ArgumentForms {
     }
 }
 
+/// Tracks how confidently a parameter has been provided by the current argument list.
+///
+/// This is primarily used for `**kwargs` matching, where a `TypedDict`-shaped source may expose a
+/// key only on some arms or only optionally.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ParameterProvision {
+    /// No argument has been matched to this parameter.
+    #[default]
+    Absent,
+    /// An argument may provide this parameter, but it is not guaranteed to do so.
+    Possible,
+    /// An argument definitely provides this parameter.
+    Definite,
+}
+
+impl ParameterProvision {
+    /// Returns `true` if the parameter participates in argument matching and type checking.
+    const fn is_matched(self) -> bool {
+        !matches!(self, Self::Absent)
+    }
+
+    /// Returns `true` if this provision is strong enough to suppress `missing-argument`.
+    const fn satisfies_missing_argument(self) -> bool {
+        matches!(self, Self::Definite)
+    }
+}
+
 #[derive(Default, Clone, Copy)]
 struct ParameterInfo {
-    matched: bool,
+    provision: ParameterProvision,
     suppress_missing_error: bool,
 }
 
@@ -3631,6 +3659,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameter: &Parameter<'db>,
         positional: bool,
         variable_argument_length: bool,
+        provision: ParameterProvision,
     ) {
         if !matches!(argument, Argument::Synthetic) {
             let adjusted_argument_index = argument_index - self.num_synthetic_args;
@@ -3643,7 +3672,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 }
             }
         }
-        if self.parameter_info[parameter_index].matched {
+        if self.parameter_info[parameter_index].provision.is_matched() {
             if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
                 self.errors.push(BindingError::ParameterAlreadyAssigned {
                     argument_index: self.get_argument_index(argument_index),
@@ -3664,7 +3693,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         matched_argument.parameters.push(parameter_index);
         matched_argument.types.push(argument_type);
         matched_argument.matched = true;
-        self.parameter_info[parameter_index].matched = true;
+        self.parameter_info[parameter_index].provision = self.parameter_info[parameter_index]
+            .provision
+            .max(provision);
     }
 
     fn match_positional(
@@ -3696,6 +3727,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             parameter,
             !parameter.is_variadic(),
             variable_argument_length,
+            ParameterProvision::Definite,
         );
         Ok(())
     }
@@ -3706,6 +3738,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
         name: &str,
+        provision: ParameterProvision,
     ) -> Result<(), ()> {
         let Some((parameter_index, parameter)) = self
             .parameters
@@ -3737,6 +3770,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             parameter,
             false,
             false,
+            provision,
         );
         Ok(())
     }
@@ -3970,19 +4004,29 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(Type::TypedDict(typed_dict)) = argument_type {
-            // Special case TypedDict because we know which keys are present.
-            for (name, field) in typed_dict.items(db) {
+        if let Some(argument_type) = argument_type
+            && let Some(unpacked_keys) = unpacked_typed_dict_keys(db, argument_type)
+        {
+            // Special case TypedDict-shaped kwargs because we know which keys may be present.
+            // Keys that are not required in every arm still participate in duplicate and type
+            // checking, but they cannot satisfy a required parameter on their own.
+            for (name, unpacked_key) in unpacked_keys {
                 let _ = self.match_keyword(
                     argument_index,
                     Argument::Keywords,
-                    Some(field.declared_ty),
+                    Some(unpacked_key.value_ty),
                     name.as_str(),
+                    if unpacked_key.is_required {
+                        ParameterProvision::Definite
+                    } else {
+                        ParameterProvision::Possible
+                    },
                 );
             }
         } else {
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
-                if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic()
+                if self.parameter_info[parameter_index].provision.is_matched()
+                    && !parameter.is_keyword_variadic()
                 {
                     continue;
                 }
@@ -4015,6 +4059,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     parameter,
                     false,
                     true,
+                    ParameterProvision::Definite,
                 );
             }
         }
@@ -4038,12 +4083,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         for (
             index,
             ParameterInfo {
-                matched,
+                provision,
                 suppress_missing_error,
             },
         ) in self.parameter_info.iter().copied().enumerate()
         {
-            if !matched {
+            if !provision.satisfies_missing_argument() {
                 if suppress_missing_error {
                     continue;
                 }
@@ -4759,72 +4804,36 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Type<'db>,
     ) {
-        if let Type::TypedDict(typed_dict) = argument_type {
-            for (argument_type, parameter_index) in typed_dict
-                .items(self.db)
-                .values()
-                .map(|field| field.declared_ty)
-                .zip(&self.argument_matches[argument_index].parameters)
-            {
-                self.check_argument_type(
-                    constraints,
-                    argument_index,
-                    adjusted_argument_index,
-                    argument,
-                    argument_type,
-                    *parameter_index,
-                );
-            }
+        if argument_type.as_paramspec_typevar(self.db).is_none() {
+            let Some((key_type, _)) = double_starred_key_and_value_types(self.db, argument_type)
+            else {
+                return;
+            };
 
-            return;
+            if !key_type
+                .when_assignable_to(
+                    self.db,
+                    KnownClass::Str.to_instance(self.db),
+                    constraints,
+                    self.inferable_typevars,
+                )
+                .is_always_satisfied(self.db)
+            {
+                self.errors.push(BindingError::InvalidKeyType {
+                    argument_index: adjusted_argument_index,
+                    provided_ty: key_type,
+                });
+            }
         }
 
-        let value_type_paramspec =
-            if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
-                Some(paramspec)
-            } else {
-                let Some((key_type, _)) = argument_type.unpack_keys_and_items(self.db) else {
-                    return;
-                };
-
-                if !key_type
-                    .when_assignable_to(
-                        self.db,
-                        KnownClass::Str.to_instance(self.db),
-                        constraints,
-                        self.inferable_typevars,
-                    )
-                    .is_always_satisfied(self.db)
-                {
-                    self.errors.push(BindingError::InvalidKeyType {
-                        argument_index: adjusted_argument_index,
-                        provided_ty: key_type,
-                    });
-                }
-
-                None
-            };
-
-        for parameter_index in &self.argument_matches[argument_index].parameters {
-            let value_type = if let Some(value_type) = value_type_paramspec {
-                value_type
-            } else {
-                let parameter_name = self.signature.parameters()[*parameter_index]
-                    .keyword_name()
-                    .map(Name::as_str);
-
-                argument_type
-                    .getitem_dunder_call(self.db, parameter_name)
-                    .unwrap_or(Type::unknown())
-            };
-
+        for (parameter_index, value_type) in self.argument_matches[argument_index].iter() {
             self.check_argument_type(
                 constraints,
                 argument_index,
                 adjusted_argument_index,
-                Argument::Keywords,
-                value_type,
-                *parameter_index,
+                argument,
+                value_type.unwrap_or_else(Type::unknown),
+                parameter_index,
             );
         }
     }
@@ -4966,7 +4975,13 @@ impl<'db> Binding<'db> {
                     let _ = matcher.match_positional(argument_index, argument, None, false);
                 }
                 Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, None, name);
+                    let _ = matcher.match_keyword(
+                        argument_index,
+                        argument,
+                        None,
+                        name,
+                        ParameterProvision::Definite,
+                    );
                 }
                 Argument::Variadic => {
                     let _ = matcher.match_variadic(
