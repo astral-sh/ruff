@@ -577,7 +577,10 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if known_class == Some(KnownClass::ParamSpec) {
+                if matches!(
+                    known_class,
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+                ) {
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
