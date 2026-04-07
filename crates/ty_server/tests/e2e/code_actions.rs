@@ -29,7 +29,7 @@ fn code_actions_at(
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 fn full_range(input: &str) -> Range {
     let (num_lines, last_line) = input
         .lines()

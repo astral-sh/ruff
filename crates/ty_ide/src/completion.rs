@@ -8633,7 +8633,7 @@ raise <CURSOR>
         imports: bool,
         module_names: bool,
         // This doesn't seem like a "very complex" type to me... ---AG
-        #[allow(clippy::type_complexity)]
+        #[expect(clippy::type_complexity)]
         predicate: Option<Box<dyn Fn(&Completion) -> bool>>,
     }
 

@@ -304,7 +304,7 @@ impl ProgressReporterState<'_> {
         let checked = self.checked_files;
         let total = self.total_files;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let percentage = if total > 0 {
             Some((checked * 100 / total) as u32)
         } else {
