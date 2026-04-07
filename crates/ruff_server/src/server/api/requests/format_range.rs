@@ -87,3 +87,89 @@ fn format_text_document_range(
         }]
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use lsp_types::{ClientCapabilities, Position, Range, Url};
+
+    use crate::server::api::requests::format_range::format_document_range;
+    use crate::session::{Client, GlobalOptions};
+    use crate::{PositionEncoding, TextDocument, Workspace, Workspaces};
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        std::env::temp_dir().join(format!("ruff-server-{name}-{nanos}"))
+    }
+
+    #[test]
+    fn range_format_custom_extension_mapped_to_markdown_is_unsupported() {
+        let workspace_dir = unique_temp_dir("custom-markdown-range");
+        fs::create_dir_all(&workspace_dir).expect("create temp workspace");
+        fs::write(
+            workspace_dir.join("pyproject.toml"),
+            r#"[tool.ruff]
+extension = { thing = "markdown" }
+
+[tool.ruff.format]
+preview = true
+"#,
+        )
+        .expect("write pyproject");
+
+        let file_path = workspace_dir.join("test.thing");
+        let content = "# title\n\n```python\nx='hi'\n```\n";
+        fs::write(&file_path, content).expect("write document");
+
+        let (main_loop_sender, _) = crossbeam::channel::unbounded();
+        let (client_sender, _) = crossbeam::channel::unbounded();
+        let client = Client::new(main_loop_sender, client_sender);
+
+        let workspace_url = Url::from_file_path(&workspace_dir).expect("workspace url");
+        let global = GlobalOptions::default().into_settings(client.clone());
+
+        let mut session = crate::Session::new(
+            &ClientCapabilities::default(),
+            PositionEncoding::UTF16,
+            global,
+            &Workspaces::new(vec![
+                Workspace::new(workspace_url).with_options(crate::ClientOptions::default()),
+            ]),
+            &client,
+        )
+        .expect("create session");
+
+        let file_url = Url::from_file_path(&file_path).expect("file url");
+        let document = TextDocument::new(content.to_string(), 0).with_language_id("markdown");
+        session.open_text_document(file_url.clone(), document);
+
+        let snapshot = session.take_snapshot(file_url).expect("snapshot");
+        let result = format_document_range(
+            &snapshot,
+            Range {
+                start: Position {
+                    line: 2,
+                    character: 0,
+                },
+                end: Position {
+                    line: 3,
+                    character: 6,
+                },
+            },
+        )
+        .expect("range format request should succeed");
+
+        assert!(
+            result.is_none(),
+            "expected no range formatting edits for markdown-mapped extension"
+        );
+
+        fs::remove_dir_all(&workspace_dir).ok();
+    }
+}
