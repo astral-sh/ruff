@@ -2392,7 +2392,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         is_in_not_type_checking_chain
                     };
 
-                    self.in_type_checking_block = clause_in_type_checking;
+                    // Nested conditional clauses inherit an enclosing TYPE_CHECKING context.
+                    self.in_type_checking_block =
+                        is_outer_block_in_type_checking || clause_in_type_checking;
 
                     self.visit_body(clause_body);
                 }
