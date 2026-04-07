@@ -33,7 +33,7 @@ pub(crate) fn hover(
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
     // Don't show noqa hover for non-Python documents (e.g., markdown files).
-    let SourceType::Python(_) = snapshot.query().source_type() else {
+    let SourceType::Python(_) = snapshot.query().source_type_for_lint() else {
         return None;
     };
 

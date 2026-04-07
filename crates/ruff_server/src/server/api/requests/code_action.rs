@@ -33,7 +33,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         let query = snapshot.query();
 
         // Don't provide code actions for non-Python documents (e.g., markdown files).
-        let SourceType::Python(_) = query.source_type() else {
+        let SourceType::Python(_) = query.source_type_for_lint() else {
             return Ok(Some(response));
         };
 

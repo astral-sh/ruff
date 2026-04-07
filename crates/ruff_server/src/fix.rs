@@ -31,7 +31,7 @@ pub(crate) fn fix_all(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type() else {
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
         return Ok(Fixes::default());
     };
 
