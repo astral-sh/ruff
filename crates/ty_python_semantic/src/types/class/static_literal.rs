@@ -2747,7 +2747,6 @@ fn static_class_try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -2770,7 +2769,6 @@ fn implicit_attribute_initial<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
