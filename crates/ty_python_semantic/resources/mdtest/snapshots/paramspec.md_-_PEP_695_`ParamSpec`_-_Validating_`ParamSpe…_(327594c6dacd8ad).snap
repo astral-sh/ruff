@@ -66,6 +66,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/paramspe
 51 | def invalid_stringified_variable_annotation[**P](y: Any) -> None:
 52 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 53 |     x: "P" = y
+54 | 
+55 | class InvalidSpecializationTarget[**P]:
+56 |     attr: Callable[P, None]
+57 | 
+58 | def invalid_specialization[**Q](
+59 |     # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+60 |     a: InvalidSpecializationTarget[[Q]],
+61 |     # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+62 |     b: InvalidSpecializationTarget[Q,],
+63 | ) -> None: ...
 ```
 
 # Diagnostics
@@ -352,6 +362,47 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a t
 52 |     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 53 |     x: "P" = y
    |         ^
+54 |
+55 | class InvalidSpecializationTarget[**P]:
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a type expression
+  --> src/mdtest_snippet.py:60:37
+   |
+58 | def invalid_specialization[**Q](
+59 |     # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+60 |     a: InvalidSpecializationTarget[[Q]],
+   |                                     ^
+61 |     # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+62 |     b: InvalidSpecializationTarget[Q,],
+   |
+info: A bare ParamSpec is only valid:
+info:  - as the first argument to `Callable`
+info:  - as the last argument to `Concatenate`
+info:  - as the default type for another ParamSpec
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
+
+```
+
+```
+error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a type expression
+  --> src/mdtest_snippet.py:62:36
+   |
+60 |     a: InvalidSpecializationTarget[[Q]],
+61 |     # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+62 |     b: InvalidSpecializationTarget[Q,],
+   |                                    ^
+63 | ) -> None: ...
    |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`

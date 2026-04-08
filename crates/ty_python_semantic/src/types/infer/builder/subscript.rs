@@ -776,8 +776,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
+                let mut infer_parameter = |param| {
+                    let previously_allowed_paramspec = self
+                        .inference_flags
+                        .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
+                    let param_type = self.infer_type_expression(param);
+                    self.inference_flags.set(
+                        InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                        previously_allowed_paramspec,
+                    );
+                    param_type
+                };
+
                 let parameters = if let [single_elt] = &**elts {
-                    let param_type = self.infer_type_expression(single_elt);
+                    let param_type = infer_parameter(single_elt);
                     match param_type {
                         Type::Dynamic(dynamic) if dynamic.is_todo() => Parameters::todo(),
                         Type::Dynamic(dynamic) if dynamic != DynamicType::Any => {
@@ -795,7 +807,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut return_todo = false;
 
                     for param in elts {
-                        let param_type = self.infer_type_expression(param);
+                        let param_type = infer_parameter(param);
                         // This is similar to what we currently do for inferring tuple type expression.
                         // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                         // when trying to check for assignability or any other relation. For example,
