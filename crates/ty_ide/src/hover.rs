@@ -1282,6 +1282,10 @@ mod tests {
         "#);
     }
 
+    // TODO: We currently cannot match arguments with overload when dict expression is used inside
+    // the constructor.
+    // The reason is that the synthesized constructor is only used for server. Not in the type
+    // inference. During inference the type context when checking dict expression is not TypedDict.
     #[test]
     fn hover_typeddict_constructor_positional_map_dict_literal_in_constructor() {
         let test = hover_test(
@@ -1304,12 +1308,108 @@ mod tests {
             title: str = ...,
             year: int = ...
         )
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ---------------------------------------------
         ```python
         class Movie(
             __map: Movie,
             *,
             /,
+            title: str = ...,
+            year: int = ...
+        )
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie({"title": "Alien", "year": 1979})
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_not_required() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict, NotRequired
+
+        class Movie(TypedDict):
+            title: str
+            year: NotRequired[int]
+
+        x = Mov<CURSOR>ie(title="Alien")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: NotRequired[int]
+        7 |
+        8 | x = Movie(title="Alien")
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_total_false() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict, total=False):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
             title: str = ...,
             year: int = ...
         )
@@ -1320,7 +1420,7 @@ mod tests {
           |
         6 |     year: int
         7 |
-        8 | x = Movie({"title": "Alien", "year": 1979})
+        8 | x = Movie()
           |     ^^^-^
           |     |  |
           |     |  Cursor offset
