@@ -6888,13 +6888,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(class) = class
             && class.is_typed_dict(self.db())
         {
+            let mut speculative = self.speculate();
             validate_typed_dict_constructor(
                 &self.context,
                 TypedDictType::new(class),
                 arguments,
                 func.as_ref().into(),
-                |expr| self.expression_type(expr),
+                |expr, tcx| speculative.infer_expression(expr, tcx),
             );
+            // TODO: Merging speculative inference preserves TypedDict-specific diagnostics, but it
+            // can also duplicate diagnostics that were already emitted during the initial
+            // type-context-free argument inference.
+            self.extend(speculative);
         }
 
         let mut bindings = match bindings_result {

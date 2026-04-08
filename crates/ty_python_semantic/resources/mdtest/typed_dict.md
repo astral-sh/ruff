@@ -408,6 +408,21 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+Known issue: speculative `TypedDict` constructor validation currently duplicates diagnostics that
+were already emitted by the initial inference pass:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+# TODO: This should only emit a single `unresolved-reference` diagnostic.
+# error: [unresolved-reference] "Name `missing` used when not defined"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+TD(x=missing)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -2396,6 +2411,32 @@ def _(node: Node, person: Person):
     _: Node = person
 
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
+```
+
+TypedDict constructor calls should also use field type context when inferring nested values:
+
+```py
+from typing import TypedDict
+
+class Comparison(TypedDict):
+    field: str
+    value: object
+
+class Logical(TypedDict):
+    primary: Comparison
+    conditions: list[Comparison]
+
+logical_from_literal = Logical(
+    primary=Comparison(field="a", value="b"),
+    conditions=[Comparison(field="c", value="d")],
+)
+logical_from_dict_call = Logical(dict(primary=dict(field="a", value="b"), conditions=[dict(field="c", value="d")]))
+
+# error: [missing-typed-dict-key]
+missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[dict(field="c", value="d")])
+
+# error: [missing-typed-dict-key]
+missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
 ```
 
 ## Function/assignment syntax
