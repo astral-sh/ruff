@@ -180,12 +180,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors: RefCell::default(),
         };
 
-        builder.push_scope_with_parent(
-            NodeWithScopeRef::Module,
-            None,
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-        );
-
+        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
         builder
     }
 
@@ -303,28 +298,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
-        let parent = self.current_scope();
-        let reachability = self.current_use_def_map().reachability;
-        self.push_scope_with_parent(node, Some(parent), reachability);
+        self.push_scope_with_parent(node, Some(self.current_scope()));
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScopeRef,
-        parent: Option<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
-    ) {
+    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(
-            parent,
-            node_with_kind,
-            children_start..children_start,
-            reachability,
-        );
+        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
@@ -1741,14 +1724,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
-
-        for scope in &self.scopes {
-            if let Some(parent) = scope.parent() {
-                self.use_def_maps[parent]
-                    .reachability_constraints
-                    .mark_used(scope.reachability());
-            }
-        }
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables

@@ -474,20 +474,6 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
-    pub(crate) fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
-        self.parent_scope_id(scope_id)
-            .is_none_or(|parent_scope_id| {
-                if !self.is_scope_reachable(db, parent_scope_id) {
-                    return false;
-                }
-
-                let parent_use_def = self.use_def_map(parent_scope_id);
-                let reachability = self.scope(scope_id).reachability();
-
-                parent_use_def.is_reachable(db, reachability)
-            })
-    }
-
     /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
     /// scope reachability and statement-level reachability within the scope.
     pub(crate) fn is_range_reachable(
@@ -496,8 +482,8 @@ impl<'db> SemanticIndex<'db> {
         scope_id: FileScopeId,
         range: TextRange,
     ) -> bool {
-        self.is_scope_reachable(db, scope_id)
-            && self.use_def_map(scope_id).is_range_reachable(db, range)
+        self.ancestor_scopes(scope_id)
+            .all(|(scope_id, _)| self.use_def_map(scope_id).is_range_reachable(db, range))
     }
 
     pub(crate) fn is_in_type_checking_block(
