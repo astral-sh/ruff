@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1–5.5 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1–5.7 complete)
 
 ## Overview
 
@@ -610,7 +610,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.5 complete)
+Status: In progress (Steps 5.1–5.7 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -867,34 +867,41 @@ transitional callers.
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.6**: Add an internal “solve pending set” path for specialization construction.
+**Step 5.6 ✅**: Added an internal pending-set solve path for specialization construction.
 
-There is no separate `build()` method anymore; all current callers go through `build_with`.
-Introduce an internal helper that solves `self.pending` via `ConstraintSet::solutions_with(...)`,
-using `PathBounds::default_solve(...)` as the fallback policy, and materializes per-typevar
-specialization entries (`Some(solution)` or `None`) for `specialize_recursive`.
+Implementation details:
 
-Keep the existing HashMap-backed path alongside temporarily for comparison during testing.
+1. Added a private helper on `SpecializationBuilder` that solves `self.pending` via
+    `ConstraintSet::solutions_with(...)`.
+1. The helper removes non-inferable typevars before solving, and uses
+    `PathBounds::default_solve(...)` as the fallback policy when the builder-level hook returns
+    `None`.
+1. Per-path chosen solutions are materialized and then combined across paths via union, matching
+    the existing hybrid behavior of `add_type_mappings_from_constraint_set`.
+1. The old HashMap-backed path was narrowed substantially during follow-up cleanup:
+    - it is still used when the pending set is unsatisfiable or vacuous
+    - ParamSpec-specialized generic contexts still use the legacy path for now
+    - satisfiable pending-set solutions are no longer generally filled in from the HashMap; the
+        only remaining constrained-path supplement is for explicit extremal mappings (e.g. a
+        covariant `Never` result such as `Sequence[Never]` from `tuple[()]`), which the constraint
+        representation elides as vacuous bounds
+1. This leaves a much smaller dependency surface for the old HashMap state while preserving
+    current behavior ahead of the Phase 5.8 removal work.
 
-**Step 5.7**: Update `build_with` to use the pending constraint set.
+**Step 5.7 ✅**: Updated `build_with` to use the pending constraint set.
 
-Change `build_with` to drive off the helper from Step 5.6. Internally this means iterating the
-pending set's per-path solutions, calling the existing builder-level hook with real lower/upper
-bounds, and unioning path-wise results just as the hybrid code does today.
+Implementation details:
 
-Validate both current callers:
-
-- `maybe_promote` in `bind.rs`
-- the collection-literal singleton-promotion hook in `infer/builder.rs`
-
-The `maybe_promote` hook should work correctly with real bounds:
-
-- For typevars with a single covariant constraint: lower = inferred type, upper = object.
-    Hook sees `(typevar, Literal[1], object)` and can promote to `int`.
-- For typevars with both lower and upper bounds: hook can check whether the promoted type
-    is within the upper bound.
-
-The collection-literal hook should continue to look only at the lower bound when there is no TCX.
+1. `build_with` now drives specialization construction through the new pending-solve helper.
+1. The builder-level hook is now called with real lower/upper bounds from satisfiable pending-set
+    paths rather than synthetic equality bounds from the HashMap.
+1. The resulting specialization still leaves unsolved typevars as `None` so that
+    `specialize_recursive` can fill in defaults.
+1. Both current callers were validated:
+    - `maybe_promote` in `bind.rs`
+    - the collection-literal singleton-promotion hook in `infer/builder.rs`
+1. Mdtest expectations were updated for the resulting behavior changes, including cases where the
+    pending-set path now preserves correlated solutions or avoids former false-positive errors.
 
 **Step 5.8**: Remove the HashMap field and old code paths.
 

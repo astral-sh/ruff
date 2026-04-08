@@ -561,8 +561,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
+        self.solutions_with(db, builder, |bound_typevar, _variance, lower, upper| {
+            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
+        })
+    }
+
+    pub(crate) fn solutions_with(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions(db, builder)
+        self.node.solutions_with(db, builder, choose)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -1793,13 +1809,19 @@ impl NodeId {
         }
     }
 
-    fn solutions<'db>(
+    fn solutions_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            Type<'db>,
+            Type<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self);
-        path_bounds.solve(db, builder)
+        path_bounds.solve_with(choose)
     }
 
     /// Returns the negation of this BDD.
