@@ -1193,6 +1193,48 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     Ok(())
 }
 
+#[test]
+fn config_file_python_setting_directory_with_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"
+            version_info = 3.16.0
+            home = base/bin
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("base/bin/python.exe", "")
+        } else {
+            ("base/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.16/site-packages/foo.py", "")
+        },
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 // This error message is never emitted on Windows, because Windows installations have simpler layouts
 #[cfg(not(windows))]
 #[test]

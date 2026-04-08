@@ -257,6 +257,17 @@ impl Options {
                     .cloned()
             })
             .or_else(|| site_packages_paths.python_version_from_layout())
+            .filter(|python_version| {
+                let is_supported =
+                    PythonVersion::iter().any(|supported| supported == python_version.version);
+                if !is_supported {
+                    tracing::debug!(
+                        "Ignoring unsupported inferred Python version: {}",
+                        python_version.version
+                    );
+                }
+                is_supported
+            })
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
