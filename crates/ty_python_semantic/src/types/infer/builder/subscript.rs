@@ -781,6 +781,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
+                let previously_allowed_paramspec = self
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 for param in elts {
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
@@ -791,6 +794,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }
+                self.inference_flags.set(
+                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                    previously_allowed_paramspec,
+                );
 
                 let parameters = if return_todo {
                     // TODO: `Unpack`

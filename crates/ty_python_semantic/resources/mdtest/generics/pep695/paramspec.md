@@ -53,6 +53,10 @@ def foo3[**P = [int, str]]() -> None:
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
     reveal_type(Q)  # revealed: ParamSpec
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+def foo5[**Q, **P = [Q]]() -> None:
+    pass
 ```
 
 Other values are invalid.
@@ -123,6 +127,16 @@ def invalid_stringified_annotation[**P](
 def invalid_stringified_variable_annotation[**P](y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget[**P]:
+    attr: Callable[P, None]
+
+def invalid_specialization[**Q](
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage

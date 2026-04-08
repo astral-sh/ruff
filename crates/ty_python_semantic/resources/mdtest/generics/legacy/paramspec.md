@@ -93,6 +93,10 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", default=[int, str])
 P2 = ParamSpec("P2", default=...)
 P3 = ParamSpec("P3", default=P2)
+Q = ParamSpec("Q")
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+P5 = ParamSpec("P5", default=[Q])
 ```
 
 Other values are invalid.
@@ -170,6 +174,7 @@ import library
 from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic, Union, Optional, Annotated
 
 P = ParamSpec("P")
+Q = ParamSpec("Q")
 
 class ValidProtocol(Protocol[P]):
     def method(self, c: Callable[P, int]) -> None: ...
@@ -232,6 +237,16 @@ def invalid_stringified_annotation(
 def invalid_stringified_variable_annotation(y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: "P" = y
+
+class InvalidSpecializationTarget(Generic[P]):
+    attr: Callable[P, None]
+
+def invalid_specialization(
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
+) -> None: ...
 ```
 
 ## Validating `P.args` and `P.kwargs` usage
