@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1 complete)
 
 ## Overview
 
@@ -611,7 +611,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: Not started
+Status: In progress (Step 5.1 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -728,34 +728,39 @@ for now, not made worse.
 
 #### Steps
 
-**Step 5.1**: Eliminate the `f` callback from `infer_map` / `add_type_mapping`.
+**Step 5.1 ✅**: Eliminated the `f` callback from `infer_map` / `add_type_mapping`.
 
-Do this first so that subsequent steps don't have to consider callback invocation logic.
+Implementation details:
 
-The only non-trivial `f` callback is in `infer_argument_constraints` (bind.rs). Restructure it:
+1. `infer_argument_constraints` (`bind.rs`) now calls `builder.infer()` instead of
+    `builder.infer_map()`.
+1. After argument inference, preferred-type compatibility is checked post-hoc against the
+    builder's current inferred result for each preferred typevar.
+1. To preserve the old HashMap-backed semantics **without mutating the builder's internal
+    state**, the final `build_with(...)` hook in `bind.rs` now prefers the declared type when the
+    builder's inferred result is assignable to it. If the inferred result is incompatible and the
+    typevar is **not** in `partially_specialized_declared_type`,
+    `assignable_to_declared_type` is set to `false`. Partially-specialized preferred types keep
+    the unioned mapping, matching the previous callback-driven behavior.
+1. The retry logic is unchanged: if the preferred types are not compatible, inference is retried
+    with a fresh builder that ignores them.
+1. Removed the callback plumbing from `SpecializationBuilder`:
+    - deleted `infer_map`
+    - removed the `f` parameter from `add_type_mapping`
+    - removed the `f` parameter from `infer_map_impl`
+    - removed the `f` parameter from `add_type_mappings_from_constraint_set`
+    - removed the `f` parameter from callable/protocol inference helpers
+    - removed the `TypeVarAssignment` type alias
+1. Added a temporary read-only query on `SpecializationBuilder` to support the post-hoc
+    compatibility check. This helper is expected to go away once Phase 5 switches the builder to
+    a `ConstraintSet`, at which point the compatibility test becomes a satisfiability check on
+    `self.pending`.
 
-1. Change `infer_argument_constraints` to call `builder.infer()` instead of `builder.infer_map()`.
-    Each argument's inferred type is added to the builder alongside the preferred type
-    constraints (already seeded via `insert_type_mapping`). In the HashMap world, when a
-    typevar already has a preferred type and the argument adds a second type, they are unioned.
-    The satisfiability check (next point) replaces the per-mapping filtering.
-1. After all arguments are inferred, check whether the argument types are compatible with the
-    preferred types. The current `assignable_to_declared_type` flag is set by the `f` callback
-    when an argument's inferred type is not assignable to the preferred type. Replace this with
-    a post-hoc check: for each typevar that has a preferred type, check whether the builder's
-    inferred type (from `self.types`) is assignable to the preferred type. If any is not (and
-    the typevar is not in `partially_specialized_declared_type`), set
-    `assignable_to_declared_type = false`. This is semantically equivalent to the callback.
-    (In later steps, when the builder switches to a constraint set, this becomes a
-    satisfiability check on the pending set.)
-1. The retry logic remains: if not assignable to declared type, create a fresh builder without
-    preferred types and re-infer.
+**Validation**:
 
-Then remove the `f` parameter from `add_type_mapping`, delete `infer_map` (making `infer`
-call `infer_map_impl` directly), and remove the `f` parameter from `infer_map_impl` and
-`add_type_mappings_from_constraint_set`. The `TypeVarAssignment` type alias can also be removed.
-
-This step changes no inference semantics — only the mechanism for preferred type filtering.
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run -a`
 
 **Step 5.2**: Add the `pending` field to `SpecializationBuilder`.
 
