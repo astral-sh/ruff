@@ -731,7 +731,7 @@ impl SpecialFormType {
 
             // `Concatenate` is just always invalid in this context in a type expression
             Self::Concatenate
-                if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR) =>
+                if !inference_flags.contains(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT) =>
             {
                 Err(InvalidTypeExpression::Concatenate)
             }

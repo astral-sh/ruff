@@ -1685,8 +1685,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let first_argument = arguments.next();
 
+            let previously_allowed_concatenate = builder
+                .inference_flags
+                .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
             let parameters =
                 first_argument.and_then(|arg| builder.infer_callable_parameter_types(arg));
+            builder.inference_flags.set(
+                InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+                previously_allowed_concatenate,
+            );
 
             let return_type = arguments
                 .next()
@@ -2140,7 +2147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(arguments_slice, Type::unknown());
                 }
 
-                Type::unknown()
+                Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
             }
             SpecialFormType::Unpack => {
                 let inner_ty = self.infer_type_expression(arguments_slice);
@@ -2508,6 +2515,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         subscript: &ast::ExprSubscript,
     ) -> Parameters<'db> {
+        let previous_concatenate_context = self
+            .inference_flags
+            .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, false);
+
         let arguments_slice = &*subscript.slice;
         let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
             &*tuple.elts
@@ -2562,7 +2573,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.store_expression_type(arguments_slice, Type::unknown());
         }
 
-        parameters.unwrap_or_else(Parameters::unknown)
+        let result = parameters.unwrap_or_else(Parameters::unknown);
+
+        self.inference_flags.set(
+            InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+            previous_concatenate_context,
+        );
+        result
     }
 
     /// Infer the last argument to a `typing.Concatenate` special form, which can be either `...`
@@ -2630,7 +2647,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             _ => {
                 let ty = self.infer_type_expression(expr);
-                report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                if ty != Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                }
                 None
             }
         }

@@ -833,7 +833,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Err(());
                 }
 
+                let previous_concatenate_context = self
+                    .inference_flags
+                    .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
                 let param_type = self.infer_type_expression(expr);
+                self.inference_flags.set(
+                    InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+                    previous_concatenate_context,
+                );
 
                 match param_type {
                     Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
