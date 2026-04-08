@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1–5.4 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1–5.5 complete)
 
 ## Overview
 
@@ -94,11 +94,10 @@ Pattern: 1 (constraint conjunction)
     variance from the bounds themselves
 1. The resulting preferred types are filtered (covariant positions, top-level inferable-typevar
     artifacts, unspecialized typevars, and “no concrete content” results), then seeded into the
-    builder via `insert_type_mapping`
-1. `infer_argument_constraints` still uses the `infer_map` callback to suppress argument
-    assignments that are already compatible with the preferred type, and to flip
-    `assignable_to_declared_type` when a non-partially-specialized preferred type conflicts with an
-    argument inference
+    builder via `add_type_mapping(..., TypeVarVariance::Invariant)`
+1. `infer_argument_constraints` now uses `infer()` directly; compatibility with the preferred type
+    is checked post-hoc against the builder's inferred result, with retry logic if a
+    non-partially-specialized preferred type conflicts with argument inference
 
 So this site is already using CSA for the TCX query, but it still collapses the TCX constraint
 set into per-typevar preferred types *before* argument inference starts.
@@ -231,7 +230,8 @@ Pattern: 1 (constraint conjunction) **plus** 2 (solution extraction hook)
 
 **Current behavior**: The second builder now:
 
-- injects surviving non-covariant TCX constraints via `insert_type_mapping`
+- injects surviving non-covariant TCX constraints via
+    `add_type_mapping(..., TypeVarVariance::Invariant)`
 - adds per-element constraints via `infer(...)`
 - finishes with `build_with(...)`, using a hook that promotes singleton lower bounds to
     `T | Unknown` when there were no TCX constraints (so e.g. `[None]` becomes
@@ -309,17 +309,16 @@ No fundamental blockers. Main design challenges *for the remaining work*:
 The current public `SpecializationBuilder` API is much smaller than when this plan was first
 written:
 
-| Method                | Current callers                                        | Plan coverage         |
-| --------------------- | ------------------------------------------------------ | --------------------- |
-| `new`                 | `call/bind.rs:3917,4060`; `infer/builder.rs:6239`      | Call sites #1 and #6  |
-| `build_with`          | `call/bind.rs:4121`; `infer/builder.rs:6363`           | Call sites #2 and #6b |
-| `insert_type_mapping` | `call/bind.rs:4037`; `infer/builder.rs:6268`; internal | Call sites #1 and #6b |
-| `infer`               | `infer/builder.rs:6297,6300,6346`                      | Call site #6b         |
-| `infer_map`           | `call/bind.rs:4146`                                    | Call site #1          |
+| Method             | Current callers                                                                             | Plan coverage         |
+| ------------------ | ------------------------------------------------------------------------------------------- | --------------------- |
+| `new`              | `call/bind.rs:3917,4060`; `infer/builder.rs:6239`                                           | Call sites #1 and #6  |
+| `build_with`       | `call/bind.rs:4121`; `infer/builder.rs:6363`                                                | Call sites #2 and #6b |
+| `add_type_mapping` | `call/bind.rs` preferred-type seeding; `infer/builder.rs` TCX injection; internal inference | Call sites #1 and #6b |
+| `infer`            | `infer/builder.rs:6297,6300,6346`                                                           | Call site #6b         |
 
 Removed APIs such as `mapped`, `with_default`, `infer_reverse`, `infer_reverse_map`,
-`into_type_mappings`, and the old `build()` entry point are already covered by completed
-Phases 1–4.
+`infer_map`, `into_type_mappings`, the dedicated `insert_type_mapping` entry point, and the old
+`build()` entry point are already covered by completed Phases 1–5.
 
 All former `infer_reverse` / `infer_reverse_map` callers remain accounted for. The surviving
 standalone-query sites now use the cached `PathBounds` helpers:
@@ -589,8 +588,8 @@ Test expectation updated.
 (`infer/builder.rs`):
 
 - Replaced `builder.infer(Type::TypeVar(elt_ty), elt_tcx)` with
-    `builder.insert_type_mapping(elt_ty, elt_tcx)`, which directly inserts the type mapping
-    without going through `infer_map_impl`
+    `builder.add_type_mapping(elt_ty, elt_tcx, TypeVarVariance::Invariant)`, which directly adds
+    the equality constraint without going through `infer_map_impl`
 - The covariant filtering and Unknown fallback logic remain unchanged
 - Note: the original plan envisioned conjoining the raw CSA constraint set here. That is still
     deferred to Phase 5 because this code path needs both (a) covariant-typevar filtering and
@@ -611,7 +610,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.4 complete)
+Status: In progress (Steps 5.1–5.5 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -691,7 +690,8 @@ the builder maintains a constraint set, we can replace this per-mapping filterin
 constraint-set-level check:
 
 1. **Before argument inference**: Seed the preferred types into the builder (via
-    `insert_type_mapping`, which creates equality constraints — already done today).
+    `add_type_mapping(..., TypeVarVariance::Invariant)`, which creates equality constraints —
+    already done today).
 1. **During argument inference**: Call `infer()` instead of `infer_map()` — no callback needed.
     Each argument's inferred type becomes a constraint AND'd into the pending set alongside
     the preferred type constraints.
@@ -713,10 +713,11 @@ constraints with callable/protocol constraints, and satisfiability is checked at
 
 #### ParamSpec "first wins" semantics
 
-The current `add_type_mapping` and `insert_type_mapping` both have special handling for
-ParamSpec: if a mapping already exists for the typevar, the new one is silently dropped. This
-"first wins" semantics can't be expressed as constraint conjunction (ANDing two ParamSpec
-constraints would produce their intersection).
+The current `add_type_mapping` path has special handling for ParamSpec: if a mapping already
+exists for the typevar, the new one is silently dropped. Equality-constraint insertions that now
+flow through `add_type_mapping(..., Invariant)` share the same behavior. This "first wins"
+semantics can't be expressed as constraint conjunction (ANDing two ParamSpec constraints would
+produce their intersection).
 
 **Mitigation**: Keep a `HashSet<BoundTypeVarIdentity>` of ParamSpec typevars that have already
 been constrained. Before creating a constraint for a ParamSpec typevar, check the set; if
@@ -835,15 +836,36 @@ existing HashMap-based extraction. The old extraction path remains in place unti
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.5**: Convert `insert_type_mapping` to create constraints.
+**Step 5.5 ✅**: Converted equality-constraint insertions to dual-write into the pending
+constraint set.
 
-`insert_type_mapping` (used by `bind.rs` to seed preferred types and by
-`infer_collection_literal` for TCX injection) currently inserts directly into the HashMap.
-Convert it to create an equality constraint `constrain_typevar(T, ty, ty)` and AND it into
-the pending set. (Equality because preferred types and TCX injections represent specific type
-assignments, not directional bounds.)
+Implementation details:
 
-During the transition, update both HashMap and constraint set.
+1. The old dedicated `insert_type_mapping` entry point was collapsed into
+    `add_type_mapping(..., TypeVarVariance::Invariant)`, so preferred-type seeding and
+    collection-literal TCX injection now use the same helper as the rest of the builder.
+1. `add_type_mapping` still updates the existing HashMap-backed specialization state, and for the
+    invariant case it now also ANDs the equality constraint `constrain_typevar(T, ty, ty)` into
+    `self.pending`.
+1. Factored the old HashMap-only update logic into a private helper so that callers which already
+    manage pending constraints separately do not accidentally over-constrain the pending set:
+    - `add_type_mapping` uses the HashMap-only helper before adding its variance-based pending
+        constraint
+    - `add_type_mappings_from_constraint_set` uses the HashMap-only helper when replaying
+        extracted solutions into the transitional HashMap state
+1. `paramspec_seen` is now shared across all pending-constraint updates, so ParamSpec "first
+    wins" semantics continue to hold for both ordinary inference and invariant equality seeding.
+
+This leaves the builder in the intended dual-write state before the pending-solve migration:
+external equality-injection callers (`bind.rs` preferred types and collection-literal TCX
+injection) now feed `self.pending`, while the old HashMap extraction path remains in place for
+transitional callers.
+
+**Validation**:
+
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run -a`
 
 **Step 5.6**: Add an internal “solve pending set” path for specialization construction.
 
@@ -879,7 +901,7 @@ The collection-literal hook should continue to look only at the lower bound when
 Once tests pass with the constraint-set-based `build_with`:
 
 - Remove the `types: FxHashMap` field
-- Remove the HashMap update code from `add_type_mapping` and `insert_type_mapping`
+- Remove the HashMap update code from `add_type_mapping`
 - Remove the old `add_type_mappings_from_constraint_set` method entirely
 - Remove the `paramspec_seen` set if ParamSpec handling has been integrated into the constraint
     logic (or keep it as a necessary workaround)
@@ -966,7 +988,8 @@ After Phase 5, the preferred type mechanism works as follows:
 
 1. Extract preferred types from the TCX by solving `return_ty ≤ tcx` and filtering solutions
     (variance, inferable typevars, concrete content checks)
-1. Seed them into the builder via `insert_type_mapping` (creating equality constraints)
+1. Seed them into the builder via `add_type_mapping(..., TypeVarVariance::Invariant)`
+    (creating equality constraints)
 1. Infer argument types via `infer()` (creating additional constraints)
 1. Check satisfiability of the combined constraint set; retry without preferred types if
     unsatisfiable
@@ -985,6 +1008,6 @@ This phase replaces that with direct conjunction:
 
 This eliminates the ad-hoc solution-level filtering (variance, inferable typevars, concrete
 content), since the constraint solver naturally resolves the tension between TCX preferences and
-argument constraints. It also removes `insert_type_mapping`, the `preferred_type_mappings`
-HashMap, the `partially_specialized_declared_type` set, and the solution extraction/filtering
-logic in `infer_specialization`.
+argument constraints. It also removes the invariant equality-seeding call sites, the
+`preferred_type_mappings` HashMap, the `partially_specialized_declared_type` set, and the solution
+extraction/filtering logic in `infer_specialization`.
