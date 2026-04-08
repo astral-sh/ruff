@@ -1000,26 +1000,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
                     // constraints that exposes a union; this requires special handling.
                     match source {
-                        Type::Intersection(intersection)
-                            if intersection.positive(db).iter().any(|t| {
-                                matches!(t, Type::NewTypeInstance(_) | Type::TypeVar(_))
-                            }) =>
-                        {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
-                        }
-                        Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
-                            match typevar.typevar(db).bound_or_constraints(db) {
-                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                    self.check_type_pair(db, bound, target)
-                                }
-                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                    self.check_type_pair(db, constraints.as_type(db), target)
-                                }
-                                None => self.never(),
+                        Type::Intersection(intersection) => {
+                            if intersection.positive(db).iter().any(|element| {
+                                element.is_type_var()
+                                    || element.as_new_type().is_some_and(|newtype| {
+                                        newtype.concrete_base_type(db).is_union()
+                                    })
+                            }) {
+                                self.check_type_pair(
+                                    db,
+                                    intersection.with_expanded_typevars_and_newtypes(db),
+                                    target,
+                                )
+                            } else {
+                                self.never()
                             }
                         }
                         Type::NewTypeInstance(newtype) => {
@@ -1088,24 +1082,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                intersection
-                    .positive_elements_or_object(db)
-                    .when_any(db, self.constraints, |elem_ty| {
-                        self.check_type_pair(db, elem_ty, target)
-                    })
-                    .or(db, self.constraints, || {
-                        if intersection.positive(db).iter().any(|element| {
-                            matches!(element, Type::NewTypeInstance(_) | Type::TypeVar(_))
-                        }) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
-                        } else {
-                            self.never()
-                        }
-                    })
+                intersection.positive_elements_or_object(db).when_any(
+                    db,
+                    self.constraints,
+                    |elem_ty| self.check_type_pair(db, elem_ty, target),
+                )
             }
 
             // `Never` is the bottom type, the empty set.
