@@ -194,7 +194,7 @@ enum DescriptorReceiverKind {
     Instance,
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
     /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
@@ -222,7 +222,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 
     fn recursive_type_normalized_impl(
-        self,
+        &self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
@@ -238,7 +238,7 @@ impl<'db> ResolvedSuperOwner<'db> {
         })
     }
 
-    fn typevar(self, db: &'db dyn Db) -> Option<TypeVarInstance<'db>> {
+    fn typevar(&self, db: &'db dyn Db) -> Option<TypeVarInstance<'db>> {
         match self.owner_type {
             Type::TypeVar(bound_typevar) => Some(bound_typevar.typevar(db)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -249,7 +249,7 @@ impl<'db> ResolvedSuperOwner<'db> {
         }
     }
 
-    fn descriptor_binding(self, db: &'db dyn Db) -> (Option<Type<'db>>, Type<'db>) {
+    fn descriptor_binding(&self, db: &'db dyn Db) -> (Option<Type<'db>>, Type<'db>) {
         match self.receiver {
             DescriptorReceiverKind::Class => (None, self.owner_type),
             DescriptorReceiverKind::Instance => {
@@ -259,7 +259,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
@@ -268,7 +268,7 @@ pub enum SuperOwnerKind<'db> {
 
 impl<'db> SuperOwnerKind<'db> {
     fn recursive_type_normalized_impl(
-        self,
+        &self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
@@ -277,20 +277,20 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Divergent(_) => Some(self),
+            SuperOwnerKind::Divergent(_) => Some(self.clone()),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
                 resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
     }
 
-    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    fn iter_mro(&self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
-                Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
+                Either::Left(ClassBase::Dynamic(*dynamic).mro(db, None))
             }
             SuperOwnerKind::Divergent(divergent) => {
-                Either::Left(ClassBase::Divergent(divergent).mro(db, None))
+                Either::Left(ClassBase::Divergent(*divergent).mro(db, None))
             }
             SuperOwnerKind::Resolved(resolved_owner) => {
                 Either::Right(resolved_owner.lookup_anchor.iter_mro(db))
@@ -298,7 +298,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn lookup_anchor(self, _db: &'db dyn Db) -> Option<ClassType<'db>> {
+    fn lookup_anchor(&self, _db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
             SuperOwnerKind::Resolved(resolved_owner) => Some(resolved_owner.lookup_anchor),
@@ -306,7 +306,7 @@ impl<'db> SuperOwnerKind<'db> {
     }
 
     /// Returns the `TypeVar` instance if this owner is a `TypeVar` variant.
-    fn typevar(self, db: &'db dyn Db) -> Option<TypeVarInstance<'db>> {
+    fn typevar(&self, db: &'db dyn Db) -> Option<TypeVarInstance<'db>> {
         match self {
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.typevar(db),
             SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
@@ -314,10 +314,10 @@ impl<'db> SuperOwnerKind<'db> {
     }
 
     /// Returns the type representation of this owner.
-    pub(super) fn owner_type(self, _db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn owner_type(&self, _db: &'db dyn Db) -> Type<'db> {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SuperOwnerKind::Divergent(divergent) => Type::Divergent(divergent),
+            SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(*dynamic),
+            SuperOwnerKind::Divergent(divergent) => Type::Divergent(*divergent),
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.owner_type,
         }
     }
@@ -856,9 +856,9 @@ impl<'db> BoundSuperType<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let owner = self.owner(db);
-        let class = match owner {
+        let class = match &owner {
             SuperOwnerKind::Dynamic(dynamic) => {
-                return Type::Dynamic(dynamic)
+                return Type::Dynamic(*dynamic)
                     .find_name_in_mro_with_policy(db, name, policy)
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
             }
