@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1–5.2 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1–5.3 complete)
 
 ## Overview
 
@@ -611,7 +611,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.2 complete)
+Status: In progress (Steps 5.1–5.3 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -779,21 +779,32 @@ Implementation details:
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.3**: Convert `add_type_mapping` to create constraints.
+**Step 5.3 ✅**: Converted `add_type_mapping` to dual-write into the pending constraint set.
 
-Change `add_type_mapping` to, in addition to the existing HashMap update, also:
+Implementation details:
 
-1. Check `paramspec_seen` for ParamSpec typevars (skip if already seen)
-1. Map polarity to lower/upper bounds:
+1. `add_type_mapping` still updates the existing HashMap-backed state via `insert_type_mapping`,
+    preserving the current specialization behavior.
+1. It now also maps variance to constraint polarity and ANDs the corresponding constraint into
+    `self.pending`:
     - Covariant: `(ty, object)`
     - Contravariant: `(Never, ty)`
     - Invariant: `(ty, ty)`
-    - Bivariant: skip
-1. Call `ConstraintSet::constrain_typevar(db, constraints, typevar, lower, upper)`
-1. AND the result into `self.pending` via `self.pending.intersect(...)`
+    - Bivariant: no pending constraint
+1. The new constraint is created with `ConstraintSet::constrain_typevar(...)` and intersected into
+    `self.pending` via `self.pending.intersect(...)`.
+1. ParamSpec tracking now uses `paramspec_seen` to preserve today's "first wins" behavior for the
+    pending constraint path as well: after the first ParamSpec occurrence, subsequent
+    `add_type_mapping` calls for the same bound ParamSpec skip pending-constraint updates.
 
-During the transition, both the HashMap and the constraint set are updated. This lets us
-validate that the constraint set produces equivalent (or better) results.
+This leaves `insert_type_mapping` and `add_type_mappings_from_constraint_set` for later steps, so
+only the `add_type_mapping` path is dual-written so far.
+
+**Validation**:
+
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run -a`
 
 **Step 5.4**: Convert `add_type_mappings_from_constraint_set` to direct conjunction.
 
