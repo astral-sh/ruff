@@ -2,7 +2,7 @@ use anyhow::Result;
 use insta::assert_snapshot;
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, Position, WorkspaceDiagnosticReport,
+    FullDocumentDiagnosticReport, Position, Url, WorkspaceDiagnosticReport,
     WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
     WorkspaceDocumentDiagnosticReport, notification::PublishDiagnostics,
 };
@@ -617,6 +617,176 @@ fn global_settings_change() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn open_document_then_add_nested_workspace_folder_open_files_only() -> Result<()> {
+    let root = SystemPath::new("root");
+    let root_main = root.join("main.py");
+    let child = SystemPath::new("root/child");
+    let child_main = child.join("main.py");
+    let child_main_content_v1 = "does_not_exist_child1()\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_file(&root_main, "does_not_exist_root()")?
+        .with_file(&child_main, child_main_content_v1)?
+        .with_workspace(root, None)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&child_main, child_main_content_v1, 1);
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @"0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined",
+    );
+
+    server.add_workspace_folder(child, None)?;
+    server.change_workspace_folders([child], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @"0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined",
+    );
+
+    Ok(())
+}
+
+/// Tests that when a file exists in multiple workspace folders
+/// simultaneousy, then changes to that file are properly captured even
+/// after a workspace folder is removed.
+#[test]
+fn open_document_then_add_nested_workspace_folder_with_change() -> Result<()> {
+    let root = SystemPath::new("root");
+    let root_main = root.join("main.py");
+    let child = SystemPath::new("root/child");
+    let child_main = child.join("main.py");
+    let child_main_content_v1 = "does_not_exist_child1()\n";
+    let child_main_content_v2 = "does_not_exist_child1()\ndoes_not_exist_child2()\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_file(&root_main, "does_not_exist_root()")?
+        .with_file(&child_main, child_main_content_v1)?
+        .with_workspace(root, None)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&child_main, child_main_content_v1, 1);
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @"0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined",
+    );
+
+    server.add_workspace_folder(child, None)?;
+    server.change_workspace_folders([child], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    server.change_text_document(
+        &child_main,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: child_main_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @r"
+    0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    1:0..1:21[ERROR]: Name `does_not_exist_child2` used when not defined
+    ",
+    );
+
+    server.change_workspace_folders([], [&child]);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    // Previously, the diagnostics here would be reported for
+    // `child_main_content_v1`. The bug was that after the removal
+    // of the nested workspace, `child` now became part of the root
+    // project. But its state in the root project hadn't been updated
+    // when the file was changed. Only its state in the child project
+    // was updated.
+    let diagnostics = server.document_diagnostic_request(&child_main, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics),
+        @r"
+    0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    1:0..1:21[ERROR]: Name `does_not_exist_child2` used when not defined
+    ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn open_document_then_add_nested_workspace_folder_workspace() -> Result<()> {
+    let root = SystemPath::new("root");
+    let root_main = root.join("main.py");
+    let child = SystemPath::new("root/child");
+    let child_main = child.join("main.py");
+    let child_main_content_v1 = "does_not_exist_child1()\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_file(&root_main, "does_not_exist_root()")?
+        .with_file(&child_main, child_main_content_v1)?
+        .with_workspace(root, None)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&child_main, child_main_content_v1, 1);
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+    assert_snapshot!(
+        condensed_workspace_diagnostic_snapshot(diagnostics), @r"
+    file://<temp_dir>/root/child/main.py
+    	0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    file://<temp_dir>/root/main.py
+    	0:0..0:19[ERROR]: Name `does_not_exist_root` used when not defined
+    "
+    );
+
+    server.add_workspace_folder(child, None)?;
+    server.change_workspace_folders([child], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    // This specifically asserts that we get duplicate diagnostics
+    // here. VS Code seems to de-duplicate them, but ultimately this
+    // comes from checking `root/child/main.py` twice: once as part
+    // of the `root` workspace folder and another as part of the
+    // `root/child` workspace folder. It seems like this is ultimately
+    // necessary as a result of using a distinct project database for
+    // each workspace folder.
+    server.open_text_document(&child_main, child_main_content_v1, 1);
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+    assert_snapshot!(
+        condensed_workspace_diagnostic_snapshot(diagnostics), @r"
+    file://<temp_dir>/root/child/main.py
+    	0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    file://<temp_dir>/root/child/main.py
+    	0:0..0:21[ERROR]: Name `does_not_exist_child1` used when not defined
+    file://<temp_dir>/root/main.py
+    	0:0..0:19[ERROR]: Name `does_not_exist_root` used when not defined
+    "
+    );
+
+    Ok(())
+}
+
 /// A helper routine for creating a snapshot for a collection of
 /// workspace diagnostics.
 ///
@@ -625,12 +795,21 @@ fn global_settings_change() -> Result<()> {
 /// workspace folder. This isn't really meant to test the diagnostics
 /// themselves, hence the condensed output.
 fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReportResult) -> String {
-    let items = match report {
+    let mut items = match report {
         WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) => items,
         WorkspaceDiagnosticReportResult::Partial(WorkspaceDiagnosticReportPartialResult {
             items,
         }) => items,
     };
+    items.sort_by(|item1, item2| {
+        fn uri(item: &WorkspaceDocumentDiagnosticReport) -> &Url {
+            match *item {
+                WorkspaceDocumentDiagnosticReport::Full(ref item) => &item.uri,
+                WorkspaceDocumentDiagnosticReport::Unchanged(ref item) => &item.uri,
+            }
+        }
+        uri(item1).cmp(uri(item2))
+    });
     items
         .into_iter()
         .map(|item| match item {
