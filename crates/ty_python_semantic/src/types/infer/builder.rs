@@ -2815,7 +2815,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => {
+                        if self.validate_final_attribute_deletion(
+                            target,
+                            object_ty,
+                            attribute,
+                            emit_diagnostics,
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    }
                     Err(CallDunderError::CallError(kind, _bindings)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
@@ -2829,6 +2839,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return false;
                     }
                     Err(CallDunderError::MethodNotAvailable) => {}
+                }
+
+                if self.validate_final_attribute_deletion(
+                    target,
+                    object_ty,
+                    attribute,
+                    emit_diagnostics,
+                ) {
+                    return false;
                 }
 
                 if let Some(PlaceAndQualifiers {

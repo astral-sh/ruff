@@ -286,6 +286,37 @@ fallback_instance_attribute = FallbackInstanceAttribute()
 del fallback_instance_attribute.x
 ```
 
+### Final attributes
+
+```py
+from typing import Final
+
+class FinalAttribute:
+    def __init__(self) -> None:
+        self.x: Final[int] = 1
+
+class FinalAttributeWithDelAttr:
+    def __init__(self) -> None:
+        self.x: Final[int] = 1
+
+    def __delattr__(self, name: str) -> None:
+        pass
+
+class FinalClassAttribute:
+    x: Final[int] = 1
+
+final_attribute = FinalAttribute()
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttribute`"
+del final_attribute.x
+
+final_attribute_with_delattr = FinalAttributeWithDelAttr()
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `FinalAttributeWithDelAttr`"
+del final_attribute_with_delattr.x
+
+# error: [invalid-assignment] "Cannot delete final attribute `x` on type `<class 'FinalClassAttribute'>`"
+del FinalClassAttribute.x
+```
+
 ### Metaclass `__delattr__`
 
 ```py
