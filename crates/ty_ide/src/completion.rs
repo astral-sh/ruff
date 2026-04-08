@@ -1503,7 +1503,11 @@ fn add_function_arg_completions<'db>(
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
+            if p.is_positional_only
+                || p.is_variadic
+                || p.is_keyword_variadic
+                || !set_function_args.insert(p.name.as_str())
+            {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -4577,6 +4581,45 @@ bar(o<CURSOR>
         okay_okay=
         foo
         "
+        );
+    }
+
+    #[test]
+    fn call_bare_paramspec_has_no_keyword_argument_completions() {
+        let builder = completion_test_builder(
+            "\
+from typing import Callable, ParamSpec
+
+P = ParamSpec(\"P\")
+sentinel = 1
+
+def takes(f: Callable[P, None]) -> None:
+    f(<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import();
+        let completions = builder.build();
+
+        completions.contains("sentinel");
+
+        let keyword_argument_completions = completions
+            .completions()
+            .iter()
+            .filter_map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .filter(|insert| insert.ends_with('='))
+            })
+            .collect::<Vec<_>>();
+
+        // Bare `ParamSpec` signatures are rendered as a synthetic parameter for
+        // signature help, but they don't correspond to a valid keyword argument.
+        assert!(
+            keyword_argument_completions.is_empty(),
+            "Unexpected keyword argument completions: {keyword_argument_completions:?}",
         );
     }
 

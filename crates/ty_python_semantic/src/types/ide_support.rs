@@ -7,7 +7,7 @@ use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::signatures::{ParameterKind, Signature};
+use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
     Type, TypeContext, UnionType,
@@ -595,20 +595,8 @@ pub struct CallSignatureDetails<'db> {
     /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
     pub label: String,
 
-    /// Label offsets for each parameter in the signature string.
-    /// Each range specifies the start position and length of a parameter label
-    /// within the full signature string.
-    pub parameter_label_offsets: Vec<TextRange>,
-
-    /// The names of the parameters in the signature, in order.
-    /// This provides easy access to parameter names for documentation lookup.
-    pub parameter_names: Vec<String>,
-
-    /// Parameter kinds, useful to determine correct autocomplete suggestions.
-    pub parameter_kinds: Vec<ParameterKind<'db>>,
-
-    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
-    pub parameter_types: Vec<Type<'db>>,
+    /// The displayed parameters for this signature, in left-to-right order.
+    pub parameters: Vec<CallSignatureParameter<'db>>,
 
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
@@ -617,6 +605,32 @@ pub struct CallSignatureDetails<'db> {
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
+
+    /// Mapping from argument indices to displayed parameter indices. This accounts for
+    /// displayed signatures that synthesize parameters, like bare `ParamSpec` signatures.
+    pub argument_to_displayed_parameter_mapping: Vec<Option<usize>>,
+}
+
+/// A single displayed parameter in a callable signature for IDE support.
+#[derive(Debug, Clone)]
+pub struct CallSignatureParameter<'db> {
+    /// The rendered label of the parameter as shown in the signature.
+    pub label: String,
+
+    /// The rendered name of the parameter, used for downstream IDE features.
+    pub name: String,
+
+    /// Annotated type of the parameter after applying any inferred specialization.
+    pub ty: Type<'db>,
+
+    /// True if the parameter is positional-only.
+    pub is_positional_only: bool,
+
+    /// True if the parameter can absorb arbitrarily many positional arguments.
+    pub is_variadic: bool,
+
+    /// True if the parameter can absorb arbitrarily many keyword arguments.
+    pub is_keyword_variadic: bool,
 }
 
 impl<'db> CallSignatureDetails<'db> {
@@ -625,30 +639,27 @@ impl<'db> CallSignatureDetails<'db> {
         let specialization = binding.specialization();
         let signature = binding.signature.clone();
         let display_details = signature.display(db).to_string_parts();
-        let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
-            .parameters()
+        let (parameters, parameter_to_displayed_parameter_mapping) =
+            displayed_parameters_for_signature(db, &signature, &display_details, specialization);
+        let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
-            .map(|param| {
-                // Apply the inferred specialization (if any) to resolve TypeVars
-                // in the annotated type. For example, if `_KT` was inferred as
-                // `str` from the call arguments, this turns `_KT` into `str`.
-                let mut ty = param.annotated_type();
-                if let Some(spec) = specialization {
-                    ty = ty.apply_specialization(db, spec);
-                }
-                (param.kind().clone(), ty)
+            .map(|mapping| {
+                mapping.parameters.iter().find_map(|parameter_index| {
+                    parameter_to_displayed_parameter_mapping
+                        .get(*parameter_index)
+                        .copied()
+                        .flatten()
+                })
             })
-            .unzip();
+            .collect();
 
         CallSignatureDetails {
             definition: signature.definition(),
             signature,
             label: display_details.label,
-            parameter_label_offsets: display_details.parameter_ranges,
-            parameter_names: display_details.parameter_names,
-            parameter_kinds,
-            parameter_types,
+            parameters,
             argument_to_parameter_mapping,
+            argument_to_displayed_parameter_mapping,
         }
     }
 
@@ -664,6 +675,105 @@ impl<'db> CallSignatureDetails<'db> {
         };
 
         Some(FileRange::new(file, parameters.find(name)?.name().range))
+    }
+}
+
+/// Build the parameter list shown for a rendered signature.
+///
+/// Returns both the displayed parameters and a mapping from each parameter in
+/// `signature` to its displayed parameter index, if any. This accounts for
+/// rendered signatures that synthesize or omit parameters, such as bare
+/// `ParamSpec` signatures, and applies any inferred specialization to the
+/// displayed parameter types.
+fn displayed_parameters_for_signature<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    display_details: &crate::types::display::SignatureDisplayDetails,
+    specialization: Option<crate::types::generics::Specialization<'db>>,
+) -> (Vec<CallSignatureParameter<'db>>, Vec<Option<usize>>) {
+    // Apply any inferred specialization to displayed parameter types so
+    // call-site substitutions are reflected in the rendered signature. For
+    // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
+    let apply_specialization =
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, spec));
+    let parameters = signature.parameters();
+
+    match parameters.kind() {
+        ParametersKind::Standard | ParametersKind::Concatenate(_) => {
+            let mut displayed_parameters = Vec::new();
+            let mut parameter_to_displayed_parameter_mapping = vec![None; parameters.len()];
+
+            for (parameter_index, parameter) in parameters.iter().enumerate() {
+                let Some(range) = display_details
+                    .parameter_ranges
+                    .get(parameter_index)
+                    .copied()
+                else {
+                    continue;
+                };
+                let Some(name) = display_details
+                    .parameter_names
+                    .get(parameter_index)
+                    .cloned()
+                else {
+                    continue;
+                };
+                let Some(label) = display_details
+                    .label
+                    .get(range.to_std_range())
+                    .map(ToString::to_string)
+                else {
+                    continue;
+                };
+
+                parameter_to_displayed_parameter_mapping[parameter_index] =
+                    Some(displayed_parameters.len());
+                displayed_parameters.push(CallSignatureParameter {
+                    label,
+                    name,
+                    ty: apply_specialization(parameter.annotated_type()),
+                    is_positional_only: parameter.is_positional_only(),
+                    is_variadic: parameter.is_variadic(),
+                    is_keyword_variadic: parameter.is_keyword_variadic(),
+                });
+            }
+
+            (
+                displayed_parameters,
+                parameter_to_displayed_parameter_mapping,
+            )
+        }
+        ParametersKind::ParamSpec(typevar) => {
+            let parameter_name = format!("**{}", typevar.name(db));
+            let label = display_details
+                .parameter_ranges
+                .first()
+                .and_then(|range| {
+                    display_details
+                        .label
+                        .get(range.to_std_range())
+                        .map(ToString::to_string)
+                })
+                .unwrap_or_else(|| parameter_name.clone());
+            let name = display_details
+                .parameter_names
+                .first()
+                .cloned()
+                .unwrap_or(parameter_name);
+
+            (
+                vec![CallSignatureParameter {
+                    label,
+                    name,
+                    ty: Type::TypeVar(typevar),
+                    is_positional_only: false,
+                    is_variadic: true,
+                    is_keyword_variadic: true,
+                }],
+                vec![Some(0); parameters.len()],
+            )
+        }
+        ParametersKind::Gradual | ParametersKind::Top => (Vec::new(), vec![None; parameters.len()]),
     }
 }
 
