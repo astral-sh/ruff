@@ -7932,31 +7932,26 @@ from .imp<CURSOR>
     fn auto_import_prefers_typing_over_third_party_reexport() {
         let builder = CursorTest::builder()
             .with_site_packages()
-            .source("main.py", "Prot<CURSOR>")
+            .source("main.py", "Concaten<CURSOR>")
             .site_packages(
                 "thirdparty/__init__.py",
                 r#"
-from typing import Protocol as Protocol
+from typing import Concatenate as Concatenate
 "#,
             )
             .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let typing_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "Protocol" && c.module_name.map(ModuleName::as_str) == Some("typing")
-            })
-            .expect("expected `Protocol` completion from `typing`");
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "Protocol" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `Protocol` completion from `thirdparty`");
-        assert!(typing_idx < third_party_idx);
+            .module_names()
+            .filter(|c| {
+                c.name == "Concatenate"
+                    && matches!(
+                        c.module_name.map(|m| m.as_str()),
+                        Some("typing" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Concatenate :: typing
+        Concatenate :: thirdparty
+        ");
     }
 
     #[test]
@@ -7971,23 +7966,18 @@ from collections import ChainMap as ChainMap
 "#,
             )
             .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let collections_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "ChainMap" && c.module_name.map(ModuleName::as_str) == Some("collections")
-            })
-            .expect("expected `ChainMap` completion from `collections`");
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "ChainMap" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `ChainMap` completion from `thirdparty`");
-        assert!(collections_idx < third_party_idx);
+            .module_names()
+            .filter(|c| {
+                c.name == "ChainMap"
+                    && matches!(
+                        c.module_name.map(|m| m.as_str()),
+                        Some("collections" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        ChainMap :: collections
+        ChainMap :: thirdparty
+        ");
     }
 
     #[test]
@@ -8003,27 +7993,18 @@ def no_type_check_decorator():
 "#,
             )
             .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
+            .module_names()
+            .filter(|c| {
                 c.name == "no_type_check_decorator"
-                    && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect(
-                "expected non-deprecated `no_type_check_decorator` completion from `thirdparty`",
-            );
-        let typing_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "no_type_check_decorator"
-                    && c.module_name.map(ModuleName::as_str) == Some("typing")
-            })
-            .expect("expected deprecated `no_type_check_decorator` completion from `typing`");
-        assert!(third_party_idx < typing_idx);
+                    && matches!(
+                        c.module_name.map(|m| m.as_str()),
+                        Some("typing" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        no_type_check_decorator :: thirdparty
+        no_type_check_decorator :: typing
+        ");
     }
 
     #[test]
@@ -8038,21 +8019,18 @@ from sys import argv as argv
 "#,
             )
             .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "argv" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `argv` completion from `thirdparty`");
-        let sys_idx = test
-            .completions()
-            .iter()
-            .position(|c| c.name == "argv" && c.module_name.map(ModuleName::as_str) == Some("sys"))
-            .expect("expected `argv` completion from `sys`");
-        assert!(third_party_idx < sys_idx);
+            .module_names()
+            .filter(|c| {
+                c.name == "argv"
+                    && matches!(
+                        c.module_name.map(|m| m.as_str()),
+                        Some("sys" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        argv :: thirdparty
+        argv :: sys
+        ");
     }
 
     #[test]
@@ -8067,21 +8045,15 @@ from os import getpid as getpid
 "#,
             )
             .completion_test_builder()
-            .module_names();
-        let test = builder.build();
-        let third_party_idx = test
-            .completions()
-            .iter()
-            .position(|c| {
-                c.name == "getpid" && c.module_name.map(ModuleName::as_str) == Some("thirdparty")
-            })
-            .expect("expected `getpid` completion from `thirdparty`");
-        let os_idx = test
-            .completions()
-            .iter()
-            .position(|c| c.name == "getpid" && c.module_name.map(ModuleName::as_str) == Some("os"))
-            .expect("expected `getpid` completion from `os`");
-        assert!(third_party_idx < os_idx);
+            .module_names()
+            .filter(|c| {
+                c.name == "getpid"
+                    && matches!(c.module_name.map(|m| m.as_str()), Some("os" | "thirdparty"))
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        getpid :: thirdparty
+        getpid :: os
+        ");
     }
 
     #[test]
