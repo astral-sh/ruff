@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1–5.2 complete)
 
 ## Overview
 
@@ -611,7 +611,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Step 5.1 complete)
+Status: In progress (Steps 5.1–5.2 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -762,14 +762,22 @@ Implementation details:
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.2**: Add the `pending` field to `SpecializationBuilder`.
+**Step 5.2 ✅**: Added the pending constraint-set scaffolding to `SpecializationBuilder`.
 
-Add a `pending: ConstraintSet<'db, 'c>` field to the struct, initialized to
-`ConstraintSet::always(constraints)` (the always-true constraint set, the identity for AND).
-Keep the `types` HashMap as a parallel path during the transition — both fields are updated
-simultaneously so we can compare results during testing.
+Implementation details:
 
-Also add a `paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>` field for ParamSpec tracking.
+1. Added `pending: ConstraintSet<'db, 'c>` to `SpecializationBuilder`, initialized to the
+    always-true constraint set via `ConstraintSet::from_bool(constraints, true)`.
+1. Added `paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>` to hold the forthcoming
+    ParamSpec "first wins" tracking state.
+1. Kept the existing `types` HashMap intact as the active specialization state for now; the new
+    fields are scaffolding for the dual-write transition in Steps 5.3–5.5.
+
+**Validation**:
+
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run -a`
 
 **Step 5.3**: Convert `add_type_mapping` to create constraints.
 
