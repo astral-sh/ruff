@@ -342,10 +342,12 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
@@ -826,10 +828,12 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)
     }

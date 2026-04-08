@@ -4,7 +4,9 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::iter;
+use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -235,8 +237,90 @@ fn definition_expression_type<'db>(
     }
 }
 
+struct ApplyDefaultTypeMapping;
+struct ApplyTopMaterialization;
+struct ApplyBottomMaterialization;
+struct ApplyMaterializationEquivalence;
+
+type MaterializationEquivalenceVisitor<'db> =
+    Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
+///
+/// Materialization is the only mapping mode that needs to visit the same type under two different
+/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
+/// for those modes so invariant checks can safely reuse one visitor.
+pub(crate) struct ApplyTypeMappingVisitor<'db> {
+    default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
+    top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
+    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+}
+
+impl<'db> ApplyTypeMappingVisitor<'db> {
+    fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
+        self.materialization_equivalence
+            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    }
+
+    pub(crate) fn visit(
+        &self,
+        ty: Type<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => self
+                .top_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
+            TypeMapping::Materialize(MaterializationKind::Bottom) => self
+                .bottom_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
+            _ => self
+                .default
+                .get_or_init(TypeTransformer::default)
+                .visit(ty, func),
+        }
+    }
+
+    pub(crate) fn is_equivalent_to_materialization(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> bool {
+        self.materialization_equivalence().visit((left, right), || {
+            left.is_equivalent_to_with_materialization_visitor(db, right, self)
+        })
+    }
+
+    pub(crate) fn for_new_materialization_root(&self) -> Self {
+        let materialization_equivalence = OnceCell::new();
+        let was_empty =
+            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
+        debug_assert!(was_empty.is_ok());
+
+        Self {
+            default: OnceCell::new(),
+            top_materialization: OnceCell::new(),
+            bottom_materialization: OnceCell::new(),
+            materialization_equivalence,
+        }
+    }
+}
+
+impl Default for ApplyTypeMappingVisitor<'_> {
+    fn default() -> Self {
+        Self {
+            default: OnceCell::new(),
+            top_materialization: OnceCell::new(),
+            bottom_materialization: OnceCell::new(),
+            materialization_equivalence: OnceCell::new(),
+        }
+    }
+}
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
@@ -5520,7 +5604,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
+            Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5568,7 +5652,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -5649,7 +5733,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, || {
+            Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
@@ -5658,7 +5742,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, || {
+            Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5682,7 +5766,7 @@ impl<'db> Type<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, || {
+                let mapped = visitor.visit(self, type_mapping, || {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 

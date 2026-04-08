@@ -489,6 +489,54 @@ static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
 static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
+### Equivalence of top materializations of mutually recursive invariant aliases
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_equivalent_to, is_subtype_of, Top
+
+class Box[T]:
+    pass
+
+type A = Callable[[B], None]
+type B = Callable[[A], None]
+
+static_assert(is_equivalent_to(Top[Box[A]], Top[Box[B]]))
+static_assert(is_subtype_of(Top[Box[A]], Top[Box[B]]))
+static_assert(is_subtype_of(Top[Box[B]], Top[Box[A]]))
+```
+
+### Assignment through recursive aliases
+
+```py
+from __future__ import annotations
+
+type JSON = str | int | float | bool | list[JSON] | list[JSON_OBJECT] | dict[str, JSON] | None
+type JSON_OBJECT = dict[str, JSON]
+
+x: JSON_OBJECT = {"hello": 23}
+
+def f() -> JSON_OBJECT:
+    return {"hello": 23}
+```
+
+### Recursive dict alias in method return
+
+```py
+from __future__ import annotations
+from dataclasses import dataclass
+
+type NodeDict = dict[str, str | list[NodeDict]]
+
+@dataclass
+class Node:
+    label: str
+    children: list[Node]
+
+    def to_dict(self) -> NodeDict:
+        return {"label": self.label, "children": [child.to_dict() for child in self.children]}
+```
+
 ### Cyclic defaults
 
 ```py
