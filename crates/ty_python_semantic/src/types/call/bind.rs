@@ -4414,7 +4414,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(self.db);
                         if let Some(&ty) = preferred.get(&identity) {
-                            builder.insert_type_mapping(binding.bound_typevar, ty);
+                            builder.add_type_mapping(
+                                binding.bound_typevar,
+                                ty,
+                                TypeVarVariance::Invariant,
+                            );
                         }
                     }
                 }

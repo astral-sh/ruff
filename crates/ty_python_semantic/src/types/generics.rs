@@ -1747,11 +1747,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context.specialize_recursive(self.db, types)
     }
 
-    /// Insert a type mapping for a bound typevar.
-    ///
-    /// If a mapping already exists for this typevar, the new type is unioned with the existing
-    /// one.
-    pub(crate) fn insert_type_mapping(
+    fn insert_hash_map_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
@@ -1777,35 +1773,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    pub(crate) fn inferred_type_is_assignable_to(
-        &self,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-        ty: Type<'db>,
-    ) -> bool {
-        self.types
-            .get(&bound_typevar)
-            .is_some_and(|inferred_ty| inferred_ty.is_assignable_to(self.db, ty))
-    }
-
-    fn add_type_mapping(
+    fn intersect_pending_typevar_constraint(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
-        variance: TypeVarVariance,
+        lower: Type<'db>,
+        upper: Type<'db>,
     ) {
-        self.insert_type_mapping(bound_typevar, ty);
-
         let identity = bound_typevar.identity(self.db);
         if bound_typevar.is_paramspec(self.db) && !self.paramspec_seen.insert(identity) {
             return;
         }
-
-        let (lower, upper) = match variance {
-            TypeVarVariance::Covariant => (ty, Type::object()),
-            TypeVarVariance::Contravariant => (Type::Never, ty),
-            TypeVarVariance::Invariant => (ty, ty),
-            TypeVarVariance::Bivariant => return,
-        };
 
         let constraint = ConstraintSet::constrain_typevar(
             self.db,
@@ -1816,6 +1793,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         );
         self.pending
             .intersect(self.db, self.constraints, constraint);
+    }
+
+    pub(crate) fn inferred_type_is_assignable_to(
+        &self,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        self.types
+            .get(&bound_typevar)
+            .is_some_and(|inferred_ty| inferred_ty.is_assignable_to(self.db, ty))
+    }
+
+    /// Add a type mapping for a bound typevar using the given variance to determine how the
+    /// inferred type constrains the typevar.
+    pub(crate) fn add_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        variance: TypeVarVariance,
+    ) {
+        self.insert_hash_map_type_mapping(bound_typevar, ty);
+
+        let (lower, upper) = match variance {
+            TypeVarVariance::Covariant => (ty, Type::object()),
+            TypeVarVariance::Contravariant => (Type::Never, ty),
+            TypeVarVariance::Invariant => (ty, ty),
+            TypeVarVariance::Bivariant => return,
+        };
+
+        self.intersect_pending_typevar_constraint(bound_typevar, lower, upper);
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
@@ -1838,7 +1845,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         for solution in solutions {
             for binding in solution {
-                self.insert_type_mapping(binding.bound_typevar, binding.solution);
+                self.insert_hash_map_type_mapping(binding.bound_typevar, binding.solution);
             }
         }
         Ok(())
