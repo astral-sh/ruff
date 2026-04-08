@@ -85,7 +85,7 @@ PublishDiagnosticsParams {
                                 },
                             },
                         },
-                        message: "Inferred type is `Literal[/"test/"]`",
+                        message: "Inferred type is `Literal[\"test\"]`",
                     },
                 ],
             ),

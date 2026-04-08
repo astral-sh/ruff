@@ -94,7 +94,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-argument-type"
       },
       "source": "ty",
-      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`"
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\", \"]`"
     },
     {
       "range": {
