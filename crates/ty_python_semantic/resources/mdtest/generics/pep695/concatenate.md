@@ -374,6 +374,9 @@ def invalid[**P](
     c: Callable[Concatenate[Concatenate[int, ...], P], None],
     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
     d: Callable[Concatenate[Concatenate, P], int],
+    # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `Unknown`"
+    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
+    e: Callable[Concatenate[int, Concatenate[int, ...]], None]
 ):
     pass
 ```
