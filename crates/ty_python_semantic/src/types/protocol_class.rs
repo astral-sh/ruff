@@ -746,8 +746,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             "protocol member `{member_name}` is not defined on type `{ty_display}`"
                         )
                     });
+                    return self.never();
                 }
-                ConstraintSet::from_bool(self.constraints, is_defined)
+                ConstraintSet::from_bool(self.constraints, true)
             }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
