@@ -114,9 +114,6 @@ pub(crate) struct Scope {
 
     /// The constraint that determines the reachability of this scope.
     reachability: ScopedReachabilityConstraintId,
-
-    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
-    in_type_checking_block: bool,
 }
 
 impl Scope {
@@ -125,14 +122,12 @@ impl Scope {
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
         reachability: ScopedReachabilityConstraintId,
-        in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
             reachability,
-            in_type_checking_block,
         }
     }
 
@@ -166,10 +161,6 @@ impl Scope {
 
     pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
-    }
-
-    pub(crate) fn in_type_checking_block(&self) -> bool {
-        self.in_type_checking_block
     }
 }
 

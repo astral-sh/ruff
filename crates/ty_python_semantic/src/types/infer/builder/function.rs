@@ -65,7 +65,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if self.in_function_overload_or_abstractmethod() {
                     return;
                 }
-                if self.scope().scope(db).in_type_checking_block() {
+                if self.is_in_type_checking_block(self.scope(), function) {
                     return;
                 }
                 if let Some(class) = self.class_context_of_current_method() {
@@ -639,7 +639,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !suppress_invalid_default
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
-                        || self.scope().scope(db).in_type_checking_block()
+                        || self.is_in_type_checking_block(self.scope(), default_expr)
                         || self
                             .class_context_of_current_method()
                             .is_some_and(|class| class.is_protocol(db)))

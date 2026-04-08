@@ -492,7 +492,7 @@ impl<'db> SemanticIndex<'db> {
     /// scope reachability and statement-level reachability within the scope.
     pub(crate) fn is_range_reachable(
         &self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn Db,
         scope_id: FileScopeId,
         range: TextRange,
     ) -> bool {
@@ -505,14 +505,13 @@ impl<'db> SemanticIndex<'db> {
         scope_id: FileScopeId,
         range: TextRange,
     ) -> bool {
-        self.scope(scope_id).in_type_checking_block()
-            || self
-                .use_def_map(scope_id)
+        self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
+            self.use_def_map(scope_id)
                 .is_range_in_type_checking_block(range)
+        })
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
-    #[allow(unused)]
     pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
     }
