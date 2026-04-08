@@ -23,7 +23,7 @@ expression: main_diagnostics
         "href": "https://ty.dev/rules#undefined-reveal"
       },
       "source": "ty",
-      "message": "`reveal_type` used without importing it\n/ninfo: This is allowed for debugging convenience but will fail at runtime"
+      "message": "`reveal_type` used without importing it\n\ninfo: This is allowed for debugging convenience but will fail at runtime"
     },
     {
       "range": {

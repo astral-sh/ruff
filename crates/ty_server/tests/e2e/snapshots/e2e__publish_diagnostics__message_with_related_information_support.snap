@@ -58,7 +58,7 @@ PublishDiagnosticsParams {
             source: Some(
                 "ty",
             ),
-            message: "Argument does not have asserted type `list[str]`\n/ninfo: `list[str]` and `Literal[/"test/"]` are not equivalent types",
+            message: "Argument does not have asserted type `list[str]`\n\ninfo: `list[str]` and `Literal[\"test\"]` are not equivalent types",
             related_information: Some(
                 [
                     DiagnosticRelatedInformation {
