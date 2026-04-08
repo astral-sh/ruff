@@ -561,18 +561,16 @@ impl DocumentQuery {
         }
     }
 
-    /// Generate a source kind used by the linter.
-    pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
+    /// Generate a Python source kind used by the linter.
+    pub(crate) fn make_python_source_kind(
+        &self,
+        source_type: ruff_python_ast::PySourceType,
+    ) -> ruff_linter::source_kind::SourceKind {
         match self {
-            Self::Text { document, .. } => {
-                let source_type = self.source_type_for_lint();
-                ruff_linter::source_kind::SourceKind::from_source_code(
-                    document.contents().to_string(),
-                    source_type,
-                )
-                .expect("source kind creation should succeed")
-                .expect("text documents should not resolve to TOML source kinds")
-            }
+            Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
+                code: document.contents().to_string(),
+                is_stub: source_type.is_stub(),
+            },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }
