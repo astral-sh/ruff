@@ -4444,53 +4444,64 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
-                             bounds: Option<(Type<'db>, Type<'db>)>| {
-            let (lower, _upper) = bounds?;
-            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+        let maybe_promote =
+            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, _upper: Type<'db>| {
+                let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return None;
-            }
-
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            self.return_ty
-                .visit_specialization(self.db, |ty, variance| {
-                    if ty != Type::TypeVar(typevar) {
-                        return;
-                    }
-
-                    variance_in_return = variance_in_return.join(variance);
-                });
-
-            // Promotion is only useful if the type variable is in non-covariant position
-            // in the return type.
-            if variance_in_return.is_covariant() {
-                return None;
-            }
-
-            let promoted = lower.promote(self.db);
-
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(self.db, bound) {
+                // For constrained TypeVars, the inferred type is already one of the
+                // constraints. Promoting literals would produce a type that doesn't
+                // match any constraint.
+                if matches!(
+                    bound_or_constraints,
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) {
                     return None;
                 }
-            }
 
-            Some(promoted)
-        };
+                let mut variance_in_return = TypeVarVariance::Bivariant;
 
-        let specialization = builder.build_with(generic_context, maybe_promote);
+                // Find all occurrences of the type variable in the return type.
+                self.return_ty
+                    .visit_specialization(self.db, |ty, variance| {
+                        if ty != Type::TypeVar(typevar) {
+                            return;
+                        }
+
+                        variance_in_return = variance_in_return.join(variance);
+                    });
+
+                // Promotion is only useful if the type variable is in non-covariant position
+                // in the return type.
+                if variance_in_return.is_covariant() {
+                    return None;
+                }
+
+                let promoted = lower.promote(self.db);
+
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                    if !promoted.is_assignable_to(self.db, bound) {
+                        return None;
+                    }
+                }
+
+                Some(promoted)
+            };
+
+        let choose_solution =
+            |typevar: BoundTypeVarInstance<'db>, bounds: Option<(Type<'db>, Type<'db>)>| {
+                let (lower, upper) = bounds?;
+                if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(self.db))
+                    && lower.is_assignable_to(self.db, preferred_ty)
+                {
+                    return Some(preferred_ty);
+                }
+
+                maybe_promote(typevar, lower, upper)
+            };
+
+        let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
@@ -4503,8 +4514,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
-        let mut assignable_to_declared_type = true;
-
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
@@ -4518,27 +4527,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
-
-                let specialization_result = builder.infer_map(
+                let specialization_result = builder.infer(
                     declared_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, _, inferred_ty)| {
-                        // Avoid widening the inferred type if it is already assignable to the
-                        // preferred declared type.
-                        if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
-                            if inferred_ty.is_assignable_to(self.db, *preferred_ty) {
-                                return None;
-                            }
-
-                            // If this is a partially specialized type, the type we infer may still
-                            // be assignable to it once fully specialized.
-                            if !partially_specialized_declared_type.contains(&identity) {
-                                assignable_to_declared_type = false;
-                            }
-                        }
-
-                        Some(inferred_ty)
-                    },
                 );
 
                 if let Err(error) = specialization_result {
@@ -4550,7 +4541,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        assignable_to_declared_type
+        preferred_type_mappings
+            .iter()
+            .all(|(&identity, &preferred_ty)| {
+                partially_specialized_declared_type.contains(&identity)
+                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+            })
     }
 
     fn check_argument_type(
