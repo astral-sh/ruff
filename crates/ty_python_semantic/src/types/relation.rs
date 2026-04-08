@@ -639,31 +639,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    fn expanded_intersection_source(
-        &self,
-        db: &'db dyn Db,
-        intersection: crate::types::IntersectionType<'db>,
-    ) -> Option<Type<'db>> {
-        let expanded = intersection.map_positive(db, |element| match *element {
-            Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
-                // Leave inferable typevars alone: widening them here could bypass the normal
-                // solving path and discard information needed to infer a concrete specialization.
-                match typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db)
-                    }
-                    None => *element,
-                }
-            }
-            _ => element
-                .as_new_type()
-                .map_or(*element, |newtype| newtype.concrete_base_type(db)),
-        });
-
-        (expanded != Type::Intersection(intersection)).then_some(expanded)
-    }
-
     fn with_recursion_guard(
         &self,
         source: Type<'db>,
@@ -1036,12 +1011,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 None => self.never(),
                             }
                         }
-                        Type::Intersection(intersection) => self
-                            .expanded_intersection_source(db, intersection)
-                            .map_or_else(
-                                || self.never(),
-                                |expanded| self.check_type_pair(db, expanded, target),
-                            ),
+                        Type::Intersection(intersection)
+                            if intersection.positive(db).iter().any(|t| {
+                                matches!(t, Type::NewTypeInstance(_) | Type::TypeVar(_))
+                            }) =>
+                        {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
+                        }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
                             if concrete_base.is_union() {
@@ -1108,21 +1088,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                let direct = intersection.positive_elements_or_object(db).when_any(
-                    db,
-                    self.constraints,
-                    |elem_ty| self.check_type_pair(db, elem_ty, target),
-                );
-
-                if let Some(expanded_source) = self.expanded_intersection_source(db, intersection) {
-                    // Replacing a positive bounded/constrained typevar or newtype with its
-                    // bound/base yields a wider view of the same source intersection.
-                    direct.or(db, self.constraints, || {
-                        self.check_type_pair(db, expanded_source, target)
+                intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, self.constraints, |elem_ty| {
+                        self.check_type_pair(db, elem_ty, target)
                     })
-                } else {
-                    direct
-                }
+                    .or(db, self.constraints, || {
+                        if intersection.positive(db).iter().any(|element| {
+                            matches!(element, Type::NewTypeInstance(_) | Type::TypeVar(_))
+                        }) {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
+                        } else {
+                            self.never()
+                        }
+                    })
             }
 
             // `Never` is the bottom type, the empty set.
