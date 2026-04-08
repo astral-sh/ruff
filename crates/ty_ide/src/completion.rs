@@ -8027,7 +8027,7 @@ from typing import Concatenate as Concatenate
                         Some("typing" | "thirdparty")
                     )
             });
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         Concatenate :: typing
         Concatenate :: thirdparty
         ");
@@ -8053,7 +8053,7 @@ from collections import ChainMap as ChainMap
                         Some("collections" | "thirdparty")
                     )
             });
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         ChainMap :: collections
         ChainMap :: thirdparty
         ");
@@ -8080,7 +8080,7 @@ def no_type_check_decorator():
                         Some("typing" | "thirdparty")
                     )
             });
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         no_type_check_decorator :: thirdparty
         no_type_check_decorator :: typing
         ");
@@ -8106,7 +8106,7 @@ from sys import argv as argv
                         Some("sys" | "thirdparty")
                     )
             });
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         argv :: thirdparty
         argv :: sys
         ");
@@ -8132,7 +8132,7 @@ from os import getpid as getpid
                         Some("os" | "thirdparty")
                     )
             });
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         getpid :: thirdparty
         getpid :: os
         ");

@@ -1,6 +1,5 @@
 ---
 source: crates/ty_server/tests/e2e/folding_range.rs
-assertion_line: 84
 expression: "[first_cell_ranges, second_cell_ranges]"
 ---
 [
