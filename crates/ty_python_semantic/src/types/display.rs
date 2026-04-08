@@ -6,6 +6,7 @@ use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
+use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::FilePath;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
@@ -13,9 +14,6 @@ use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
-
-use ruff_db::parsed::parsed_module;
-use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
@@ -27,6 +25,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::method::BoundMethodType;
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
@@ -36,9 +35,12 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    ProtocolInstanceType, SpecialFormType, StaticClassLiteral, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypeVarBoundOrConstraints, TypedDictType,
+    UnionType, WrapperDescriptorKind, visitor,
 };
+use ruff_db::parsed::parsed_module;
+use ty_module_resolver::file_to_module;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -116,6 +118,11 @@ pub struct DisplaySettings<'db> {
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     pub hide_return_type: bool,
+    /// Types that are currently being displayed in fully qualified form.
+    /// Used to break recursive qualified-display cycles.
+    pub visited_qualified_types: Rc<RefCell<FxHashSet<Type<'db>>>>,
+    /// Whether to fully qualify every name
+    pub fully_qualified: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -171,6 +178,24 @@ impl<'db> DisplaySettings<'db> {
     pub fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn fully_qualified(&self) -> Self {
+        Self {
+            fully_qualified: true,
+            ..self.clone()
+        }
+    }
+
+    /// Returns a new `DisplaySettings` with `fully_qualified` set to false,
+    /// keeping all other settings unchanged.
+    #[must_use]
+    pub fn not_fully_qualified(&self) -> Self {
+        Self {
+            fully_qualified: false,
             ..self.clone()
         }
     }
@@ -606,6 +631,7 @@ impl<'db> Type<'db> {
             db,
             ty: self,
             settings,
+            generic_context: None,
         }
     }
 }
@@ -640,7 +666,11 @@ impl<'db> FmtDetailed<'db> for DisplayType<'db> {
                 | LiteralValueTypeKind::Enum(_),
             ) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::Literal))
-                    .write_str("Literal")?;
+                    .write_str(if self.settings.fully_qualified {
+                        "typing.Literal"
+                    } else {
+                        "Literal"
+                    })?;
                 f.write_char('[')?;
                 representation.fmt_detailed(f)?;
                 f.write_str("]")
@@ -859,6 +889,7 @@ struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
+    generic_context: Option<&'db GenericContext<'db>>,
 }
 
 impl Display for DisplayRepresentation<'_> {
@@ -867,43 +898,422 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
+impl<'db> DisplayRepresentation<'db> {
+    fn with_fully_qualified_recursion_guard(
+        &self,
+        writer: &mut TypeWriter<'_, '_, 'db>,
+        f: impl FnOnce(&mut TypeWriter<'_, '_, 'db>) -> fmt::Result,
+    ) -> fmt::Result {
+        if !self.settings.fully_qualified {
+            return f(writer);
+        }
+
+        if self
+            .settings
+            .visited_qualified_types
+            .borrow()
+            .contains(&self.ty)
+        {
+            return self
+                .ty
+                .display_with(self.db, self.settings.not_fully_qualified())
+                .fmt_detailed(writer);
+        }
+
+        self.settings
+            .visited_qualified_types
+            .borrow_mut()
+            .insert(self.ty);
+
+        let result = f(writer);
+
+        self.settings
+            .visited_qualified_types
+            .borrow_mut()
+            .remove(&self.ty);
+
+        result
+    }
+
+    fn with_type_and_generic_context(
+        &self,
+        ty: Type<'db>,
+        generic_context: Option<&'db GenericContext<'db>>,
+    ) -> Self {
+        Self {
+            ty,
+            db: self.db,
+            settings: self.settings.clone(),
+            generic_context,
+        }
+    }
+
+    fn qualified_representation(&self, class: ClassLiteral) -> String {
+        let body_scope = match class {
+            ClassLiteral::Static(c) => c.body_scope(self.db),
+            ClassLiteral::Dynamic(c) => c.scope(self.db),
+            ClassLiteral::DynamicNamedTuple(c) => c.scope(self.db),
+            ClassLiteral::DynamicTypedDict(c) => { c.scope(self.db) },
+        };
+        let file = body_scope.file(self.db);
+        let module_ast = parsed_module(self.db, file).load(self.db);
+        let index = semantic_index(self.db, file);
+        let file_scope_id = body_scope.file_scope_id(self.db);
+
+        let mut name_parts = vec![class.name(self.db).as_str().to_string()];
+
+        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
+        {
+            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+            let node = ancestor_scope_id.node(self.db);
+
+            match ancestor_scope.kind() {
+                ScopeKind::Class => {
+                    if let Some(class_def) = node.as_class() {
+                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
+                    }
+                }
+                ScopeKind::Function => {
+                    if let Some(function_def) = node.as_function() {
+                        name_parts.push(function_def.node(&module_ast).name.as_str().to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(module) = file_to_module(self.db, file) {
+            let module_name = module.name(self.db);
+            name_parts.push(module_name.as_str().to_string());
+        }
+
+        name_parts.reverse();
+        name_parts.join(".")
+    }
+
+    fn qualified_representation_static_class_literal(&self, class: StaticClassLiteral) -> String {
+        let body_scope = class.body_scope(self.db);
+        let file = body_scope.file(self.db);
+        let module_ast = parsed_module(self.db, file).load(self.db);
+        let index = semantic_index(self.db, file);
+        let file_scope_id = body_scope.file_scope_id(self.db);
+
+        let mut name_parts = vec![class.name(self.db).as_str().to_string()];
+
+        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
+        {
+            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+            let node = ancestor_scope_id.node(self.db);
+
+            match ancestor_scope.kind() {
+                ScopeKind::Class => {
+                    if let Some(class_def) = node.as_class() {
+                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
+                    }
+                }
+                ScopeKind::Function => {
+                    if let Some(function_def) = node.as_function() {
+                        name_parts.push(function_def.node(&module_ast).name.as_str().to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(module) = file_to_module(self.db, file) {
+            let module_name = module.name(self.db);
+            name_parts.push(module_name.as_str().to_string());
+        }
+
+        name_parts.reverse();
+        name_parts.join(".")
+    }
+
+    fn fmt_fully_qualified_function_literal(
+        &self,
+        function: FunctionType<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        let callable = function.signature(self.db);
+        match callable.overloads.as_slice() {
+            [signature] => {
+                let type_parameters = DisplayOptionalQualifiedGenericContext {
+                    generic_context: signature.generic_context.as_ref(),
+                    db: self.db,
+                };
+                let file = function.file(self.db);
+                let module_prefix = if let Some(module) = file_to_module(self.db, file) {
+                    let module_name = module.name(self.db);
+                    format!("{}.", module_name.as_str())
+                } else {
+                    String::new()
+                };
+
+                write!(
+                    f,
+                    "def {module}{name}{type_parameters}",
+                    module = module_prefix,
+                    name = function.name(self.db),
+                    type_parameters = type_parameters,
+                )?;
+
+                f.write_str("(")?;
+                let mut first = true;
+                for param in signature.parameters() {
+                    if !first {
+                        f.write_str(", ")?;
+                    }
+                    first = false;
+
+                    if let Some(name) = param.display_name() {
+                        f.write_str(&name)?;
+                        f.write_str(": ")?;
+                    }
+
+                    self.with_type_and_generic_context(
+                        param.annotated_type(),
+                        signature.generic_context.as_ref(),
+                    )
+                    .fmt_detailed(f)?;
+
+                    if let Some(default_type) = param.default_type() {
+                        f.write_str(" = ")?;
+                        match default_type {
+                            Type::LiteralValue(literal)
+                                if matches!(
+                                    literal.kind(),
+                                    LiteralValueTypeKind::Int(_)
+                                        | LiteralValueTypeKind::Bool(_)
+                                        | LiteralValueTypeKind::String(_)
+                                        | LiteralValueTypeKind::Enum(_)
+                                        | LiteralValueTypeKind::Bytes(_)
+                                ) =>
+                            {
+                                default_type
+                                    .representation(self.db, self.settings.clone())
+                                    .fmt_detailed(f)?;
+                            }
+                            Type::NominalInstance(instance) => {
+                                let class = instance.class(self.db);
+
+                                match (class, class.known(self.db)) {
+                                    (_, Some(KnownClass::NoneType)) => f.write_str("None")?,
+                                    (_, Some(KnownClass::NoDefaultType)) => {
+                                        f.write_str("NoDefault")?
+                                    }
+                                    _ => f.write_str("...")?,
+                                }
+                            }
+                            _ => f.write_str("...")?,
+                        }
+                    }
+                }
+                f.write_str(") -> ")?;
+                self.with_type_and_generic_context(
+                    signature.return_ty,
+                    signature.generic_context.as_ref(),
+                )
+                .fmt_detailed(f)
+            }
+            _ => self
+                .ty
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
+        }
+    }
+
+    fn fmt_fully_qualified_bound_method(
+        &self,
+        bound_method: BoundMethodType<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        let function = bound_method.function(self.db);
+        let self_ty = bound_method.self_instance(self.db);
+        let typing_self_ty = bound_method.typing_self_type(self.db);
+
+        match function.signature(self.db).overloads.as_slice() {
+            [signature] => {
+                let type_parameters = DisplayOptionalQualifiedGenericContext {
+                    generic_context: signature.generic_context.as_ref(),
+                    db: self.db,
+                };
+
+                let file = function.file(self.db);
+                let module_prefix = if let Some(module) = file_to_module(self.db, file) {
+                    format!("{}.", module.name(self.db).as_str())
+                } else {
+                    String::new()
+                };
+
+                f.write_str("bound method ")?;
+                self_ty
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                write!(
+                    f,
+                    ".{module}{method}{type_parameters}",
+                    module = module_prefix,
+                    method = function.name(self.db),
+                    type_parameters = type_parameters,
+                )?;
+
+                f.write_str("(")?;
+                let mut first = true;
+                for param in signature.parameters() {
+                    if !first {
+                        f.write_str(", ")?;
+                    }
+                    first = false;
+
+                    if let Some(name) = param.display_name() {
+                        f.write_str(&name)?;
+                        f.write_str(": ")?;
+                    }
+
+                    self.with_type_and_generic_context(
+                        param.annotated_type(),
+                        signature.generic_context.as_ref(),
+                    )
+                    .fmt_detailed(f)?;
+                }
+                f.write_str(") -> ")?;
+                self.with_type_and_generic_context(
+                    signature.bind_self(self.db, Some(typing_self_ty)).return_ty,
+                    signature.generic_context.as_ref(),
+                )
+                .fmt_detailed(f)
+            }
+            _ => f.write_str("@TODO: overloaded bound method"),
+        }
+    }
+
+    fn fmt_fully_qualified_intersection(
+        &self,
+        intersection: IntersectionType<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        let db = self.db;
+        let mut first = true;
+        let mut write_elem =
+            |f: &mut TypeWriter<'_, '_, 'db>, ty: Type<'db>, negated: bool| -> fmt::Result {
+                if !first {
+                    f.write_str(" & ")?;
+                }
+                first = false;
+                if negated {
+                    f.write_str("~")?;
+                }
+                let needs_paren = matches!(
+                    ty,
+                    Type::Callable(_)
+                        | Type::FunctionLiteral(_)
+                        | Type::BoundMethod(_)
+                        | Type::Union(_)
+                ) || matches!(ty, Type::Intersection(inter) if !inter.has_one_element(db));
+
+                if needs_paren {
+                    f.write_char('(')?;
+                    ty.display_with(db, self.settings.clone()).fmt_detailed(f)?;
+                    f.write_char(')')
+                } else {
+                    ty.display_with(db, self.settings.clone()).fmt_detailed(f)
+                }
+            };
+
+        for &ty in intersection.positive(db) {
+            write_elem(f, ty, false)?;
+        }
+        for &ty in intersection.negative(db) {
+            write_elem(f, ty, true)?;
+        }
+        Ok(())
+    }
+}
+
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        match self.ty {
+        self.with_fully_qualified_recursion_guard(f, |f| match self.ty {
             Type::Dynamic(dynamic) => {
-                if dynamic.is_todo() {
-                    f.set_invalid_type_annotation();
+                if self.settings.fully_qualified {
+                    write!(f, "{dynamic}")
+                } else {
+                    if dynamic.is_todo() {
+                        f.set_invalid_type_annotation();
+                    }
+                    write!(f.with_type(self.ty), "{dynamic}")
                 }
-                write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            Type::Never => f.with_type(self.ty).write_str("Never"),
+            Type::Never => {
+                if self.settings.fully_qualified {
+                    f.write_str("typing.Never")
+                } else {
+                    f.with_type(self.ty).write_str("Never")
+                }
+            }
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
 
                 match (class, class.known(self.db)) {
-                    (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
-                    (_, Some(KnownClass::NoDefaultType)) => f.with_type(self.ty).write_str("NoDefault"),
-                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
-                        .specialization(self.db)
-                        .tuple(self.db)
-                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
+                    (_, Some(KnownClass::NoneType)) => f.write_str("None"),
+                    (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
+                        if self.settings.fully_qualified {
+                            f.write_str("builtins.")?;
+                        }
+                        alias
+                            .specialization(self.db)
+                            .tuple(self.db)
+                            .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)
+                    }
                     (ClassType::NonGeneric(class), _) => {
-                        class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
-                    },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
+                        if self.settings.fully_qualified {
+                            f.write_str(&self.qualified_representation(class))
+                        } else {
+                            class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                        }
+                    }
+                    (ClassType::Generic(alias), _) => {
+                        if self.settings.fully_qualified {
+                            f.write_str(
+                                &self.qualified_representation_static_class_literal(
+                                    alias.origin(self.db),
+                                ),
+                            )?;
+                            alias.specialization(self.db).display_short(
+                                self.db,
+                                TupleSpecialization::No,
+                                self.settings.clone(),
+                            )
+                            .fmt_detailed(f)
+                        } else {
+                            alias.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                        }
+                    }
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => match *class {
-                    ClassType::NonGeneric(class) => class
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
-                    ClassType::Generic(alias) => alias
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
+                    ClassType::NonGeneric(class) => {
+                        if self.settings.fully_qualified {
+                            f.write_str(&self.qualified_representation(class))
+                        } else {
+                            class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                        }
+                    }
+                    ClassType::Generic(alias) => {
+                        if self.settings.fully_qualified {
+                            f.write_str(
+                                &self.qualified_representation_static_class_literal(
+                                    alias.origin(self.db),
+                                ),
+                            )
+                        } else {
+                            alias.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                        }
+                    }
                 },
                 Protocol::Synthesized(synthetic) => {
                     f.set_invalid_type_annotation();
@@ -924,298 +1334,394 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
+            Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
-                f.set_invalid_type_annotation();
-                f.write_char('<')?;
-                f.with_type(KnownClass::ModuleType.to_class_literal(self.db))
-                    .write_str("module")?;
-                f.write_str(" '")?;
-                f.with_type(self.ty)
-                    .write_str(module.module(self.db).name(self.db))?;
-                f.write_str("'>")
+                if self.settings.fully_qualified {
+                    write!(f, "Module[{}]", module.module(self.db).name(self.db))
+                } else {
+                    f.set_invalid_type_annotation();
+                    f.write_char('<')?;
+                    f.with_type(KnownClass::ModuleType.to_class_literal(self.db))
+                        .write_str("module")?;
+                    f.write_str(" '")?;
+                    f.with_type(self.ty)
+                        .write_str(module.module(self.db).name(self.db))?;
+                    f.write_str("'>")
+                }
             }
             Type::ClassLiteral(class) => {
-                f.set_invalid_type_annotation();
-                let mut f = f.with_type(self.ty);
-                f.write_str("<class '")?;
-                class
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(&mut f)?;
-                f.write_str("'>")
+                if self.settings.fully_qualified {
+                    write!(f, "builtins.type[{}]", self.qualified_representation(class))
+                } else {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    f.write_str("<class '")?;
+                    class
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str("'>")
+                }
             }
             Type::GenericAlias(generic) => {
-                f.set_invalid_type_annotation();
-                let mut f = f.with_type(self.ty);
-                f.write_str("<class '")?;
-                generic
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(&mut f)?;
-                f.write_str("'>")
+                if self.settings.fully_qualified {
+                    write!(
+                        f,
+                        "builtins.type[{}]",
+                        self.qualified_representation_static_class_literal(generic.origin(self.db))
+                    )
+                } else {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    f.write_str("<class '")?;
+                    generic
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str("'>")
+                }
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    class
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(']')
+                    if self.settings.fully_qualified {
+                        write!(f, "builtins.type[{}]", self.qualified_representation(class))
+                    } else {
+                        f.with_type(KnownClass::Type.to_class_literal(self.db))
+                            .write_str("type")?;
+                        f.write_char('[')?;
+                        class
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?;
+                        f.write_char(']')
+                    }
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    alias
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(']')
+                    if self.settings.fully_qualified {
+                        write!(
+                            f,
+                            "builtins.type[{}]",
+                            self.qualified_representation_static_class_literal(alias.origin(self.db))
+                        )
+                    } else {
+                        f.with_type(KnownClass::Type.to_class_literal(self.db))
+                            .write_str("type")?;
+                        f.write_char('[')?;
+                        alias
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?;
+                        f.write_char(']')
+                    }
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
-                    f.write_char(']')
+                    if self.settings.fully_qualified {
+                        write!(f, "{dynamic}")
+                    } else {
+                        f.with_type(KnownClass::Type.to_class_literal(self.db))
+                            .write_str("type")?;
+                        f.write_char('[')?;
+                        write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
+                        f.write_char(']')
+                    }
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
-                    f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    write!(
-                        f.with_type(Type::TypeVar(bound_typevar)),
-                        "{}",
-                        bound_typevar
-                            .identity(self.db)
-                            .display_with(self.db, self.settings.clone())
-                    )?;
-                    f.write_char(']')
+                    if self.settings.fully_qualified {
+                        write!(f, "builtins.type[{}]", bound_typevar.name(self.db))
+                    } else {
+                        f.set_invalid_type_annotation();
+                        f.with_type(KnownClass::Type.to_class_literal(self.db))
+                            .write_str("type")?;
+                        f.write_char('[')?;
+                        write!(
+                            f.with_type(Type::TypeVar(bound_typevar)),
+                            "{}",
+                            bound_typevar
+                                .identity(self.db)
+                                .display_with(self.db, self.settings.clone())
+                        )?;
+                        f.write_char(']')
+                    }
                 }
             },
             Type::SpecialForm(special_form) => {
-                f.set_invalid_type_annotation();
-                write!(f.with_type(self.ty), "<special-form '{special_form}'>")
+                if self.settings.fully_qualified {
+                    write!(f, "{special_form}")
+                } else {
+                    f.set_invalid_type_annotation();
+                    write!(f.with_type(self.ty), "<special-form '{special_form}'>")
+                }
             }
-            Type::KnownInstance(known_instance) => known_instance
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
-            Type::FunctionLiteral(function) => function
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
-            Type::Callable(callable) => callable
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
-            Type::BoundMethod(bound_method) => {
-                let function = bound_method.function(self.db);
-                let self_ty = bound_method.self_instance(self.db);
-                let typing_self_ty = bound_method.typing_self_type(self.db);
-
-                match function.signature(self.db).overloads.as_slice() {
-                    [signature] => {
-                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
-                        let hide_unused_self =
-                            bound_signature.should_hide_self_from_display(self.db);
-                        let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: bound_signature.generic_context.as_ref(),
-                            db: self.db,
-                            settings: self.settings.clone(),
-                            hide_unused_self,
-                        };
-                        f.set_invalid_type_annotation();
-                        f.write_str("bound method ")?;
-                        self_ty
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
-                        f.write_char('.')?;
-                        f.with_type(self.ty).write_str(function.name(self.db))?;
-                        type_parameters.fmt_detailed(f)?;
-                        bound_signature
-                            .display_with(self.db, self.settings.disallow_signature_name())
-                            .fmt_detailed(f)
+            Type::KnownInstance(known_instance) => {
+                if self.settings.fully_qualified {
+                    match known_instance {
+                        KnownInstanceType::TypeAliasType(alias)
+                            if alias.specialization(self.db).is_none() =>
+                        {
+                            f.write_str("typing.TypeAliasType")
+                        }
+                        _ => write!(f, "{}", known_instance.repr(self.db)),
                     }
-                    signatures => {
-                        // TODO: How to display overloads?
-                        if !self.settings.multiline {
-                            // TODO: This should ideally have a TypeDetail but we actually
-                            // don't have a type for @overload (we just detect the decorator)
-                            f.write_str("Overload")?;
-                            f.write_char('[')?;
+                } else {
+                    known_instance
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
+            Type::FunctionLiteral(function) => {
+                if self.settings.fully_qualified {
+                    self.fmt_fully_qualified_function_literal(function, f)
+                } else {
+                    function
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
+            Type::Callable(callable) => {
+                if self.settings.fully_qualified {
+                    write!(f, "{}", callable.qualified_display(self.db))
+                } else {
+                    callable
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
+            Type::BoundMethod(bound_method) => {
+                if self.settings.fully_qualified {
+                    self.fmt_fully_qualified_bound_method(bound_method, f)
+                } else {
+                    let function = bound_method.function(self.db);
+                    let self_ty = bound_method.self_instance(self.db);
+                    let typing_self_ty = bound_method.typing_self_type(self.db);
+
+                    match function.signature(self.db).overloads.as_slice() {
+                        [signature] => {
+                            let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
+                            let hide_unused_self =
+                                bound_signature.should_hide_self_from_display(self.db);
+                            let type_parameters = DisplayOptionalGenericContext {
+                                generic_context: bound_signature.generic_context.as_ref(),
+                                db: self.db,
+                                settings: self.settings.clone(),
+                                hide_unused_self,
+                            };
+                            f.set_invalid_type_annotation();
+                            f.write_str("bound method ")?;
+                            self_ty
+                                .display_with(self.db, self.settings.singleline())
+                                .fmt_detailed(f)?;
+                            f.write_char('.')?;
+                            f.with_type(self.ty).write_str(function.name(self.db))?;
+                            type_parameters.fmt_detailed(f)?;
+                            bound_signature
+                                .display_with(self.db, self.settings.disallow_signature_name())
+                                .fmt_detailed(f)
                         }
-                        let separator = if self.settings.multiline { "\n" } else { ", " };
-                        let mut join = f.join(separator);
-                        for signature in signatures {
-                            join.entry(
-                                &signature
-                                    .bind_self(self.db, Some(typing_self_ty))
-                                    .display_with(self.db, self.settings.clone()),
-                            );
+                        signatures => {
+                            if !self.settings.multiline {
+                                f.write_str("Overload")?;
+                                f.write_char('[')?;
+                            }
+                            let separator = if self.settings.multiline { "\n" } else { ", " };
+                            let mut join = f.join(separator);
+                            for signature in signatures {
+                                join.entry(
+                                    &signature
+                                        .bind_self(self.db, Some(typing_self_ty))
+                                        .display_with(self.db, self.settings.clone()),
+                                );
+                            }
+                            join.finish()?;
+                            if !self.settings.multiline {
+                                f.write_str("]")?;
+                            }
+                            Ok(())
                         }
-                        join.finish()?;
-                        if !self.settings.multiline {
-                            f.write_str("]")?;
-                        }
-                        Ok(())
                     }
                 }
             }
             Type::KnownBoundMethod(method_type) => {
-                f.set_invalid_type_annotation();
-                let (cls, member_name, cls_name, ty, ty_name) = match method_type {
-                    KnownBoundMethodType::FunctionTypeDunderGet(function) => (
-                        KnownClass::FunctionType,
-                        "__get__",
-                        "function",
-                        Type::FunctionLiteral(function),
-                        Some(&**function.name(self.db)),
-                    ),
-                    KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                        KnownClass::FunctionType,
-                        "__call__",
-                        "function",
-                        Type::FunctionLiteral(function),
-                        Some(&**function.name(self.db)),
-                    ),
-                    KnownBoundMethodType::PropertyDunderGet(property) => (
-                        KnownClass::Property,
-                        "__get__",
-                        "property",
-                        Type::PropertyInstance(property),
-                        property
-                            .getter(self.db)
-                            .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
-                    ),
-                    KnownBoundMethodType::PropertyDunderSet(property) => (
-                        KnownClass::Property,
-                        "__set__",
-                        "property",
-                        Type::PropertyInstance(property),
-                        property
-                            .getter(self.db)
-                            .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
-                    ),
-                    KnownBoundMethodType::StrStartswith(literal) => (
-                        KnownClass::Property,
-                        "startswith",
-                        "string",
-                        Type::LiteralValue(LiteralValueType::promotable(
-                            LiteralValueTypeKind::String(literal),
-                        )),
-                        Some(literal.value(self.db)),
-                    ),
-                    KnownBoundMethodType::ConstraintSetRange => {
-                        return f.write_str("bound method `ConstraintSet.range`");
-                    }
-                    KnownBoundMethodType::ConstraintSetAlways => {
-                        return f.write_str("bound method `ConstraintSet.always`");
-                    }
-                    KnownBoundMethodType::ConstraintSetNever => {
-                        return f.write_str("bound method `ConstraintSet.never`");
-                    }
-                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
-                        return f.write_str("bound method `ConstraintSet.implies_subtype_of`");
-                    }
-                    KnownBoundMethodType::ConstraintSetSatisfies(_) => {
-                        return f.write_str("bound method `ConstraintSet.satisfies`");
-                    }
-                    KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
-                        return f
-                            .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
-                    }
-                };
+                if self.settings.fully_qualified {
+                    let signatures = method_type.signatures(self.db);
+                    let callable = CallableType::new(
+                        self.db,
+                        CallableSignature::from_overloads(signatures),
+                        CallableTypeKind::Regular,
+                    );
+                    Type::Callable(callable)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                } else {
+                    f.set_invalid_type_annotation();
+                    let (cls, member_name, cls_name, ty, ty_name) = match method_type {
+                        KnownBoundMethodType::FunctionTypeDunderGet(function) => (
+                            KnownClass::FunctionType,
+                            "__get__",
+                            "function",
+                            Type::FunctionLiteral(function),
+                            Some(&**function.name(self.db)),
+                        ),
+                        KnownBoundMethodType::FunctionTypeDunderCall(function) => (
+                            KnownClass::FunctionType,
+                            "__call__",
+                            "function",
+                            Type::FunctionLiteral(function),
+                            Some(&**function.name(self.db)),
+                        ),
+                        KnownBoundMethodType::PropertyDunderGet(property) => (
+                            KnownClass::Property,
+                            "__get__",
+                            "property",
+                            Type::PropertyInstance(property),
+                            property
+                                .getter(self.db)
+                                .and_then(Type::as_function_literal)
+                                .map(|getter| &**getter.name(self.db)),
+                        ),
+                        KnownBoundMethodType::PropertyDunderSet(property) => (
+                            KnownClass::Property,
+                            "__set__",
+                            "property",
+                            Type::PropertyInstance(property),
+                            property
+                                .getter(self.db)
+                                .and_then(Type::as_function_literal)
+                                .map(|getter| &**getter.name(self.db)),
+                        ),
+                        KnownBoundMethodType::StrStartswith(literal) => (
+                            KnownClass::Property,
+                            "startswith",
+                            "string",
+                            Type::LiteralValue(LiteralValueType::promotable(
+                                LiteralValueTypeKind::String(literal),
+                            )),
+                            Some(literal.value(self.db)),
+                        ),
+                        KnownBoundMethodType::ConstraintSetRange => {
+                            return f.write_str("bound method `ConstraintSet.range`");
+                        }
+                        KnownBoundMethodType::ConstraintSetAlways => {
+                            return f.write_str("bound method `ConstraintSet.always`");
+                        }
+                        KnownBoundMethodType::ConstraintSetNever => {
+                            return f.write_str("bound method `ConstraintSet.never`");
+                        }
+                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
+                            return f.write_str("bound method `ConstraintSet.implies_subtype_of`");
+                        }
+                        KnownBoundMethodType::ConstraintSetSatisfies(_) => {
+                            return f.write_str("bound method `ConstraintSet.satisfies`");
+                        }
+                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
+                            return f
+                                .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
+                        }
+                    };
 
-                let class_ty = cls.to_class_literal(self.db);
-                f.write_char('<')?;
-                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
-                    .write_str("method-wrapper")?;
-                f.write_str(" '")?;
-                if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
-                    class_ty.member(self.db, member_name).place
-                {
-                    f.with_type(member_ty).write_str(member_name)?;
-                } else {
-                    f.write_str(member_name)?;
-                }
-                f.write_str("' of ")?;
-                f.with_type(class_ty).write_str(cls_name)?;
-                if let Some(name) = ty_name {
+                    let class_ty = cls.to_class_literal(self.db);
+                    f.write_char('<')?;
+                    f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
+                        .write_str("method-wrapper")?;
                     f.write_str(" '")?;
-                    f.with_type(ty).write_str(name)?;
-                    f.write_str("'>")
-                } else {
-                    f.write_str("' object>")
+                    if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
+                        class_ty.member(self.db, member_name).place
+                    {
+                        f.with_type(member_ty).write_str(member_name)?;
+                    } else {
+                        f.write_str(member_name)?;
+                    }
+                    f.write_str("' of ")?;
+                    f.with_type(class_ty).write_str(cls_name)?;
+                    if let Some(name) = ty_name {
+                        f.write_str(" '")?;
+                        f.with_type(ty).write_str(name)?;
+                        f.write_str("'>")
+                    } else {
+                        f.write_str("' object>")
+                    }
                 }
             }
             Type::WrapperDescriptor(kind) => {
-                f.set_invalid_type_annotation();
-                let (method, object, cls) = match kind {
-                    WrapperDescriptorKind::FunctionTypeDunderGet => {
-                        ("__get__", "function", KnownClass::FunctionType)
-                    }
-                    WrapperDescriptorKind::PropertyDunderGet => {
-                        ("__get__", "property", KnownClass::Property)
-                    }
-                    WrapperDescriptorKind::PropertyDunderSet => {
-                        ("__set__", "property", KnownClass::Property)
-                    }
-                };
-                f.write_char('<')?;
-                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
-                    .write_str("wrapper-descriptor")?;
-                f.write_str(" '")?;
-                f.write_str(method)?;
-                f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(self.db))
-                    .write_str(object)?;
-                f.write_str("' objects>")
+                if self.settings.fully_qualified {
+                    let signatures = kind.signatures(self.db);
+                    let callable = CallableType::new(
+                        self.db,
+                        CallableSignature::from_overloads(signatures),
+                        CallableTypeKind::Regular,
+                    );
+                    Type::Callable(callable)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                } else {
+                    f.set_invalid_type_annotation();
+                    let (method, object, cls) = match kind {
+                        WrapperDescriptorKind::FunctionTypeDunderGet => {
+                            ("__get__", "function", KnownClass::FunctionType)
+                        }
+                        WrapperDescriptorKind::PropertyDunderGet => {
+                            ("__get__", "property", KnownClass::Property)
+                        }
+                        WrapperDescriptorKind::PropertyDunderSet => {
+                            ("__set__", "property", KnownClass::Property)
+                        }
+                    };
+                    f.write_char('<')?;
+                    f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
+                        .write_str("wrapper-descriptor")?;
+                    f.write_str(" '")?;
+                    f.write_str(method)?;
+                    f.write_str("' of '")?;
+                    f.with_type(cls.to_class_literal(self.db))
+                        .write_str(object)?;
+                    f.write_str("' objects>")
+                }
             }
             Type::DataclassDecorator(_) => {
-                f.set_invalid_type_annotation();
-                f.write_str("<decorator produced by dataclass-like function>")
+                if self.settings.fully_qualified {
+                    f.write_str("(builtins.type) -> builtins.type")
+                } else {
+                    f.set_invalid_type_annotation();
+                    f.write_str("<decorator produced by dataclass-like function>")
+                }
             }
             Type::DataclassTransformer(_) => {
-                f.set_invalid_type_annotation();
-                f.write_str("<decorator produced by typing.dataclass_transform>")
+                if self.settings.fully_qualified {
+                    f.write_str("(builtins.object) -> Unknown")
+                } else {
+                    f.set_invalid_type_annotation();
+                    f.write_str("<decorator produced by typing.dataclass_transform>")
+                }
             }
             Type::Union(union) => union
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::Intersection(intersection) => intersection
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::Intersection(intersection) => {
+                if self.settings.fully_qualified {
+                    self.fmt_fully_qualified_intersection(intersection, f)
+                } else {
+                    intersection
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
-                LiteralValueTypeKind::Bool(boolean) => {
-                    f.with_type(self.ty)
-                        .write_str(if boolean { "True" } else { "False" })
-                }
-                LiteralValueTypeKind::String(string) => {
-                    write!(
-                        f.with_type(self.ty),
-                        "{}",
-                        string.display_with(self.db, self.settings.clone()),
-                    )
-                }
-                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-                // which would mean users would be able to jump to the definition of `LiteralString` from the
-                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-                // at runtime)
-                LiteralValueTypeKind::LiteralString => {
-                    f.with_type(self.ty).write_str("LiteralString")
-                }
+                LiteralValueTypeKind::Bool(boolean) => f
+                    .with_type(self.ty)
+                    .write_str(if boolean { "True" } else { "False" }),
+                LiteralValueTypeKind::String(string) => write!(
+                    f.with_type(self.ty),
+                    "{}",
+                    string.display_with(self.db, self.settings.clone()),
+                ),
+                LiteralValueTypeKind::LiteralString => f.with_type(self.ty).write_str(
+                    if self.settings.fully_qualified {
+                        "typing.LiteralString"
+                    } else {
+                        "LiteralString"
+                    },
+                ),
                 LiteralValueTypeKind::Bytes(bytes) => {
                     let escape =
                         AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
-                    write!(
-                        f.with_type(self.ty),
-                        "{}",
-                        escape.bytes_repr(TripleQuotes::No)
-                    )
+                    write!(f.with_type(self.ty), "{}", escape.bytes_repr(TripleQuotes::No))
                 }
                 LiteralValueTypeKind::Enum(enum_literal) => {
                     enum_literal
@@ -1226,19 +1732,44 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
             },
             Type::TypeVar(bound_typevar) => {
-                f.set_invalid_type_annotation();
-                write!(
-                    f,
-                    "{}",
-                    bound_typevar
-                        .identity(self.db)
-                        .display_with(self.db, self.settings.clone())
-                )
+                if self.settings.fully_qualified {
+                    let show_context = match self.generic_context {
+                        Some(generic) => {
+                            let vars = generic.variables(self.db);
+                            !vars.into_iter().any(|v| v == bound_typevar)
+                        }
+                        None => true,
+                    };
+                    if show_context {
+                        write!(
+                            f,
+                            "{}",
+                            bound_typevar.identity(self.db).display_with(
+                                self.db,
+                                DisplaySettings::default().fully_qualified(),
+                            )
+                        )?;
+                    } else {
+                        f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+                    }
+                    Ok(())
+                } else {
+                    f.set_invalid_type_annotation();
+                    write!(
+                        f,
+                        "{}",
+                        bound_typevar
+                            .identity(self.db)
+                            .display_with(self.db, self.settings.clone())
+                    )
+                }
             }
-            Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
-            Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
+            Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
+            Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
-                f.set_invalid_type_annotation();
+                if !self.settings.fully_qualified {
+                    f.set_invalid_type_annotation();
+                }
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
                     .display_with(self.db, self.settings.singleline())
@@ -1251,47 +1782,109 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => {
+                if self.settings.fully_qualified {
+                    f.write_str("TypeIs[")?;
+                    type_is
+                        .return_type(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    if let Some(name) = type_is.place_name(self.db) {
+                        f.write_str(" @ ")?;
+                        f.write_str(&name)?;
+                    }
+                    f.write_str("]")
+                } else {
+                    fmt_type_guard_like(self.db, type_is, &self.settings, f)
+                }
+            }
             Type::TypeGuard(type_guard) => {
-                fmt_type_guard_like(self.db, type_guard, &self.settings, f)
+                if self.settings.fully_qualified {
+                    f.write_str("TypeGuard")
+                } else {
+                    fmt_type_guard_like(self.db, type_guard, &self.settings, f)
+                }
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
-                ClassType::NonGeneric(class) => class
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f),
-                ClassType::Generic(alias) => alias
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f),
-            },
-            Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
-                f.set_invalid_type_annotation();
-                f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
-                    .write_str("TypedDict")?;
-                f.write_str(" with items ")?;
-                let items = synthesized.items(self.db);
-                for (i, name) in items.keys().enumerate() {
-                    let is_last = i == items.len() - 1;
-                    write!(f, "'{name}'")?;
-                    if !is_last {
-                        f.write_str(", ")?;
+                ClassType::NonGeneric(class) => {
+                    if self.settings.fully_qualified {
+                        f.write_str(&self.qualified_representation(class))
+                    } else {
+                        class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
                     }
                 }
-                f.write_char('>')
-            }
-            Type::TypeAlias(alias) => {
-                alias
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                match alias.specialization(self.db) {
-                    None => Ok(()),
-                    Some(specialization) => specialization
-                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
-                        .fmt_detailed(f),
+                ClassType::Generic(alias) => {
+                    if self.settings.fully_qualified {
+                        f.write_str(
+                            &self.qualified_representation_static_class_literal(alias.origin(self.db)),
+                        )
+                    } else {
+                        alias.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                    }
+                }
+            },
+            Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
+                if self.settings.fully_qualified {
+                    f.write_str("Unknown")
+                } else {
+                    f.set_invalid_type_annotation();
+                    f.write_char('<')?;
+                    f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
+                        .write_str("TypedDict")?;
+                    f.write_str(" with items ")?;
+                    let items = synthesized.items(self.db);
+                    for (i, name) in items.keys().enumerate() {
+                        let is_last = i == items.len() - 1;
+                        write!(f, "'{name}'")?;
+                        if !is_last {
+                            f.write_str(", ")?;
+                        }
+                    }
+                    f.write_char('>')
                 }
             }
-            Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(self.db)),
-        }
+            Type::TypeAlias(alias) => {
+                if self.settings.fully_qualified {
+                    let definition = alias.definition(self.db);
+                    let scope = definition.scope(self.db);
+                    let file = scope.file(self.db);
+                    if let Some(module) = file_to_module(self.db, file) {
+                        write!(f, "{}.{}", module.name(self.db), alias.name(self.db))?;
+                    } else {
+                        f.write_str(alias.name(self.db))?;
+                    }
+                    match alias.specialization(self.db) {
+                        None => Ok(()),
+                        Some(specialization) => specialization
+                            .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                            .fmt_detailed(f),
+                    }
+                } else {
+                    alias
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    match alias.specialization(self.db) {
+                        None => Ok(()),
+                        Some(specialization) => specialization
+                            .display_short(self.db, TupleSpecialization::No, self.settings.clone())
+                            .fmt_detailed(f),
+                    }
+                }
+            }
+            Type::NewTypeInstance(newtype) => {
+                if self.settings.fully_qualified {
+                    let definition = newtype.definition(self.db);
+                    let file = definition.file(self.db);
+                    if let Some(module) = file_to_module(self.db, file) {
+                        write!(f, "{}.{}", module.name(self.db), newtype.name(self.db))
+                    } else {
+                        f.write_str(newtype.name(self.db))
+                    }
+                } else {
+                    f.with_type(self.ty).write_str(newtype.name(self.db))
+                }
+            }
+        })
     }
 }
 
@@ -1327,11 +1920,56 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
         let binding_context = self.bound_typevar_identity.binding_context;
-        if let Some(binding_context_name) = binding_context.name(self.db)
-            && let Some(definition) = binding_context.definition()
+        if let Some(definition) = binding_context.definition()
             && !self.settings.active_scopes.contains(&definition)
         {
-            write!(f, "@{binding_context_name}")?;
+            let binding_context_name = if self.settings.fully_qualified {
+                let scope = definition.scope(self.db);
+                let file = scope.file(self.db);
+                let module_ast = parsed_module(self.db, file).load(self.db);
+                let index = semantic_index(self.db, file);
+                let file_scope_id = scope.file_scope_id(self.db);
+
+                let mut name_parts = vec![];
+                if let Some(name) = definition.name(self.db) {
+                    name_parts.push(name);
+                }
+
+                for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id)
+                {
+                    let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+                    let node = ancestor_scope_id.node(self.db);
+
+                    match ancestor_scope.kind() {
+                        ScopeKind::Class => {
+                            if let Some(class_def) = node.as_class() {
+                                name_parts
+                                    .push(class_def.node(&module_ast).name.as_str().to_string());
+                            }
+                        }
+                        ScopeKind::Function => {
+                            if let Some(function_def) = node.as_function() {
+                                name_parts
+                                    .push(function_def.node(&module_ast).name.as_str().to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                if let Some(module) = file_to_module(self.db, file) {
+                    name_parts.push(module.name(self.db).as_str().to_string());
+                }
+
+                name_parts.reverse();
+                Some(name_parts.join("."))
+            } else {
+                binding_context.name(self.db)
+            };
+
+            if let Some(binding_context_name) = binding_context_name {
+                write!(f, "@{binding_context_name}")?;
+            }
         }
         if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
             write!(f, ".{paramspec_attr}")?;
@@ -1784,6 +2422,86 @@ impl Display for DisplayGenericContext<'_, '_> {
     }
 }
 
+struct DisplayQualifiedGenericContext<'db> {
+    generic_context: &'db GenericContext<'db>,
+    db: &'db dyn Db,
+    settings: &'db DisplaySettings<'db>,
+}
+
+impl Display for DisplayQualifiedGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let variables = self.generic_context.variables(self.db);
+
+        let non_implicit_variables: Vec<_> = variables
+            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
+            .collect();
+
+        if non_implicit_variables.is_empty() {
+            return Ok(());
+        }
+
+        f.write_char('[')?;
+        for (idx, bound_typevar) in non_implicit_variables.iter().enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            // name
+            let typevar = bound_typevar.typevar(self.db);
+            f.write_str(typevar.name(self.db))?;
+            match typevar.bound_or_constraints(self.db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    write!(
+                        f,
+                        ": {}",
+                        bound.display_with(self.db, self.settings.clone())
+                    )?;
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    f.write_str(": (")?;
+                    for (cidx, constraint) in constraints.elements(self.db).iter().enumerate() {
+                        if cidx > 0 {
+                            f.write_str(", ")?;
+                        }
+                        constraint
+                            .display_with(self.db, self.settings.clone())
+                            .fmt(f)?;
+                    }
+                    f.write_char(')')?;
+                }
+                None => {}
+            }
+            if let Some(default_type) = bound_typevar.default_type(self.db) {
+                write!(
+                    f,
+                    " = {}",
+                    default_type.display_with(self.db, self.settings.clone())
+                )?;
+            }
+        }
+        f.write_char(']')
+    }
+}
+
+struct DisplayOptionalQualifiedGenericContext<'db> {
+    generic_context: Option<&'db GenericContext<'db>>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayOptionalQualifiedGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(generic_context) = self.generic_context {
+            DisplayQualifiedGenericContext {
+                generic_context,
+                db: self.db,
+                settings: &DisplaySettings::default().fully_qualified(),
+            }
+            .fmt(f)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl<'db> Specialization<'db> {
     pub fn display(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
         self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
@@ -1915,6 +2633,76 @@ impl<'db> CallableType<'db> {
             settings,
         }
     }
+
+    pub fn qualified_display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+    ) -> DisplayCallableTypeQualified<'a, 'db> {
+        DisplayCallableTypeQualified {
+            signatures: self.signatures(db),
+            db,
+        }
+    }
+}
+
+pub(crate) struct DisplayCallableTypeQualified<'a, 'db> {
+    signatures: &'a CallableSignature<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayCallableTypeQualified<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.signatures.overloads.as_slice() {
+            [signature] => {
+                let type_parameters = DisplayOptionalQualifiedGenericContext {
+                    generic_context: signature.generic_context.as_ref(),
+                    db: self.db,
+                };
+
+                write!(f, "{type_parameters}", type_parameters = type_parameters,)?;
+
+                // Parameters with qualified types and scope suppression for local type vars
+                f.write_str("(")?;
+                let mut first = true;
+                for param in signature.parameters() {
+                    if !first {
+                        f.write_str(", ")?;
+                    }
+                    first = false;
+                    if let Some(name) = param.display_name() {
+                        f.write_str(&name)?;
+                        let annotated_type = param.annotated_type();
+                        write!(
+                            f,
+                            ": {}",
+                            annotated_type.display_with(
+                                self.db,
+                                DisplaySettings::default().fully_qualified()
+                            )
+                        )?;
+                    } else {
+                        let ty = param.annotated_type();
+                        ty.display_with(self.db, DisplaySettings::default().fully_qualified())
+                            .fmt(f)?;
+                    }
+                }
+                f.write_str(") -> ")?;
+                let ret = signature.return_ty;
+                ret.display_with(self.db, DisplaySettings::default().fully_qualified())
+                    .fmt(f)
+            }
+            signatures => {
+                // TODO: How to display overloads?
+                f.write_str("Overload[")?;
+                let mut join = f.join(", ");
+                for signature in signatures {
+                    join.entry(&signature.display(self.db));
+                }
+                join.finish()?;
+                f.write_char(']')
+            }
+        }
+    }
 }
 
 pub(crate) struct DisplayCallableType<'a, 'db> {
@@ -1928,7 +2716,19 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.signatures.overloads.as_slice() {
             [signature] => {
-                if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                // If fully_qualified, show type parameters with qualified bounds first,
+                // but display the signature itself without fully_qualified to get proper
+                // scope suppression for locally-bound type variables
+                if self.settings.fully_qualified {
+                    write!(
+                        f,
+                        "{}",
+                        DisplayCallableTypeQualified {
+                            signatures: self.signatures,
+                            db: self.db,
+                        }
+                    )
+                } else if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
                     if signature.parameters().is_top() {
                         f.write_str("Top[")?;
                     }
@@ -1937,12 +2737,14 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
-                        f.write_str("]")?;
+                        f.write_str("]")
+                    } else {
+                        Ok(())
                     }
                 } else {
                     signature
                         .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
+                        .fmt_detailed(f)
                 }
             }
             signatures => {
@@ -1960,12 +2762,12 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 }
                 join.finish()?;
                 if !self.settings.multiline {
-                    f.write_char(']')?;
+                    f.write_char(']')
+                } else {
+                    Ok(())
                 }
             }
         }
-
-        Ok(())
     }
 }
 
@@ -2655,7 +3457,11 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
 impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.with_type(Type::SpecialForm(SpecialFormType::Literal))
-            .write_str("Literal")?;
+            .write_str(if self.settings.fully_qualified {
+                "typing.Literal"
+            } else {
+                "Literal"
+            })?;
         f.write_char('[')?;
 
         let total_entries = self.literals.len();
@@ -3455,5 +4261,550 @@ mod tests {
         ) -> bytes
         "
         );
+    }
+
+    mod qualified_display {
+        use crate::DisplaySettings;
+        use crate::db::tests::setup_db;
+        use crate::types::{KnownClass, Type};
+
+        #[test]
+        fn none() {
+            let db = setup_db();
+            assert_eq!(
+                KnownClass::NoneType
+                    .to_instance(&db)
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "None"
+            );
+        }
+
+        #[test]
+        fn literals() {
+            let db = setup_db();
+            assert_eq!(
+                Type::int_literal(1)
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Literal[1]"
+            );
+            assert_eq!(
+                Type::bool_literal(true)
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Literal[True]"
+            );
+            assert_eq!(
+                Type::bool_literal(false)
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Literal[False]"
+            );
+            assert_eq!(
+                Type::string_literal(&db, "hello")
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                r#"typing.Literal["hello"]"#
+            );
+            assert_eq!(
+                Type::bytes_literal(&db, b"ab")
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Literal[b\"ab\"]"
+            );
+        }
+
+        #[test]
+        fn union_basic() {
+            use crate::types::UnionType;
+            let db = setup_db();
+            let u = UnionType::from_elements(&db, [Type::int_literal(1), Type::int_literal(2)]);
+            assert_eq!(
+                u.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Literal[1, 2]" // or typing.Literal[1] | typing.Literal[2]
+            );
+        }
+
+        #[test]
+        fn intersection_basic_and_not() {
+            use crate::types::IntersectionBuilder;
+            use crate::types::KnownClass;
+
+            let db = setup_db();
+
+            let a = KnownClass::SupportsIndex.to_instance(&db);
+            let b = KnownClass::Str.to_instance(&db);
+
+            let i = IntersectionBuilder::new(&db)
+                .add_positive(a)
+                .add_positive(b)
+                .build();
+            assert_eq!(
+                i.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.SupportsIndex & builtins.str"
+            );
+
+            let n = IntersectionBuilder::new(&db).add_negative(b).build();
+            assert_eq!(
+                n.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "~builtins.str"
+            );
+        }
+
+        #[test]
+        fn tuples_fixed_and_variadic() {
+            use crate::types::KnownClass;
+            use crate::types::tuple::TupleType;
+            let db = setup_db();
+            // Fixed-length tuple: tuple[int, str]
+            let t_fixed = Type::tuple(TupleType::heterogeneous(
+                &db,
+                [
+                    KnownClass::Int.to_instance(&db),
+                    KnownClass::Str.to_instance(&db),
+                ],
+            ));
+            assert_eq!(
+                t_fixed
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "builtins.tuple[builtins.int, builtins.str]"
+            );
+
+            // Variadic homogeneous tuple: builtins.tuple[int, ...]
+            let t_var = Type::tuple(Some(TupleType::homogeneous(
+                &db,
+                KnownClass::Int.to_instance(&db),
+            )));
+            assert_eq!(
+                t_var
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "builtins.tuple[builtins.int, ...]"
+            );
+        }
+
+        #[test]
+        fn callable_basic() {
+            use crate::types::signatures::{Parameter, Parameters, Signature};
+            use crate::types::{CallableType, KnownClass};
+            let db = setup_db();
+            let params = Parameters::new(
+                &db,
+                [
+                    Parameter::positional_or_keyword(ruff_python_ast::name::Name::new_static("x"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                ],
+            );
+            let sig = Signature::new(params, KnownClass::Str.to_instance(&db));
+            let callable = CallableType::single(&db, sig);
+            // Falls back to standard signature display
+            assert_eq!(
+                callable
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "(x: builtins.int) -> builtins.str"
+            );
+        }
+
+        #[test]
+        fn function() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/mod.py", "def f(x: str) -> int: ...\nf")
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            let last_stmt = module.suite().last().unwrap().as_expr_stmt().unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model).unwrap();
+
+            assert_eq!(
+                ty.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "def mod.f(x: builtins.str) -> builtins.int"
+            );
+        }
+
+        #[test]
+        fn generic_function() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/mod.py", "def f[T: int](x: T) -> T: ...\nf")
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            // The last statement is an expression statement containing the name `f`.
+            let last_stmt = module.suite().last().unwrap().as_expr_stmt().unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model).unwrap();
+
+            assert_eq!(
+                ty.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                // no need to show the type var scope because the definition is in the display
+                "def mod.f[T: builtins.int](x: T) -> T"
+            );
+        }
+
+        #[test]
+        fn callable_generic() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::types::CallableType;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            // Build a simple module with a generic function
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/mod.py", "def f[T: int](t: T) -> T: ...\nf")
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            // The last statement is an expression statement containing the name `f`.
+            let last_stmt = module.suite().last().unwrap().as_expr_stmt().unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model);
+
+            // Extract the function signature from the function literal
+            let Some(Type::FunctionLiteral(function)) = ty else {
+                panic!("expected function literal, got: {ty:?}");
+            };
+            let signatures = function.signature(&db);
+            let signature = signatures.overloads.as_slice()[0].clone();
+
+            let callable = CallableType::single(&db, signature);
+
+            assert_eq!(
+                callable
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "[T: builtins.int](t: T@mod.f) -> T@mod.f"
+            );
+        }
+
+        #[test]
+        fn callable_with_generic_outside() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::types::CallableType;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let input = "def f1[T1: int](t1: T1):\n  def f2[T2: str](t1: T1, t2: T2): ...\n  f2";
+            // Build a simple module with a generic function
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/mod.py", input)
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            let last_stmt = module
+                .suite()
+                .last()
+                .unwrap()
+                .as_function_def_stmt()
+                .unwrap()
+                .body
+                .last()
+                .unwrap()
+                .as_expr_stmt()
+                .unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model);
+
+            // Extract the function signature from the function literal
+            let Some(Type::FunctionLiteral(function)) = ty else {
+                panic!("expected function literal, got: {ty:?}");
+            };
+            let signatures = function.signature(&db);
+            let signature = signatures.overloads.as_slice()[0].clone();
+
+            let callable = CallableType::single(&db, signature);
+
+            assert_eq!(
+                callable
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "[T2: builtins.str](t1: T1@mod.f1, t2: T2@mod.f1.f2) -> Unknown"
+            );
+        }
+
+        #[test]
+        fn dynamic_unknown() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            // Test that Dynamic(Unknown) doesn't cause infinite recursion
+            // when displayed with fully_qualified settings
+            let unknown = Type::unknown();
+            let display = unknown.display_with(&db, DisplaySettings::default().fully_qualified());
+
+            // This should not hang or overflow the stack
+            assert_eq!(display.to_string(), "Unknown");
+        }
+
+        #[test]
+        fn never_type() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            let never = Type::Never;
+            assert_eq!(
+                never
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Never"
+            );
+        }
+
+        #[test]
+        fn always_truthy_falsy() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            assert_eq!(
+                Type::AlwaysTruthy
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "AlwaysTruthy"
+            );
+            assert_eq!(
+                Type::AlwaysFalsy
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "AlwaysFalsy"
+            );
+        }
+
+        #[test]
+        fn literal_string() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            assert_eq!(
+                Type::literal_string()
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.LiteralString"
+            );
+        }
+
+        #[test]
+        fn class_literal() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(
+                    &"/src/mod.py",
+                    "
+class A: ...
+
+A
+",
+                )
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            // Get the type of 'A' (the name expression, not the class definition)
+            let last_stmt = module.suite().last().unwrap().as_expr_stmt().unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model).unwrap();
+
+            assert_eq!(
+                ty.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "builtins.type[mod.A]"
+            );
+        }
+
+        #[test]
+        fn module_literal() {
+            use crate::HasType;
+            use crate::db::tests::TestDbBuilder;
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/foo.py", "import bar")
+                .with_file(&"/src/bar.py", "x = 1")
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            // Get the type of the imported module
+            let import_stmt = module.suite().first().unwrap().as_import_stmt().unwrap();
+            let model = crate::SemanticModel::new(&db, file);
+            let module_ty = import_stmt.names[0].inferred_type(&model).unwrap();
+
+            assert_eq!(
+                module_ty
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "Module[bar]"
+            );
+        }
+
+        #[test]
+        fn type_alias() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(&"/src/mod.py", "type MyAlias = int\nMyAlias")
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            let last_stmt = module.suite().last().unwrap().as_expr_stmt().unwrap();
+            let name_expr = last_stmt.value.as_name_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = name_expr.inferred_type(&model).unwrap();
+
+            // When you reference MyAlias, you get a TypeAliasType instance
+            // The qualified display falls back to standard display for KnownInstance types
+            assert_eq!(
+                ty.display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.TypeAliasType"
+            );
+        }
+
+        #[test]
+        fn bound_method() {
+            use crate::db::tests::TestDbBuilder;
+            use crate::{HasType, SemanticModel};
+            use ruff_db::files::system_path_to_file;
+            use ruff_db::parsed::parsed_module;
+
+            let db = TestDbBuilder::new()
+                .with_file(
+                    &"/src/mod.py",
+                    "
+class MyClass:
+    def my_method(self, x: int) -> str:
+        return str(x)
+
+instance = MyClass()
+bound = instance.my_method
+",
+                )
+                .build()
+                .expect("valid TestDb setup");
+
+            let file = system_path_to_file(&db, "/src/mod.py").unwrap();
+            let module = parsed_module(&db, file).load(&db);
+
+            // Get the type of 'bound' - the value is an attribute access (instance.my_method)
+            let last_stmt = module.suite().last().unwrap().as_assign_stmt().unwrap();
+            let attr_expr = last_stmt.value.as_attribute_expr().unwrap();
+
+            let model = SemanticModel::new(&db, file);
+            let ty = attr_expr.inferred_type(&model).unwrap();
+
+            let display = ty
+                .display_with(&db, DisplaySettings::default().fully_qualified())
+                .to_string();
+
+            // Should display as a bound method with qualified types
+            assert!(display.contains("bound method"));
+            assert!(display.contains("mod.my_method"));
+            assert!(display.contains("builtins.int"));
+            assert!(display.contains("builtins.str"));
+        }
+
+        #[test]
+        fn dataclass_decorator() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            let decorator =
+                Type::DataclassDecorator(crate::types::DataclassParams::default_params(&db));
+
+            assert_eq!(
+                decorator
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "(builtins.type) -> builtins.type"
+            );
+        }
+
+        #[test]
+        fn special_form() {
+            use crate::types::{SpecialFormType, Type};
+            let db = setup_db();
+
+            let annotated = Type::SpecialForm(SpecialFormType::Annotated);
+
+            assert_eq!(
+                annotated
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Annotated"
+            );
+        }
+
+        #[test]
+        fn module_type() {
+            use ty_module_resolver::{ModuleName, resolve_module_confident};
+
+            let db = setup_db();
+            let module_name = ModuleName::new_static("os").unwrap();
+            let module = resolve_module_confident(&db, &module_name).expect("os module to resolve");
+            let module_literal = Type::module_literal(&db, module.file(&db).unwrap(), module);
+
+            assert_eq!(
+                module_literal
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "Module[os]"
+            );
+        }
     }
 }

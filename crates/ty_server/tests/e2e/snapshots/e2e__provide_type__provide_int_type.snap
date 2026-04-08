@@ -1,0 +1,10 @@
+---
+source: crates/ty_server/tests/e2e/provide_type.rs
+assertion_line: 24
+expression: "&provide_type_response"
+---
+{
+  "types": [
+    "builtins.int"
+  ]
+}
