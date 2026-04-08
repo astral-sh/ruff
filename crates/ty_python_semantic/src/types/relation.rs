@@ -685,6 +685,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn set_hint(
+        &self,
+        hint: TypeRelationHint<'db>,
+        children: Vec<TypeRelationErrorContext<'db>>,
+    ) {
+        if let Some(error_context) = &self.error_context {
+            error_context.set_root(hint, children);
+        }
+    }
+
     pub(super) fn collects_error_context(&self) -> bool {
         self.error_context.is_some()
     }
@@ -1046,7 +1056,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
                         if constraint_set.is_never_satisfied(db) {
-                            self.provide_hint(|| TypeRelationHint::UnionElementNotAssignable {
+                            self.provide_hint(|| TypeRelationHint::NotAllUnionElementsAssignable {
                                 element: elem_ty,
                                 union: source,
                                 target,
@@ -1056,13 +1066,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .when_any(db, self.constraints, |&elem_ty| {
-                    self.check_type_pair(db, source, elem_ty)
-                })
-                .or(db, self.constraints, || {
+            (_, Type::Union(union)) => {
+                let is_new_type_of_union = || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
                     // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
@@ -1088,7 +1093,45 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         }
                         _ => self.never(),
                     }
-                }),
+                };
+
+                let mut child_context = vec![];
+
+                let result = union
+                    .elements(db)
+                    .iter()
+                    .when_any(db, self.constraints, |&elem_ty| {
+                        let result = self.check_type_pair(db, source, elem_ty);
+                        if let Some(ctx) = self.error_context.as_ref() {
+                            let ctx = ctx.take();
+                            if ctx.is_empty() {
+                                child_context.push(
+                                    TypeRelationHint::NotAssignable {
+                                        source,
+                                        target: elem_ty,
+                                    }
+                                    .into(),
+                                );
+                            } else {
+                                child_context.push(ctx);
+                            }
+                        }
+                        result
+                    })
+                    .or(db, self.constraints, is_new_type_of_union);
+
+                if self.error_context.is_some() && result.is_never_satisfied(db) {
+                    self.set_hint(
+                        TypeRelationHint::NotAssignableToAnyUnionElement {
+                            source,
+                            union: target,
+                        },
+                        child_context,
+                    );
+                }
+
+                result
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,

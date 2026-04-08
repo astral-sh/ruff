@@ -40,7 +40,7 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |             Declared type
    |
 info: type `Incompatible` is not compatible with protocol `SupportsCheck`
-info: ├── protocol member `check1` is incompatible
-info: └── incompatible parameter types `bytes` and `str`
+info: └── protocol member `check1` is incompatible
+info:     └── incompatible parameter types `bytes` and `str`
 
 ```

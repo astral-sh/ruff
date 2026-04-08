@@ -94,7 +94,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-argument-type"
       },
       "source": "ty",
-      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\", \"]`"
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\", \"]`\n\ninfo: type `Literal[\", \"]` is not assignable to any element of the union `Literal[\"italic\", \"bold\", \"underline\"]`\ninfo: ├── type `Literal[\", \"]` is not assignable to `Literal[\"italic\"]`\ninfo: ├── type `Literal[\", \"]` is not assignable to `Literal[\"bold\"]`\ninfo: └── type `Literal[\", \"]` is not assignable to `Literal[\"underline\"]`"
     },
     {
       "range": {

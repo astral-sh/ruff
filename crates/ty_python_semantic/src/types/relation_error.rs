@@ -9,10 +9,19 @@ use crate::types::tuple::TupleLength;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TypeRelationHint<'db> {
-    UnionElementNotAssignable {
+    Root,
+    NotAssignable {
+        source: Type<'db>,
+        target: Type<'db>,
+    },
+    NotAllUnionElementsAssignable {
         element: Type<'db>,
         union: Type<'db>,
         target: Type<'db>,
+    },
+    NotAssignableToAnyUnionElement {
+        source: Type<'db>,
+        union: Type<'db>,
     },
     TypedDictNotAssignableToDict,
     IncompatibleReturnTypes {
@@ -58,9 +67,17 @@ pub(crate) enum TypeRelationHint<'db> {
 }
 
 impl<'db> TypeRelationHint<'db> {
-    fn render(&self, db: &'db dyn Db) -> String {
-        match self {
-            Self::UnionElementNotAssignable {
+    fn render(&self, db: &'db dyn Db) -> Option<String> {
+        Some(match self {
+            Self::Root => {
+                return None;
+            }
+            Self::NotAssignable { source, target } => format!(
+                "type `{}` is not assignable to `{}`",
+                source.display(db),
+                target.display(db),
+            ),
+            Self::NotAllUnionElementsAssignable {
                 element,
                 union,
                 target,
@@ -69,6 +86,11 @@ impl<'db> TypeRelationHint<'db> {
                 element.display(db),
                 union.display(db),
                 target.display(db),
+            ),
+            Self::NotAssignableToAnyUnionElement { source, union } => format!(
+                "type `{}` is not assignable to any element of the union `{}`",
+                source.display(db),
+                union.display(db),
             ),
             Self::TypedDictNotAssignableToDict => {
                 "`TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)"
@@ -143,51 +165,119 @@ impl<'db> TypeRelationHint<'db> {
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ErrorContextNode<'db> {
+    hint: TypeRelationHint<'db>,
+    children: Vec<ErrorContextNode<'db>>,
+}
+
+impl Default for ErrorContextNode<'_> {
+    fn default() -> Self {
+        Self {
+            hint: TypeRelationHint::Root,
+            children: Vec::new(),
         }
     }
 }
 
-#[derive(Clone, Default, Debug)]
+impl<'db> ErrorContextNode<'db> {
+    /// Returns `true` if this node has no renderable content.
+    fn is_empty(&self) -> bool {
+        matches!(self.hint, TypeRelationHint::Root) && self.children.is_empty()
+    }
+
+    fn render_messages(
+        &self,
+        db: &'db dyn Db,
+        messages: &mut Vec<String>,
+        prefix: &str,
+        continuation: &str,
+    ) {
+        if let Some(message) = self.hint.render(db) {
+            messages.push(format!("{prefix}{message}"));
+        }
+
+        let num_children = self.children.len();
+        for (index, child) in self.children.iter().enumerate() {
+            let is_last = index == num_children - 1;
+            let (child_prefix, child_continuation) = if is_last {
+                (format!("{continuation}└── "), format!("{continuation}    "))
+            } else {
+                (format!("{continuation}├── "), format!("{continuation}│   "))
+            };
+            child.render_messages(db, messages, &child_prefix, &child_continuation);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct TypeRelationErrorContext<'db> {
-    stack: Rc<RefCell<Vec<TypeRelationHint<'db>>>>,
+    root: Rc<RefCell<ErrorContextNode<'db>>>,
 }
 
 impl PartialEq for TypeRelationErrorContext<'_> {
     fn eq(&self, other: &Self) -> bool {
-        *self.stack.borrow() == *other.stack.borrow()
+        *self.root.borrow() == *other.root.borrow()
     }
 }
 
 impl Eq for TypeRelationErrorContext<'_> {}
 
+impl<'db> From<TypeRelationHint<'db>> for TypeRelationErrorContext<'db> {
+    fn from(hint: TypeRelationHint<'db>) -> Self {
+        let context = TypeRelationErrorContext::new();
+        context.push(hint);
+        context
+    }
+}
+
 impl<'db> TypeRelationErrorContext<'db> {
     pub(crate) fn new() -> Self {
         Self {
-            stack: Rc::new(RefCell::new(Vec::new())),
+            root: Rc::new(RefCell::new(ErrorContextNode::default())),
         }
     }
 
-    pub(crate) fn push(&self, message: TypeRelationHint<'db>) {
-        self.stack.borrow_mut().push(message);
+    pub(crate) fn is_empty(&self) -> bool {
+        self.root.borrow().is_empty()
+    }
+
+    pub(crate) fn push(&self, hint: TypeRelationHint<'db>) {
+        let root = self.root.take();
+        let children = if root.is_empty() { vec![] } else { vec![root] };
+        *self.root.borrow_mut() = ErrorContextNode { hint, children };
+    }
+
+    pub(crate) fn set_root(
+        &self,
+        hint: TypeRelationHint<'db>,
+        children: Vec<TypeRelationErrorContext<'db>>,
+    ) {
+        *self.root.borrow_mut() = ErrorContextNode {
+            hint,
+            children: children
+                .into_iter()
+                .map(|child_context| child_context.root.take())
+                .filter(|child| !child.is_empty())
+                .collect(),
+        };
+    }
+
+    pub(crate) fn take(&self) -> Self {
+        TypeRelationErrorContext {
+            root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
+        }
     }
 
     pub fn info_messages(&self, db: &'db dyn Db) -> Vec<String> {
-        let stack = self.stack.borrow();
-        let len = stack.len();
-        stack
-            .iter()
-            .rev()
-            .enumerate()
-            .map(|(i, message)| {
-                let message = message.render(db);
-                if i == 0 {
-                    message
-                } else if i < len - 1 {
-                    format!("├── {message}")
-                } else {
-                    format!("└── {message}")
-                }
-            })
-            .collect()
+        let mut messages = Vec::new();
+        self.root
+            .borrow()
+            .render_messages(db, &mut messages, "", "");
+        messages
     }
 }
