@@ -15,7 +15,8 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    TypedDictSchema, functional_typed_dict_field, validate_typed_dict_constructor,
+    TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
+    infer_unpacked_keyword_types, typed_dict_without_keys, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
@@ -367,11 +368,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let target_ty = Type::TypedDict(typed_dict);
                 self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
             }
+            TypedDictConstructorForm::MixedPositionalAndKeywords => {
+                // Infer the positional argument against the schema left after removing keys that
+                // are guaranteed by keywords. For `Target(source if cond else {"a": 1}, b=2)`,
+                // the conditional must be prepared against `{"a": int}` rather than the full
+                // `Target`; otherwise the cached type spuriously requires `b` before validation.
+                let unpacked_keyword_types =
+                    infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                        self.get_or_infer_expression(expr, tcx)
+                    });
+                let keyword_keys =
+                    collect_guaranteed_keyword_keys(self.db(), arguments, &unpacked_keyword_types);
+                let positional_target =
+                    typed_dict_without_keys(self.db(), typed_dict, &keyword_keys);
+                let target_ty = Type::TypedDict(positional_target);
+                self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
+            }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
             }
-            TypedDictConstructorForm::MixedPositionalAndKeywords
-            | TypedDictConstructorForm::KeywordOnly => {}
+            TypedDictConstructorForm::KeywordOnly => {}
         }
 
         if !arguments.keywords.is_empty() {

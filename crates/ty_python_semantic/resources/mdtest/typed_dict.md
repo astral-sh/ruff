@@ -496,6 +496,54 @@ def _(
     ChildKwargs(**maybe_name, count=1)
 ```
 
+TypedDict positional arguments in mixed constructors should validate their declared keys:
+
+```py
+from typing import TypedDict
+
+class Target(TypedDict):
+    a: int
+    b: int
+
+class Source(TypedDict):
+    a: int
+
+class BadSource(TypedDict):
+    a: str
+
+class MaybeSource(TypedDict, total=False):
+    a: int
+
+class WiderSource(TypedDict):
+    a: int
+    extra: str
+
+class WiderBadSource(TypedDict):
+    a: str
+    extra: str
+
+def _(
+    source: Source,
+    bad: BadSource,
+    maybe: MaybeSource,
+    wide: WiderSource,
+    wide_bad: WiderBadSource,
+    cond: bool,
+):
+    Target(source, b=2)
+    Target(source if cond else {"a": 1}, b=2)
+    Target(wide, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(bad, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(wide_bad, b=2)
+
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `Target` constructor"
+    Target(maybe, b=2)
+```
+
 All of these are missing the required `age` field:
 
 ```py
