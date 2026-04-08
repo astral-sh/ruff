@@ -563,6 +563,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or(self.fallback_type())
     }
 
+    /// Return an already-inferred type for `expr`, or infer it with `tcx` if needed.
+    ///
+    /// This is used in places where an expression may already have been inferred earlier with a
+    /// more specific type context, and re-inferring it would be redundant or would duplicate
+    /// diagnostics.
+    fn get_or_infer_expression(&mut self, expr: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+        self.try_expression_type(expr)
+            .unwrap_or_else(|| self.infer_expression(expr, tcx))
+    }
+
     /// Store qualifiers for an annotation expression.
     fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
         if !qualifiers.is_empty() {
@@ -6566,6 +6576,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    /// Infer subexpressions of a `TypedDict` constructor call before general argument inference.
+    ///
+    /// This gives constructor values the declared field type as context, then validates the full
+    /// call once. A lone positional dict literal is inferred as a `TypedDict` expression directly,
+    /// while mixed dict-literal and keyword calls infer the nested key and value expressions
+    /// without re-inferring the outer dict literal later during argument binding.
+    fn infer_typed_dict_constructor_values<'expr>(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        arguments: &'expr ast::Arguments,
+        error_node: AnyNodeRef<'expr>,
+    ) {
+        if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+            let target_ty = Type::TypedDict(typed_dict);
+            let argument = &arguments.args[0];
+            self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+            if argument.is_dict_expr() {
+                return;
+            }
+        } else if arguments.args.len() == 1
+            && let ast::Expr::Dict(dict_expr) = &arguments.args[0]
+        {
+            self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
+        }
+
+        let items = typed_dict.items(self.db());
+        for keyword in &arguments.keywords {
+            let value_tcx = keyword
+                .arg
+                .as_ref()
+                .and_then(|arg_name| items.get(arg_name.id.as_str()))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.get_or_infer_expression(&keyword.value, value_tcx);
+        }
+
+        validate_typed_dict_constructor(
+            &self.context,
+            typed_dict,
+            arguments,
+            error_node,
+            |expr, _| self.expression_type(expr),
+        );
+    }
+
+    /// Infer the key and value expressions of a positional dict literal passed to a
+    /// `TypedDict` constructor alongside keyword arguments.
+    ///
+    /// The outer dict literal is intentionally left uninferred for later call binding; this helper only
+    /// pre-infers its nested expressions so full constructor validation can still combine keys
+    /// from the dict literal and keyword arguments without double-inferring the dict itself.
+    fn infer_typed_dict_constructor_dict_literal_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        dict_expr: &ast::ExprDict,
+    ) {
+        let items = typed_dict.items(self.db());
+
+        for item in &dict_expr.items {
+            let value_tcx = item
+                .key
+                .as_ref()
+                .map(|key| self.get_or_infer_expression(key, TypeContext::default()))
+                .and_then(Type::as_string_literal)
+                .and_then(|key| items.get(key.value(self.db())))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.get_or_infer_expression(&item.value, value_tcx);
+        }
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -6876,31 +6957,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
+        let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
+        let has_mixed_typed_dict_literal_argument = is_typed_dict_constructor
+            && arguments.args.len() == 1
+            && arguments.args[0].is_dict_expr()
+            && !arguments.keywords.is_empty();
+
+        // Validate `TypedDict` constructor calls before general argument inference so the field
+        // type context becomes the canonical inference for constructor values.
+        if let Some(class) = class
+            && is_typed_dict_constructor
+        {
+            let typed_dict = TypedDictType::new(class);
+            self.infer_typed_dict_constructor_values(typed_dict, arguments, func.as_ref().into());
+        }
+
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+            &mut |builder, (_, expr, tcx)| {
+                if has_mixed_typed_dict_literal_argument && expr.is_dict_expr() {
+                    builder.try_expression_type(expr).unwrap_or(Type::unknown())
+                } else if is_typed_dict_constructor {
+                    builder.get_or_infer_expression(expr, tcx)
+                } else {
+                    builder.infer_expression(expr, tcx)
+                }
+            },
             &mut bindings,
             call_expression_tcx,
         );
-
-        // Validate `TypedDict` constructor calls after argument type inference.
-        if let Some(class) = class
-            && class.is_typed_dict(self.db())
-        {
-            let mut speculative = self.speculate();
-            validate_typed_dict_constructor(
-                &self.context,
-                TypedDictType::new(class),
-                arguments,
-                func.as_ref().into(),
-                |expr, tcx| speculative.infer_expression(expr, tcx),
-            );
-            // TODO: Merging speculative inference preserves TypedDict-specific diagnostics, but it
-            // can also duplicate diagnostics that were already emitted during the initial
-            // type-context-free argument inference.
-            self.extend(speculative);
-        }
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,

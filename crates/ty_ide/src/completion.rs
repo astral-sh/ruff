@@ -1206,6 +1206,16 @@ struct Relevance {
     /// other non-module symbols, even when those symbols are in
     /// the user's project.
     is_module: Sort,
+    /// Sorts based on whether this symbol is only available during
+    /// type checking and not at runtime.
+    type_check_only: Sort,
+    /// Deprecated symbols appear lower in the completion result.
+    ///
+    /// This appears before `module_dependency_kind` so deprecation
+    /// downranking applies even when a symbol's module origin would
+    /// otherwise boost it, but after `type_check_only` so runtime-
+    /// unavailable symbols still sort last.
+    deprecated: Sort,
     /// The "dependency kind" of the module where this symbol
     /// originates from.
     ///
@@ -1219,11 +1229,6 @@ struct Relevance {
     /// other sorting criteria being applied or that it is generally
     /// more specific than completions where this is set.
     module_dependency_kind: Option<ModuleDependencyKind>,
-    /// Sorts based on whether this symbol is only available during
-    /// type checking and not at runtime.
-    type_check_only: Sort,
-    /// Deprecated symbols appear lower in the completion result
-    deprecated: Sort,
 }
 
 impl Relevance {
@@ -1268,7 +1273,6 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
                 Sort::Lower
             } else {
@@ -1279,6 +1283,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            module_dependency_kind: c.module_dependency_kind,
         }
     }
 }
@@ -1311,6 +1316,20 @@ enum ModuleDependencyKind {
     Builtin,
     /// Symbols defined somewhere in the user's project.
     Project,
+    /// Symbols from "special" standard library modules that
+    /// are so commonly used---but commonly have names in
+    /// conflict with other stdlib modules---that we want to
+    /// prioritize them above third-party re-exports and
+    /// other stdlib modules.
+    ///
+    /// `typing` is a good example of this. It has lots of
+    /// symbols that also exist in other modules. e.g.,
+    /// `TypeVar` in `ast`, `cast` in `ctypes` and
+    /// `Protocol` in `asyncio`.
+    ///
+    /// We also include `collections`
+    /// for similar reasons.
+    StdlibSpecial,
     /// A namespace package somewhat defies classification, since
     /// it can exist over multiple search paths. Since std doesn't
     /// use namespace packages, we just assume that they are roughly
@@ -1320,21 +1339,12 @@ enum ModuleDependencyKind {
     /// package is within the user's project. Probably we
     /// could do better once we know how to navigate namespace
     /// packages better. Regardless, we put this between
-    /// `Project` and `ThirdParty` as a bad compromise for now.
+    /// strongly preferred and weakly preferred modules as a
+    /// bad compromise for now.
     Namespace,
     /// Symbols defined somewhere in a dependency, direct or
     /// indirect.
     ThirdParty,
-    /// Symbols from "special" standard library modules that
-    /// are so commonly used---but commonly have names in
-    /// conflict with other stdlib modules---that we want to
-    /// prioritize them above other stdlib modules.
-    ///
-    /// `typing` is a good example of this. It has lots of
-    /// symbols that also exist in other modules. e.g.,
-    /// `TypeVar` in `ast`, `cast` in `ctypes` and
-    /// `Protocol` in `asyncio`.
-    StdlibSpecial,
     /// Symbols from the standard library get ranked last by
     /// the logic that they are least specific to the end user's
     /// context.
@@ -1354,12 +1364,13 @@ impl ModuleDependencyKind {
         if module.is_known(db, KnownModule::Builtins) {
             return ModuleDependencyKind::Builtin;
         }
-
         let Some(sp) = module.search_path(db) else {
             return ModuleDependencyKind::Namespace;
         };
         if sp.is_standard_library() {
-            if module.is_known(db, KnownModule::Typing) {
+            if module.is_known(db, KnownModule::Typing)
+                || module.is_known(db, KnownModule::Collections)
+            {
                 ModuleDependencyKind::StdlibSpecial
             } else {
                 ModuleDependencyKind::Stdlib
@@ -2560,7 +2571,7 @@ mod tests {
     use ty_module_resolver::ModuleName;
 
     use crate::completion::{Completion, completion};
-    use crate::tests::{CursorTest, CursorTestBuilder};
+    use crate::tests::{CursorTest, CursorTestBuilder, SitePackagesCursorTestBuilder};
 
     use super::{CompletionKind, CompletionSettings, token_suffix_by_kinds};
 
@@ -7997,6 +8008,137 @@ from .imp<CURSOR>
     }
 
     #[test]
+    fn auto_import_prefers_typing_over_third_party_reexport() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "Concaten<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from typing import Concatenate as Concatenate
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                c.name == "Concatenate"
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("typing" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Concatenate :: typing
+        Concatenate :: thirdparty
+        ");
+    }
+
+    #[test]
+    fn auto_import_prefers_collections_over_third_party_reexport() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "ChainM<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from collections import ChainMap as ChainMap
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                c.name == "ChainMap"
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("collections" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        ChainMap :: collections
+        ChainMap :: thirdparty
+        ");
+    }
+
+    #[test]
+    fn auto_import_deprioritizes_deprecated_over_stdlib_special() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "no_type_check_dec<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+def no_type_check_decorator():
+    pass
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                c.name == "no_type_check_decorator"
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("typing" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        no_type_check_decorator :: thirdparty
+        no_type_check_decorator :: typing
+        ");
+    }
+
+    #[test]
+    fn auto_import_keeps_sys_below_third_party() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "argv<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from sys import argv as argv
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                c.name == "argv"
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("sys" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        argv :: thirdparty
+        argv :: sys
+        ");
+    }
+
+    #[test]
+    fn auto_import_keeps_os_below_third_party() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "getpid<CURSOR>")
+            .site_packages(
+                "thirdparty/__init__.py",
+                r#"
+from os import getpid as getpid
+"#,
+            )
+            .completion_test_builder()
+            .module_names()
+            .filter(|c| {
+                c.name == "getpid"
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("os" | "thirdparty")
+                    )
+            });
+        assert_snapshot!(builder.build().snapshot(), @r"
+        getpid :: thirdparty
+        getpid :: os
+        ");
+    }
+
+    #[test]
     fn reexport_simple_import_noauto() {
         let snapshot = CursorTest::builder()
             .source(
@@ -8869,6 +9011,23 @@ raise <CURSOR>
                 // production environment. If a default changes, the
                 // tests should be fixed to accomodate that change
                 // as well. ---AG
+                settings: CompletionSettings::default(),
+                skip_builtins: false,
+                skip_keywords: false,
+                skip_dunders: false,
+                type_signatures: false,
+                imports: false,
+                module_names: false,
+                predicate: None,
+            }
+        }
+    }
+
+    impl SitePackagesCursorTestBuilder {
+        fn completion_test_builder(&self) -> CompletionTestBuilder {
+            CompletionTestBuilder {
+                cursor_test: self.build(),
+                // Keep defaults aligned with production completion settings.
                 settings: CompletionSettings::default(),
                 skip_builtins: false,
                 skip_keywords: false,

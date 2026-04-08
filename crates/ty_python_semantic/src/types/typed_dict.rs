@@ -934,13 +934,24 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         arguments.args.len() == 1 && arguments.keywords.is_empty() && !has_positional_dict_literal;
 
     if has_positional_dict_literal {
-        let provided_keys = validate_from_dict_literal(
+        let mut provided_keys = validate_from_dict_literal(
             context,
             typed_dict,
             arguments,
             error_node,
             &mut expression_type_fn,
         );
+
+        for key in validate_from_keywords(
+            context,
+            typed_dict,
+            arguments,
+            error_node,
+            &mut expression_type_fn,
+        ) {
+            provided_keys.insert(key);
+        }
+
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
     } else if is_single_positional_arg {
         // Single positional argument: check if assignable to the target TypedDict.
@@ -988,11 +999,10 @@ fn validate_from_dict_literal<'db, 'ast>(
         // Validate dict entries
         for dict_item in &dict_expr.items {
             if let Some(ref key_expr) = dict_item.key
-                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_value, ..
-                }) = key_expr
+                && let Some(key_value) =
+                    expression_type_fn(key_expr, TypeContext::default()).as_string_literal()
             {
-                let key = key_value.to_str();
+                let key = key_value.value(context.db());
                 provided_keys.insert(Name::new(key));
 
                 let value_tcx = items
