@@ -250,39 +250,52 @@ impl WorkspaceOptions {
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
-                Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix.clone(),
-                ))
-            };
+            let ActiveEnvironment {
+                executable,
+                environment,
+                version,
+            } = active_environment;
 
-            overrides.fallback_python_version =
-                active_environment.version.as_ref().and_then(|version| {
-                    Some(RangedValue::python_extension(PythonVersion::from((
-                        u8::try_from(version.major).ok()?,
-                        u8::try_from(version.minor).ok()?,
-                    ))))
-                });
+            // If the editor-selected interpreter reports an unsupported Python version,
+            // ignore that interpreter entirely. Otherwise we could still infer the same
+            // unsupported version later from its environment metadata.
+            match version
+                .as_ref()
+                .map(resolve_editor_python_version)
+                .transpose()
+            {
+                Ok(fallback_python_version) => {
+                    overrides.fallback_python = if let Some(environment) = environment {
+                        environment.folder_uri.to_file_path().ok().and_then(|path| {
+                            Some(RelativePathBuf::python_extension(
+                                SystemPathBuf::from_path_buf(path).ok()?,
+                            ))
+                        })
+                    } else {
+                        Some(RelativePathBuf::python_extension(executable.sys_prefix))
+                    };
 
-            if let Some(python) = &overrides.fallback_python {
-                tracing::debug!(
-                    "Using the Python environment selected in your editor \
-                    in case the configuration doesn't specify a Python environment: {python}",
-                    python = python.path()
-                );
-            }
+                    overrides.fallback_python_version =
+                        fallback_python_version.map(RangedValue::python_extension);
 
-            if let Some(version) = &overrides.fallback_python_version {
-                tracing::debug!(
-                    "Using the Python version selected in your editor: {version} \
-                    in case the configuration doesn't specify a Python version",
-                );
+                    if let Some(python) = &overrides.fallback_python {
+                        tracing::debug!(
+                            "Using the Python environment selected in your editor \
+                            in case the configuration doesn't specify a Python environment: {python}",
+                            python = python.path()
+                        );
+                    }
+
+                    if let Some(version) = &overrides.fallback_python_version {
+                        tracing::debug!(
+                            "Using the Python version selected in your editor: {version} \
+                            in case the configuration doesn't specify a Python version",
+                        );
+                    }
+                }
+                Err(message) => {
+                    tracing::warn!("{message}");
+                }
             }
         }
 
@@ -304,6 +317,33 @@ impl WorkspaceOptions {
                 .unwrap_or_default(),
             overrides,
         }
+    }
+}
+
+fn resolve_editor_python_version(version: &EnvironmentVersion) -> Result<PythonVersion, String> {
+    let version_text = format!("{}.{}", version.major, version.minor);
+    let unsupported_version = || {
+        format!(
+            "Unsupported Python version `{version_text}` selected in your editor; expected one of {}.",
+            PythonVersion::iter()
+                .map(|version| format!("`{version}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+
+    let Some(major) = u8::try_from(version.major).ok() else {
+        return Err(unsupported_version());
+    };
+    let Some(minor) = u8::try_from(version.minor).ok() else {
+        return Err(unsupported_version());
+    };
+
+    let python_version = PythonVersion::from((major, minor));
+    if PythonVersion::iter().any(|version| version == python_version) {
+        Ok(python_version)
+    } else {
+        Err(unsupported_version())
     }
 }
 

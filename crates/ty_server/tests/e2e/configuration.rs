@@ -148,6 +148,86 @@ def foo() -> str:
 }
 
 #[test]
+fn unsupported_editor_python_version() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import decimal
+import time
+
+time.ctime(decimal.Decimal(\"1.5\"))
+";
+
+    let builder = TestServerBuilder::new()?;
+    let python = builder.file_path("venv/bin/python");
+    let sys_prefix = builder.file_path("venv");
+    let python_uri =
+        lsp_types::Url::from_file_path(python.as_std_path()).expect("Path must be a valid URL");
+
+    let workspace_options: ClientOptions = serde_json::from_value(json!({
+        "pythonExtension": {
+            "activeEnvironment": {
+                "executable": {
+                    "uri": python_uri,
+                    "sysPrefix": sys_prefix,
+                },
+                "version": {
+                    "major": 3,
+                    "minor": 16,
+                    "patch": 0,
+                    "sysVersion": "3.16.0",
+                }
+            }
+        }
+    }))?;
+
+    let mut server = builder
+        .with_workspace(workspace_root, Some(workspace_options))?
+        .with_file(foo, foo_content)?
+        .with_file("venv/bin/python", "")?
+        .with_file("venv/pyvenv.cfg", "version_info = 3.16.0\n")?
+        .with_file("venv/lib/python3.16/site-packages/.gitkeep", "")?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "kind": "full",
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 3,
+              "character": 11
+            },
+            "end": {
+              "line": 3,
+              "character": 33
+            }
+          },
+          "severity": 1,
+          "code": "invalid-argument-type",
+          "codeDescription": {
+            "href": "https://ty.dev/rules#invalid-argument-type"
+          },
+          "source": "ty",
+          "message": "Argument to function `ctime` is incorrect: Expected `SupportsIndex | float | None`, found `Decimal`"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn configuration_file_and_overrides() -> Result<()> {
     let _filter = filter_result_id();
 
