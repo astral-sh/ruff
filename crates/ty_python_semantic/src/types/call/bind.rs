@@ -1255,7 +1255,11 @@ impl<'db> Bindings<'db> {
                                     .try_call(db, &CallArguments::positional([*instance]))
                                     .map(|binding| binding.return_type(db))
                                 {
-                                    overload.set_return_type(return_ty);
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
                                 } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
@@ -1297,7 +1301,11 @@ impl<'db> Bindings<'db> {
                                     .try_call(db, &CallArguments::positional([*instance]))
                                     .map(|binding| binding.return_type(db))
                                 {
-                                    overload.set_return_type(return_ty);
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
                                 } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
@@ -2354,8 +2362,11 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownClass::Property) => {
                             if let [getter, setter, deleter, ..] = overload.parameter_types() {
+                                let getter = getter.filter(|ty| !ty.is_none(db));
+                                let setter = setter.filter(|ty| !ty.is_none(db));
+                                let deleter = deleter.filter(|ty| !ty.is_none(db));
                                 overload.set_return_type(Type::PropertyInstance(
-                                    PropertyInstanceType::new(db, *getter, *setter, *deleter),
+                                    PropertyInstanceType::new(db, getter, setter, deleter),
                                 ));
                             }
                         }

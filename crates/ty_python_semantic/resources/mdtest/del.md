@@ -213,6 +213,13 @@ class RejectsDescriptorDelete:
     def x(self) -> NoReturn:
         raise AttributeError("x")
 
+class ExplicitNoneDeleter:
+    def get(self) -> int:
+        return 1
+
+    keyword = property(get, fdel=None)
+    positional = property(get, None, None)
+
 class DeletableNamedTuple(NamedTuple):
     x: int
 
@@ -265,6 +272,12 @@ del rejects_delete.x
 rejects_descriptor_delete = RejectsDescriptorDelete()
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
 del rejects_descriptor_delete.x
+
+explicit_none_deleter = ExplicitNoneDeleter()
+# error: [invalid-assignment] "Cannot delete read-only property `keyword` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.keyword
+# error: [invalid-assignment] "Cannot delete read-only property `positional` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.positional
 
 fallback_instance_attribute = FallbackInstanceAttribute()
 del fallback_instance_attribute.x

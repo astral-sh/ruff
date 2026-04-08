@@ -136,6 +136,20 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+Direct `property.__delete__` calls return `None`, even if the stored deleter's annotation is less
+precise:
+
+```py
+from typing import Any, cast
+
+def raw_deleter(obj: object) -> int:
+    return 1
+
+prop = property(fdel=cast(Any, raw_deleter))
+reveal_type(prop.__delete__(object()))  # revealed: None
+reveal_type(property.__delete__(prop, object()))  # revealed: None
+```
+
 ## Conditional redefinition in class body
 
 Distinct property definitions in statically unknown class-body branches should remain distinct, the
