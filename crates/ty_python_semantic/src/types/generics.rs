@@ -1791,9 +1791,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
-        _variance: TypeVarVariance,
+        variance: TypeVarVariance,
     ) {
         self.insert_type_mapping(bound_typevar, ty);
+
+        let identity = bound_typevar.identity(self.db);
+        if bound_typevar.is_paramspec(self.db) && !self.paramspec_seen.insert(identity) {
+            return;
+        }
+
+        let (lower, upper) = match variance {
+            TypeVarVariance::Covariant => (ty, Type::object()),
+            TypeVarVariance::Contravariant => (Type::Never, ty),
+            TypeVarVariance::Invariant => (ty, ty),
+            TypeVarVariance::Bivariant => return,
+        };
+
+        let constraint = ConstraintSet::constrain_typevar(
+            self.db,
+            self.constraints,
+            bound_typevar,
+            lower,
+            upper,
+        );
+        self.pending
+            .intersect(self.db, self.constraints, constraint);
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
