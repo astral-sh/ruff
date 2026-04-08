@@ -872,6 +872,16 @@ class SomeClass[T: int | str]:
         assert not isinstance(self.field, A)
         reveal_type(self.field)  # revealed: T@SomeClass & ~A
         narrowed = self.field
+
+def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
+    if not isinstance(class_or_tuple, tuple):
+        reveal_type(class_or_tuple)  # revealed: T@lenient_issubclass & ~tuple[object, ...]
+        # `T@lenient_issubclass & ~tuple[object, ...]` is assignable to `type`,
+        # because `(type | tuple[type, ...]) & ~tuple[object, ...]` simplifies to `type`
+        return check(class_or_tuple)
+    return class_or_tuple
+
+def check(check_type: type): ...
 ```
 
 ## Constrained typevars remain assignable to the union of their constraints after narrowing
