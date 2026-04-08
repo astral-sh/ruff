@@ -56,7 +56,6 @@ info: Function defined here
 8 | def g(
 9 |     a: str | Foo,
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -82,7 +81,6 @@ info: Function defined here
 8 | def g(
 9 |     a: str | Foo,
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -107,7 +105,6 @@ info: Function defined here
 8 | def g(
 9 |     a: str | Foo,
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -131,6 +128,5 @@ info: Function defined here
 8 | def g(
 9 |     a: str | Foo,
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

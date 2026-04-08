@@ -18,8 +18,8 @@ doctest = false
 ruff_python_ast = { workspace = true }
 
 bitflags = { workspace = true }
+icu_properties = { workspace = true }
 itertools = { workspace = true }
-unic-ucd-category = { workspace = true }
 
 [dev-dependencies]
 

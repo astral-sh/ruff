@@ -48,7 +48,7 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    any_over_expr(expr, &|expr| {
+    any_over_expr(expr, |expr| {
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
@@ -130,200 +130,225 @@ where
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
-pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
-    if func(expr) {
-        return true;
-    }
-    match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-            values.iter().any(|expr| any_over_expr(expr, func))
+pub fn any_over_expr<F>(expr: &Expr, mut func: F) -> bool
+where
+    F: FnMut(&Expr) -> bool,
+{
+    fn inner(expr: &Expr, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+        if func(expr) {
+            return true;
         }
-        Expr::FString(ast::ExprFString { value, .. }) => value
-            .elements()
-            .any(|expr| any_over_interpolated_string_element(expr, func)),
-        Expr::TString(ast::ExprTString { value, .. }) => value
-            .elements()
-            .any(|expr| any_over_interpolated_string_element(expr, func)),
-        Expr::Named(ast::ExprNamed {
-            target,
-            value,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(target, func) || any_over_expr(value, func),
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            any_over_expr(left, func) || any_over_expr(right, func)
-        }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-        Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        Expr::If(ast::ExprIf {
-            test,
-            body,
-            orelse,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
-        Expr::Dict(ast::ExprDict {
-            items,
-            range: _,
-            node_index: _,
-        }) => items.iter().any(|ast::DictItem { key, value }| {
-            any_over_expr(value, func) || key.as_ref().is_some_and(|key| any_over_expr(key, func))
-        }),
-        Expr::Set(ast::ExprSet {
-            elts,
-            range: _,
-            node_index: _,
-        })
-        | Expr::List(ast::ExprList {
-            elts,
-            range: _,
-            node_index: _,
-            ..
-        })
-        | Expr::Tuple(ast::ExprTuple {
-            elts,
-            range: _,
-            node_index: _,
-            ..
-        }) => elts.iter().any(|expr| any_over_expr(expr, func)),
-        Expr::ListComp(ast::ExprListComp {
-            elt,
-            generators,
-            range: _,
-            node_index: _,
-        })
-        | Expr::SetComp(ast::ExprSetComp {
-            elt,
-            generators,
-            range: _,
-            node_index: _,
-        })
-        | Expr::Generator(ast::ExprGenerator {
-            elt,
-            generators,
-            range: _,
-            node_index: _,
-            parenthesized: _,
-        }) => {
-            any_over_expr(elt, func)
-                || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
-                })
-        }
-        Expr::DictComp(ast::ExprDictComp {
-            key,
-            value,
-            generators,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(key, func)
-                || any_over_expr(value, func)
-                || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
-                })
-        }
-        Expr::Await(ast::ExprAwait {
-            value,
-            range: _,
-            node_index: _,
-        })
-        | Expr::YieldFrom(ast::ExprYieldFrom {
-            value,
-            range: _,
-            node_index: _,
-        })
-        | Expr::Attribute(ast::ExprAttribute {
-            value,
-            range: _,
-            node_index: _,
-            ..
-        })
-        | Expr::Starred(ast::ExprStarred {
-            value,
-            range: _,
-            node_index: _,
-            ..
-        }) => any_over_expr(value, func),
-        Expr::Yield(ast::ExprYield {
-            value,
-            range: _,
-            node_index: _,
-        }) => value
-            .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
-        Expr::Compare(ast::ExprCompare {
-            left, comparators, ..
-        }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
-        Expr::Call(ast::ExprCall {
-            func: call_func,
-            arguments,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(call_func, func)
-                // Note that this is the evaluation order but not necessarily the declaration order
-                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
-                || arguments.keywords
-                    .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
-        }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            any_over_expr(value, func) || any_over_expr(slice, func)
-        }
-        Expr::Slice(ast::ExprSlice {
-            lower,
-            upper,
-            step,
-            range: _,
-            node_index: _,
-        }) => {
-            lower
+        match expr {
+            Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                values.iter().any(|expr| any_over_expr(expr, &mut *func))
+            }
+            Expr::FString(ast::ExprFString { value, .. }) => value
+                .elements()
+                .any(|expr| any_over_interpolated_string_element(expr, &mut *func)),
+            Expr::TString(ast::ExprTString { value, .. }) => value
+                .elements()
+                .any(|expr| any_over_interpolated_string_element(expr, &mut *func)),
+            Expr::Named(ast::ExprNamed {
+                target,
+                value,
+                range: _,
+                node_index: _,
+            }) => any_over_expr(target, &mut *func) || any_over_expr(value, &mut *func),
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+                any_over_expr(left, &mut *func) || any_over_expr(right, &mut *func)
+            }
+            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
+            Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+            Expr::If(ast::ExprIf {
+                test,
+                body,
+                orelse,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(test, &mut *func)
+                    || any_over_expr(body, &mut *func)
+                    || any_over_expr(orelse, &mut *func)
+            }
+            Expr::Dict(ast::ExprDict {
+                items,
+                range: _,
+                node_index: _,
+            }) => items.iter().any(|ast::DictItem { key, value }| {
+                any_over_expr(value, &mut *func)
+                    || key
+                        .as_ref()
+                        .is_some_and(|key| any_over_expr(key, &mut *func))
+            }),
+            Expr::Set(ast::ExprSet {
+                elts,
+                range: _,
+                node_index: _,
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                range: _,
+                node_index: _,
+                ..
+            })
+            | Expr::Tuple(ast::ExprTuple {
+                elts,
+                range: _,
+                node_index: _,
+                ..
+            }) => elts.iter().any(|expr| any_over_expr(expr, &mut *func)),
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+                node_index: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+                node_index: _,
+            })
+            | Expr::Generator(ast::ExprGenerator {
+                elt,
+                generators,
+                range: _,
+                node_index: _,
+                parenthesized: _,
+            }) => {
+                any_over_expr(elt, &mut *func)
+                    || generators.iter().any(|generator| {
+                        any_over_expr(&generator.target, &mut *func)
+                            || any_over_expr(&generator.iter, &mut *func)
+                            || generator
+                                .ifs
+                                .iter()
+                                .any(|expr| any_over_expr(expr, &mut *func))
+                    })
+            }
+            Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(key, &mut *func)
+                    || any_over_expr(value, &mut *func)
+                    || generators.iter().any(|generator| {
+                        any_over_expr(&generator.target, &mut *func)
+                            || any_over_expr(&generator.iter, &mut *func)
+                            || generator
+                                .ifs
+                                .iter()
+                                .any(|expr| any_over_expr(expr, &mut *func))
+                    })
+            }
+            Expr::Await(ast::ExprAwait {
+                value,
+                range: _,
+                node_index: _,
+            })
+            | Expr::YieldFrom(ast::ExprYieldFrom {
+                value,
+                range: _,
+                node_index: _,
+            })
+            | Expr::Attribute(ast::ExprAttribute {
+                value,
+                range: _,
+                node_index: _,
+                ..
+            })
+            | Expr::Starred(ast::ExprStarred {
+                value,
+                range: _,
+                node_index: _,
+                ..
+            }) => any_over_expr(value, func),
+            Expr::Yield(ast::ExprYield {
+                value,
+                range: _,
+                node_index: _,
+            }) => value
                 .as_ref()
-                .is_some_and(|value| any_over_expr(value, func))
-                || upper
+                .is_some_and(|value| any_over_expr(value, func)),
+            Expr::Compare(ast::ExprCompare {
+                left, comparators, ..
+            }) => {
+                any_over_expr(left, &mut *func)
+                    || comparators
+                        .iter()
+                        .any(|expr| any_over_expr(expr, &mut *func))
+            }
+            Expr::Call(ast::ExprCall {
+                func: call_func,
+                arguments,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(call_func, &mut *func)
+                    // Note that this is the evaluation order but not necessarily the declaration order
+                    // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
+                    || arguments.args.iter().any(|expr| any_over_expr(expr, &mut *func))
+                    || arguments.keywords
+                        .iter()
+                        .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+            }
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                any_over_expr(value, &mut *func) || any_over_expr(slice, &mut *func)
+            }
+            Expr::Slice(ast::ExprSlice {
+                lower,
+                upper,
+                step,
+                range: _,
+                node_index: _,
+            }) => {
+                lower
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-                || step
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
+                    .is_some_and(|value| any_over_expr(value, &mut *func))
+                    || upper
+                        .as_ref()
+                        .is_some_and(|value| any_over_expr(value, &mut *func))
+                    || step
+                        .as_ref()
+                        .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Expr::Name(_)
+            | Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::IpyEscapeCommand(_) => false,
         }
-        Expr::Name(_)
-        | Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::IpyEscapeCommand(_) => false,
     }
+
+    inner(expr, &mut func)
 }
 
-pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
+fn any_over_type_param(type_param: &TypeParam, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
     match type_param {
         TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
             bound
                 .as_ref()
-                .is_some_and(|value| any_over_expr(value, func))
+                .is_some_and(|value| any_over_expr(value, &mut *func))
                 || default
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
+                    .is_some_and(|value| any_over_expr(value, &mut *func))
         }
         TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => default
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .is_some_and(|value| any_over_expr(value, &mut *func)),
         TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => default
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .is_some_and(|value| any_over_expr(value, &mut *func)),
     }
 }
 
-pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
+fn any_over_pattern(pattern: &Pattern, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue {
             value,
@@ -337,23 +362,23 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
             node_index: _,
         }) => patterns
             .iter()
-            .any(|pattern| any_over_pattern(pattern, func)),
+            .any(|pattern| any_over_pattern(pattern, &mut *func)),
         Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
-            keys.iter().any(|key| any_over_expr(key, func))
+            keys.iter().any(|key| any_over_expr(key, &mut *func))
                 || patterns
                     .iter()
-                    .any(|pattern| any_over_pattern(pattern, func))
+                    .any(|pattern| any_over_pattern(pattern, &mut *func))
         }
         Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
-            any_over_expr(cls, func)
+            any_over_expr(cls, &mut *func)
                 || arguments
                     .patterns
                     .iter()
-                    .any(|pattern| any_over_pattern(pattern, func))
+                    .any(|pattern| any_over_pattern(pattern, &mut *func))
                 || arguments
                     .keywords
                     .iter()
-                    .any(|keyword| any_over_pattern(&keyword.pattern, func))
+                    .any(|keyword| any_over_pattern(&keyword.pattern, &mut *func))
         }
         Pattern::MatchStar(_) => false,
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
@@ -365,13 +390,13 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
             node_index: _,
         }) => patterns
             .iter()
-            .any(|pattern| any_over_pattern(pattern, func)),
+            .any(|pattern| any_over_pattern(pattern, &mut *func)),
     }
 }
 
-pub fn any_over_interpolated_string_element(
+fn any_over_interpolated_string_element(
     element: &ast::InterpolatedStringElement,
-    func: &dyn Fn(&Expr) -> bool,
+    func: &mut dyn FnMut(&Expr) -> bool,
 ) -> bool {
     match element {
         ast::InterpolatedStringElement::Literal(_) => false,
@@ -380,239 +405,261 @@ pub fn any_over_interpolated_string_element(
             format_spec,
             ..
         }) => {
-            any_over_expr(expression, func)
+            any_over_expr(expression, &mut *func)
                 || format_spec.as_ref().is_some_and(|spec| {
                     spec.elements.iter().any(|spec_element| {
-                        any_over_interpolated_string_element(spec_element, func)
+                        any_over_interpolated_string_element(spec_element, &mut *func)
                     })
                 })
         }
     }
 }
 
-pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
-    match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            type_params,
-            body,
-            decorator_list,
-            returns,
-            ..
-        }) => {
-            parameters.iter().any(|param| {
-                param
-                    .default()
-                    .is_some_and(|default| any_over_expr(default, func))
-                    || param
-                        .annotation()
-                        .is_some_and(|annotation| any_over_expr(annotation, func))
-            }) || type_params.as_ref().is_some_and(|type_params| {
-                type_params
-                    .iter()
-                    .any(|type_param| any_over_type_param(type_param, func))
-            }) || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
-                    .iter()
-                    .any(|decorator| any_over_expr(&decorator.expression, func))
-                || returns
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
-        Stmt::ClassDef(ast::StmtClassDef {
-            arguments,
-            type_params,
-            body,
-            decorator_list,
-            ..
-        }) => {
-            // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
-            // definition
-            arguments
-                .as_deref()
-                .is_some_and(|Arguments { args, keywords, .. }| {
-                    args.iter().any(|expr| any_over_expr(expr, func))
-                        || keywords
+fn any_over_stmt<F>(stmt: &Stmt, mut func: F) -> bool
+where
+    F: FnMut(&Expr) -> bool,
+{
+    fn inner(stmt: &Stmt, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                parameters,
+                type_params,
+                body,
+                decorator_list,
+                returns,
+                ..
+            }) => {
+                parameters.iter().any(|param| {
+                    param
+                        .default()
+                        .is_some_and(|default| any_over_expr(default, &mut *func))
+                        || param
+                            .annotation()
+                            .is_some_and(|annotation| any_over_expr(annotation, &mut *func))
+                }) || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, &mut *func))
+                }) || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
+                    || decorator_list
+                        .iter()
+                        .any(|decorator| any_over_expr(&decorator.expression, &mut *func))
+                    || returns
+                        .as_ref()
+                        .is_some_and(|value| any_over_expr(value, func))
+            }
+            Stmt::ClassDef(ast::StmtClassDef {
+                arguments,
+                type_params,
+                body,
+                decorator_list,
+                ..
+            }) => {
+                // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
+                // definition
+                arguments
+                    .as_deref()
+                    .is_some_and(|Arguments { args, keywords, .. }| {
+                        args.iter().any(|expr| any_over_expr(expr, &mut *func))
+                            || keywords
+                                .iter()
+                                .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+                    })
+                    || type_params.as_ref().is_some_and(|type_params| {
+                        type_params
                             .iter()
-                            .any(|keyword| any_over_expr(&keyword.value, func))
-                })
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
+                            .any(|type_param| any_over_type_param(type_param, &mut *func))
+                    })
+                    || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
+                    || decorator_list
                         .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
-                })
-                || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
-                    .iter()
-                    .any(|decorator| any_over_expr(&decorator.expression, func))
-        }
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _,
-            node_index: _,
-        }) => value
-            .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _,
-            node_index: _,
-        }) => targets.iter().any(|expr| any_over_expr(expr, func)),
-        Stmt::TypeAlias(ast::StmtTypeAlias {
-            name,
-            type_params,
-            value,
-            ..
-        }) => {
-            any_over_expr(name, func)
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
-                        .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
-                })
-                || any_over_expr(value, func)
-        }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
-        }
-        Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-            any_over_expr(target, func) || any_over_expr(value, func)
-        }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            annotation,
-            value,
-            ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(annotation, func)
-                || value
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
-        Stmt::For(ast::StmtFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(iter, func)
-                || any_over_body(body, func)
-                || any_over_body(orelse, func)
-        }
-        Stmt::While(ast::StmtWhile {
-            test,
-            body,
-            orelse,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
-        Stmt::If(ast::StmtIf {
-            test,
-            body,
-            elif_else_clauses,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(test, func)
-                || any_over_body(body, func)
-                || elif_else_clauses.iter().any(|clause| {
-                    clause
-                        .test
+                        .any(|decorator| any_over_expr(&decorator.expression, &mut *func))
+            }
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) => value
+                .as_ref()
+                .is_some_and(|value| any_over_expr(value, func)),
+            Stmt::Delete(ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            }) => targets.iter().any(|expr| any_over_expr(expr, &mut *func)),
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                name,
+                type_params,
+                value,
+                ..
+            }) => {
+                any_over_expr(name, &mut *func)
+                    || type_params.as_ref().is_some_and(|type_params| {
+                        type_params
+                            .iter()
+                            .any(|type_param| any_over_type_param(type_param, &mut *func))
+                    })
+                    || any_over_expr(value, func)
+            }
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                targets.iter().any(|expr| any_over_expr(expr, &mut *func))
+                    || any_over_expr(value, func)
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
+                any_over_expr(target, &mut *func) || any_over_expr(value, &mut *func)
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                target,
+                annotation,
+                value,
+                ..
+            }) => {
+                any_over_expr(target, &mut *func)
+                    || any_over_expr(annotation, &mut *func)
+                    || value
                         .as_ref()
-                        .is_some_and(|test| any_over_expr(test, func))
-                        || any_over_body(&clause.body, func)
-                })
-        }
-        Stmt::With(ast::StmtWith { items, body, .. }) => {
-            items.iter().any(|with_item| {
-                any_over_expr(&with_item.context_expr, func)
-                    || with_item
-                        .optional_vars
+                        .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Stmt::For(ast::StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            }) => {
+                any_over_expr(target, &mut *func)
+                    || any_over_expr(iter, &mut *func)
+                    || any_over_body(body, &mut *func)
+                    || any_over_body(orelse, &mut *func)
+            }
+            Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(test, &mut *func)
+                    || any_over_body(body, &mut *func)
+                    || any_over_body(orelse, &mut *func)
+            }
+            Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(test, &mut *func)
+                    || any_over_body(body, &mut *func)
+                    || elif_else_clauses.iter().any(|clause| {
+                        clause
+                            .test
+                            .as_ref()
+                            .is_some_and(|test| any_over_expr(test, &mut *func))
+                            || any_over_body(&clause.body, &mut *func)
+                    })
+            }
+            Stmt::With(ast::StmtWith { items, body, .. }) => {
+                items.iter().any(|with_item| {
+                    any_over_expr(&with_item.context_expr, &mut *func)
+                        || with_item
+                            .optional_vars
+                            .as_ref()
+                            .is_some_and(|expr| any_over_expr(expr, &mut *func))
+                }) || any_over_body(body, &mut *func)
+            }
+            Stmt::Raise(ast::StmtRaise {
+                exc,
+                cause,
+                range: _,
+                node_index: _,
+            }) => {
+                exc.as_ref()
+                    .is_some_and(|value| any_over_expr(value, &mut *func))
+                    || cause
                         .as_ref()
-                        .is_some_and(|expr| any_over_expr(expr, func))
-            }) || any_over_body(body, func)
+                        .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: _,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_body(body, &mut *func)
+                    || handlers.iter().any(|handler| {
+                        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                            type_,
+                            body,
+                            ..
+                        }) = handler;
+                        type_
+                            .as_ref()
+                            .is_some_and(|expr| any_over_expr(expr, &mut *func))
+                            || any_over_body(body, &mut *func)
+                    })
+                    || any_over_body(orelse, &mut *func)
+                    || any_over_body(finalbody, &mut *func)
+            }
+            Stmt::Assert(ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(test, &mut *func)
+                    || msg
+                        .as_ref()
+                        .is_some_and(|value| any_over_expr(value, &mut *func))
+            }
+            Stmt::Match(ast::StmtMatch {
+                subject,
+                cases,
+                range: _,
+                node_index: _,
+            }) => {
+                any_over_expr(subject, &mut *func)
+                    || cases.iter().any(|case| {
+                        let MatchCase {
+                            pattern,
+                            guard,
+                            body,
+                            range: _,
+                            node_index: _,
+                        } = case;
+                        any_over_pattern(pattern, &mut *func)
+                            || guard
+                                .as_ref()
+                                .is_some_and(|expr| any_over_expr(expr, &mut *func))
+                            || any_over_body(body, &mut *func)
+                    })
+            }
+            Stmt::Import(_) => false,
+            Stmt::ImportFrom(_) => false,
+            Stmt::Global(_) => false,
+            Stmt::Nonlocal(_) => false,
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) => any_over_expr(value, func),
+            Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
+            Stmt::IpyEscapeCommand(_) => false,
         }
-        Stmt::Raise(ast::StmtRaise {
-            exc,
-            cause,
-            range: _,
-            node_index: _,
-        }) => {
-            exc.as_ref().is_some_and(|value| any_over_expr(value, func))
-                || cause
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_body(body, func)
-                || handlers.iter().any(|handler| {
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        type_,
-                        body,
-                        ..
-                    }) = handler;
-                    type_.as_ref().is_some_and(|expr| any_over_expr(expr, func))
-                        || any_over_body(body, func)
-                })
-                || any_over_body(orelse, func)
-                || any_over_body(finalbody, func)
-        }
-        Stmt::Assert(ast::StmtAssert {
-            test,
-            msg,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(test, func)
-                || msg.as_ref().is_some_and(|value| any_over_expr(value, func))
-        }
-        Stmt::Match(ast::StmtMatch {
-            subject,
-            cases,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(subject, func)
-                || cases.iter().any(|case| {
-                    let MatchCase {
-                        pattern,
-                        guard,
-                        body,
-                        range: _,
-                        node_index: _,
-                    } = case;
-                    any_over_pattern(pattern, func)
-                        || guard.as_ref().is_some_and(|expr| any_over_expr(expr, func))
-                        || any_over_body(body, func)
-                })
-        }
-        Stmt::Import(_) => false,
-        Stmt::ImportFrom(_) => false,
-        Stmt::Global(_) => false,
-        Stmt::Nonlocal(_) => false,
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(value, func),
-        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
-        Stmt::IpyEscapeCommand(_) => false,
     }
+
+    inner(stmt, &mut func)
 }
 
-pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
-    body.iter().any(|stmt| any_over_stmt(stmt, func))
+pub fn any_over_body<F>(body: &[Stmt], mut func: F) -> bool
+where
+    F: FnMut(&Expr) -> bool,
+{
+    body.iter().any(|stmt| any_over_stmt(stmt, &mut func))
 }
 
 pub fn is_dunder(id: &str) -> bool {
@@ -765,7 +812,7 @@ pub fn uses_magic_variable_access<F>(body: &[Stmt], is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    any_over_body(body, &|expr| {
+    any_over_body(body, |expr| {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
@@ -1163,7 +1210,7 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
         Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.is_tuple_expr() {
-                    if any_over_expr(optional_vars, &|expr| expr == child) {
+                    if any_over_expr(optional_vars, |expr| expr == child) {
                         return true;
                     }
                 }
@@ -1187,7 +1234,7 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
             let child_in_tuple = targets_are_tuples
                 || targets.iter().any(|item| {
                     matches!(item, Expr::Set(_) | Expr::List(_) | Expr::Tuple(_))
-                        && any_over_expr(item, &|expr| expr == child)
+                        && any_over_expr(item, |expr| expr == child)
                 });
 
             // If our child is a tuple, and value is not, it's always an unpacking
@@ -1681,6 +1728,14 @@ pub fn comment_indentation_after(
         .unwrap_or_default()
 }
 
+pub fn is_dotted_name(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::Name(_) => true,
+        ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -1779,7 +1834,7 @@ mod tests {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
         });
-        assert!(!any_over_stmt(&type_alias, &|expr| {
+        assert!(!any_over_stmt(&type_alias, |expr| {
             seen.borrow_mut().push(expr.clone());
             false
         }));
@@ -1798,7 +1853,7 @@ mod tests {
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
-        assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
+        assert!(!any_over_type_param(&type_var_no_bound, &mut |_expr| true));
 
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
@@ -1814,7 +1869,7 @@ mod tests {
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
-            any_over_type_param(&type_var_with_bound, &|expr| {
+            any_over_type_param(&type_var_with_bound, &mut |expr| {
                 assert_eq!(
                     *expr, constant,
                     "the received expression should be the unwrapped bound"
@@ -1832,7 +1887,7 @@ mod tests {
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
-            any_over_type_param(&type_var_with_default, &|expr| {
+            any_over_type_param(&type_var_with_default, &mut |expr| {
                 assert_eq!(
                     *expr, constant,
                     "the received expression should be the unwrapped default"
@@ -1852,7 +1907,7 @@ mod tests {
             default: None,
         });
         assert!(
-            !any_over_type_param(&type_var_tuple, &|_expr| true),
+            !any_over_type_param(&type_var_tuple, &mut |_expr| true),
             "this TypeVarTuple has no expressions to visit"
         );
 
@@ -1869,7 +1924,7 @@ mod tests {
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
-            any_over_type_param(&type_var_tuple_with_default, &|expr| {
+            any_over_type_param(&type_var_tuple_with_default, &mut |expr| {
                 assert_eq!(
                     *expr, constant,
                     "the received expression should be the unwrapped default"
@@ -1889,7 +1944,7 @@ mod tests {
             default: None,
         });
         assert!(
-            !any_over_type_param(&type_param_spec, &|_expr| true),
+            !any_over_type_param(&type_param_spec, &mut |_expr| true),
             "this ParamSpec has no expressions to visit"
         );
 
@@ -1906,7 +1961,7 @@ mod tests {
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
-            any_over_type_param(&param_spec_with_default, &|expr| {
+            any_over_type_param(&param_spec_with_default, &mut |expr| {
                 assert_eq!(
                     *expr, constant,
                     "the received expression should be the unwrapped default"

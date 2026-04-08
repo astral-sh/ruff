@@ -59,15 +59,14 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 8 | # fmt: off
   |
 help: Move `Generic[K, V]` to the end of the bases list
-info: rule `inconsistent-mro` is enabled by default
 3 | K = TypeVar("K")
 4 | V = TypeVar("V")
-5 | 
+5 |
   - class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
 6 + class Foo1(dict, Generic[K, V]): ...  # error: [inconsistent-mro]
-7 | 
+7 |
 8 | # fmt: off
-9 | 
+9 |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -91,8 +90,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 18 |   class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
    |
 help: Move `Generic[K, V]` to the end of the bases list
-info: rule `inconsistent-mro` is enabled by default
-9  | 
+9  |
 10 | class Foo2(  # error: [inconsistent-mro]
 11 |     # comment1
    -     Generic[K, V],  # comment2
@@ -101,7 +99,7 @@ info: rule `inconsistent-mro` is enabled by default
 12 +     dict, Generic[K, V]  # comment4
 13 |     # comment5
 14 | ): ...
-15 | 
+15 |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -118,13 +116,12 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 20 | class Foo4(  # error: [inconsistent-mro]
    |
 help: Move `Generic[K, V]` to the end of the bases list
-info: rule `inconsistent-mro` is enabled by default
 15 |     # comment5
 16 | ): ...
-17 | 
+17 |
    - class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
 18 + class Foo3(dict, Generic[K, V], metaclass=type): ...  # error: [inconsistent-mro]
-19 | 
+19 |
 20 | class Foo4(  # error: [inconsistent-mro]
 21 |     # comment1
 note: This is an unsafe fix and may change runtime behavior
@@ -152,8 +149,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 30 |   # fmt: on
    |
 help: Move `Generic[K, V]` to the end of the bases list
-info: rule `inconsistent-mro` is enabled by default
-19 | 
+19 |
 20 | class Foo4(  # error: [inconsistent-mro]
 21 |     # comment1
    -     Generic[K, V],  # comment2

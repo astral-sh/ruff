@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unreachable.md
 # Diagnostics
 
 ```
-error[invalid-type-form]: Variable of type `Never` is not allowed in a type expression
+error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter annotation
  --> src/main.py:3:10
   |
 1 | import module
@@ -41,6 +41,5 @@ error[invalid-type-form]: Variable of type `Never` is not allowed in a type expr
   |          ^^^^^^^^^^^^^^^^^
   |
 help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
-info: rule `invalid-type-form` is enabled by default
 
 ```

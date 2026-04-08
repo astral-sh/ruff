@@ -12,7 +12,7 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 help: Replace with `or` operator
   - z = x if x else y  # FURB110
 1 + z = x or y  # FURB110
-2 | 
+2 |
 3 | z = x \
 4 |     if x else y  # FURB110
 
@@ -30,11 +30,11 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
   |
 help: Replace with `or` operator
 1 | z = x if x else y  # FURB110
-2 | 
+2 |
   - z = x \
   -     if x else y  # FURB110
 3 + z = x or y  # FURB110
-4 | 
+4 |
 5 | z = x if x \
 6 |     else  \
 
@@ -54,14 +54,14 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 help: Replace with `or` operator
 3 | z = x \
 4 |     if x else y  # FURB110
-5 | 
+5 |
   - z = x if x \
   -     else  \
   -         y  # FURB110
 6 + z = x or y  # FURB110
-7 | 
+7 |
 8 | z = x() if x() else y()  # FURB110
-9 | 
+9 |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
   --> FURB110.py:10:5
@@ -76,10 +76,10 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 help: Replace with `or` operator
 7  |     else  \
 8  |         y  # FURB110
-9  | 
+9  |
    - z = x() if x() else y()  # FURB110
 10 + z = x() or y()  # FURB110
-11 | 
+11 |
 12 | # FURB110
 13 | z = x if (
 note: This is an unsafe fix and may change runtime behavior
@@ -102,7 +102,7 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
 10 | z = x() if x() else y()  # FURB110
-11 | 
+11 |
 12 | # FURB110
    - z = x if (
 13 + z = (
@@ -131,7 +131,7 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 30 |   )
    |
 help: Replace with `or` operator
-20 | 
+20 |
 21 | # FURB110
 22 | z = (
    -     x if (
@@ -160,7 +160,7 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 40 |   )
    |
 help: Replace with `or` operator
-31 | 
+31 |
 32 | # FURB110
 33 | z = (
    -     x if
@@ -171,7 +171,7 @@ help: Replace with `or` operator
    -     y
 34 +     x or y
 35 | )
-36 | 
+36 |
 37 | # FURB110
 note: This is an unsafe fix and may change runtime behavior
 
@@ -189,7 +189,7 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 49 |   )
    |
 help: Replace with `or` operator
-41 | 
+41 |
 42 | # FURB110
 43 | z = (
    -     x
@@ -200,8 +200,8 @@ help: Replace with `or` operator
    -     else None
 46 +     else None)
 47 | )
-48 | 
-49 | 
+48 |
+49 |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
   --> FURB110.py:53:5
@@ -215,8 +215,8 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
 57 |   )
    |
 help: Replace with `or` operator
-50 | 
-51 | 
+50 |
+51 |
 52 | z = (
    -     x
    -     if x

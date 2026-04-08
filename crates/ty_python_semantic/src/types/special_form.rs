@@ -11,14 +11,13 @@ use crate::semantic_index::{
     scope::ScopeId,
     semantic_index, use_def_map,
 };
+use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
 use crate::types::{
-    CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
-    TypeDefinition, TypeQualifiers,
+    CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use crate::types::{DynamicType, IntersectionType};
 use ruff_db::files::File;
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
@@ -651,7 +650,7 @@ impl SpecialFormType {
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
-    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+    ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),
@@ -675,12 +674,10 @@ impl SpecialFormType {
             Self::TypingSelf => {
                 let index = semantic_index(db, scope_id.file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::InvalidType(Type::SpecialForm(self), scope_id)
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::InvalidType(
+                        Type::SpecialForm(self),
+                        scope_id,
+                    ));
                 };
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
@@ -700,12 +697,7 @@ impl SpecialFormType {
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInStaticMethod
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInStaticMethod);
                 }
 
                 let is_in_metaclass = KnownClass::Type
@@ -717,12 +709,7 @@ impl SpecialFormType {
                             .is_subclass_of(db, type_class)
                     });
                 if is_in_metaclass {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInMetaclass
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInMetaclass);
                 }
 
                 Ok(typing_self
@@ -732,30 +719,26 @@ impl SpecialFormType {
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type
             // expression is an error.
-            Self::TypeAlias => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypeAlias],
-                fallback_type: Type::unknown(),
-            }),
-            Self::TypedDict => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypedDict],
-                fallback_type: Type::unknown(),
-            }),
+            Self::TypeAlias => Err(InvalidTypeExpression::TypeAlias),
+            Self::TypedDict => Err(InvalidTypeExpression::TypedDict),
 
-            Self::Literal | Self::Union | Self::Intersection => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Literal | Self::Union | Self::Intersection => {
+                Err(InvalidTypeExpression::RequiresArguments(self))
+            }
 
-            Self::Protocol => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Protocol],
-                fallback_type: Type::unknown(),
-            }),
-            Self::Generic => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Protocol => Err(InvalidTypeExpression::Protocol),
+            Self::Generic => Err(InvalidTypeExpression::Generic),
+
+            // `Concatenate` is just always invalid in this context in a type expression
+            Self::Concatenate
+                if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR) =>
+            {
+                Err(InvalidTypeExpression::Concatenate)
+            }
+
+            Self::Concatenate | Self::Annotated => {
+                Err(InvalidTypeExpression::RequiresTwoArguments(self))
+            }
 
             Self::Optional
             | Self::Not
@@ -766,50 +749,16 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::Unpack
             | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresOneArgument(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            // `Concatenate` is just always invalid in this context in a type expression
-            Self::Concatenate
-                if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR) =>
-            {
-                Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::Concatenate
-                    ],
-                    fallback_type: Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
-                })
-            }
-
-            // `Concatenate` can be valid in this context in a type expression,
-            // but type arguments weren't provided here.
-            Self::Concatenate => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresTwoArguments(self)
-                ],
-                fallback_type: Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
-            }),
-
-            Self::Annotated => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresTwoArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
+            | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
-            SpecialFormType::TypeQualifier(qualifier) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![qualifier.in_type_expression()],
-                fallback_type: Type::unknown(),
-            }),
+            SpecialFormType::TypeQualifier(qualifier) => {
+                Err(InvalidTypeExpression::TypeQualifier(qualifier))
+            }
         }
     }
 }
@@ -875,7 +824,7 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumIter)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,
@@ -919,7 +868,7 @@ impl TypeQualifier {
         }
     }
 
-    const fn name(self) -> &'static str {
+    pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::ReadOnly => "ReadOnly",
             Self::Final => "Final",
@@ -948,17 +897,29 @@ impl TypeQualifier {
         }
     }
 
-    const fn in_type_expression(self) -> InvalidTypeExpression<'static> {
+    /// Return `true` if this type qualifier requires exactly one argument
+    /// when used in a type expression.
+    pub(super) const fn requires_one_argument(self) -> bool {
         match self {
-            TypeQualifier::Final | TypeQualifier::ClassVar => {
-                InvalidTypeExpression::TypeQualifier(self)
-            }
+            Self::Final | Self::ClassVar => false,
+            Self::Required | Self::NotRequired | Self::InitVar | Self::ReadOnly => true,
+        }
+    }
+    pub(crate) const fn is_valid_for_non_name_targets(self) -> bool {
+        match self {
             TypeQualifier::ReadOnly
+            | TypeQualifier::Required
             | TypeQualifier::NotRequired
-            | TypeQualifier::InitVar
-            | TypeQualifier::Required => {
-                InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
-            }
+            | TypeQualifier::ClassVar
+            | TypeQualifier::InitVar => false,
+            TypeQualifier::Final => true,
+        }
+    }
+
+    pub(crate) const fn is_valid_in_typeddict_field(self) -> bool {
+        match self {
+            TypeQualifier::ReadOnly | TypeQualifier::Required | TypeQualifier::NotRequired => true,
+            TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => false,
         }
     }
 }

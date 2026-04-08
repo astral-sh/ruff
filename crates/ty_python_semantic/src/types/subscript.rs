@@ -440,6 +440,10 @@ fn typed_dict_subscript<'db>(
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
+    if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
+        return typed_dict_subscript(db, typed_dict, fallback);
+    }
+
     if slice_ty.is_dynamic() {
         return Ok(Type::unknown());
     }
@@ -478,10 +482,18 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.subscript(db, slice_ty, expr_context);
+        }
+
+        if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
+            return self.subscript(db, fallback, expr_context);
+        }
+
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

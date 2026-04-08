@@ -13,12 +13,12 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
   |
 help: Replace with `min`
 1 | # Errors
-2 | 
+2 |
   - sorted(l)[0]
 3 + min(l)
-4 | 
+4 |
 5 | sorted(l)[-1]
-6 | 
+6 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
@@ -32,14 +32,14 @@ FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a seque
 7 | sorted(l, reverse=False)[-1]
   |
 help: Replace with `max`
-2 | 
+2 |
 3 | sorted(l)[0]
-4 | 
+4 |
   - sorted(l)[-1]
 5 + max(l)
-6 | 
+6 |
 7 | sorted(l, reverse=False)[-1]
-8 | 
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
@@ -53,14 +53,14 @@ FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a seque
 9 | sorted(l, key=lambda x: x)[0]
   |
 help: Replace with `max`
-4  | 
+4  |
 5  | sorted(l)[-1]
-6  | 
+6  |
    - sorted(l, reverse=False)[-1]
 7  + max(l)
-8  | 
+8  |
 9  | sorted(l, key=lambda x: x)[0]
-10 | 
+10 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
@@ -74,14 +74,14 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 11 | sorted(l, key=key_fn)[0]
    |
 help: Replace with `min`
-6  | 
+6  |
 7  | sorted(l, reverse=False)[-1]
-8  | 
+8  |
    - sorted(l, key=lambda x: x)[0]
 9  + min(l, key=lambda x: x)
-10 | 
+10 |
 11 | sorted(l, key=key_fn)[0]
-12 | 
+12 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
@@ -95,14 +95,14 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 13 | sorted([1, 2, 3])[0]
    |
 help: Replace with `min`
-8  | 
+8  |
 9  | sorted(l, key=lambda x: x)[0]
-10 | 
+10 |
    - sorted(l, key=key_fn)[0]
 11 + min(l, key=key_fn)
-12 | 
+12 |
 13 | sorted([1, 2, 3])[0]
-14 | 
+14 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
@@ -116,14 +116,14 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 15 | # Unsafe
    |
 help: Replace with `min`
-10 | 
+10 |
 11 | sorted(l, key=key_fn)[0]
-12 | 
+12 |
    - sorted([1, 2, 3])[0]
 13 + min([1, 2, 3])
-14 | 
+14 |
 15 | # Unsafe
-16 | 
+16 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
@@ -137,14 +137,14 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 19 | sorted(l, reverse=True)[0]
    |
 help: Replace with `min`
-14 | 
+14 |
 15 | # Unsafe
-16 | 
+16 |
    - sorted(l, key=key_fn, reverse=True)[-1]
 17 + min(l, key=key_fn)
-18 | 
+18 |
 19 | sorted(l, reverse=True)[0]
-20 | 
+20 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
@@ -158,14 +158,14 @@ FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a seque
 21 | sorted(l, reverse=True)[-1]
    |
 help: Replace with `max`
-16 | 
+16 |
 17 | sorted(l, key=key_fn, reverse=True)[-1]
-18 | 
+18 |
    - sorted(l, reverse=True)[0]
 19 + max(l)
-20 | 
+20 |
 21 | sorted(l, reverse=True)[-1]
-22 | 
+22 |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
@@ -179,12 +179,12 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 23 | # Non-errors
    |
 help: Replace with `min`
-18 | 
+18 |
 19 | sorted(l, reverse=True)[0]
-20 | 
+20 |
    - sorted(l, reverse=True)[-1]
 21 + min(l)
-22 | 
+22 |
 23 | # Non-errors
-24 | 
+24 |
 note: This is an unsafe fix and may change runtime behavior

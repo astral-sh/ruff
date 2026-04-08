@@ -1446,13 +1446,8 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        ty.as_nominal_instance().is_some_and(|instance| {
-            instance
-                .class(db)
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|mro_class| mro_class.class_literal(db) == class)
-        })
+        ty.as_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_subtype_of_class_literal(db, class))
     };
 
     let always_true_if = |test: bool| {
@@ -1571,6 +1566,7 @@ fn is_instance_truthiness<'db>(
         | Type::TypeGuard(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
+        | Type::Divergent(_)
         | Type::Never
         | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear
@@ -1774,6 +1770,8 @@ pub enum KnownFunction {
     RevealMro,
     /// `struct.unpack`
     Unpack,
+    /// `types.new_class`
+    NewClass,
 }
 
 impl KnownFunction {
@@ -1858,6 +1856,9 @@ impl KnownFunction {
             Self::ImportModule => module.is_importlib(),
             Self::Unpack => {
                 matches!(module, KnownModule::Struct)
+            }
+            Self::NewClass => {
+                matches!(module, KnownModule::Types)
             }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
@@ -2042,8 +2043,9 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
-                let contains_unknown_or_todo =
-                    |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                let contains_unknown_or_todo = |ty: Type<'_>| {
+                    ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
+                };
                 if source_type.is_equivalent_to(db, *casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
@@ -2362,6 +2364,7 @@ pub(crate) mod tests {
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
                 KnownFunction::Unpack => KnownModule::Struct,
+                KnownFunction::NewClass => KnownModule::Types,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

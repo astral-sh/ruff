@@ -52,8 +52,8 @@ def _(c: Callable[42, str]):
 Or, when one of the parameter type is invalid in the list:
 
 ```py
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+# error: [invalid-type-form] "Boolean literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, 42, str, False], None]):
     # revealed: (int, Unknown, str, Unknown, /) -> None
     reveal_type(c)
@@ -69,7 +69,7 @@ def _(c: Callable[[...], int]):
 ```
 
 ```py
-# error: [invalid-type-form] "`...` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`...` is not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, ...], int]):
     reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```
@@ -114,7 +114,7 @@ from typing import Callable
 # fmt: off
 
 def _(c: Callable[
-            # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+            # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
             {1, 2}, 2  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -143,7 +143,7 @@ from typing import Callable
 
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
-            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -158,7 +158,7 @@ from typing import Callable
 
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
-            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -169,7 +169,7 @@ def _(c: Callable[
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
 def _(c: Callable[[int], [str]]):
     reveal_type(c)  # revealed: (int, /) -> Unknown
 ```
@@ -184,8 +184,8 @@ from typing import Callable
 
 def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
             [int],
-            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
+            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown

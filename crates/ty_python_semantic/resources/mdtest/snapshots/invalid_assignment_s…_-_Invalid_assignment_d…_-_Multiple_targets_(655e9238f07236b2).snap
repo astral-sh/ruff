@@ -36,7 +36,6 @@ error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `i
 5 |
 6 | x, y = (0, 0)  # error: [invalid-assignment]
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -51,6 +50,5 @@ error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str
   |    |
   |    Declared type `str`
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

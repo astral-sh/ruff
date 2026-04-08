@@ -16,7 +16,7 @@ info: Suggested value of 0o444 sets permissions: u=r--, g=r--, o=r--
 help: Replace with octal literal
 3 | import os
 4 | from pathlib import Path
-5 | 
+5 |
   - os.chmod("foo", 444)  # Error
 6 + os.chmod("foo", 0o444)  # Error
 7 | os.chmod("foo", 0o444)  # OK
@@ -75,11 +75,11 @@ info: Suggested value of 0o777 sets permissions: u=rwx, g=rwx, o=rwx
 help: Replace with octal literal
 9  | os.chmod("foo", 10000)  # Error
 10 | os.chmod("foo", 99999)  # Error
-11 | 
+11 |
    - os.umask(777)  # Error
 12 + os.umask(0o777)  # Error
 13 | os.umask(0o777)  # OK
-14 | 
+14 |
 15 | os.fchmod(0, 400)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -97,11 +97,11 @@ info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
 help: Replace with octal literal
 12 | os.umask(777)  # Error
 13 | os.umask(0o777)  # OK
-14 | 
+14 |
    - os.fchmod(0, 400)  # Error
 15 + os.fchmod(0, 0o400)  # Error
 16 | os.fchmod(0, 0o400)  # OK
-17 | 
+17 |
 18 | os.lchmod("foo", 755)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -119,11 +119,11 @@ info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 help: Replace with octal literal
 15 | os.fchmod(0, 400)  # Error
 16 | os.fchmod(0, 0o400)  # OK
-17 | 
+17 |
    - os.lchmod("foo", 755)  # Error
 18 + os.lchmod("foo", 0o755)  # Error
 19 | os.lchmod("foo", 0o755)  # OK
-20 | 
+20 |
 21 | os.mkdir("foo", 600)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -141,11 +141,11 @@ info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 help: Replace with octal literal
 18 | os.lchmod("foo", 755)  # Error
 19 | os.lchmod("foo", 0o755)  # OK
-20 | 
+20 |
    - os.mkdir("foo", 600)  # Error
 21 + os.mkdir("foo", 0o600)  # Error
 22 | os.mkdir("foo", 0o600)  # OK
-23 | 
+23 |
 24 | os.makedirs("foo", 644)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,11 +163,11 @@ info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
 help: Replace with octal literal
 21 | os.mkdir("foo", 600)  # Error
 22 | os.mkdir("foo", 0o600)  # OK
-23 | 
+23 |
    - os.makedirs("foo", 644)  # Error
 24 + os.makedirs("foo", 0o644)  # Error
 25 | os.makedirs("foo", 0o644)  # OK
-26 | 
+26 |
 27 | os.mkfifo("foo", 640)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -185,11 +185,11 @@ info: Suggested value of 0o640 sets permissions: u=rw-, g=r--, o=---
 help: Replace with octal literal
 24 | os.makedirs("foo", 644)  # Error
 25 | os.makedirs("foo", 0o644)  # OK
-26 | 
+26 |
    - os.mkfifo("foo", 640)  # Error
 27 + os.mkfifo("foo", 0o640)  # Error
 28 | os.mkfifo("foo", 0o640)  # OK
-29 | 
+29 |
 30 | os.mknod("foo", 660)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -207,11 +207,11 @@ info: Suggested value of 0o660 sets permissions: u=rw-, g=rw-, o=---
 help: Replace with octal literal
 27 | os.mkfifo("foo", 640)  # Error
 28 | os.mkfifo("foo", 0o640)  # OK
-29 | 
+29 |
    - os.mknod("foo", 660)  # Error
 30 + os.mknod("foo", 0o660)  # Error
 31 | os.mknod("foo", 0o660)  # OK
-32 | 
+32 |
 33 | os.open("foo", os.O_CREAT, 644)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -229,11 +229,11 @@ info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
 help: Replace with octal literal
 30 | os.mknod("foo", 660)  # Error
 31 | os.mknod("foo", 0o660)  # OK
-32 | 
+32 |
    - os.open("foo", os.O_CREAT, 644)  # Error
 33 + os.open("foo", os.O_CREAT, 0o644)  # Error
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
-35 | 
+35 |
 36 | Path("bar").chmod(755)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -251,11 +251,11 @@ info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 help: Replace with octal literal
 33 | os.open("foo", os.O_CREAT, 644)  # Error
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
-35 | 
+35 |
    - Path("bar").chmod(755)  # Error
 36 + Path("bar").chmod(0o755)  # Error
 37 | Path("bar").chmod(0o755)  # OK
-38 | 
+38 |
 39 | path = Path("bar")
 note: This is an unsafe fix and may change runtime behavior
 
@@ -271,12 +271,12 @@ info: Current value of 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 help: Replace with octal literal
 37 | Path("bar").chmod(0o755)  # OK
-38 | 
+38 |
 39 | path = Path("bar")
    - path.chmod(755)  # Error
 40 + path.chmod(0o755)  # Error
 41 | path.chmod(0o755)  # OK
-42 | 
+42 |
 43 | dbm.open("db", "r", 600)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -294,11 +294,11 @@ info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 help: Replace with octal literal
 40 | path.chmod(755)  # Error
 41 | path.chmod(0o755)  # OK
-42 | 
+42 |
    - dbm.open("db", "r", 600)  # Error
 43 + dbm.open("db", "r", 0o600)  # Error
 44 | dbm.open("db", "r", 0o600)  # OK
-45 | 
+45 |
 46 | dbm.gnu.open("db", "r", 600)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -316,11 +316,11 @@ info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 help: Replace with octal literal
 43 | dbm.open("db", "r", 600)  # Error
 44 | dbm.open("db", "r", 0o600)  # OK
-45 | 
+45 |
    - dbm.gnu.open("db", "r", 600)  # Error
 46 + dbm.gnu.open("db", "r", 0o600)  # Error
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
-48 | 
+48 |
 49 | dbm.ndbm.open("db", "r", 600)  # Error
 note: This is an unsafe fix and may change runtime behavior
 
@@ -338,11 +338,11 @@ info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 help: Replace with octal literal
 46 | dbm.gnu.open("db", "r", 600)  # Error
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
-48 | 
+48 |
    - dbm.ndbm.open("db", "r", 600)  # Error
 49 + dbm.ndbm.open("db", "r", 0o600)  # Error
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
-51 | 
+51 |
 52 | os.fchmod(0, 256)  # 0o400
 note: This is an unsafe fix and may change runtime behavior
 
@@ -360,11 +360,11 @@ info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
 help: Replace with octal literal
 49 | dbm.ndbm.open("db", "r", 600)  # Error
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
-51 | 
+51 |
    - os.fchmod(0, 256)  # 0o400
 52 + os.fchmod(0, 0o400)  # 0o400
 53 | os.fchmod(0, 493)  # 0o755
-54 | 
+54 |
 55 | # https://github.com/astral-sh/ruff/issues/19010
 note: This is an unsafe fix and may change runtime behavior
 
@@ -381,11 +381,11 @@ info: Current value of 493 (0o755) sets permissions: u=rwx, g=r-x, o=r-x
 info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 help: Replace with octal literal
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
-51 | 
+51 |
 52 | os.fchmod(0, 256)  # 0o400
    - os.fchmod(0, 493)  # 0o755
 53 + os.fchmod(0, 0o755)  # 0o755
-54 | 
+54 |
 55 | # https://github.com/astral-sh/ruff/issues/19010
 56 | os.chmod("foo", 000)  # Error
 note: This is an unsafe fix and may change runtime behavior
@@ -401,12 +401,12 @@ RUF064 [*] Non-octal mode
 info: Current value of 000 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal
 53 | os.fchmod(0, 493)  # 0o755
-54 | 
+54 |
 55 | # https://github.com/astral-sh/ruff/issues/19010
    - os.chmod("foo", 000)  # Error
 56 + os.chmod("foo", 0o000)  # Error
 57 | os.chmod("foo", 0000)  # Error
-58 | 
+58 |
 59 | os.chmod("foo", 0b0)  # Error
 
 RUF064 [*] Non-octal mode
@@ -421,12 +421,12 @@ RUF064 [*] Non-octal mode
    |
 info: Current value of 0000 (0o000) sets permissions: u=---, g=---, o=---
 help: Replace with octal literal
-54 | 
+54 |
 55 | # https://github.com/astral-sh/ruff/issues/19010
 56 | os.chmod("foo", 000)  # Error
    - os.chmod("foo", 0000)  # Error
 57 + os.chmod("foo", 0o0000)  # Error
-58 | 
+58 |
 59 | os.chmod("foo", 0b0)  # Error
 60 | os.chmod("foo", 0x0)  # Error
 

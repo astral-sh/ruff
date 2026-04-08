@@ -14,7 +14,7 @@ help: Replace double quotes docstring with single quotes
   -     "Do not"' start with empty string' ' and lint docstring safely'
 2 +     'Do not'' start with empty string' ' and lint docstring safely'
 3 |     """ Not a docstring """
-4 | 
+4 |
 5 |     def foo(self, bar="""not a docstring"""):
 
 Q002 [*] Double quote docstring found but single quotes preferred
@@ -27,12 +27,12 @@ Q002 [*] Double quote docstring found but single quotes preferred
   |
 help: Replace double quotes docstring with single quotes
 3 |     """ Not a docstring """
-4 | 
+4 |
 5 |     def foo(self, bar="""not a docstring"""):
   -         "Do not"' start with empty string' ' and lint docstring safely'
 6 +         'Do not'' start with empty string' ' and lint docstring safely'
 7 |         pass
-8 | 
+8 |
 9 |     class Nested(foo()[:]): "Do not"' start with empty string' ' and lint docstring safely'; pass
 
 Q002 [*] Double quote docstring found but single quotes preferred
@@ -46,6 +46,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
 help: Replace double quotes docstring with single quotes
 6 |         "Do not"' start with empty string' ' and lint docstring safely'
 7 |         pass
-8 | 
+8 |
   -     class Nested(foo()[:]): "Do not"' start with empty string' ' and lint docstring safely'; pass
 9 +     class Nested(foo()[:]): 'Do not'' start with empty string' ' and lint docstring safely'; pass

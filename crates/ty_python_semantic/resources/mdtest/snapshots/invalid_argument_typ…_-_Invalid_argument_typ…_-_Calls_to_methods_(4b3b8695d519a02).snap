@@ -39,6 +39,5 @@ info: Method defined here
   |         ^^^^^^       ------ Parameter declared here
 3 |         return x * x
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -79,9 +79,8 @@ info: `Foo.method` is decorated with `@final`, forbidding overrides
 10 |     else:
    |
 help: Remove all overloads for `method`
-info: rule `override-of-final-method` is enabled by default
 25 |     def method2(self, x: str) -> str: ...
-26 | 
+26 |
 27 | class Bar(Foo):
    -     @overload
    -     def method(self, x: int) -> int: ...
@@ -89,7 +88,7 @@ info: rule `override-of-final-method` is enabled by default
    -     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
 28 +     
 29 +       # error: [override-of-final-method]
-30 | 
+30 |
 31 |     # This is fine: the only overload that is marked `@final`
 32 |     # is in a statically-unreachable branch
 note: This is an unsafe fix and may change runtime behavior

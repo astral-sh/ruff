@@ -281,17 +281,17 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-insta
       - name: "Install uv"
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -344,13 +344,13 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
           enable-cache: "true"
       - name: "Run tests"
         run: cargo nextest run --cargo-profile profiling --all-features
@@ -378,13 +378,13 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
           enable-cache: "true"
       - name: "Run tests"
         run: |
@@ -471,7 +471,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@113a77a4ce971c41332f2129c3d995df993cf746 # v1.17.8
+        uses: cargo-bins/cargo-binstall@0b24824336e2b3800b0f89d9e08b2c08bfa3dcdd # v1.17.9
       - name: "Install cargo-fuzz"
         # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
         run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
@@ -491,7 +491,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           shared-key: ruff-linux-debug
@@ -528,7 +528,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -572,7 +572,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
-          version: "0.11.2"
+          version: "0.11.3"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -684,7 +684,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -730,7 +730,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@113a77a4ce971c41332f2129c3d995df993cf746 # v1.17.8
+      - uses: cargo-bins/cargo-binstall@0b24824336e2b3800b0f89d9e08b2c08bfa3dcdd # v1.17.9
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear --deny-warnings
 
@@ -745,7 +745,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -798,7 +798,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 24
@@ -836,7 +836,7 @@ jobs:
         with:
           python-version: 3.13
           activate-environment: true
-          version: "0.11.2"
+          version: "0.11.3"
       - name: "Install dependencies"
         run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
@@ -987,23 +987,23 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@1c8ae4843586d3ba879736b7f6b7b0c990757fab # v4.12.1
         with:
-          mode: simulation
+          mode: "simulation,memory"
           run: cargo codspeed run
 
   benchmarks-instrumented-ty-build:
@@ -1032,12 +1032,12 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m instrumentation --features "codspeed,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
+        run: cargo codspeed build -m simulation -m memory --features "codspeed,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -1048,7 +1048,7 @@ jobs:
           retention-days: 1
 
   benchmarks-instrumented-ty-run:
-    name: "benchmarks instrumented ty (${{ matrix.benchmark }})"
+    name: "benchmarks instrumented ty (${{matrix.mode}}: ${{ matrix.benchmark }})"
     runs-on: ubuntu-24.04
     needs: benchmarks-instrumented-ty-build
     timeout-minutes: 20
@@ -1061,6 +1061,9 @@ jobs:
         benchmark:
           - "check_file|micro|anyio"
           - "attrs|hydra|datetype"
+        mode:
+          - simulation
+          - memory
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -1068,10 +1071,10 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-codspeed
 
@@ -1088,7 +1091,7 @@ jobs:
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@1c8ae4843586d3ba879736b7f6b7b0c990757fab # v4.12.1
         with:
-          mode: simulation
+          mode: ${{ matrix.mode }}
           run: cargo codspeed run --bench ty "${{ matrix.benchmark }}"
 
   benchmarks-walltime-build:
@@ -1119,13 +1122,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-codspeed
 
@@ -1163,10 +1166,10 @@ jobs:
 
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
-          version: "0.11.2"
+          version: "0.11.3"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@06203676c62f0d3c765be3f2fcfbebbcb02d09f5 # v2.69.6
+        uses: taiki-e/install-action@e9e8e031bcd90cdbe8ac6bb1d376f8596e587fbf # v2.70.2
         with:
           tool: cargo-codspeed
 
@@ -1190,3 +1193,28 @@ jobs:
         with:
           mode: walltime
           run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
+
+  required-checks-passed:
+    name: "all required checks passed"
+    if: always()
+    needs:
+      - cargo-fmt
+      - cargo-clippy
+      - cargo-test-linux
+      - cargo-test-wasm
+      - cargo-build-msrv
+      - scripts
+      - prek
+      - docs
+      - python-package
+    runs-on: ubuntu-slim
+    steps:
+      - name: "Check required jobs passed"
+        run: |
+          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
+          if [ -n "$failing" ]; then
+            echo "$failing"
+            exit 1
+          fi
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}

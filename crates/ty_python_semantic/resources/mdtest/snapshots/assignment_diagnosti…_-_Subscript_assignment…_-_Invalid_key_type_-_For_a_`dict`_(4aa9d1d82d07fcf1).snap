@@ -29,6 +29,5 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
   |        |
   |        Expected key of type `str`, got `Literal[0]`
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

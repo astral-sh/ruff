@@ -399,7 +399,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
 reveal_type(Url)  # revealed: <class 'Url'>
 # revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
-reveal_type(Url.__new__)  # revealed: [Self](cls: type[Self], host: str, path: str) -> Self
+reveal_type(Url.__new__)  # revealed: [Self](_cls: type[Self], host: str, path: str) -> Self
 
 # Constructor works with the inherited fields.
 url = Url("example.com", "/path")
@@ -618,10 +618,17 @@ reveal_type(nt2.a)  # revealed: Any
 reveal_type(nt2.b)  # revealed: Any
 reveal_type(nt2.c)  # revealed: Any
 
+field_names = ("left", "right")
+NT2Starred = collections.namedtuple("NT2Starred", field_names=[*field_names])
+reveal_type(NT2Starred)  # revealed: <class 'NT2Starred'>
+nt2_starred = NT2Starred(1, 2)
+reveal_type(nt2_starred.left)  # revealed: Any
+reveal_type(nt2_starred.right)  # revealed: Any
+
 # Keyword arguments can be combined with other kwargs like `defaults`
 NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
 reveal_type(NT3)  # revealed: <class 'NT3'>
-reveal_type(NT3.__new__)  # revealed: [Self](cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
+reveal_type(NT3.__new__)  # revealed: [Self](_cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
 
 nt3 = NT3(1, 2)
 reveal_type(nt3.z)  # revealed: Any
@@ -643,7 +650,7 @@ from ty_extensions import reveal_mro
 # `rename=True` replaces invalid identifiers with positional names
 Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
 reveal_type(Point)  # revealed: <class 'Point'>
-reveal_type(Point.__new__)  # revealed: [Self](cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
+reveal_type(Point.__new__)  # revealed: [Self](_cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any, Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point)
 p = Point(1, 2, 3, 4, 5)
@@ -657,7 +664,7 @@ reveal_type(p._4)  # revealed: Any
 # error: [invalid-argument-type] "Invalid argument to parameter `rename` of `namedtuple()`"
 Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
 reveal_type(Point2)  # revealed: <class 'Point2'>
-reveal_type(Point2.__new__)  # revealed: [Self](cls: type[Self], _0: Any, _1: Any) -> Self
+reveal_type(Point2.__new__)  # revealed: [Self](_cls: type[Self], _0: Any, _1: Any) -> Self
 
 # Without `rename=True`, invalid field names emit diagnostics:
 # - Field names starting with underscore
@@ -683,7 +690,15 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: [Self](cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+reveal_type(Person.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+
+defaults = (0, "Unknown")
+PersonStarred = collections.namedtuple(
+    "PersonStarred",
+    ["name", "age", "city"],
+    defaults=[*defaults],
+)
+reveal_type(PersonStarred.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any = 0, city: Any = "Unknown") -> Self
 
 # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Person)
@@ -702,7 +717,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: [Self](cls: type[Self], x: Any = "a", y: Any = "b") -> Self
+reveal_type(TooManyDefaults.__new__)  # revealed: [Self](_cls: type[Self], x: Any = "a", y: Any = "b") -> Self
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
@@ -1189,6 +1204,23 @@ alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
 
 reveal_type(Person.__slots__)  # revealed: tuple[()]
+```
+
+Regression test for <https://github.com/astral-sh/ty/issues/3184>: the first parameter of `__new__`
+at runtime for a namedtuple class is `_cls`, meaning that `cls` can be used as a field name:
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+PInfo = namedtuple("PInfo", "inst cls")
+reveal_type(PInfo(inst=None, cls=str))  # revealed: PInfo
+
+class StaticInfo(NamedTuple):
+    inst: object | None
+    cls: type[str]
+
+reveal_type(StaticInfo(inst=None, cls=str))  # revealed: StaticInfo
 ```
 
 ## `collections.namedtuple` with tuple variable field names

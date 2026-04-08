@@ -33,7 +33,6 @@ error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assigna
 3 | def _(source: tuple[int, str]):
 4 |     target: tuple[int, str, bool] = source  # error: [invalid-assignment]
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -48,6 +47,5 @@ error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to
   |             |
   |             Declared type
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -44,7 +44,6 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
 10 | class CheckWithWrongSignature:
 11 |     def check(self, x: int, y: bytes) -> bool:
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -58,6 +57,5 @@ error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assig
    |             |
    |             Declared type
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

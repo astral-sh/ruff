@@ -403,7 +403,7 @@ fn unknown_initialization_options() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options during initialization: {\n  /"bar/": null\n}"
+      "message": "Received unknown options during initialization: {\n  \"bar\": null\n}"
     }
     "#);
 
@@ -428,7 +428,7 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  /"bar/": null\n}"
+      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  \"bar\": null\n}"
     }
     "#);
 
@@ -490,12 +490,9 @@ fn missing_virtual_env_does_not_panic() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let _show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessage>();
 
-    // Something accursed in the escaping pipeline produces `\/` in windows paths
-    // and I can't for the life of me get insta to escape it properly, so I just
-    // need to move on with my life and not debug this right now, but ideally we
-    // would snapshot the message here.
+    insta::assert_snapshot!(show_message_params.message, @"Failed to load project for workspace file://<temp_dir>/project. Please refer to the logs for more details.");
 
     Ok(())
 }

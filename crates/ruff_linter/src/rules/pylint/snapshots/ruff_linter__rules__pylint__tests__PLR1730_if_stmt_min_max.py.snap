@@ -13,12 +13,12 @@ PLR1730 [*] Replace `if` statement with `a = min(b, a)`
    |
 help: Replace with `a = min(b, a)`
 18 | a, b = [], []
-19 | 
+19 |
 20 | # case 1: a = min(b, a)
    - if a >= b:
    -     a = b
 21 + a = min(b, a)
-22 | 
+22 |
 23 | # case 2: a = max(b, a)
 24 | if a <= b:
 
@@ -34,12 +34,12 @@ PLR1730 [*] Replace `if` statement with `a = max(b, a)`
    |
 help: Replace with `a = max(b, a)`
 22 |     a = b
-23 | 
+23 |
 24 | # case 2: a = max(b, a)
    - if a <= b:
    -     a = b
 25 + a = max(b, a)
-26 | 
+26 |
 27 | # case 3: b = min(a, b)
 28 | if a <= b:
 
@@ -55,12 +55,12 @@ PLR1730 [*] Replace `if` statement with `b = min(a, b)`
    |
 help: Replace with `b = min(a, b)`
 26 |     a = b
-27 | 
+27 |
 28 | # case 3: b = min(a, b)
    - if a <= b:
    -     b = a
 29 + b = min(a, b)
-30 | 
+30 |
 31 | # case 4: b = max(a, b)
 32 | if a >= b:
 
@@ -76,12 +76,12 @@ PLR1730 [*] Replace `if` statement with `b = max(a, b)`
    |
 help: Replace with `b = max(a, b)`
 30 |     b = a
-31 | 
+31 |
 32 | # case 4: b = max(a, b)
    - if a >= b:
    -     b = a
 33 + b = max(a, b)
-34 | 
+34 |
 35 | # case 5: a = min(a, b)
 36 | if a > b:
 
@@ -97,12 +97,12 @@ PLR1730 [*] Replace `if` statement with `a = min(a, b)`
    |
 help: Replace with `a = min(a, b)`
 34 |     b = a
-35 | 
+35 |
 36 | # case 5: a = min(a, b)
    - if a > b:
    -     a = b
 37 + a = min(a, b)
-38 | 
+38 |
 39 | # case 6: a = max(a, b)
 40 | if a < b:
 
@@ -118,12 +118,12 @@ PLR1730 [*] Replace `if` statement with `a = max(a, b)`
    |
 help: Replace with `a = max(a, b)`
 38 |     a = b
-39 | 
+39 |
 40 | # case 6: a = max(a, b)
    - if a < b:
    -     a = b
 41 + a = max(a, b)
-42 | 
+42 |
 43 | # case 7: b = min(b, a)
 44 | if a < b:
 
@@ -139,12 +139,12 @@ PLR1730 [*] Replace `if` statement with `b = min(b, a)`
    |
 help: Replace with `b = min(b, a)`
 42 |     a = b
-43 | 
+43 |
 44 | # case 7: b = min(b, a)
    - if a < b:
    -     b = a
 45 + b = min(b, a)
-46 | 
+46 |
 47 | # case 8: b = max(b, a)
 48 | if a > b:
 
@@ -158,13 +158,13 @@ PLR1730 [*] Replace `if` statement with `b = max(b, a)`
    |
 help: Replace with `b = max(b, a)`
 46 |     b = a
-47 | 
+47 |
 48 | # case 8: b = max(b, a)
    - if a > b:
    -     b = a
 49 + b = max(b, a)
-50 | 
-51 | 
+50 |
+51 |
 52 | # test cases with assigned variables and primitives
 
 PLR1730 [*] Replace `if` statement with `value = max(value, 10)`
@@ -179,12 +179,12 @@ PLR1730 [*] Replace `if` statement with `value = max(value, 10)`
    |
 help: Replace with `value = max(value, 10)`
 56 | value3 = 3
-57 | 
+57 |
 58 | # base case 6: value = max(value, 10)
    - if value < 10:
    -     value = 10
 59 + value = max(value, 10)
-60 | 
+60 |
 61 | # base case 2: value = max(10, value)
 62 | if value <= 10:
 
@@ -200,12 +200,12 @@ PLR1730 [*] Replace `if` statement with `value = max(10, value)`
    |
 help: Replace with `value = max(10, value)`
 60 |     value = 10
-61 | 
+61 |
 62 | # base case 2: value = max(10, value)
    - if value <= 10:
    -     value = 10
 63 + value = max(10, value)
-64 | 
+64 |
 65 | # base case 6: value = max(value, value2)
 66 | if value < value2:
 
@@ -221,12 +221,12 @@ PLR1730 [*] Replace `if` statement with `value = max(value, value2)`
    |
 help: Replace with `value = max(value, value2)`
 64 |     value = 10
-65 | 
+65 |
 66 | # base case 6: value = max(value, value2)
    - if value < value2:
    -     value = value2
 67 + value = max(value, value2)
-68 | 
+68 |
 69 | # base case 5: value = min(value, 10)
 70 | if value > 10:
 
@@ -242,12 +242,12 @@ PLR1730 [*] Replace `if` statement with `value = min(value, 10)`
    |
 help: Replace with `value = min(value, 10)`
 68 |     value = value2
-69 | 
+69 |
 70 | # base case 5: value = min(value, 10)
    - if value > 10:
    -     value = 10
 71 + value = min(value, 10)
-72 | 
+72 |
 73 | # base case 1: value = min(10, value)
 74 | if value >= 10:
 
@@ -263,12 +263,12 @@ PLR1730 [*] Replace `if` statement with `value = min(10, value)`
    |
 help: Replace with `value = min(10, value)`
 72 |     value = 10
-73 | 
+73 |
 74 | # base case 1: value = min(10, value)
    - if value >= 10:
    -     value = 10
 75 + value = min(10, value)
-76 | 
+76 |
 77 | # base case 5: value = min(value, value2)
 78 | if value > value2:
 
@@ -282,13 +282,13 @@ PLR1730 [*] Replace `if` statement with `value = min(value, value2)`
    |
 help: Replace with `value = min(value, value2)`
 76 |     value = 10
-77 | 
+77 |
 78 | # base case 5: value = min(value, value2)
    - if value > value2:
    -     value = value2
 79 + value = min(value, value2)
-80 | 
-81 | 
+80 |
+81 |
 82 | # cases with calls
 
 PLR1730 [*] Replace `if` statement with `A1.value = max(A1.value, 10)`
@@ -302,12 +302,12 @@ PLR1730 [*] Replace `if` statement with `A1.value = max(A1.value, 10)`
    |
 help: Replace with `A1.value = max(A1.value, 10)`
 89 | A1 = A()
-90 | 
-91 | 
+90 |
+91 |
    - if A1.value < 10:
    -     A1.value = 10
 92 + A1.value = max(A1.value, 10)
-93 | 
+93 |
 94 | if A1.value > 10:
 95 |     A1.value = 10
 
@@ -323,12 +323,12 @@ PLR1730 [*] Replace `if` statement with `A1.value = min(A1.value, 10)`
 help: Replace with `A1.value = min(A1.value, 10)`
 92 | if A1.value < 10:
 93 |     A1.value = 10
-94 | 
+94 |
    - if A1.value > 10:
    -     A1.value = 10
 95 + A1.value = min(A1.value, 10)
-96 | 
-97 | 
+96 |
+97 |
 98 | class AA:
 
 PLR1730 [*] Replace `if` statement with `A2 = max(A2, A1)`
@@ -345,11 +345,11 @@ PLR1730 [*] Replace `if` statement with `A2 = max(A2, A1)`
 help: Replace with `A2 = max(A2, A1)`
 116 | A1 = AA(0)
 117 | A2 = AA(3)
-118 | 
+118 |
     - if A2 < A1:  # [max-instead-of-if]
     -     A2 = A1
 119 + A2 = max(A2, A1)
-120 | 
+120 |
 121 | if A2 <= A1:  # [max-instead-of-if]
 122 |     A2 = A1
 note: This is an unsafe fix and may change runtime behavior
@@ -368,11 +368,11 @@ PLR1730 [*] Replace `if` statement with `A2 = max(A1, A2)`
 help: Replace with `A2 = max(A1, A2)`
 119 | if A2 < A1:  # [max-instead-of-if]
 120 |     A2 = A1
-121 | 
+121 |
     - if A2 <= A1:  # [max-instead-of-if]
     -     A2 = A1
 122 + A2 = max(A1, A2)
-123 | 
+123 |
 124 | if A2 > A1:  # [min-instead-of-if]
 125 |     A2 = A1
 note: This is an unsafe fix and may change runtime behavior
@@ -391,11 +391,11 @@ PLR1730 [*] Replace `if` statement with `A2 = min(A2, A1)`
 help: Replace with `A2 = min(A2, A1)`
 122 | if A2 <= A1:  # [max-instead-of-if]
 123 |     A2 = A1
-124 | 
+124 |
     - if A2 > A1:  # [min-instead-of-if]
     -     A2 = A1
 125 + A2 = min(A2, A1)
-126 | 
+126 |
 127 | if A2 >= A1:  # [min-instead-of-if]
 128 |     A2 = A1
 note: This is an unsafe fix and may change runtime behavior
@@ -414,11 +414,11 @@ PLR1730 [*] Replace `if` statement with `A2 = min(A1, A2)`
 help: Replace with `A2 = min(A1, A2)`
 125 | if A2 > A1:  # [min-instead-of-if]
 126 |     A2 = A1
-127 | 
+127 |
     - if A2 >= A1:  # [min-instead-of-if]
     -     A2 = A1
 128 + A2 = min(A1, A2)
-129 | 
+129 |
 130 | # Negative
 131 | if value < 10:
 note: This is an unsafe fix and may change runtime behavior
@@ -438,7 +438,7 @@ PLR1730 [*] Replace `if` statement with `min` call
     |
 help: Replace with `min` call
 188 |     value = 2
-189 | 
+189 |
 190 | # Parenthesized expressions
     - if value.attr > 3:
     -     (
@@ -447,7 +447,7 @@ help: Replace with `min` call
 193 |         attr
     -     ) = 3
 194 +     ) = min(value.attr, 3)
-195 | 
+195 |
 196 | class Foo:
 197 |     _min = 0
 
@@ -463,14 +463,14 @@ PLR1730 [*] Replace `if` statement with `self._min = min(self._min, value)`
     |
 help: Replace with `self._min = min(self._min, value)`
 199 |     _max = 0
-200 | 
+200 |
 201 |     def foo(self, value) -> None:
     -         if value < self._min:
     -             self._min = value
 202 +         self._min = min(self._min, value)
 203 |         if value > self._max:
 204 |             self._max = value
-205 | 
+205 |
 
 PLR1730 [*] Replace `if` statement with `self._max = max(self._max, value)`
    --> if_stmt_min_max.py:204:9
@@ -490,7 +490,7 @@ help: Replace with `self._max = max(self._max, value)`
     -         if value > self._max:
     -             self._max = value
 204 +         self._max = max(self._max, value)
-205 | 
+205 |
 206 |         if self._min < value:
 207 |             self._min = value
 
@@ -508,13 +508,13 @@ PLR1730 [*] Replace `if` statement with `self._min = max(self._min, value)`
 help: Replace with `self._min = max(self._min, value)`
 204 |         if value > self._max:
 205 |             self._max = value
-206 | 
+206 |
     -         if self._min < value:
     -             self._min = value
 207 +         self._min = max(self._min, value)
 208 |         if self._max > value:
 209 |             self._max = value
-210 | 
+210 |
 
 PLR1730 [*] Replace `if` statement with `self._max = min(self._max, value)`
    --> if_stmt_min_max.py:209:9
@@ -528,13 +528,13 @@ PLR1730 [*] Replace `if` statement with `self._max = min(self._max, value)`
 212 |           if value <= self._min:
     |
 help: Replace with `self._max = min(self._max, value)`
-206 | 
+206 |
 207 |         if self._min < value:
 208 |             self._min = value
     -         if self._max > value:
     -             self._max = value
 209 +         self._max = min(self._max, value)
-210 | 
+210 |
 211 |         if value <= self._min:
 212 |             self._min = value
 
@@ -552,13 +552,13 @@ PLR1730 [*] Replace `if` statement with `self._min = min(value, self._min)`
 help: Replace with `self._min = min(value, self._min)`
 209 |         if self._max > value:
 210 |             self._max = value
-211 | 
+211 |
     -         if value <= self._min:
     -             self._min = value
 212 +         self._min = min(value, self._min)
 213 |         if value >= self._max:
 214 |             self._max = value
-215 | 
+215 |
 
 PLR1730 [*] Replace `if` statement with `self._max = max(value, self._max)`
    --> if_stmt_min_max.py:214:9
@@ -572,13 +572,13 @@ PLR1730 [*] Replace `if` statement with `self._max = max(value, self._max)`
 217 |           if self._min <= value:
     |
 help: Replace with `self._max = max(value, self._max)`
-211 | 
+211 |
 212 |         if value <= self._min:
 213 |             self._min = value
     -         if value >= self._max:
     -             self._max = value
 214 +         self._max = max(value, self._max)
-215 | 
+215 |
 216 |         if self._min <= value:
 217 |             self._min = value
 
@@ -596,13 +596,13 @@ PLR1730 [*] Replace `if` statement with `self._min = max(value, self._min)`
 help: Replace with `self._min = max(value, self._min)`
 214 |         if value >= self._max:
 215 |             self._max = value
-216 | 
+216 |
     -         if self._min <= value:
     -             self._min = value
 217 +         self._min = max(value, self._min)
 218 |         if self._max >= value:
 219 |             self._max = value
-220 | 
+220 |
 
 PLR1730 [*] Replace `if` statement with `self._max = min(value, self._max)`
    --> if_stmt_min_max.py:219:9
@@ -614,14 +614,14 @@ PLR1730 [*] Replace `if` statement with `self._max = min(value, self._max)`
     | |_____________________________^
     |
 help: Replace with `self._max = min(value, self._max)`
-216 | 
+216 |
 217 |         if self._min <= value:
 218 |             self._min = value
     -         if self._max >= value:
     -             self._max = value
 219 +         self._max = min(value, self._max)
-220 | 
-221 | 
+220 |
+221 |
 222 | counter = {"a": 0, "b": 0}
 
 PLR1730 [*] Replace `if` statement with `counter["a"] = max(counter["b"], counter["a"])`
@@ -636,12 +636,12 @@ PLR1730 [*] Replace `if` statement with `counter["a"] = max(counter["b"], counte
     |
 help: Replace with `counter["a"] = max(counter["b"], counter["a"])`
 223 | counter = {"a": 0, "b": 0}
-224 | 
+224 |
 225 | # base case 2: counter["a"] = max(counter["b"], counter["a"])
     - if counter["a"] <= counter["b"]:
     -     counter["a"] = counter["b"]
 226 + counter["a"] = max(counter["b"], counter["a"])
-227 | 
+227 |
 228 | # case 3: counter["b"] = min(counter["a"], counter["b"])
 229 | if counter["a"] <= counter["b"]:
 
@@ -657,12 +657,12 @@ PLR1730 [*] Replace `if` statement with `counter["b"] = min(counter["a"], counte
     |
 help: Replace with `counter["b"] = min(counter["a"], counter["b"])`
 227 |     counter["a"] = counter["b"]
-228 | 
+228 |
 229 | # case 3: counter["b"] = min(counter["a"], counter["b"])
     - if counter["a"] <= counter["b"]:
     -     counter["b"] = counter["a"]
 230 + counter["b"] = min(counter["a"], counter["b"])
-231 | 
+231 |
 232 | # case 5: counter["a"] = min(counter["a"], counter["b"])
 233 | if counter["a"] > counter["b"]:
 
@@ -678,12 +678,12 @@ PLR1730 [*] Replace `if` statement with `counter["b"] = max(counter["b"], counte
     |
 help: Replace with `counter["b"] = max(counter["b"], counter["a"])`
 231 |     counter["b"] = counter["a"]
-232 | 
+232 |
 233 | # case 5: counter["a"] = min(counter["a"], counter["b"])
     - if counter["a"] > counter["b"]:
     -     counter["b"] = counter["a"]
 234 + counter["b"] = max(counter["b"], counter["a"])
-235 | 
+235 |
 236 | # case 8: counter["a"] = max(counter["b"], counter["a"])
 237 | if counter["a"] > counter["b"]:
 
@@ -699,14 +699,14 @@ PLR1730 [*] Replace `if` statement with `counter["b"] = max(counter["b"], counte
     |
 help: Replace with `counter["b"] = max(counter["b"], counter["a"])`
 235 |     counter["b"] = counter["a"]
-236 | 
+236 |
 237 | # case 8: counter["a"] = max(counter["b"], counter["a"])
     - if counter["a"] > counter["b"]:
     -     counter["b"] = counter["a"]
 238 + counter["b"] = max(counter["b"], counter["a"])
-239 | 
+239 |
 240 | # https://github.com/astral-sh/ruff/issues/17311
-241 | 
+241 |
 
 PLR1730 [*] Replace `if` statement with `a = min(b, a)`
    --> if_stmt_min_max.py:245:1
@@ -721,14 +721,14 @@ PLR1730 [*] Replace `if` statement with `a = min(b, a)`
 249 |   # fix marked safe as preserve comments
     |
 help: Replace with `a = min(b, a)`
-242 | 
+242 |
 243 | # fix marked unsafe as delete comments
 244 | a, b = [], []
     - if a >= b:
     -     # very important comment
     -     a = b
 245 + a = min(b, a)
-246 | 
+246 |
 247 | # fix marked safe as preserve comments
 248 | if a >= b:
 note: This is an unsafe fix and may change runtime behavior
@@ -743,7 +743,7 @@ PLR1730 [*] Replace `if` statement with `a = min(b, a)`
     |
 help: Replace with `a = min(b, a)`
 247 |     a = b
-248 | 
+248 |
 249 | # fix marked safe as preserve comments
     - if a >= b:
     -     a = b  # very important comment

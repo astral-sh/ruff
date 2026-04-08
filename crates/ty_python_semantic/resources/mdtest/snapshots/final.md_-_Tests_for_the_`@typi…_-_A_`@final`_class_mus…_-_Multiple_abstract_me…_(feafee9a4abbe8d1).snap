@@ -57,7 +57,6 @@ error[abstract-method-in-final-class]: Final class `MissingAll` has unimplemente
  7 |     @abstractmethod
  8 |     def bar(self) -> str: ...
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
@@ -80,6 +79,5 @@ error[abstract-method-in-final-class]: Final class `PartiallyImplemented` has un
 11 |
 12 | @final
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

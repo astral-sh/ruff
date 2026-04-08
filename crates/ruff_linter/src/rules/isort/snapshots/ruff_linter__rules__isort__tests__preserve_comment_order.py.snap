@@ -20,7 +20,7 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 1  + import abc
 2  | import io
-3  + 
+3  +
 4  | # Old MacDonald had a farm,
 5  | # EIEIO
 6  | # And on his farm he had a cow,

@@ -2497,6 +2497,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                 .iter_positive(db)
                 .find_map(|ty| imp(db, ty, visitor))?,
             Type::Dynamic(_)
+            | Type::Divergent(_)
             | Type::Never
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
@@ -8632,7 +8633,7 @@ raise <CURSOR>
         imports: bool,
         module_names: bool,
         // This doesn't seem like a "very complex" type to me... ---AG
-        #[allow(clippy::type_complexity)]
+        #[expect(clippy::type_complexity)]
         predicate: Option<Box<dyn Fn(&Completion) -> bool>>,
     }
 

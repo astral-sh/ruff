@@ -1,0 +1,89 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid.md - Tests for invalid types in type expressions - Diagnostics for common errors - List-literal used when you meant to use a list
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(
+ 2 |     x: [int],  # error: [invalid-type-form]
+ 3 | ) -> [int]:  # error: [invalid-type-form]
+ 4 |     return x
+ 5 | 
+ 6 | # No special hints for these: it's unclear what the user meant:
+ 7 | def _(
+ 8 |     x: [int, str],  # error: [invalid-type-form]
+ 9 | ) -> [int, str]:  # error: [invalid-type-form]
+10 |     return x
+```
+
+# Diagnostics
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:2:8
+  |
+1 | def _(
+2 |     x: [int],  # error: [invalid-type-form]
+  |        ^^^^^ Did you mean `list[int]`?
+3 | ) -> [int]:  # error: [invalid-type-form]
+4 |     return x
+  |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a return type annotation
+ --> src/mdtest_snippet.py:3:6
+  |
+1 | def _(
+2 |     x: [int],  # error: [invalid-type-form]
+3 | ) -> [int]:  # error: [invalid-type-form]
+  |      ^^^^^ Did you mean `list[int]`?
+4 |     return x
+  |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+  --> src/mdtest_snippet.py:8:8
+   |
+ 6 | # No special hints for these: it's unclear what the user meant:
+ 7 | def _(
+ 8 |     x: [int, str],  # error: [invalid-type-form]
+   |        ^^^^^^^^^^
+ 9 | ) -> [int, str]:  # error: [invalid-type-form]
+10 |     return x
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a return type annotation
+  --> src/mdtest_snippet.py:9:6
+   |
+ 7 | def _(
+ 8 |     x: [int, str],  # error: [invalid-type-form]
+ 9 | ) -> [int, str]:  # error: [invalid-type-form]
+   |      ^^^^^^^^^^
+10 |     return x
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```

@@ -17,7 +17,7 @@ help: Replace with `exception`
 12 |     except Exception:
    -         logging.error("Context message here")
 13 +         logging.exception("Context message here")
-14 | 
+14 |
 15 |         if True:
 16 |             logging.error("Context message here")
 
@@ -30,12 +30,12 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
 13 |         logging.error("Context message here")
-14 | 
+14 |
 15 |         if True:
    -             logging.error("Context message here")
 16 +             logging.exception("Context message here")
-17 | 
-18 | 
+17 |
+18 |
 19 | def bad():
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
@@ -54,7 +54,7 @@ help: Replace with `exception`
 26 |     except Exception:
    -         logger.error("Context message here")
 27 +         logger.exception("Context message here")
-28 | 
+28 |
 29 |         if True:
 30 |             logger.error("Context message here")
 note: This is an unsafe fix and may change runtime behavior
@@ -68,12 +68,12 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
 27 |         logger.error("Context message here")
-28 | 
+28 |
 29 |         if True:
    -             logger.error("Context message here")
 30 +             logger.exception("Context message here")
-31 | 
-32 | 
+31 |
+32 |
 33 | def bad():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -93,7 +93,7 @@ help: Replace with `exception`
 36 |     except Exception:
    -         log.error("Context message here")
 37 +         log.exception("Context message here")
-38 | 
+38 |
 39 |         if True:
 40 |             log.error("Context message here")
 note: This is an unsafe fix and may change runtime behavior
@@ -107,12 +107,12 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
 37 |         log.error("Context message here")
-38 | 
+38 |
 39 |         if True:
    -             log.error("Context message here")
 40 +             log.exception("Context message here")
-41 | 
-42 | 
+41 |
+42 |
 43 | def bad():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -132,7 +132,7 @@ help: Replace with `exception`
 46 |     except Exception:
    -         self.logger.error("Context message here")
 47 +         self.logger.exception("Context message here")
-48 | 
+48 |
 49 |         if True:
 50 |             self.logger.error("Context message here")
 note: This is an unsafe fix and may change runtime behavior
@@ -146,12 +146,12 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
 47 |         self.logger.error("Context message here")
-48 | 
+48 |
 49 |         if True:
    -             self.logger.error("Context message here")
 50 +             self.logger.exception("Context message here")
-51 | 
-52 | 
+51 |
+52 |
 53 | def good():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -171,7 +171,7 @@ help: Replace with `exception`
 99  |     except Exception:
     -         error("Context message here")
 100 +         exception("Context message here")
-101 | 
+101 |
 102 |         if True:
 103 |             error("Context message here")
 
@@ -184,12 +184,12 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
 help: Replace with `exception`
 100 |         error("Context message here")
-101 | 
+101 |
 102 |         if True:
     -             error("Context message here")
 103 +             exception("Context message here")
-104 | 
-105 | 
+104 |
+105 |
 106 | def good():
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`

@@ -680,7 +680,7 @@ impl Ranged for AstImport<'_> {
 ///
 /// This guarantees that child symbols have a symbol ID greater
 /// than all of its parents.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
     file: File,

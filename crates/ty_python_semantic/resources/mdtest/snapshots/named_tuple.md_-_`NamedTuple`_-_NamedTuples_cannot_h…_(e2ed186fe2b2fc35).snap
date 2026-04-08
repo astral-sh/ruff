@@ -56,7 +56,6 @@ error[invalid-named-tuple]: NamedTuple field name cannot start with an underscor
 6 |
 7 | class Bar(NamedTuple):
   |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -69,7 +68,6 @@ error[invalid-named-tuple]: Field name `_x` in `NamedTuple()` cannot start with 
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
 16 | reveal_type(Underscore)  # revealed: <class 'Underscore'>
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -82,7 +80,6 @@ error[invalid-named-tuple]: Field name `class` in `NamedTuple()` cannot be a Pyt
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
 20 | reveal_type(Keyword)  # revealed: <class 'Keyword'>
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -95,7 +92,6 @@ error[invalid-named-tuple]: Duplicate field name `x` in `NamedTuple()`
    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Field `x` already defined; will raise `ValueError` at runtime
 24 | reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -108,6 +104,5 @@ error[invalid-named-tuple]: Field name `not valid` in `NamedTuple()` is not a va
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
 28 | reveal_type(Invalid)  # revealed: <class 'Invalid'>
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```

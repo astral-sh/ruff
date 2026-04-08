@@ -37,7 +37,6 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
 7 |
 8 | C.attr = 1  # fine
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -49,6 +48,5 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
 9 | C.attr = "wrong"  # error: [invalid-assignment]
   | ^^^^^^
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

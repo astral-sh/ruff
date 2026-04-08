@@ -21,13 +21,13 @@ help: Organize imports
 1  | from a.prometheus.metrics import (  # type:ignore[attr-defined]
 2  |     TERMINAL_CURRENTLY_RUNNING_TOTAL,
 3  | )
-   - 
+   -
 4  | from b.prometheus.metrics import (
 5  |     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
 6  | )
-   - 
+   -
    - from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
-   - 
+   -
    - from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
 7  + from c.prometheus.metrics import (
 8  +     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]

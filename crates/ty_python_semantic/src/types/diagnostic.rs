@@ -20,9 +20,8 @@ use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::string_annotation::{
-    BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
-    IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
-    RAW_STRING_TYPE_ANNOTATION,
+    ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
+    INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
@@ -151,6 +150,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
@@ -160,9 +160,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
 
     // String annotations
-    registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
-    registry.register_lint(&FSTRING_TYPE_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
@@ -3011,6 +3009,31 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects invalid `TypedDict` field declarations.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the
+    /// subtype guarantees that `TypedDict` inheritance is meant to preserve.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Base(TypedDict):
+    ///     x: int
+    ///
+    /// class Child(Base):
+    ///     x: str  # error: [invalid-typed-dict-field]
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_FIELD = {
+        summary: "detects invalid `TypedDict` field declarations",
+        status: LintStatus::stable("0.0.28"),
         default_level: Level::Error,
     }
 }

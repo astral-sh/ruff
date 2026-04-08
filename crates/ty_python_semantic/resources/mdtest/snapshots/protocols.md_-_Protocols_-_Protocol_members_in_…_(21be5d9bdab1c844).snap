@@ -53,6 +53,5 @@ info: Assigning to an undeclared variable in a protocol class leads to an ambigu
 6 |         a: int
   |
 info: No declarations found for `e` in the body of `Foo` or any of its superclasses
-info: rule `ambiguous-protocol-member` is enabled by default
 
 ```

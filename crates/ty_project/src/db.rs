@@ -278,12 +278,11 @@ pub struct SalsaMemoryDump {
     memos: Vec<(&'static str, salsa::IngredientInfo)>,
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn bytes_to_mb(total: usize) -> f64 {
     total as f64 / 1_000_000.
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl SalsaMemoryDump {
     /// Returns a short report that provides total memory usage information.
     pub fn display_short(&self) -> impl fmt::Display + '_ {

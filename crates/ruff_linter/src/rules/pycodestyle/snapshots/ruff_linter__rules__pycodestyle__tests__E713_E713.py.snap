@@ -94,7 +94,7 @@ help: Convert to `not in`
    - if not (X in Y):
 14 + if X not in Y:
 15 |     pass
-16 | 
+16 |
 17 | #: Okay
 
 E713 [*] Test for membership should be `not in`

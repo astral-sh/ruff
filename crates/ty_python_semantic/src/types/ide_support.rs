@@ -329,6 +329,18 @@ pub fn definitions_for_attribute<'db>(
     resolved
 }
 
+/// Returns the descriptor object type for an attribute expression `x.y`, without invoking the
+/// descriptor protocol. This corresponds to `inspect.getattr_static(x, "y")` at the type level.
+pub fn static_member_type_for_attribute<'db>(
+    model: &SemanticModel<'db>,
+    attribute: &ast::ExprAttribute,
+) -> Option<Type<'db>> {
+    let lhs_ty = attribute.value.inferred_type(model)?;
+    lhs_ty
+        .static_member(model.db(), attribute.attr.as_str())
+        .ignore_possibly_undefined()
+}
+
 fn definitions_for_attribute_in_class_hierarchy<'db>(
     class_literal: &ClassLiteral<'db>,
     model: &SemanticModel<'db>,
@@ -347,31 +359,38 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
             let use_def = use_def_map(db, class_scope);
+            let mut ancestor_resolved = Vec::new();
 
-            // Check declarations first
+            // Declarations take precedence over bindings, but attribute go-to-definition
+            // should return all co-definitions for the chosen class scope.
             for decl in use_def.reachable_symbol_declarations(place_id) {
                 if let Some(def) = decl.declaration.definition() {
-                    resolved.extend(resolve_definition(
+                    ancestor_resolved.extend(resolve_definition(
                         db,
                         def,
                         Some(attribute_name),
                         ImportAliasResolution::ResolveAliases,
                     ));
-                    break 'scopes;
                 }
             }
 
             // If no declarations found, check bindings
-            for binding in use_def.reachable_symbol_bindings(place_id) {
-                if let Some(def) = binding.binding.definition() {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(attribute_name),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
-                    break 'scopes;
+            if ancestor_resolved.is_empty() {
+                for binding in use_def.reachable_symbol_bindings(place_id) {
+                    if let Some(def) = binding.binding.definition() {
+                        ancestor_resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(attribute_name),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
+                    }
                 }
+            }
+
+            if !ancestor_resolved.is_empty() {
+                resolved.extend(ancestor_resolved);
+                break 'scopes;
             }
         }
 
@@ -385,31 +404,38 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
+                let mut scope_resolved = Vec::new();
 
-                // Check declarations first
+                // Declarations take precedence over bindings, but return all
+                // co-definitions from the chosen method scope.
                 for decl in use_def.reachable_member_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(
+                        scope_resolved.extend(resolve_definition(
                             db,
                             def,
                             Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
-                        break 'scopes;
                     }
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.reachable_member_bindings(place_id) {
-                    if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(
-                            db,
-                            def,
-                            Some(attribute_name),
-                            ImportAliasResolution::ResolveAliases,
-                        ));
-                        break 'scopes;
+                if scope_resolved.is_empty() {
+                    for binding in use_def.reachable_member_bindings(place_id) {
+                        if let Some(def) = binding.binding.definition() {
+                            scope_resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(attribute_name),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
+                        }
                     }
+                }
+
+                if !scope_resolved.is_empty() {
+                    resolved.extend(scope_resolved);
+                    break 'scopes;
                 }
             }
         }
@@ -697,6 +723,42 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Resolve overloads for a callable type using call arguments,
+/// returning the single matching signature if exactly one matches.
+fn resolve_single_overload<'db>(
+    model: &SemanticModel<'db>,
+    callable_type: Type<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<Signature<'db>> {
+    let db = model.db();
+    let bindings = callable_type.bindings(db);
+
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
+    });
+
+    let constraints = ConstraintSetBuilder::new();
+    let mut resolved: Vec<_> = bindings
+        .match_parameters(db, &args)
+        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .iter()
+        .flat_map(super::call::bind::Bindings::iter_flat)
+        .flat_map(|binding| {
+            binding
+                .matching_overloads()
+                .map(|(_, overload)| overload.signature.clone())
+        })
+        .collect();
+
+    if resolved.len() != 1 {
+        return None;
+    }
+
+    resolved.pop()
+}
+
 /// Given a call expression that has overloads, and whose overload is resolved to a
 /// single option by its arguments, return the type of the Signature.
 ///
@@ -715,48 +777,21 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
-    let bindings = callable_type.bindings(db);
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = bindings.single_element()
+    if let Some(binding) = callable_type.bindings(db).single_element()
         && binding.overloads().len() < 2
     {
         return None;
     }
 
-    // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
-    });
-
-    // Try to resolve overloads with the arguments/types we have
-    let constraints = ConstraintSetBuilder::new();
-    let mut resolved = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
-        // Only use the Ok
-        .iter()
-        .flat_map(super::call::bind::Bindings::iter_flat)
-        .flat_map(|binding| {
-            binding.matching_overloads().map(|(_, overload)| {
-                overload
-                    .signature
-                    .display_with(db, DisplaySettings::default().multiline())
-                    .to_string()
-            })
-        })
-        .collect::<Vec<_>>();
-
-    // If at the end of this we still got multiple signatures (or no signatures), give up
-    if resolved.len() != 1 {
-        return None;
-    }
-
-    resolved.pop()
+    let signature = resolve_single_overload(model, callable_type, call_expr)?;
+    Some(
+        signature
+            .display_with(db, DisplaySettings::default().multiline())
+            .to_string(),
+    )
 }
 
 /// Returns the definitions of the binary operation along with its callable type.
@@ -1693,7 +1728,8 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             }
 
             let file_scope_id = scope_id.file_scope_id(db);
-            if !index.is_scope_reachable(db, file_scope_id) {
+            let parsed = parsed_module(db, file).load(db);
+            if !index.is_range_reachable(db, file_scope_id, class_node.node(&parsed).range()) {
                 continue;
             }
 
@@ -1819,5 +1855,51 @@ fn class_literal_to_hierarchy_info(
         file,
         full_range,
         selection_range,
+    }
+}
+
+pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
+    let function_ty = call_expr.func.inferred_type(model)?;
+    let db = model.db();
+    let class_name = function_ty.as_class_literal()?.name(db);
+    let display_sig = |signature: &Signature| {
+        let params = signature
+            .display_with(
+                db,
+                DisplaySettings::default()
+                    .multiline()
+                    .disallow_signature_name()
+                    .hide_return_type(),
+            )
+            .to_string();
+
+        format!("class {class_name}{params}")
+    };
+    let callable_type = function_ty.try_upcast_to_callable(db)?.into_type(db);
+    let bindings = callable_type.bindings(db);
+
+    if let Some(binding) = bindings.single_element()
+        && binding.overloads().len() == 1
+    {
+        return binding
+            .overloads()
+            .first()
+            .map(|overload| display_sig(&overload.signature));
+    }
+
+    if let Some(signature) = resolve_single_overload(model, callable_type, call_expr) {
+        return Some(display_sig(&signature));
+    }
+
+    let all_sigs: Vec<String> = bindings
+        .iter_flat()
+        .flatten()
+        .map(|binding| display_sig(&binding.signature))
+        .collect();
+
+    if all_sigs.is_empty() {
+        None
+    } else {
+        Some(all_sigs.join("\n"))
     }
 }

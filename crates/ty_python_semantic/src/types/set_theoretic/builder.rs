@@ -1344,10 +1344,20 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        // `Divergent & ~T` -> `Divergent`. Note that `~Divergent` becomes `Divergent` via the
-        // `Type::Dynamic` branch below, so we don't need a special case for that.
+        // `Never & ~T` -> `Never`.
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `Divergent & ~T` -> `Divergent`.
         if self.positive.iter().any(Type::is_divergent) {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
+        if let Some(negated_divergent) = new_negative.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated_divergent);
             return;
         }
 

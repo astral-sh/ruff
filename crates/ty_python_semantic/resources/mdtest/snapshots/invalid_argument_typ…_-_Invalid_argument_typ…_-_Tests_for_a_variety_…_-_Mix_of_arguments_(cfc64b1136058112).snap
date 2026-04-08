@@ -37,6 +37,5 @@ info: Function defined here
   |     ^^^                       ---------- Parameter declared here
 2 |     return x * y * z
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

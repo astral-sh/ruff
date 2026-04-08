@@ -88,7 +88,6 @@ error[call-non-callable]: Object of type `Literal[5]` is not callable
    |
 info: Union variant `Literal[5]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -103,7 +102,6 @@ error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (
    |
 info: Union variant `PossiblyNotCallable` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -118,7 +116,6 @@ error[missing-argument]: No argument provided for required parameter `b` of func
    |
 info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -154,7 +151,6 @@ info: Overload implementation defined here
    |
 info: Union variant `Overload[() -> None, (x: str, y: str) -> str]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `no-matching-overload` is enabled by default
 
 ```
 
@@ -178,7 +174,6 @@ info: Function defined here
   |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -202,7 +197,6 @@ info: Type variable defined here
    |
 info: Union variant `def f4[T](x: T) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -229,7 +223,6 @@ info: Non-matching overloads for function `f5`:
 info:   () -> None
 info: Union variant `Overload[() -> None, (x: str) -> str]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -244,6 +237,5 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 info: Union variant `def f1() -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
-info: rule `too-many-positional-arguments` is enabled by default
 
 ```

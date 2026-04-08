@@ -219,16 +219,16 @@ from typing import Callable, Concatenate, ParamSpec
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 def invalid0(x: Concatenate): ...
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
 def invalid1(x: Concatenate[int]): ...
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
 def invalid2(x: Concatenate[int, ...]) -> None: ...
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
 def invalid3() -> Concatenate[int, ...]: ...
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
 def invalid4() -> Concatenate[()]: ...
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"

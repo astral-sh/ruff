@@ -29,6 +29,5 @@ error[invalid-assignment]: Object of type `str` is not assignable to `bytes`
   |             |
   |             Declared type
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

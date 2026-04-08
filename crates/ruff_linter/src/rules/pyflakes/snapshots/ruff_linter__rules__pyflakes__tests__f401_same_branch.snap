@@ -11,7 +11,7 @@ F401 [*] `a.b` imported but unused
 5 |     a.foo()
   |
 help: Remove unused import: `a.b`
-1 | 
+1 |
 2 | if cond:
 3 |     import a
   -     import a.b

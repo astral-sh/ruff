@@ -15,7 +15,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -1147,8 +1147,9 @@ impl<'db> Specialization<'db> {
         assert_eq!(other.generic_context(db), generic_context);
         // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
         // confusing/wrong results in cases where there was a mapping found for a typevar, and it
-        // was of type Unknown. We should probably add a bitset or similar to Specialization that
-        // explicitly tells us which typevars are mapped.
+        // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
+        // may fail to specialize, but not end up as `Unknown`. We should add a bitset or similar
+        // to Specialization that explicitly tells us which typevars are mapped.
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -1581,6 +1582,9 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
+    /// substitute a typevar nested inside another constraint's bound.
+    Single(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
@@ -1611,7 +1615,32 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::Single(typevar, ty) => {
+                if bound_typevar.is_same_typevar_as(db, *typevar) {
+                    Some(*ty)
+                } else {
+                    None
+                }
+            }
         }
+    }
+}
+
+impl<'db> Type<'db> {
+    pub(crate) fn substitute_one_typevar(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                bound_typevar,
+                replacement,
+            )),
+            TypeContext::default(),
+        )
     }
 }
 
@@ -1732,12 +1761,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         set: ConstraintSet<'db, 'c>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
-        let solutions = match set.solutions(self.db, self.constraints) {
+        let solutions = match set.solutions_with_inferable(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |typevar, _variance, lower, upper| {
+                PathBounds::default_solve(self.db, typevar, lower, upper)
+            },
+        ) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in solutions.iter() {
+        for solution in &solutions {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);

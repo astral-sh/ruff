@@ -52,7 +52,6 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 7 |     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitu…
 8 |     longitude: float
   |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -71,7 +70,6 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
  9 |
 10 | class StrangeLocation(NamedTuple):
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -87,7 +85,6 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
    |     ^^^^^^^^^^^^^^^ Field `latitude` defined here without a default value
 16 |     longitude: float  # error: [invalid-named-tuple]
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -105,7 +102,6 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 17 |
 18 | class VeryStrangeLocation(NamedTuple):
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -121,7 +117,6 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 22 |     altitude: float = 0.0
    |
 info: Earlier field `altitude` was defined with a default value
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -136,6 +131,5 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 22 |     altitude: float = 0.0
    |
 info: Earlier field `altitude` was defined with a default value
-info: rule `invalid-named-tuple` is enabled by default
 
 ```

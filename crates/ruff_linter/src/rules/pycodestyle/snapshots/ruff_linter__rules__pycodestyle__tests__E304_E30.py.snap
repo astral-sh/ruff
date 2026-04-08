@@ -12,10 +12,10 @@ E304 [*] Blank lines found after function decorator (1)
 767 | # end
     |
 help: Remove extraneous blank line(s)
-761 | 
+761 |
 762 | # E304
 763 | @decorator
-    - 
+    -
 764 | def function():
 765 |     pass
 766 | # end
@@ -30,10 +30,10 @@ E304 [*] Blank lines found after function decorator (1)
 776 | # end
     |
 help: Remove extraneous blank line(s)
-769 | 
+769 |
 770 | # E304
 771 | @decorator
-    - 
+    -
 772 | # comment    E304 not expected
 773 | def function():
 774 |     pass
@@ -48,13 +48,13 @@ E304 [*] Blank lines found after function decorator (2)
 788 | # end
     |
 help: Remove extraneous blank line(s)
-778 | 
+778 |
 779 | # E304
 780 | @decorator
-    - 
+    -
 781 | # comment  E304 not expected
-    - 
-    - 
+    -
+    -
 782 | # second comment  E304 not expected
 783 | def function():
 784 |     pass

@@ -37,7 +37,6 @@ error[missing-argument]: No arguments provided for required parameters `*args`, 
 7 |         func(**kwargs)  # error: [missing-argument]
   |
 info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -53,7 +52,6 @@ error[missing-argument]: No argument provided for required parameter `**kwargs`
 8 |     return wrapper
   |
 info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -68,6 +66,5 @@ error[missing-argument]: No argument provided for required parameter `*args`
 8 |     return wrapper
   |
 info: These arguments are required because `ParamSpec` `P` could represent any set of parameters at runtime
-info: rule `missing-argument` is enabled by default
 
 ```

@@ -37,6 +37,5 @@ error[invalid-super-argument]: Argument is not a valid class
 11 |     super(A, A())  # error: [invalid-super-argument]
    |     ^^^^^^^^^^^^^ Argument has type `<class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:6:15'> | <class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:9:15'>`
    |
-info: rule `invalid-super-argument` is enabled by default
 
 ```

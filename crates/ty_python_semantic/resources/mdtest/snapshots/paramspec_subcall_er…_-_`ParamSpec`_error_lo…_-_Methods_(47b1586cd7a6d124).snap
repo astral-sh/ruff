@@ -48,7 +48,6 @@ info: Method defined here
 5 |
 6 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -70,7 +69,6 @@ info: Method defined here
 5 |
 6 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -92,6 +90,5 @@ info: Method signature here
 5 |
 6 | def fn1(a: int, b: int, c: int) -> None: ...
   |
-info: rule `unknown-argument` is enabled by default
 
 ```

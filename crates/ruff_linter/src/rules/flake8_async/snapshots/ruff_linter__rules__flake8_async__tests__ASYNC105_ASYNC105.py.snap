@@ -12,7 +12,7 @@ ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediately awaited
    |
 help: Add `await`
 27 |     await trio.lowlevel.wait_writable(foo)
-28 | 
+28 |
 29 |     # ASYNC105
    -     trio.aclose_forcefully(foo)
 30 +     await trio.aclose_forcefully(foo)
@@ -32,7 +32,7 @@ ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
    |
 help: Add `await`
-28 | 
+28 |
 29 |     # ASYNC105
 30 |     trio.aclose_forcefully(foo)
    -     trio.open_file(foo)
@@ -438,7 +438,7 @@ help: Add `await`
 51 +     await trio.lowlevel.wait_readable(foo)
 52 |     trio.lowlevel.wait_task_rescheduled(foo)
 53 |     trio.lowlevel.wait_writable(foo)
-54 | 
+54 |
 note: This is an unsafe fix and may change runtime behavior
 
 ASYNC105 [*] Call to `trio.lowlevel.wait_task_rescheduled` is not immediately awaited
@@ -457,7 +457,7 @@ help: Add `await`
    -     trio.lowlevel.wait_task_rescheduled(foo)
 52 +     await trio.lowlevel.wait_task_rescheduled(foo)
 53 |     trio.lowlevel.wait_writable(foo)
-54 | 
+54 |
 55 |     async with await trio.open_file(foo):  # Ok
 note: This is an unsafe fix and may change runtime behavior
 
@@ -477,7 +477,7 @@ help: Add `await`
 52 |     trio.lowlevel.wait_task_rescheduled(foo)
    -     trio.lowlevel.wait_writable(foo)
 53 +     await trio.lowlevel.wait_writable(foo)
-54 | 
+54 |
 55 |     async with await trio.open_file(foo):  # Ok
 56 |         pass
 note: This is an unsafe fix and may change runtime behavior
@@ -494,12 +494,12 @@ ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
 help: Add `await`
 55 |     async with await trio.open_file(foo):  # Ok
 56 |         pass
-57 | 
+57 |
    -     async with trio.open_file(foo):  # ASYNC105
 58 +     async with await trio.open_file(foo):  # ASYNC105
 59 |         pass
-60 | 
-61 | 
+60 |
+61 |
 note: This is an unsafe fix and may change runtime behavior
 
 ASYNC105 Call to `trio.open_file` is not immediately awaited

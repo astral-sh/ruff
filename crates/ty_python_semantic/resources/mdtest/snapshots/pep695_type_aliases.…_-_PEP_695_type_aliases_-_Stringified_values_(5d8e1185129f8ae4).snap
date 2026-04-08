@@ -41,6 +41,5 @@ error[unsupported-operator]: Unsupported `|` operation
 8 | def g(obj: Y):
   |
 info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
-info: rule `unsupported-operator` is enabled by default
 
 ```

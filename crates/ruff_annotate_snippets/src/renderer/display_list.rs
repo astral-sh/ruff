@@ -358,7 +358,7 @@ impl DisplaySet<'_> {
     }
 
     // Adapted from https://github.com/rust-lang/rust/blob/d371d17496f2ce3a56da76aa083f4ef157572c20/compiler/rustc_errors/src/emitter.rs#L706-L1211
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[inline]
     fn format_line(
         &self,

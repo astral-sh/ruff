@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
-    DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
+    DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
@@ -34,7 +34,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionBuilder, TypeContext, TypeMapping, UnionBuilder,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
     VarianceInferable,
 };
 use crate::{
@@ -924,6 +924,17 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class is a `TypedDict`.
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_typed_dict(db)
+    }
+
+    /// Return `true` if this class is a subtype of (any specialization of) `class_literal`.
+    pub(crate) fn is_subtype_of_class_literal(
+        self,
+        db: &'db dyn Db,
+        class_literal: ClassLiteral<'db>,
+    ) -> bool {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|base| base.class_literal(db) == class_literal)
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -1954,7 +1965,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
-                ClassBase::Dynamic(_) => match self.relation {
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming => {
@@ -2173,6 +2184,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
+                ClassBase::Divergent(_) => {
+                    dynamic_type.get_or_insert(Type::from(superclass));
+                }
                 ClassBase::Class(class) => {
                     let known = class.known(db);
 
@@ -2238,7 +2252,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) => {
+                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).
@@ -2332,13 +2346,8 @@ impl<'db> CompletedMemberLookup<'db> {
                     qualifiers,
                 },
                 Some(dynamic),
-            ) => Place::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic)
-                    .build(),
-            )
-            .with_qualifiers(qualifiers),
+            ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
+                .with_qualifiers(qualifiers),
 
             (
                 PlaceAndQualifiers {

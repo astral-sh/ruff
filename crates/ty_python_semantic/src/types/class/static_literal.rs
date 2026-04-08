@@ -16,7 +16,7 @@ use crate::{
         place_from_bindings, place_from_declarations,
     },
     semantic_index::{
-        DeclarationWithConstraint, attribute_assignments, attribute_declarations, attribute_scopes,
+        attribute_assignments, attribute_declarations, attribute_scopes,
         definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
         place_table,
         scope::{Scope, ScopeId},
@@ -1751,17 +1751,14 @@ impl<'db> StaticClassLiteral<'db> {
             // want to improve this, we could instead pass a definition-kind filter to the use-def map
             // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
             // us to generate a union of `__init__` methods.
-            if !declarations
-                .clone()
-                .all(|DeclarationWithConstraint { declaration, .. }| {
-                    declaration.is_undefined_or(|declaration| {
-                        matches!(
-                            declaration.kind(db),
-                            DefinitionKind::AnnotatedAssignment(..)
-                        )
-                    })
+            if declarations.clone().any_reachable(db, |declaration| {
+                declaration.is_defined_and(|declaration| {
+                    !matches!(
+                        declaration.kind(db),
+                        DefinitionKind::AnnotatedAssignment(..)
+                    )
                 })
-            {
+            }) {
                 continue;
             }
 
@@ -1789,20 +1786,10 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut converter = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
-                    if self
-                        .dataclass_params(db)
-                        .map(|params| params.field_specifiers(db).is_empty())
-                        .unwrap_or(false)
-                    {
-                        // This happens when constructing a `dataclass` with a `dataclass_transform`
-                        // without defining the `field_specifiers`, meaning it should ignore
-                        // `dataclasses.field` and `dataclasses.Field`.
-                    } else {
-                        init = field.init(db);
-                        kw_only = field.kw_only(db);
-                        alias = field.alias(db);
-                        converter = field.converter(db);
-                    }
+                    init = field.init(db);
+                    kw_only = field.kw_only(db);
+                    alias = field.alias(db);
+                    converter = field.converter(db);
                 }
 
                 let kind = match field_policy {
@@ -2760,7 +2747,6 @@ fn static_class_try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -2783,7 +2769,6 @@ fn implicit_attribute_initial<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,

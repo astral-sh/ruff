@@ -13,7 +13,7 @@ PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expe
   |
 help: Use a string for the first argument
 1 | import pytest
-2 | 
+2 |
   - @pytest.mark.parametrize(("param",), [[1], [2]])
 3 + @pytest.mark.parametrize("param", [1, 2])
 4 | def test_PT006_and_PT007_do_not_conflict(param):
@@ -31,7 +31,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tup
   |
 help: Use `list` of `tuple` for parameter values
 1 | import pytest
-2 | 
+2 |
   - @pytest.mark.parametrize(("param",), [[1], [2]])
 3 + @pytest.mark.parametrize(("param",), [(1,), [2]])
 4 | def test_PT006_and_PT007_do_not_conflict(param):
@@ -50,7 +50,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tup
   |
 help: Use `list` of `tuple` for parameter values
 1 | import pytest
-2 | 
+2 |
   - @pytest.mark.parametrize(("param",), [[1], [2]])
 3 + @pytest.mark.parametrize(("param",), [[1], (2,)])
 4 | def test_PT006_and_PT007_do_not_conflict(param):

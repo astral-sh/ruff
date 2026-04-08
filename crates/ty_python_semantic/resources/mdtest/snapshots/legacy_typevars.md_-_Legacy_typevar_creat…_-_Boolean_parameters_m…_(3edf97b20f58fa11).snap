@@ -40,7 +40,6 @@ error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cann
 8 |
 9 | # error: [invalid-legacy-type-variable]
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -54,7 +53,6 @@ error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` 
 11 |
 12 | # error: [invalid-legacy-type-variable]
    |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```
 
@@ -66,6 +64,5 @@ error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar`
 13 | V = TypeVar("V", infer_variance=cond())
    |                                 ^^^^^^
    |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

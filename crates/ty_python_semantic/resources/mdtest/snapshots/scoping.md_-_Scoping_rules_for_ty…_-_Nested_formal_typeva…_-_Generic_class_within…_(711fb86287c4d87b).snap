@@ -40,7 +40,6 @@ error[shadowed-type-variable]: Generic class `Bad1` uses type variable `T` alrea
 7 |     # error: [shadowed-type-variable]
 8 |     class Bad2(Iterable[T]): ...
   |
-info: rule `shadowed-type-variable` is enabled by default
 
 ```
 
@@ -59,6 +58,5 @@ error[shadowed-type-variable]: Generic class `Bad2` uses type variable `T` alrea
 8 |     class Bad2(Iterable[T]): ...
   |           ^^^^^^^^^^^^^^^^^ `T` used in class definition here
   |
-info: rule `shadowed-type-variable` is enabled by default
 
 ```

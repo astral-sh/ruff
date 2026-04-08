@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
+use ruff_python_ast::helpers::is_dotted_name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -179,12 +180,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors: RefCell::default(),
         };
 
-        builder.push_scope_with_parent(
-            NodeWithScopeRef::Module,
-            None,
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-        );
-
+        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
         builder
     }
 
@@ -302,29 +298,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
-        let parent = self.current_scope();
-        let reachability = self.current_use_def_map().reachability;
-        self.push_scope_with_parent(node, Some(parent), reachability);
+        self.push_scope_with_parent(node, Some(self.current_scope()));
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScopeRef,
-        parent: Option<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
-    ) {
+    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(
-            parent,
-            node_with_kind,
-            children_start..children_start,
-            reachability,
-            self.in_type_checking_block,
-        );
+        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
@@ -430,8 +413,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                // For the same reason, symbols declared as nonlocal or global are not recorded.
-                // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
+                // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
+                // forwarding declarations here; `snapshot_enclosing_state` stores only a
+                // constraint for those symbols. Also, if the enclosing scope allows its members to
+                // be modified from elsewhere, the snapshot will not be recorded.
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
                 if self.scopes[enclosing_scope_id].kind().is_module() {
@@ -1740,14 +1725,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        for scope in &self.scopes {
-            if let Some(parent) = scope.parent() {
-                self.use_def_maps[parent]
-                    .reachability_constraints
-                    .mark_used(scope.reachability());
-            }
-        }
-
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
             .into_iter()
@@ -1811,8 +1788,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
+        let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
-            .record_range_reachability(stmt.range());
+            .record_range_reachability(stmt.range(), in_type_checking_block);
 
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
@@ -2388,7 +2366,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         is_in_not_type_checking_chain
                     };
 
-                    self.in_type_checking_block = clause_in_type_checking;
+                    // Nested conditional clauses inherit an enclosing TYPE_CHECKING context.
+                    self.in_type_checking_block =
+                        is_outer_block_in_type_checking || clause_in_type_checking;
 
                     self.visit_body(clause_body);
                 }
@@ -3179,16 +3159,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let pre_if = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
+                let in_type_checking_block = self.in_type_checking_block;
                 self.current_use_def_map_mut()
-                    .record_range_reachability(body.range());
+                    .record_range_reachability(body.range(), in_type_checking_block);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
+                let in_type_checking_block = self.in_type_checking_block;
                 self.current_use_def_map_mut()
-                    .record_range_reachability(orelse.range());
+                    .record_range_reachability(orelse.range(), in_type_checking_block);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -3257,8 +3239,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             .record_reachability_constraint(*id); // TODO: nicer API
                     }
 
+                    let in_type_checking_block = self.in_type_checking_block;
                     self.current_use_def_map_mut()
-                        .record_range_reachability(value.range());
+                        .record_range_reachability(value.range(), in_type_checking_block);
                     self.visit_expr(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting
@@ -3768,14 +3751,6 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    fn is_dotted_name(expr: &ast::Expr) -> bool {
-        match expr {
-            ast::Expr::Name(_) => true,
-            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
-            _ => false,
-        }
-    }
-
     match expr {
         ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
         ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {

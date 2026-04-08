@@ -43,7 +43,7 @@ pub(crate) struct IncludeFilter {
     matches: Arc<Pool<Vec<usize>>>,
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
     dfa.as_ref().map(dfa::dense::DFA::memory_usage).unwrap_or(0)
 }

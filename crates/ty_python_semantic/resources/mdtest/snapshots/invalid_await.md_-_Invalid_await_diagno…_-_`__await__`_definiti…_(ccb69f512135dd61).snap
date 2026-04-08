@@ -39,6 +39,5 @@ error[invalid-await]: `InvalidAwaitReturn` is not awaitable
 3 |         return 5
   |
 info: `__await__` returns `int`, which is not a valid iterator
-info: rule `invalid-await` is enabled by default
 
 ```

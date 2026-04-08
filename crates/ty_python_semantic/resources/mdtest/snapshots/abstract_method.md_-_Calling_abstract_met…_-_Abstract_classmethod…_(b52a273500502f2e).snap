@@ -44,6 +44,5 @@ info: Method `method` defined here
 7 |
 8 | # error: [call-abstract-method] "Cannot call `method` on class object"
   |
-info: rule `call-abstract-method` is enabled by default
 
 ```

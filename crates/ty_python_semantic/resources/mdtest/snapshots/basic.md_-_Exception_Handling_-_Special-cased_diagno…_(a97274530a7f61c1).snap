@@ -39,7 +39,6 @@ error[invalid-raise]: Cannot raise `NotImplemented`
 6 | except NotImplemented:
   |
 info: Can only raise an instance or subclass of `BaseException`
-info: rule `invalid-raise` is enabled by default
 
 ```
 
@@ -55,7 +54,6 @@ error[invalid-raise]: Cannot use `NotImplemented` as an exception cause
 6 | except NotImplemented:
   |
 info: An exception cause must be an instance of `BaseException`, subclass of `BaseException`, or `None`
-info: rule `invalid-raise` is enabled by default
 
 ```
 
@@ -71,7 +69,6 @@ error[invalid-exception-caught]: Cannot catch `NotImplemented` in an exception h
 8 | # error: [invalid-exception-caught]
   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
-info: rule `invalid-exception-caught` is enabled by default
 
 ```
 
@@ -89,6 +86,5 @@ error[invalid-exception-caught]: Invalid tuple caught in an exception handler
 10 |     pass
    |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
-info: rule `invalid-exception-caught` is enabled by default
 
 ```

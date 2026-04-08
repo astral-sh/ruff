@@ -347,14 +347,10 @@ if TYPE_CHECKING:
         def f(obj: X):
             reveal_type(obj)  # revealed: int | str
 
-    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
-    # if a whole *scope* is inside the `if TYPE_CHECKING` block
-    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
-    Y = int | str  # error: [unsupported-operator]
+    Y = int | str
 
     def g(obj: Y):
-        # TODO: should be `int | str`
-        reveal_type(obj)  # revealed: Unknown
+        reveal_type(obj)  # revealed: int | str
 
 Y = list["int | str"]
 
@@ -678,8 +674,15 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-def _(doubly_specialized: List):
+# TODO: one error would be enough here
+#
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+WorseList = list[int][0]
+
+def _(doubly_specialized: List, doubly_specialized_2: WorseList):
     reveal_type(doubly_specialized)  # revealed: Unknown
+    reveal_type(doubly_specialized_2)  # revealed: Unknown
 
 Tuple = tuple[int, str]
 
@@ -776,7 +779,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [not-subscriptable] "Cannot subscript non-generic type"
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
@@ -789,7 +792,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
 # error: [unbound-type-variable]
 # error: [unbound-type-variable]
 x: (list[T] | set[T])[int]
@@ -1575,7 +1578,7 @@ errors:
 ```py
 AliasForStr = "str"
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a parameter annotation"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 
@@ -1683,4 +1686,21 @@ def _(
 ):
     reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
     reveal_type(nested_list_str)  # revealed: list[Divergent]
+```
+
+### Materialization of self-referential generic implicit type aliases
+
+```py
+from typing import TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedList = list["NestedList[T] | None"]
+NestedDict = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```

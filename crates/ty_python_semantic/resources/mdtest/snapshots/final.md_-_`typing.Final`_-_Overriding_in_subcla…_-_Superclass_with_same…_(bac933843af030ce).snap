@@ -45,6 +45,5 @@ info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
 4 |     X: Final[int] = 1
   |     - `module_a.Foo.X` defined here
   |
-info: rule `override-of-final-variable` is enabled by default
 
 ```

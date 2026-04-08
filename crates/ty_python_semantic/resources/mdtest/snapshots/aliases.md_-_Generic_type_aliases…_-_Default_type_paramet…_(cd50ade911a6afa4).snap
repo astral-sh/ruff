@@ -44,7 +44,6 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
 4 | # error: [invalid-type-variable-default]
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
 
@@ -61,7 +60,6 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
 7 | # error: [invalid-type-variable-default]
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
 
@@ -79,7 +77,6 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
 10 | # error: [invalid-type-variable-default]
    |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
 
@@ -96,6 +93,5 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
 13 | # These are fine:
    |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

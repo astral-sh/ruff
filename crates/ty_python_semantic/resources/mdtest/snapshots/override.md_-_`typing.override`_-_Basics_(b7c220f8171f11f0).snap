@@ -204,7 +204,6 @@ error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@overr
 100 |     @classmethod
     |
 info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -223,7 +222,6 @@ error[invalid-explicit-override]: Method `foo` is decorated with `@override` but
 103 |     @override
     |
 info: No `foo` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -241,7 +239,6 @@ error[invalid-explicit-override]: Method `bar` is decorated with `@override` but
 106 |     @override
     |
 info: No `bar` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -259,7 +256,6 @@ error[invalid-explicit-override]: Method `baz` is decorated with `@override` but
 109 |     @staticmethod
     |
 info: No `baz` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -278,7 +274,6 @@ error[invalid-explicit-override]: Method `eggs` is decorated with `@override` bu
 112 |     @override
     |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -296,7 +291,6 @@ error[invalid-explicit-override]: Method `bad_property1` is decorated with `@ove
 115 |     @property
     |
 info: No `bad_property1` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -315,7 +309,6 @@ error[invalid-explicit-override]: Method `bad_property2` is decorated with `@ove
 118 |     @override
     |
 info: No `bad_property2` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -333,7 +326,6 @@ error[invalid-explicit-override]: Method `bad_settable_property` is decorated wi
 121 |     def bad_settable_property(self, x: int) -> None: ...
     |
 info: No `bad_settable_property` definitions were found on any superclasses of `Invalid`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
@@ -358,7 +350,6 @@ error[invalid-method-override]: Invalid override of method `class_method1`
     |
 info: `LiskovViolatingButNotOverrideViolating.class_method1` is a staticmethod but `Parent.class_method1` is a classmethod
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -380,6 +371,5 @@ error[invalid-explicit-override]: Method `bar` is decorated with `@override` but
 157 |     @identity
     |
 info: No `bar` definitions were found on any superclasses of `Foo`
-info: rule `invalid-explicit-override` is enabled by default
 
 ```

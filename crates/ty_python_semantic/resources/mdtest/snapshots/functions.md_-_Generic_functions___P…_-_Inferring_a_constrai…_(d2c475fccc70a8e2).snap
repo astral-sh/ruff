@@ -45,6 +45,5 @@ info: Type variable defined here
   |       ^^^^^^^^^^^^^^
 4 |     return x
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

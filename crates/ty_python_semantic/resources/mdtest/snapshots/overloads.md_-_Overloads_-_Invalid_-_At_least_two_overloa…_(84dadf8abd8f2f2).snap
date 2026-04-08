@@ -45,7 +45,6 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 6 | def func(x: int | str) -> int | str:
 7 |     return x
   |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -58,6 +57,5 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
   |
-info: rule `invalid-overload` is enabled by default
 
 ```

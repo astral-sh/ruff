@@ -96,7 +96,7 @@ pub(crate) fn invalid_function_name(
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
     if name.starts_with("visit_")
         && parent_class.is_some_and(|class| {
-            any_base_class(class, semantic, &mut |superclass| {
+            any_base_class(class, semantic, |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
                 qualified.is_some_and(|name| {
                     matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
@@ -110,7 +110,7 @@ pub(crate) fn invalid_function_name(
     // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class and its subclasses
     if name.starts_with("do_")
         && parent_class.is_some_and(|class| {
-            any_base_class(class, semantic, &mut |superclass| {
+            any_base_class(class, semantic, |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
                 qualified.is_some_and(|name| {
                     matches!(

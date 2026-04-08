@@ -226,6 +226,5 @@ info: Overload implementation defined here
 128 |
 129 | foo(Foo(), Foo())  # error: [no-matching-overload]
     |
-info: rule `no-matching-overload` is enabled by default
 
 ```

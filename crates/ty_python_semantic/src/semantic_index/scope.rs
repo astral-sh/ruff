@@ -8,9 +8,7 @@ use crate::{
     Db,
     ast_node_ref::AstNodeRef,
     node_key::NodeKey,
-    semantic_index::{
-        SemanticIndex, reachability_constraints::ScopedReachabilityConstraintId, semantic_index,
-    },
+    semantic_index::{SemanticIndex, semantic_index},
     types::{GenericContext, binding_type, infer_definition_types},
 };
 
@@ -111,12 +109,6 @@ pub(crate) struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
-
-    /// The constraint that determines the reachability of this scope.
-    reachability: ScopedReachabilityConstraintId,
-
-    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
-    in_type_checking_block: bool,
 }
 
 impl Scope {
@@ -124,15 +116,11 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        reachability: ScopedReachabilityConstraintId,
-        in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
-            reachability,
-            in_type_checking_block,
         }
     }
 
@@ -162,14 +150,6 @@ impl Scope {
 
     pub(crate) fn is_eager(&self) -> bool {
         self.kind().is_eager()
-    }
-
-    pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
-        self.reachability
-    }
-
-    pub(crate) fn in_type_checking_block(&self) -> bool {
-        self.in_type_checking_block
     }
 }
 

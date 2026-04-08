@@ -27,7 +27,7 @@ pub struct Cli {
     pub(crate) command: Command,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.

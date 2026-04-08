@@ -43,12 +43,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
 12 | a = (3
    |
 help: Remove the unused suppression comment
-7  | 
+7  |
 8  | a = (3
 9  |   # error: [unused-ignore-comment]
    -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
 10 +   + 2)  # fmt: skip
-11 | 
+11 |
 12 | a = (3
 13 |   # error: [unused-ignore-comment]
 
@@ -64,7 +64,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Remove the unused suppression comment
-11 | 
+11 |
 12 | a = (3
 13 |   # error: [unused-ignore-comment]
    -   + 2)  # fmt: skip # ty:ignore[division-by-zero]

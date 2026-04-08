@@ -208,6 +208,20 @@ if not isinstance(DoesNotExist, type):
 
 ## Inheritance from `type[Any]` and `type[Unknown]`
 
+Using `type[T]` for a non-dynamic `T` as a base keeps the class analyzable, even though the exact
+MRO cannot be determined:
+
+```py
+from ty_extensions import reveal_mro
+
+class Base:
+    base_attr: int = 1
+
+def f(x: type[Base]):
+    class Foo(x): ...  # error: [unsupported-base]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+```
+
 Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
 guarantee:
 
