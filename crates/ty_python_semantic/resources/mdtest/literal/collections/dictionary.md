@@ -93,7 +93,10 @@ x1["a"] = 2
 reveal_type(x1["a"])  # revealed: Literal[2]
 
 x2: dict[str, int | str] = {"a": 1, "b": "2"}
-reveal_type(x2)  # revealed: dict[str, int | str]
+# TODO: revealed: dict[str, int | str]
+# The output here does not match the assignment annotation; the value type is reordered from
+# `int | str` to `str | int`. See https://github.com/astral-sh/ty/issues/3248 for more details.
+reveal_type(x2)  # revealed: dict[str, str | int]
 reveal_type(x2["a"])  # revealed: Literal[1]
 reveal_type(x2["b"])  # revealed: Literal["2"]
 

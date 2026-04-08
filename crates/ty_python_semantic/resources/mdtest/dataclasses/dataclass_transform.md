@@ -1198,10 +1198,6 @@ class ConverterClass:
 class Model(ModelBase):
     field3: ConverterClass = model_field(converter=ConverterClass)
     field4: int = model_field(converter=overloaded_converter)
-    # TODO: This should be accepted once overloaded class callables with richer signatures are
-    # modeled in callable assignability.
-    # error: [invalid-assignment]
-    # error: [invalid-argument-type]
     field5: dict[str, str] = model_field(converter=dict, default=())
 ```
 
