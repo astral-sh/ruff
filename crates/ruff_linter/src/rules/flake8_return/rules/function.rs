@@ -617,12 +617,14 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
-        // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
-        // functions. If there is, ignore them.
-        if assigned_binding
-            .references()
-            .map(|reference_id| checker.semantic().reference(reference_id))
-            .any(|reference| reference.scope_id() != assigned_binding.scope)
+        // The assignment is only unnecessary if the return is the sole read of
+        // the binding. If the variable is read elsewhere (e.g. in a `finally`
+        // or `except` block, or a nested function), the assignment is needed.
+        if assigned_binding.references().count() != 1
+            || assigned_binding
+                .references()
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .any(|reference| reference.scope_id() != assigned_binding.scope)
         {
             continue;
         }

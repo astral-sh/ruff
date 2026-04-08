@@ -461,3 +461,44 @@ def f():
     x = (1
               )
     return x
+
+# https://github.com/astral-sh/ruff/issues/17292
+# Variable used in finally — no RET504
+def f():
+    out = ""
+    try:
+        out = foo()
+        return out
+    except Exception as e:
+        out = str(e)
+    finally:
+        log(out)
+
+# Variable used in except handler — no RET504
+def f():
+    result = None
+    try:
+        result = compute()
+        return result
+    except Exception as e:
+        log(result)
+
+# Variable NOT used in finally — RET504 should still fire
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        log("done")
+
+# Nested try — variable used in outer finally
+def f():
+    x = ""
+    try:
+        try:
+            x = foo()
+            return x
+        except:
+            pass
+    finally:
+        log(x)

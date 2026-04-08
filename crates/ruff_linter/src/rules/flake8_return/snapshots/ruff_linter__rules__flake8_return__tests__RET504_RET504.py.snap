@@ -21,46 +21,6 @@ help: Remove unnecessary assignment
 8 | # Can be refactored false positives
 note: This is an unsafe fix and may change runtime behavior
 
-RET504 [*] Unnecessary assignment to `formatted` before `return` statement
-  --> RET504.py:23:12
-   |
-21 |     # clean up after any blank components
-22 |     formatted = formatted.replace("()", "").replace("  ", " ").strip()
-23 |     return formatted
-   |            ^^^^^^^^^
-   |
-help: Remove unnecessary assignment
-19 | def x():
-20 |     formatted = _USER_AGENT_FORMATTER.format(format_string, **values)
-21 |     # clean up after any blank components
-   -     formatted = formatted.replace("()", "").replace("  ", " ").strip()
-   -     return formatted
-22 +     return formatted.replace("()", "").replace("  ", " ").strip()
-23 |
-24 |
-25 | # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
-note: This is an unsafe fix and may change runtime behavior
-
-RET504 [*] Unnecessary assignment to `queryset` before `return` statement
-   --> RET504.py:246:12
-    |
-244 |     queryset = Model.filter(a=1)
-245 |     queryset = queryset.filter(c=3)
-246 |     return queryset
-    |            ^^^^^^^^
-    |
-help: Remove unnecessary assignment
-242 |
-243 | def get_queryset():
-244 |     queryset = Model.filter(a=1)
-    -     queryset = queryset.filter(c=3)
-    -     return queryset
-245 +     return queryset.filter(c=3)
-246 |
-247 |
-248 | def get_queryset():
-note: This is an unsafe fix and may change runtime behavior
-
 RET504 [*] Unnecessary assignment to `queryset` before `return` statement
    --> RET504.py:251:12
     |
@@ -79,26 +39,6 @@ help: Remove unnecessary assignment
 251 |
 252 |
 253 | # Function arguments
-note: This is an unsafe fix and may change runtime behavior
-
-RET504 [*] Unnecessary assignment to `val` before `return` statement
-   --> RET504.py:269:12
-    |
-267 |         return val
-268 |     val = 1
-269 |     return val  # RET504
-    |            ^^^
-    |
-help: Remove unnecessary assignment
-265 | def str_to_bool(val):
-266 |     if isinstance(val, bool):
-267 |         return val
-    -     val = 1
-    -     return val  # RET504
-268 +     return 1
-269 |
-270 |
-271 | def str_to_bool(val):
 note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `x` before `return` statement
@@ -221,26 +161,6 @@ help: Remove unnecessary assignment
 367 | # contextlib suppress in with statement
 note: This is an unsafe fix and may change runtime behavior
 
-RET504 [*] Unnecessary assignment to `y` before `return` statement
-   --> RET504.py:400:12
-    |
-398 |         x = 1
-399 |     y = y + 2
-400 |     return y  # RET504
-    |            ^
-    |
-help: Remove unnecessary assignment
-396 |     x = 2
-397 |     with contextlib.suppress(Exception):
-398 |         x = 1
-    -     y = y + 2
-    -     return y  # RET504
-399 +     return y + 2
-400 |
-401 |
-402 | def foo():
-note: This is an unsafe fix and may change runtime behavior
-
 RET504 [*] Unnecessary assignment to `services` before `return` statement
    --> RET504.py:423:16
     |
@@ -291,6 +211,8 @@ RET504 [*] Unnecessary assignment to `x` before `return` statement
 462 |               )
 463 |     return x
     |            ^
+464 |
+465 | # https://github.com/astral-sh/ruff/issues/17292
     |
 help: Remove unnecessary assignment
 458 |     return x
@@ -300,4 +222,29 @@ help: Remove unnecessary assignment
 461 +     return (1
 462 |               )
     -     return x
+463 |
+464 | # https://github.com/astral-sh/ruff/issues/17292
+465 | # Variable used in finally — no RET504
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:490:16
+    |
+488 |     try:
+489 |         x = foo()
+490 |         return x
+    |                ^
+491 |     finally:
+492 |         log("done")
+    |
+help: Remove unnecessary assignment
+486 | # Variable NOT used in finally — RET504 should still fire
+487 | def f():
+488 |     try:
+    -         x = foo()
+    -         return x
+489 +         return foo()
+490 |     finally:
+491 |         log("done")
+492 |
 note: This is an unsafe fix and may change runtime behavior
