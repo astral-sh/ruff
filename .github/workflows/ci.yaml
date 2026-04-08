@@ -302,7 +302,9 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        run: cargo insta test --all-features --unreferenced reject --test-runner nextest
+        run: cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+      - name: "Run doctests"
+        run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
         run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
       - name: Dogfood ty on the scripts directory
