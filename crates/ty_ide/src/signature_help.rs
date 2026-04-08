@@ -200,8 +200,11 @@ fn create_signature_details_from_call_signature_details<'db>(
                 .copied()
                 .flatten()
                 .or({
-                    // If we can't find a mapping for this argument, but we have a current
-                    // argument index, use that as the active parameter if it's within bounds.
+                    // If we can't find a mapping for this argument, fall back to the argument
+                    // index when it still points at a displayed parameter. Otherwise, if the
+                    // last displayed parameter is variadic, keep it active for any later
+                    // positional or keyword arguments that would still bind there. The `- 1`
+                    // converts the parameter count to the zero-based index of that last entry.
                     if current_arg_index < details.parameters.len() {
                         Some(current_arg_index)
                     } else if details.parameters.last().is_some_and(|parameter| {

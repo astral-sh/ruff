@@ -718,11 +718,9 @@ fn displayed_parameters_for_signature<'db>(
                 else {
                     continue;
                 };
-                let start = usize::from(range.start());
-                let end = usize::from(range.end());
                 let Some(label) = display_details
                     .label
-                    .get(start..end)
+                    .get(range.to_std_range())
                     .map(ToString::to_string)
                 else {
                     continue;
@@ -751,11 +749,9 @@ fn displayed_parameters_for_signature<'db>(
                 .parameter_ranges
                 .first()
                 .and_then(|range| {
-                    let start = usize::from(range.start());
-                    let end = usize::from(range.end());
                     display_details
                         .label
-                        .get(start..end)
+                        .get(range.to_std_range())
                         .map(ToString::to_string)
                 })
                 .unwrap_or_else(|| parameter_name.clone());

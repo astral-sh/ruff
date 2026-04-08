@@ -4585,7 +4585,7 @@ bar(o<CURSOR>
     }
 
     #[test]
-    fn call_bare_paramspec_does_not_suggest_keyword_argument_completion() {
+    fn call_bare_paramspec_has_no_keyword_argument_completions() {
         let builder = completion_test_builder(
             "\
 from typing import Callable, ParamSpec
@@ -4596,15 +4596,31 @@ sentinel = 1
 def takes(f: Callable[P, None]) -> None:
     f(<CURSOR>
 ",
-        );
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import();
+        let completions = builder.build();
 
-        builder
-            .skip_keywords()
-            .skip_builtins()
-            .skip_auto_import()
-            .build()
-            .contains("sentinel")
-            .not_contains("**P");
+        completions.contains("sentinel");
+
+        let keyword_argument_completions = completions
+            .completions()
+            .iter()
+            .filter_map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .filter(|insert| insert.ends_with('='))
+            })
+            .collect::<Vec<_>>();
+
+        // Bare `ParamSpec` signatures are rendered as a synthetic parameter for
+        // signature help, but they don't correspond to a valid keyword argument.
+        assert!(
+            keyword_argument_completions.is_empty(),
+            "Unexpected keyword argument completions: {keyword_argument_completions:?}",
+        );
     }
 
     #[test]
