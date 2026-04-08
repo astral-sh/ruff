@@ -1872,24 +1872,32 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
                 self.add_type_mappings_from_constraint_set(when)?;
+                self.pending.intersect(self.db, self.constraints, when);
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
                 // overloads, and only report an error if none of them are satisfiable.
-                let mut any_satisfiable = false;
-                for actual_signature in &actual_callable.signatures(self.db).overloads {
-                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
-                        self.db,
-                        formal_signature,
-                        self.constraints,
-                    );
-                    if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                        any_satisfiable = true;
-                    }
-                }
-                if !any_satisfiable {
+                let db = self.db;
+                let constraints = self.constraints;
+                let combined = actual_callable
+                    .signatures(db)
+                    .overloads
+                    .iter()
+                    .filter_map(|actual_signature| {
+                        let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                            db,
+                            formal_signature,
+                            constraints,
+                        );
+                        self.add_type_mappings_from_constraint_set(when)
+                            .ok()
+                            .map(|()| when)
+                    })
+                    .reduce(|lhs, rhs| lhs.or(db, constraints, || rhs));
+                let Some(combined) = combined else {
                     return Err(());
-                }
+                };
+                self.pending.intersect(self.db, self.constraints, combined);
             }
         }
         Ok(())
@@ -2311,13 +2319,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
+                        let when = self.constraints.load(self.db, when);
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate
                         // specialization error. This matches the previous behavior (where
                         // unsatisfied comparisons simply produced no type mappings), and avoids
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
-                        let _ = self.add_type_mappings_from_owned_constraint_set(when);
+                        if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                            self.pending.intersect(self.db, self.constraints, when);
+                        }
                         return Ok(());
                     }
 
