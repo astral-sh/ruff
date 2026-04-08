@@ -2150,14 +2150,6 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
 
             for parameter in parameters {
                 // Handle special separators
-                if !star_added && parameter.is_keyword_only() {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('*')?;
-                    star_added = true;
-                    first = false;
-                }
                 if parameter.is_positional_only() {
                     needs_slash = true;
                 } else if needs_slash {
@@ -2166,6 +2158,14 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     }
                     f.write_char('/')?;
                     needs_slash = false;
+                    first = false;
+                }
+                if !star_added && parameter.is_keyword_only() {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('*')?;
+                    star_added = true;
                     first = false;
                 }
 
@@ -3238,6 +3238,20 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @"(x, *, y) -> None"
+        );
+
+        // '/' parameter must appear before '*' parameter
+        assert_snapshot!(
+            display_signature(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @"(a, /, *, x, y) -> None"
         );
 
         // A mix of all parameter kinds.
