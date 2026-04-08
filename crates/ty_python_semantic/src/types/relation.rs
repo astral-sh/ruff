@@ -631,27 +631,23 @@ impl TypeRelationErrorContext {
         self.stack.borrow_mut().push(message);
     }
 
-    pub fn info_message(&self) -> Option<String> {
+    pub fn info_messages(&self) -> Vec<String> {
         let stack = self.stack.borrow();
         let len = stack.len();
-        if len == 0 {
-            return None;
-        }
-        let mut result = String::new();
-        for (i, message) in stack.iter().rev().enumerate() {
-            if i > 0 {
-                // add six spaces of indentation to match the "info: " prefix of the first message
-                // TODO: fix this in `ruff_annotate_snippets`?
-                result.push_str("\n      ");
-                if i < len - 1 {
-                    result.push_str("├── ");
+        stack
+            .iter()
+            .rev()
+            .enumerate()
+            .map(|(i, message)| {
+                if i == 0 {
+                    message.clone()
+                } else if i < len - 1 {
+                    format!("├── {message}")
                 } else {
-                    result.push_str("└── ");
+                    format!("└── {message}")
                 }
-            }
-            result.push_str(message);
-        }
-        Some(result)
+            })
+            .collect()
     }
 }
 

@@ -5659,7 +5659,7 @@ impl<'db> BindingError<'db> {
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
 
-                if let Some(message) = error_context.info_message() {
+                for message in error_context.info_messages() {
                     diag.info(message);
                 }
 

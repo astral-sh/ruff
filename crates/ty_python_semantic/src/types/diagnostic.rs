@@ -3678,7 +3678,7 @@ pub(super) fn report_invalid_assignment<'db>(
             value_ty.display(context.db()),
         ));
 
-        if let Some(message) = error_context.info_message() {
+        for message in error_context.info_messages() {
             diag.info(message);
         }
 
@@ -5451,7 +5451,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    if let Some(message) = error_context.info_message() {
+    for message in error_context.info_messages() {
         diagnostic.info(message);
     }
 
