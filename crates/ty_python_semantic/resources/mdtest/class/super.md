@@ -309,6 +309,49 @@ class E(enum.Enum):
                 reveal_type(super())
 ```
 
+### Metaclasses
+
+When the second argument to `super()` is a class object, the call can still be valid if that class
+object is an instance of the pivot metaclass. This includes both concrete class objects and
+`type[T]`-style annotations in metaclass methods:
+
+```py
+from typing import Any, TypeVar
+
+_TMeta = TypeVar("_TMeta", bound="BaseWithMeta")
+
+class MetaBase(type):
+    meta_base_value: int = 1
+
+    def plain(self: type[_TMeta]) -> type[_TMeta]:
+        return self
+
+class Meta(MetaBase):
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+        reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
+        reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
+        return super().__call__(*args, **kwargs)
+
+class BaseWithMeta(metaclass=Meta):
+    pass
+
+class SubWithMeta(BaseWithMeta):
+    def extra(self) -> int:
+        return 42
+
+reveal_type(SubWithMeta())  # revealed: SubWithMeta
+SubWithMeta().extra()
+reveal_type(super(Meta, BaseWithMeta).meta_base_value)  # revealed: int
+
+class OtherMeta(type):
+    pass
+
+class OtherBase(metaclass=OtherMeta):
+    pass
+
+super(Meta, OtherBase)  # error: [invalid-super-argument]
+```
+
 ### Unbound Super Object
 
 Calling `super(cls)` without a second argument returns an _unbound super object_. This is treated as
