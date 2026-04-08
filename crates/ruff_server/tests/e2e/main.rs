@@ -26,6 +26,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod code_action;
+mod format;
 mod hover;
 mod notebook;
 
