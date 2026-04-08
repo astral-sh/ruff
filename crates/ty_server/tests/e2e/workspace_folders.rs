@@ -35,7 +35,7 @@ fn initialize_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -66,7 +66,7 @@ fn add_workspace_folder_after_init() -> Result<()> {
     // don't see `root2/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -78,7 +78,7 @@ fn add_workspace_folder_after_init() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -110,7 +110,7 @@ fn add_multiple_workspace_folders() -> Result<()> {
     // don't see `root2/main.py` or `root3/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -123,7 +123,7 @@ fn add_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -157,7 +157,7 @@ fn remove_workspace_folder_after_init() -> Result<()> {
     // initially.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -175,7 +175,7 @@ fn remove_workspace_folder_after_init() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -207,7 +207,7 @@ fn remove_multiple_workspace_folders() -> Result<()> {
     // initially.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -227,7 +227,7 @@ fn remove_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -312,7 +312,7 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     // don't see `root3/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -328,7 +328,7 @@ fn add_and_remove_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root3/main.py
@@ -365,7 +365,7 @@ fn add_existing_workspace_folder_is_no_op() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "

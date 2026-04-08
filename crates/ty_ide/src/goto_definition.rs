@@ -2058,7 +2058,7 @@ p = Point<CURSOR>(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:8:6
           |
@@ -2078,7 +2078,7 @@ p = Point<CURSOR>(1, 2)
         5 |
         6 | test = Test()
           |
-        "#);
+        ");
     }
 
     #[test]
@@ -2278,7 +2278,7 @@ while True:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -2314,7 +2314,7 @@ for x in range(10):
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |

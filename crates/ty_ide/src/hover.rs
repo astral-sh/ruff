@@ -312,7 +312,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -367,7 +367,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -436,7 +436,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -498,7 +498,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -562,7 +562,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
@@ -618,7 +618,7 @@ mod tests {
             )
             .build();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
@@ -673,7 +673,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         This is such a great class!!
@@ -808,7 +808,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass()
         ---------------------------------------------
         ```python
@@ -891,7 +891,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class Shape(val: str)
         class Shape(val: int)
         ---------------------------------------------
@@ -985,7 +985,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class S(
             a: int,
             b: str
@@ -1037,7 +1037,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class S(a: int)
         ---------------------------------------------
         new docs
@@ -1077,7 +1077,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r#"
+        assert_snapshot!(test.hover(), @"
         class Handler(callback: (int, str, /) -> bool)
         ---------------------------------------------
         ```python
@@ -1095,7 +1095,7 @@ mod tests {
           |     |   Cursor offset
           |     source
           |
-        "#);
+        ");
     }
 
     // TODO: should show `class Color(value: object)`
@@ -1260,7 +1260,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         bound method MyClass.my_method(
             a,
             b
@@ -2576,7 +2576,7 @@ def ab(a: int, *, c: int):
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -3130,7 +3130,7 @@ def function():
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -3530,7 +3530,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3619,7 +3619,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -5078,7 +5078,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r###"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python
@@ -5093,7 +5093,7 @@ def function():
           |      |
           |      source
           |
-        "###);
+        ");
 
         let test = hover_test(
             r#"
@@ -5131,7 +5131,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         ```python
@@ -5156,7 +5156,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         ```python
@@ -5184,7 +5184,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python
@@ -5209,7 +5209,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python

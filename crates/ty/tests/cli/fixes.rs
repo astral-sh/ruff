@@ -20,7 +20,7 @@ fn add_ignore() -> anyhow::Result<()> {
             "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @r"
+    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -31,7 +31,7 @@ fn add_ignore() -> anyhow::Result<()> {
     ");
 
     // There should be no diagnostics when running ty again
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
