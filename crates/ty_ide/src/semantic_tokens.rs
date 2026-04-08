@@ -38,8 +38,8 @@ use ruff_python_ast::visitor::source_order::{
     walk_interpolated_string_element, walk_stmt,
 };
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, BytesLiteral, Expr, InterpolatedStringElement, Stmt, StringLiteral,
-    TypeParam,
+    self as ast, AnyNodeRef, ArgOrKeyword, BytesLiteral, Expr, InterpolatedStringElement, Stmt,
+    StringLiteral, TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
@@ -49,7 +49,10 @@ use ty_python_semantic::{
     HasType, SemanticModel,
     semantic_index::definition::DefinitionKind,
     types::Type,
-    types::ide_support::{definition_for_name, static_member_type_for_attribute},
+    types::ide_support::{
+        CallArgumentForm, call_argument_forms, definition_for_name,
+        static_member_type_for_attribute,
+    },
 };
 
 /// Semantic token types supported by the language server.
@@ -956,6 +959,23 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
                     walk_expr(self, expr);
+                }
+            }
+            ast::Expr::Call(call) => {
+                self.visit_expr(call.func.as_ref());
+
+                // Determine whether each argument should be considered a type annotation or a
+                // value based on the position.
+                let argument_forms = call_argument_forms(self.model, call);
+                for (argument, form) in call.arguments.arguments_source_order().zip(argument_forms)
+                {
+                    match form {
+                        CallArgumentForm::Type => self.visit_annotation(argument.value()),
+                        CallArgumentForm::Unknown | CallArgumentForm::Value => match argument {
+                            ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
+                            ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                        },
+                    }
                 }
             }
             _ => {
@@ -2511,26 +2531,208 @@ z2 = os.PathLike[str]
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 5,
-            "expected import plus annotation tokens, got {pathlike_types:?}"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "x1" @ 36..38: Variable [definition]
+        "os" @ 40..42: Namespace
+        "PathLike" @ 43..51: Class
+        "x2" @ 52..54: Variable [definition]
+        "os" @ 56..58: Namespace
+        "PathLike" @ 59..67: Class
+        "str" @ 68..71: Class
+        "y1" @ 74..76: Variable [definition]
+        "PathLike" @ 78..86: Class
+        "y2" @ 87..89: Variable [definition]
+        "PathLike" @ 91..99: Class
+        "str" @ 100..103: Class
+        "z1" @ 106..108: Class [definition]
+        "os" @ 111..113: Namespace
+        "PathLike" @ 114..122: Class
+        "z2" @ 123..125: Class [definition]
+        "os" @ 128..130: Namespace
+        "PathLike" @ 131..139: Class
+        "str" @ 140..143: Class
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_cast() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import cast
+
+x1 = cast(os.PathLike[str], "")
+x2 = cast(PathLike[str], "")
+x3 = typing.cast(os.PathLike[str], "")
+"#,
         );
 
-        assert_eq!(
-            pathlike_types[1..5],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "cast" @ 68..72: Function
+        "x1" @ 74..76: Variable [definition]
+        "cast" @ 79..83: Function
+        "os" @ 84..86: Namespace
+        "PathLike" @ 87..95: Class
+        "str" @ 96..99: Class
+        "\"\"" @ 102..104: String
+        "x2" @ 106..108: Variable [definition]
+        "cast" @ 111..115: Function
+        "PathLike" @ 116..124: Class
+        "str" @ 125..128: Class
+        "\"\"" @ 131..133: String
+        "x3" @ 135..137: Variable [definition]
+        "typing" @ 140..146: Namespace
+        "cast" @ 147..151: Method
+        "os" @ 152..154: Namespace
+        "PathLike" @ 155..163: Class
+        "str" @ 164..167: Class
+        "\"\"" @ 170..172: String
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_assert_type() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import assert_type
+
+x1 = assert_type("", os.PathLike[str])
+x2 = assert_type("", PathLike[str])
+x3 = typing.assert_type("", os.PathLike[str])
+"#,
         );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "assert_type" @ 68..79: Function
+        "x1" @ 81..83: Variable [definition]
+        "assert_type" @ 86..97: Function
+        "\"\"" @ 98..100: String
+        "os" @ 102..104: Namespace
+        "PathLike" @ 105..113: Class
+        "str" @ 114..117: Class
+        "x2" @ 120..122: Variable [definition]
+        "assert_type" @ 125..136: Function
+        "\"\"" @ 137..139: String
+        "PathLike" @ 141..149: Class
+        "str" @ 150..153: Class
+        "x3" @ 156..158: Variable [definition]
+        "typing" @ 161..167: Namespace
+        "assert_type" @ 168..179: Method
+        "\"\"" @ 180..182: String
+        "os" @ 184..186: Namespace
+        "PathLike" @ 187..195: Class
+        "str" @ 196..199: Class
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_type_form_keyword_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+from os import PathLike
+from typing import assert_type, cast
+
+x1 = cast(typ=os.PathLike[str], val="")
+x2 = cast(val="", typ=PathLike[str])
+x3 = assert_type(type=os.PathLike[str], value="")
+x4 = assert_type(value="", type=PathLike[str])
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "typing" @ 40..46: Namespace
+        "assert_type" @ 54..65: Function
+        "cast" @ 67..71: Function
+        "x1" @ 73..75: Variable [definition]
+        "cast" @ 78..82: Function
+        "os" @ 87..89: Namespace
+        "PathLike" @ 90..98: Class
+        "str" @ 99..102: Class
+        "\"\"" @ 109..111: String
+        "x2" @ 113..115: Variable [definition]
+        "cast" @ 118..122: Function
+        "\"\"" @ 127..129: String
+        "PathLike" @ 135..143: Class
+        "str" @ 144..147: Class
+        "x3" @ 150..152: Variable [definition]
+        "assert_type" @ 155..166: Function
+        "os" @ 172..174: Namespace
+        "PathLike" @ 175..183: Class
+        "str" @ 184..187: Class
+        "\"\"" @ 196..198: String
+        "x4" @ 200..202: Variable [definition]
+        "assert_type" @ 205..216: Function
+        "\"\"" @ 223..225: String
+        "PathLike" @ 232..240: Class
+        "str" @ 241..244: Class
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_ignore_failed_bindings_for_type_form_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import cast
+
+flag = bool(input())
+def g(x):
+    return x
+
+x = ""
+f = cast if flag else g
+f(int, x)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "cast" @ 20..24: Function
+        "flag" @ 26..30: Variable [definition]
+        "bool" @ 33..37: Class
+        "input" @ 38..43: Function
+        "g" @ 51..52: Function [definition]
+        "x" @ 53..54: Parameter [definition]
+        "x" @ 68..69: Parameter
+        "x" @ 71..72: Variable [definition]
+        "\"\"" @ 75..77: String
+        "f" @ 78..79: Variable [definition]
+        "cast" @ 82..86: Function
+        "flag" @ 90..94: Variable
+        "g" @ 100..101: Function
+        "f" @ 102..103: Variable
+        "int" @ 104..107: Class
+        "x" @ 109..110: Variable
+        "#);
     }
 
     #[test]
