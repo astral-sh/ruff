@@ -1308,11 +1308,6 @@ mod tests {
             title: str = ...,
             year: int = ...
         )
-        class Movie(
-            *,
-            title: str,
-            year: int
-        )
         ---------------------------------------------
         ```python
         class Movie(
@@ -1321,11 +1316,6 @@ mod tests {
             /,
             title: str = ...,
             year: int = ...
-        )
-        class Movie(
-            *,
-            title: str,
-            year: int
         )
         ```
         ---------------------------------------------
