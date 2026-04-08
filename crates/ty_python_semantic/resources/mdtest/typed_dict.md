@@ -408,8 +408,7 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
-Known issue: speculative `TypedDict` constructor validation currently duplicates diagnostics that
-were already emitted by the initial inference pass:
+TypedDict constructor validation should not duplicate diagnostics emitted by argument inference:
 
 ```py
 from typing import TypedDict
@@ -417,10 +416,22 @@ from typing import TypedDict
 class TD(TypedDict):
     x: int
 
-# TODO: This should only emit a single `unresolved-reference` diagnostic.
-# error: [unresolved-reference] "Name `missing` used when not defined"
 # error: [unresolved-reference] "Name `missing` used when not defined"
 TD(x=missing)
+```
+
+TypedDict constructor validation should respect string-valued constants used as keys in positional
+dict literals:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+
+Record({VALUE_KEY: "x"})
 ```
 
 All of these are missing the required `age` field:

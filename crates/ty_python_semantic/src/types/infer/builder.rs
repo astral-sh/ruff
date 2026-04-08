@@ -563,6 +563,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or(self.fallback_type())
     }
 
+    fn try_expression_type_or_infer(
+        &mut self,
+        expr: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.try_expression_type(expr)
+            .unwrap_or_else(|| self.infer_expression(expr, tcx))
+    }
+
     /// Store qualifiers for an annotation expression.
     fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
         if !qualifiers.is_empty() {
@@ -6566,6 +6575,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    fn infer_typed_dict_constructor_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        arguments: &ast::Arguments,
+    ) {
+        if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+            let target_ty = Type::TypedDict(typed_dict);
+            self.try_expression_type_or_infer(
+                &arguments.args[0],
+                TypeContext::new(Some(target_ty)),
+            );
+            return;
+        }
+
+        let items = typed_dict.items(self.db());
+        for keyword in &arguments.keywords {
+            let value_tcx = keyword
+                .arg
+                .as_ref()
+                .and_then(|arg_name| items.get(arg_name.id.as_str()))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.try_expression_type_or_infer(&keyword.value, value_tcx);
+        }
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -6876,31 +6911,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
+        let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
+        let has_positional_dict_literal =
+            arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
+
+        // Validate `TypedDict` constructor calls before general argument inference so the field
+        // type context becomes the canonical inference for constructor values.
+        if let Some(class) = class
+            && is_typed_dict_constructor
+        {
+            let typed_dict = TypedDictType::new(class);
+            self.infer_typed_dict_constructor_values(typed_dict, arguments);
+
+            // Positional dict literals are validated during TypedDict-context inference above.
+            // Re-validating them here would duplicate those diagnostics.
+            if !has_positional_dict_literal {
+                validate_typed_dict_constructor(
+                    &self.context,
+                    typed_dict,
+                    arguments,
+                    func.as_ref().into(),
+                    |expr, _| self.expression_type(expr),
+                );
+            }
+        }
+
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+            &mut |builder, (_, expr, tcx)| {
+                if is_typed_dict_constructor {
+                    builder.try_expression_type_or_infer(expr, tcx)
+                } else {
+                    builder.infer_expression(expr, tcx)
+                }
+            },
             &mut bindings,
             call_expression_tcx,
         );
-
-        // Validate `TypedDict` constructor calls after argument type inference.
-        if let Some(class) = class
-            && class.is_typed_dict(self.db())
-        {
-            let mut speculative = self.speculate();
-            validate_typed_dict_constructor(
-                &self.context,
-                TypedDictType::new(class),
-                arguments,
-                func.as_ref().into(),
-                |expr, tcx| speculative.infer_expression(expr, tcx),
-            );
-            // TODO: Merging speculative inference preserves TypedDict-specific diagnostics, but it
-            // can also duplicate diagnostics that were already emitted during the initial
-            // type-context-free argument inference.
-            self.extend(speculative);
-        }
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
