@@ -507,6 +507,81 @@ def _(
     ChildKwargs(**maybe_name, count=1)
 ```
 
+TypedDict positional arguments in mixed constructors should validate their declared keys:
+
+```py
+from typing import TypedDict
+
+class Target(TypedDict):
+    a: int
+    b: int
+
+class Source(TypedDict):
+    a: int
+
+class BadSource(TypedDict):
+    a: str
+
+class MaybeSource(TypedDict, total=False):
+    a: int
+
+class WiderSource(TypedDict):
+    a: int
+    extra: str
+
+class WiderBadSource(TypedDict):
+    a: str
+    extra: str
+
+def _(
+    source: Source,
+    bad: BadSource,
+    maybe: MaybeSource,
+    wide: WiderSource,
+    wide_bad: WiderBadSource,
+    cond: bool,
+):
+    Target(source, b=2)
+    Target(source if cond else {"a": 1}, b=2)
+    Target(source if cond else {"a": 1, "b": 0}, b=2)
+    Target(source if cond else {"a": 1, "b": "shadowed"}, b=2)
+    Target(wide, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(bad, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(wide_bad, b=2)
+
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `Target` constructor"
+    Target(maybe, b=2)
+```
+
+Mixed constructors should stay lenient for non-`TypedDict` positional mappings once the keyword
+arguments cover the full schema:
+
+```py
+from typing import TypedDict
+
+class FullFromKeywords(TypedDict):
+    a: int
+
+def _(mapping: dict[str, str]):
+    FullFromKeywords(mapping, a=1)
+```
+
+Conditional plain-dict positional mappings should not be validated as `TypedDict` literals:
+
+```py
+from typing import TypedDict
+
+class ConditionalTarget(TypedDict):
+    a: int
+
+def _(cond: bool):
+    ConditionalTarget({"x": 1} if cond else {}, a=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -628,7 +703,8 @@ These calls mix a positional `TypedDict` argument with unpacked keyword argument
 validate normally and produce ordinary diagnostics:
 
 ```py
-from typing import TypedDict
+from typing import Any, TypedDict
+from typing_extensions import Never
 
 class MixedTarget(TypedDict):
     x: int
@@ -637,8 +713,10 @@ class MixedTarget(TypedDict):
 class MaybeY(TypedDict, total=False):
     y: int
 
-def _(target: MixedTarget, maybe_y: MaybeY):
+def _(target: MixedTarget, maybe_y: MaybeY, kwargs: Any, never_kwargs: Never, cond: bool):
     MixedTarget(target, **maybe_y)
+    MixedTarget(maybe_y if cond else {}, **kwargs)
+    MixedTarget(maybe_y if cond else {}, **never_kwargs)
 
     # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
     MixedTarget({"x": 1}, **maybe_y)
