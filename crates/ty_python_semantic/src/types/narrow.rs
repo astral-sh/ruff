@@ -255,7 +255,33 @@ impl ClassInfoConstraintFunction {
                 )
             }
 
-            Type::SpecialForm(_) => None,
+            Type::SpecialForm(form) => match form {
+                SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
+                    db,
+                    alias.aliased_class().to_class_literal(db),
+                    is_positive,
+                ),
+                SpecialFormType::Tuple => self.generate_constraint(
+                    db,
+                    KnownClass::Tuple.to_class_literal(db),
+                    is_positive,
+                ),
+                SpecialFormType::Type => {
+                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db), is_positive)
+                }
+
+                // We don't have a good meta-type for `Callable`s right now,
+                // so only apply `isinstance()` narrowing, not `issubclass()`
+                SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
+                    .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+
+                // `InitVar` is a class at runtime, so can be used in `isinstance()`,
+                // but we can't represent internally the type that we should narrow to after an `isinstance()` check,
+                // so just intersect with `Any` in those cases.
+                SpecialFormType::TypeQualifier(TypeQualifier::InitVar) => Some(Type::any()),
+
+                _ => None,
+            },
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
