@@ -39,7 +39,7 @@ expression: main_diagnostics
       "severity": 3,
       "code": "revealed-type",
       "source": "ty",
-      "message": "Revealed type: `Literal[/"included/"]`"
+      "message": "Revealed type: `Literal[\"included\"]`"
     }
   ]
 }
