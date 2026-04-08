@@ -275,7 +275,7 @@ reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
 reveal_type(Foo[Concatenate].attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate]].attr)  # revealed: (...) -> None
+reveal_type(Foo[[Concatenate]].attr)  # revealed: (Unknown, /) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 reveal_type(Foo[[Concatenate, int]].attr)  # revealed: (Unknown, int, /) -> None
 
