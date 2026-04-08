@@ -654,21 +654,45 @@ reveal_type(super(B, A))
 reveal_type(super(B, object))
 
 super(object, object()).__class__
+```
 
-# Not all objects valid in a class's bases list are valid as the first argument to `super()`.
-# For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
-#
+Not all objects valid in a class's bases list are valid as the first argument to `super()`. For
+example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to
+`super()`.
+
+```py
 # error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
 reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
+```
 
-# Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
-# but it *is* valid as the first argument to `super()`.
-#
+It's not valid to inherit from unsubscripted `typing.Generic` or `typing.Protocol`, but it _is_
+valid as the first argument to `super()`. Still required that it be in the second argument's MRO,
+though:
+
+```py
 # revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
 reveal_type(super(typing.Generic, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Generic, int)
 
-def _(x: type[typing.Any], y: typing.Any):
+# revealed: <super: <special-form 'typing.Protocol'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Protocol, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Protocol, int)
+
+def _(x: type[typing.Any], y: typing.Any, z: int):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
+```
+
+`typing.TypedDict` never appears in the MRO of any class, so it's not valid as the first argument to
+`super()`.
+
+```py
+class TD(typing.TypedDict):
+    x: int
+
+# error: [invalid-super-argument]
+super(typing.TypedDict, TD)
 ```
 
 ### Diagnostic when the invalid type is rendered very verbosely
