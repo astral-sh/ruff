@@ -1283,6 +1283,53 @@ mod tests {
     }
 
     #[test]
+    fn hover_typeddict_constructor_positional_map_dict_literal_in_constructor() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie({"title": "Alien", "year": 1979})
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            __map: Movie,
+            *,
+            /,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            __map: Movie,
+            *,
+            /,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie({"title": "Alien", "year": 1979})
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_class_method() {
         let test = hover_test(
             r#"
