@@ -111,6 +111,8 @@ use ty_python_core::{
     place_table, unpack::UnpackPosition,
 };
 
+use self::typed_dict::{TypedDictConstructorBindingStrategy, TypedDictConstructorForm};
+
 mod annotation_expression;
 mod binary_expressions;
 mod class;
@@ -6721,7 +6723,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         call_arguments
     }
-
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -7039,32 +7040,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
-        let has_mixed_typed_dict_literal_argument = is_typed_dict_constructor
-            && arguments.args.len() == 1
-            && arguments.args[0].is_dict_expr()
-            && !arguments.keywords.is_empty();
-
-        // Validate `TypedDict` constructor calls before general argument inference so the field
+        // Prepare `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
-        if let Some(class) = class
-            && is_typed_dict_constructor
-        {
-            let typed_dict = TypedDictType::new(class);
-            self.infer_typed_dict_constructor_values(typed_dict, arguments, func.as_ref().into());
-        }
+        let typed_dict_binding_strategy =
+            class
+                .filter(|class| class.is_typed_dict(self.db()))
+                .map(|class| {
+                    let typed_dict = TypedDictType::new(class);
+                    let form = TypedDictConstructorForm::from_arguments(arguments);
+                    self.prepare_typed_dict_constructor(
+                        typed_dict,
+                        form,
+                        arguments,
+                        func.as_ref().into(),
+                    )
+                });
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
-                if has_mixed_typed_dict_literal_argument && expr.is_dict_expr() {
+            &mut |builder, (_, expr, tcx)| match typed_dict_binding_strategy {
+                Some(TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(
+                    dict_literal,
+                )) if expr.node_index().load() == dict_literal => {
                     builder.try_expression_type(expr).unwrap_or(Type::unknown())
-                } else if is_typed_dict_constructor {
-                    builder.get_or_infer_expression(expr, tcx)
-                } else {
-                    builder.infer_expression(expr, tcx)
                 }
+                Some(
+                    TypedDictConstructorBindingStrategy::ReusePreparedExpressions
+                    | TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(_),
+                ) => builder.get_or_infer_expression(expr, tcx),
+                None => builder.infer_expression(expr, tcx),
             },
             &mut bindings,
             call_expression_tcx,

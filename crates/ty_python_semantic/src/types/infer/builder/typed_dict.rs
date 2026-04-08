@@ -22,6 +22,46 @@ use crate::types::{
 };
 use ty_python_core::definition::Definition;
 
+/// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum TypedDictConstructorForm<'expr> {
+    /// // Ex) `TD(x=1)`
+    KeywordOnly,
+    /// // Ex) `TD({"x": 1})`
+    LiteralOnly(&'expr ast::Expr),
+    /// // Ex) `TD(other)`
+    SinglePositional(&'expr ast::Expr),
+    /// // Ex) `TD({"x": 1}, y=2)`
+    MixedLiteralAndKeywords(&'expr ast::ExprDict),
+    /// // Ex) `TD(other, y=2)`
+    MixedPositionalAndKeywords,
+}
+
+impl<'expr> TypedDictConstructorForm<'expr> {
+    /// Return the constructor form for `arguments`.
+    pub(super) fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
+        let [argument] = &arguments.args[..] else {
+            return Self::KeywordOnly;
+        };
+
+        match (argument, arguments.keywords.is_empty()) {
+            (ast::Expr::Dict(_), true) => Self::LiteralOnly(argument),
+            (ast::Expr::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords(dict_expr),
+            (_, true) => Self::SinglePositional(argument),
+            (_, false) => Self::MixedPositionalAndKeywords,
+        }
+    }
+}
+
+/// How general call binding should treat arguments after `TypedDict`-specific preparation.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum TypedDictConstructorBindingStrategy {
+    /// Reuse the cached results from `TypedDict`-specific preparation.
+    ReusePreparedExpressions,
+    /// Skip re-inferring the outer positional dict literal with this node index.
+    SkipPreparedPositionalDictLiteral(NodeIndex),
+}
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
@@ -298,31 +338,74 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .map(|_| Type::TypedDict(typed_dict))
     }
 
-    /// Infer subexpressions of a `TypedDict` constructor call before general argument inference.
+    /// Prepare a `TypedDict` constructor call before general argument inference.
     ///
     /// This gives constructor values the declared field type as context, then validates the full
-    /// call once. A lone positional dict literal is inferred as a `TypedDict` expression directly,
-    /// while mixed dict-literal and keyword calls infer the nested key and value expressions
-    /// without re-inferring the outer dict literal later during argument binding.
-    pub(super) fn infer_typed_dict_constructor_values<'expr>(
+    /// call once when needed. A lone positional dict literal is inferred as a `TypedDict`
+    /// expression directly, while mixed dict-literal and keyword calls infer the nested key and
+    /// value expressions without re-inferring the outer dict literal later during argument
+    /// binding.
+    pub(super) fn prepare_typed_dict_constructor<'expr>(
         &mut self,
         typed_dict: TypedDictType<'db>,
+        form: TypedDictConstructorForm<'expr>,
         arguments: &'expr ast::Arguments,
         error_node: AnyNodeRef<'expr>,
-    ) {
-        if arguments.args.len() == 1 && arguments.keywords.is_empty() {
-            let target_ty = Type::TypedDict(typed_dict);
-            let argument = &arguments.args[0];
-            self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
-            if argument.is_dict_expr() {
-                return;
+    ) -> TypedDictConstructorBindingStrategy {
+        match form {
+            TypedDictConstructorForm::LiteralOnly(argument) => {
+                let target_ty = Type::TypedDict(typed_dict);
+                self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+                return TypedDictConstructorBindingStrategy::ReusePreparedExpressions;
             }
-        } else if arguments.args.len() == 1
-            && let ast::Expr::Dict(dict_expr) = &arguments.args[0]
-        {
-            self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
+            TypedDictConstructorForm::SinglePositional(argument) => {
+                let target_ty = Type::TypedDict(typed_dict);
+                self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+            }
+            TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
+                self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
+            }
+            TypedDictConstructorForm::MixedPositionalAndKeywords
+            | TypedDictConstructorForm::KeywordOnly => {}
         }
 
+        if !arguments.keywords.is_empty() {
+            self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+        }
+
+        validate_typed_dict_constructor(
+            &self.context,
+            typed_dict,
+            arguments,
+            error_node,
+            |expr, _| self.expression_type(expr),
+        );
+
+        match form {
+            TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
+                TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(
+                    dict_expr.node_index().load(),
+                )
+            }
+            TypedDictConstructorForm::KeywordOnly
+            | TypedDictConstructorForm::LiteralOnly(_)
+            | TypedDictConstructorForm::SinglePositional(_)
+            | TypedDictConstructorForm::MixedPositionalAndKeywords => {
+                TypedDictConstructorBindingStrategy::ReusePreparedExpressions
+            }
+        }
+    }
+
+    /// Infer keyword argument values for a `TypedDict` constructor.
+    ///
+    /// Named keywords are inferred against the declared type of the matching `TypedDict` field.
+    /// Unpacked `**kwargs` and unknown keys fall back to default inference because they do not
+    /// map to a single field declaration at this stage.
+    fn infer_typed_dict_constructor_keyword_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        arguments: &ast::Arguments,
+    ) {
         let items = typed_dict.items(self.db());
         for keyword in &arguments.keywords {
             let value_tcx = keyword
@@ -333,14 +416,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
         }
-
-        validate_typed_dict_constructor(
-            &self.context,
-            typed_dict,
-            arguments,
-            error_node,
-            |expr, _| self.expression_type(expr),
-        );
     }
 
     /// Infer the key and value expressions of a positional dict literal passed to a
