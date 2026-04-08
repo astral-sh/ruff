@@ -6900,6 +6900,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 func.as_ref().into(),
                 |expr, tcx| speculative.infer_expression(expr, tcx),
             );
+            // TODO: Merging speculative inference preserves TypedDict-specific diagnostics, but it
+            // can also duplicate diagnostics that were already emitted during the initial
+            // type-context-free argument inference.
             self.extend(speculative);
         }
 

@@ -408,6 +408,21 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+Known issue: speculative `TypedDict` constructor validation currently duplicates diagnostics that
+were already emitted by the initial inference pass:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+# TODO: This should only emit a single `unresolved-reference` diagnostic.
+# error: [unresolved-reference] "Name `missing` used when not defined"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+TD(x=missing)
+```
+
 All of these are missing the required `age` field:
 
 ```py
