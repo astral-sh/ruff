@@ -2765,6 +2765,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
+            | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
+            | Type::SubclassOf(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
@@ -2849,12 +2852,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|(meta_attr, _)| meta_attr)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
-                    match attr_ty.try_call_dunder(
+                    let delete_dunder_call_result = attr_ty.try_call_dunder(
                         db,
                         "__delete__",
                         CallArguments::positional([object_ty]),
                         TypeContext::default(),
-                    ) {
+                    );
+
+                    match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
                         Err(CallDunderError::CallError(kind, bindings)) => {
                             if emit_diagnostics {
@@ -2876,10 +2881,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 true
             }
 
-            Type::ClassLiteral(..)
-            | Type::GenericAlias(..)
-            | Type::SubclassOf(..)
-            | Type::Dynamic(..)
+            Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never
             | Type::ModuleLiteral(..)

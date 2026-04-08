@@ -169,10 +169,10 @@ c = C()
 reveal_type(c.x)  # revealed: int
 ```
 
-### Custom deleters
+### Property deleters
 
 ```py
-from typing import NamedTuple, NoReturn
+from typing import NoReturn
 
 class ReadOnlyProperty:
     @property
@@ -187,6 +187,44 @@ class SupportsDelete:
     @x.deleter
     def x(self) -> None:
         pass
+
+class RejectsDescriptorDelete:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.deleter
+    def x(self) -> NoReturn:
+        raise AttributeError("x")
+
+class ExplicitNoneDeleter:
+    def get(self) -> int:
+        return 1
+
+    keyword = property(get, fdel=None)
+    positional = property(get, None, None)
+
+read_only = ReadOnlyProperty()
+# error: [invalid-assignment] "Cannot delete read-only property `x` on object of type `ReadOnlyProperty`"
+del read_only.x
+
+supports_delete = SupportsDelete()
+del supports_delete.x
+
+rejects_descriptor_delete = RejectsDescriptorDelete()
+del rejects_descriptor_delete.x
+
+explicit_none_deleter = ExplicitNoneDeleter()
+# error: [invalid-assignment] "Cannot delete read-only property `keyword` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.keyword
+# error: [invalid-assignment] "Cannot delete read-only property `positional` on object of type `ExplicitNoneDeleter`"
+del explicit_none_deleter.positional
+```
+
+### Instance `__delattr__`
+
+```py
+from typing import NamedTuple, NoReturn
 
 class SupportsCustomDelete:
     @property
@@ -204,20 +242,6 @@ class RejectsDelete:
     def __delattr__(self, name: str) -> NoReturn:
         raise AttributeError(name)
 
-class DeletableNamedTuple(NamedTuple):
-    x: int
-
-    def __delattr__(self, name: str) -> None:
-        pass
-
-class Weird:
-    def __delete__(self, instance: object, extra: object) -> None:
-        pass
-
-class FallbackInstanceAttribute:
-    def __init__(self) -> None:
-        self.x = Weird()
-
 class BadDelAttr:
     x: int = 1
 
@@ -225,12 +249,11 @@ class BadDelAttr:
     def __delattr__(self, name: int) -> None:
         pass
 
-read_only = ReadOnlyProperty()
-# error: [invalid-assignment] "Cannot delete read-only property `x` on object of type `ReadOnlyProperty`"
-del read_only.x
+class DeletableNamedTuple(NamedTuple):
+    x: int
 
-supports_delete = SupportsDelete()
-del supports_delete.x
+    def __delattr__(self, name: str) -> None:
+        pass
 
 supports_custom_delete = SupportsCustomDelete()
 del supports_custom_delete.x
@@ -239,15 +262,43 @@ rejects_delete = RejectsDelete()
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDelete` whose `__delattr__` method returns `Never`/`NoReturn`"
 del rejects_delete.x
 
-fallback_instance_attribute = FallbackInstanceAttribute()
-del fallback_instance_attribute.x
-
 bad_delattr = BadDelAttr()
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method."
 del bad_delattr.x
 
 deletable_namedtuple = DeletableNamedTuple(1)
 del deletable_namedtuple.x
+```
+
+### Descriptor `__delete__`
+
+```py
+class Weird:
+    def __delete__(self, instance: object, extra: object) -> None:
+        pass
+
+class FallbackInstanceAttribute:
+    def __init__(self) -> None:
+        self.x = Weird()
+
+fallback_instance_attribute = FallbackInstanceAttribute()
+del fallback_instance_attribute.x
+```
+
+### Metaclass `__delattr__`
+
+```py
+from typing import NoReturn
+
+class RejectsClassDeleteMeta(type):
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class RejectsClassDelete(metaclass=RejectsClassDeleteMeta):
+    x: int = 1
+
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
+del RejectsClassDelete.x
 ```
 
 ## Delete items
