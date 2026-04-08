@@ -422,7 +422,7 @@ def type_of_annotation() -> None:
 # error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
 
-# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -502,7 +502,7 @@ c2: CallableTypeOf["foo"]
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c20: CallableTypeOf[("foo",)]
 
-# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 

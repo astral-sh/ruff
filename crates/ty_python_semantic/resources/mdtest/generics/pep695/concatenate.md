@@ -210,6 +210,8 @@ reveal_type(f(a=1, b="", x=2))  # revealed: int
 
 ### Standalone annotation (not inside `Callable`)
 
+<!-- snapshot-diagnostics -->
+
 `Concatenate` is only valid as the first argument to `Callable` or in the context of a `ParamSpec`
 type argument.
 
@@ -218,7 +220,7 @@ from typing import Callable, Concatenate, ParamSpec
 
 class Foo[T]: ...
 
-# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+# error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
 def invalid0(x: Concatenate): ...
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
@@ -246,6 +248,8 @@ def invalid5[**P](x: Foo[Concatenate[P, ...]]) -> None: ...
 
 ### Too few arguments
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Callable, Concatenate
 
@@ -259,7 +263,7 @@ def _(
     b: Callable[Concatenate[int], int],
     # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
     c: Callable[Concatenate[(int,)], int],
-    # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+    # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a parameter annotation"
     d: Callable[Concatenate, int],
 ):
     reveal_type(a)  # revealed: (...) -> int
@@ -386,7 +390,7 @@ from typing import Callable, Concatenate
 def invalid[**P](
     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context"
     c: Callable[Concatenate[Concatenate[int, ...], P], None],
-    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+    # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
     d: Callable[Concatenate[Concatenate, P], int],
     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
     e: Callable[Concatenate[int, Concatenate[int, ...]], None],

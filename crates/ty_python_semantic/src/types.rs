@@ -6963,15 +6963,15 @@ impl<'db> InvalidTypeExpression<'db> {
                 match self.error {
                     InvalidTypeExpression::RequiresOneArgument(special_form) => write!(
                         f,
-                        "`{special_form}` requires exactly one argument when used in a type expression",
+                        "`{special_form}` requires exactly one argument when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least one argument when used in a type expression",
+                        "`{special_form}` requires at least one argument when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresTwoArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least two arguments when used in a type expression",
+                        "`{special_form}` requires at least two arguments when used in a {location}",
                     ),
                     InvalidTypeExpression::Protocol => {
                         write!(f, "`typing.Protocol` is not allowed in {location}s")
@@ -7061,11 +7061,12 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::InvalidBareParamSpec(paramspec) => write!(
                         f,
-                        "Bare ParamSpec `{}` is not valid in this context in a type expression",
+                        "Bare ParamSpec `{}` is not valid in this context in a {location}",
                         paramspec.name(self.db)
                     ),
-                    InvalidTypeExpression::Concatenate => f.write_str(
-                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                    InvalidTypeExpression::Concatenate => write!(
+                        f,
+                        "`typing.Concatenate` is not allowed in this context in a {location}",
                     ),
                 }
             }
