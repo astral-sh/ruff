@@ -93,6 +93,10 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", default=[int, str])
 P2 = ParamSpec("P2", default=...)
 P3 = ParamSpec("P3", default=P2)
+Q = ParamSpec("Q")
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+P5 = ParamSpec("P5", default=[Q])
 ```
 
 Other values are invalid.

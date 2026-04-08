@@ -53,6 +53,10 @@ def foo3[**P = [int, str]]() -> None:
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
     reveal_type(Q)  # revealed: ParamSpec
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+def foo5[**Q, **P = [Q]]() -> None:
+    pass
 ```
 
 Other values are invalid.
