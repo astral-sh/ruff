@@ -1728,7 +1728,8 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             }
 
             let file_scope_id = scope_id.file_scope_id(db);
-            if !index.is_scope_reachable(db, file_scope_id) {
+            let parsed = parsed_module(db, file).load(db);
+            if !index.is_range_reachable(db, file_scope_id, class_node.node(&parsed).range()) {
                 continue;
             }
 
