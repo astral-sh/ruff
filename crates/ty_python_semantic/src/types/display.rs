@@ -2165,6 +2165,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             let mut first = true;
 
             for parameter in parameters {
+                // Handle special separators
                 if parameter.is_positional_only() {
                     needs_slash = true;
                 } else if needs_slash {
@@ -2175,7 +2176,6 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     needs_slash = false;
                     first = false;
                 }
-                // Handle special separators
                 if !star_added && parameter.is_keyword_only() {
                     if !first {
                         f.write_str(arg_separator)?;
