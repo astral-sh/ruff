@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -21,7 +18,10 @@ use crate::types::{
 };
 use crate::{
     Db,
-    types::{Type, constraints::ConstraintSet, generics::InferableTypeVars},
+    types::{
+        Type, TypeRelationErrorContext, TypeRelationHint, constraints::ConstraintSet,
+        generics::InferableTypeVars,
+    },
 };
 
 /// A non-exhaustive enumeration of relations that can exist between types.
@@ -354,7 +354,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> Result<(), TypeRelationErrorContext> {
+    ) -> Result<(), TypeRelationErrorContext<'db>> {
         if self.is_assignable_to(db, target) {
             return Ok(());
         }
@@ -607,56 +607,12 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     }
 }
 
-#[derive(Clone, Default, Debug)]
-pub struct TypeRelationErrorContext {
-    stack: Rc<RefCell<Vec<String>>>,
-}
-
-impl PartialEq for TypeRelationErrorContext {
-    fn eq(&self, other: &Self) -> bool {
-        *self.stack.borrow() == *other.stack.borrow()
-    }
-}
-
-impl Eq for TypeRelationErrorContext {}
-
-impl TypeRelationErrorContext {
-    fn new() -> Self {
-        Self {
-            stack: Rc::new(RefCell::new(Vec::new())),
-        }
-    }
-
-    fn push(&self, message: String) {
-        self.stack.borrow_mut().push(message);
-    }
-
-    pub fn info_messages(&self) -> Vec<String> {
-        let stack = self.stack.borrow();
-        let len = stack.len();
-        stack
-            .iter()
-            .rev()
-            .enumerate()
-            .map(|(i, message)| {
-                if i == 0 {
-                    message.clone()
-                } else if i < len - 1 {
-                    format!("├── {message}")
-                } else {
-                    format!("└── {message}")
-                }
-            })
-            .collect()
-    }
-}
-
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    error_context: Option<TypeRelationErrorContext>,
+    error_context: Option<TypeRelationErrorContext<'db>>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -723,27 +679,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    pub(super) fn provide_error_context(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
-        get_message: impl FnOnce() -> String,
-    ) {
+    pub(super) fn provide_hint(&self, get_hint: impl FnOnce() -> TypeRelationHint<'db>) {
         if let Some(error_context) = &self.error_context {
-            error_context.push(format!(
-                "type `{source}` is not assignable to `{target}`",
-                source = source.display(db),
-                target = target.display(db)
-            ));
-
-            error_context.push(get_message());
-        }
-    }
-
-    pub(super) fn provide_error_hint(&self, get_message: impl FnOnce() -> String) {
-        if let Some(error_context) = &self.error_context {
-            error_context.push(get_message());
+            error_context.push(get_hint());
         }
     }
 
@@ -1108,14 +1046,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
                         if constraint_set.is_never_satisfied(db) {
-                            self.provide_error_hint(|| {
-                            let union_display = source.display(db).to_string();
-                            format!(
-                                "element `{}` of union `{union_display}` is not assignable to `{}`",
-                                elem_ty.display(db),
-                                target.display(db),
-                            )
-                        });
+                            self.provide_hint(|| TypeRelationHint::UnionElementNotAssignable {
+                                element: elem_ty,
+                                union: source,
+                                target,
+                            });
                         }
                         constraint_set
                     })
@@ -1390,11 +1325,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     if let Type::NominalInstance(instance) = target
                         && instance.class(db).is_known(db, KnownClass::Dict)
                     {
-                        self.provide_error_hint(|| {
-                            "`TypedDict` types are not assignable to `dict` \
-                             (consider using `Mapping` instead)"
-                                .to_string()
-                        });
+                        self.provide_hint(|| TypeRelationHint::TypedDictNotAssignableToDict);
                     }
                 }
                 result

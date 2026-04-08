@@ -30,8 +30,8 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
-    TypeContext, TypeMapping, UnionBuilder, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    TypeContext, TypeMapping, TypeRelationHint, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1244,12 +1244,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db);
         if !return_type_checks {
-            self.provide_error_hint(|| {
-                format!(
-                    "incompatible return types `{}` and `{}`",
-                    source.return_ty.display(db),
-                    target.return_ty.display(db),
-                )
+            self.provide_hint(|| TypeRelationHint::IncompatibleReturnTypes {
+                source: source.return_ty,
+                target: target.return_ty,
             });
         }
 
@@ -1278,12 +1275,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db) {
-                self.provide_error_hint(|| {
-                    format!(
-                        "incompatible parameter types `{}` and `{}`",
-                        source_ty.display(db),
-                        target_ty.display(db),
-                    )
+                self.provide_hint(|| TypeRelationHint::IncompatibleParameterTypes {
+                    source: source_ty,
+                    target: target_ty,
                 });
             }
             !result
@@ -1441,10 +1435,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 },
                             ) => {
                                 if self_name != other_name {
-                                    self.provide_error_hint(|| {
-                                        format!(
-                                            "parameter `{self_name}` does not match `{other_name}` (and can be used as a keyword parameter)",
-                                        )
+                                    self.provide_hint(|| TypeRelationHint::ParameterNameMismatch {
+                                        source_name: self_name.clone(),
+                                        target_name: other_name.clone(),
                                     });
                                     return self.never();
                                 }
@@ -2131,10 +2124,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
-                                self.provide_error_hint(|| {
-                                    format!(
-                                        "parameter `{source_name}` does not match `{target_name}` (and can be used as a keyword parameter)",
-                                    )
+                                self.provide_hint(|| TypeRelationHint::ParameterNameMismatch {
+                                    source_name: source_name.clone(),
+                                    target_name: target_name.clone(),
                                 });
                                 return self.never();
                             }
@@ -2220,17 +2212,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 name: target_name, ..
                             },
                         ) => {
-                            self.provide_error_hint(|| {
-                                if let Some(name) = name {
-                                    format!(
-                                        "parameter `{name}` is positional-only \
-                                         but must also accept keyword arguments",
-                                    )
-                                } else {
-                                    format!(
-                                        "parameter `{target_name}` must accept \
-                                         keyword arguments",
-                                    )
+                            self.provide_hint(|| {
+                                TypeRelationHint::ParameterMustAcceptKeywordArguments {
+                                    source_name: name.clone(),
+                                    target_name: target_name.clone(),
                                 }
                             });
                             return self.never();
@@ -2241,11 +2226,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            self.provide_error_hint(|| {
-                                format!(
-                                    "parameter `{name}` is keyword-only \
-                                     but must also accept positional arguments",
-                                )
+                            self.provide_hint(|| {
+                                TypeRelationHint::ParameterMustAcceptPositionalArguments {
+                                    name: name.clone(),
+                                }
                             });
                             return self.never();
                         }

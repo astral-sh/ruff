@@ -30,7 +30,7 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    Type, TypeMapping, UnionBuilder, UnionType,
+    Type, TypeMapping, TypeRelationHint, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -293,12 +293,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
                 if !equal_length && self.relation.is_assignability() {
-                    self.provide_error_hint(|| {
-                        format!(
-                            "a tuple of length {} is not assignable to a tuple of length {}",
-                            source_tuple.0.len(),
-                            target_tuple.len().display_minimum(), // TODO: is display_minimum the right thing to use here?
-                        )
+                    self.provide_hint(|| TypeRelationHint::TupleLengthMismatch {
+                        source_len: source_tuple.0.len(),
+                        target_len: target_tuple.len(),
                     });
                 }
 
@@ -313,20 +310,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if constraint_set.is_never_satisfied(db) {
-                                    self.provide_error_context(db, source, target, || {
-                                        let count = source_tuple.0.len();
-
-                                        let which = match (n, count) {
-                                            (1, _) => "the first tuple element".to_string(),
-                                            (2, _) => "the second tuple element".to_string(),
-                                            (n, c) if n == c => {
-                                                "the last tuple element".to_string()
-                                            }
-                                            (3, _) => "the third tuple element".to_string(),
-                                            _ => format!("tuple element {n} of {count}"),
-                                        };
-
-                                        format!("{which} is not compatible")
+                                    self.provide_hint(|| {
+                                        TypeRelationHint::TupleElementNotCompatible {
+                                            source,
+                                            target,
+                                            element_index: n,
+                                            element_count: source_tuple.0.len(),
+                                        }
                                     });
                                 }
 

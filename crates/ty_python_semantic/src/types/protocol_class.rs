@@ -20,7 +20,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
         MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeRelationHint, TypeVarVariance,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -697,10 +698,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                         .place
                     else {
-                        let member_name = member.name;
-                        let ty_display = ty.display(db).to_string();
-                        self.provide_error_hint(|| {
-                            format!("protocol member `{member_name}` is not defined on type `{ty_display}`")
+                        self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                            member_name: member.name.into(),
+                            ty,
                         });
                         return self.never();
                     };
@@ -739,12 +739,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 );
                 if !is_defined {
-                    let member_name = member.name;
-                    let ty_display = ty.display(db).to_string();
-                    self.provide_error_hint(|| {
-                        format!(
-                            "protocol member `{member_name}` is not defined on type `{ty_display}`"
-                        )
+                    self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                        member_name: member.name.into(),
+                        ty,
                     });
                     return self.never();
                 }
@@ -757,12 +754,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ..
                 }) = ty.member(db, member.name).place
                 else {
-                    let member_name = member.name;
-                    let ty_display = ty.display(db).to_string();
-                    self.provide_error_hint(|| {
-                        format!(
-                            "protocol member `{member_name}` is not defined on type `{ty_display}`"
-                        )
+                    self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                        member_name: member.name.into(),
+                        ty,
                     });
                     return self.never();
                 };
@@ -774,8 +768,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         };
         if result.is_never_satisfied(db) {
-            let member_name = member.name;
-            self.provide_error_hint(|| format!("protocol member `{member_name}` is incompatible"));
+            self.provide_hint(|| TypeRelationHint::ProtocolMemberIncompatible {
+                member_name: member.name.into(),
+            });
         }
         result
     }

@@ -28,7 +28,7 @@ use crate::types::relation::{
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    LiteralValueTypeKind, TypeContext, TypeMapping, TypeRelationHint, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -516,10 +516,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         };
         if structurally_satisfied.is_never_satisfied(db) {
-            let ty_display = ty.display(db).to_string();
-            let protocol_display = Type::ProtocolInstance(protocol).display(db).to_string();
-            self.provide_error_hint(|| {
-                format!("type `{ty_display}` is not compatible with protocol `{protocol_display}`")
+            self.provide_hint(|| TypeRelationHint::TypeNotCompatibleWithProtocol {
+                ty,
+                protocol: Type::ProtocolInstance(protocol),
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)

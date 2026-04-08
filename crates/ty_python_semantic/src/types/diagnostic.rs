@@ -19,7 +19,6 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
-use crate::types::relation::TypeRelationErrorContext;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -29,8 +28,8 @@ use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
-    binding_type, protocol_class::ProtocolClass,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext,
+    TypeRelationErrorContext, TypeVarVariance, binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -3606,7 +3605,7 @@ pub(super) fn report_invalid_assignment<'db>(
     definition: Definition<'db>,
     target_ty: Type,
     value_ty: Type<'db>,
-    error_context: &TypeRelationErrorContext,
+    error_context: &TypeRelationErrorContext<'db>,
 ) {
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
@@ -3678,7 +3677,7 @@ pub(super) fn report_invalid_assignment<'db>(
             value_ty.display(context.db()),
         ));
 
-        for message in error_context.info_messages() {
+        for message in error_context.info_messages(context.db()) {
             diag.info(message);
         }
 
@@ -5380,7 +5379,7 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
-    error_context: &TypeRelationErrorContext,
+    error_context: &TypeRelationErrorContext<'db>,
 ) {
     let db = context.db();
 
@@ -5451,7 +5450,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    for message in error_context.info_messages() {
+    for message in error_context.info_messages(context.db()) {
         diagnostic.info(message);
     }
 

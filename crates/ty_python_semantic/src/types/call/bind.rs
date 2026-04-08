@@ -44,7 +44,6 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::known_instance::FieldInstance;
-use crate::types::relation::TypeRelationErrorContext;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
 };
@@ -55,8 +54,8 @@ use crate::types::{
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members,
+    TypeRelationErrorContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -5419,7 +5418,7 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
-        error_context: TypeRelationErrorContext,
+        error_context: TypeRelationErrorContext<'db>,
     },
     /// The type of the keyword-variadic argument's key is not `str`.
     InvalidKeyType {
@@ -5659,7 +5658,7 @@ impl<'db> BindingError<'db> {
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
 
-                for message in error_context.info_messages() {
+                for message in error_context.info_messages(context.db()) {
                     diag.info(message);
                 }
 
