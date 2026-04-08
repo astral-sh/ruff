@@ -13,8 +13,7 @@ use crate::types::class::known::KnownClass;
 use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
-use crate::types::mro::Mro;
-use crate::types::todo_type;
+use crate::types::mro::{DynamicMroError, Mro};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumSpec<'db> {
@@ -110,31 +109,16 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=dynamic_enum_mro_cycle_initial
+        cycle_initial=dynamic_enum_try_mro_cycle_initial
     )]
-    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
-        let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let mixin_mro: Vec<ClassBase<'db>> = self
-            .mixin_type(db)
-            .and_then(|t| ClassBase::try_from_type(db, t, None))
-            .map(|base| base.mro(db, None).collect())
-            .unwrap_or_default();
-        let base = self
-            .base_class(db)
-            .to_class_literal(db)
-            .as_class_literal()
-            .expect("enum base should be a class literal")
-            .default_specialization(db);
-        std::iter::once(self_base)
-            .chain(mixin_mro)
-            .chain(base.iter_mro(db))
-            .collect()
+    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        Mro::of_dynamic_enum(db, self)
     }
 
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let spec = self.spec(db);
         if !spec.has_known_members(db) {
-            return Member::definitely_declared(todo_type!("functional `Enum` syntax"));
+            return Member::definitely_declared(Type::unknown());
         }
         if spec.members(db).iter().any(|(n, _)| n.as_str() == name) {
             let class_lit = ClassLiteral::DynamicEnum(self);
@@ -146,10 +130,6 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let spec = self.spec(db);
-        if !spec.has_known_members(db) {
-            return Place::bound(todo_type!("functional `Enum` syntax")).into();
-        }
         let own = self.own_class_member(db, name);
         if !own.is_undefined() {
             return own.inner;
@@ -170,9 +150,6 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        if !self.spec(db).has_known_members(db) {
-            return Place::bound(todo_type!("functional `Enum` syntax")).into();
-        }
         if let Some(mixin) = self.mixin_type(db) {
             if let Some(ClassBase::Class(class)) = ClassBase::try_from_type(db, mixin, None) {
                 let result = class.instance_member(db, name);
@@ -186,19 +163,26 @@ impl<'db> DynamicEnumLiteral<'db> {
             .instance_member(db, name)
     }
 
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        #[expect(unused)] name: &str,
+    ) -> Member<'db> {
         if !self.spec(db).has_known_members(db) {
-            return Member::definitely_declared(todo_type!("functional `Enum` syntax"));
+            return Member::definitely_declared(Type::unknown());
         }
-        let _ = name;
         Member::unbound()
     }
 }
 
-fn dynamic_enum_mro_cycle_initial<'db>(
+#[expect(clippy::unnecessary_wraps)]
+fn dynamic_enum_try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     self_: DynamicEnumLiteral<'db>,
-) -> Mro<'db> {
-    Mro::from_error(db, ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_)))
+) -> Result<Mro<'db>, DynamicMroError<'db>> {
+    Ok(Mro::from([
+        ClassBase::Class(ClassType::NonGeneric(self_.into())),
+        ClassBase::object(db),
+    ]))
 }

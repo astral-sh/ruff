@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::Db;
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
@@ -421,6 +421,84 @@ impl<'db> Mro<'db> {
         }
     }
 
+    /// Compute the MRO of a dynamic enum (created via the functional `Enum()`/`StrEnum()` API).
+    ///
+    /// Uses C3 linearization to correctly handle the optional `type=` mixin parameter.
+    /// For example, `Enum("Http", {"OK": 200}, type=int)` is equivalent to
+    /// `class Http(int, Enum)` at runtime, so the MRO must be C3-linearized from
+    /// both bases to produce `[Http, int, Enum, object]`
+    pub(super) fn of_dynamic_enum(
+        db: &'db dyn Db,
+        dynamic_enum: DynamicEnumLiteral<'db>,
+    ) -> Result<Self, DynamicMroError<'db>> {
+        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic_enum.into()));
+
+        // Build the bases list: [mixin, base_class] when a `type=` mixin is present,
+        // or just [base_class] otherwise. For example:
+        //   Enum("Color", ...)           -> resolved_bases = [Enum]
+        //   Enum("Http", ..., type=int)  -> resolved_bases = [int, Enum]
+        //   StrEnum("Method", ...)       -> resolved_bases = [StrEnum]
+        let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(2);
+        if let Some(mixin) = dynamic_enum.mixin_type(db) {
+            if let Some(base) = ClassBase::try_from_type(db, mixin, None) {
+                resolved_bases.push(base);
+            }
+        }
+        let enum_base = dynamic_enum
+            .base_class(db)
+            .to_class_literal(db)
+            .as_class_literal()
+            .expect("enum base should be a class literal")
+            .default_specialization(db);
+        resolved_bases.push(ClassBase::Class(enum_base));
+
+        // When C3 linearization fails (e.g. a bad `type=` mixin), we still need a
+        // usable MRO for downstream type inference. Rather than falling back to the
+        // generic `[self, Unknown, object]`, we chain the bases' MROs with
+        // deduplication. This preserves type information from the known bases so that
+        // member lookups can still find attributes from the mixin and enum base class.
+        //
+        // For example, if `Enum("Foo", ..., type=BadMixin)` fails C3, the fallback
+        // produces `[Foo, BadMixin, ..., Enum, object]` (deduped), so lookups for
+        // `Foo.some_method` can still resolve methods from `BadMixin` or `Enum`.
+        // With `[Foo, Unknown, object]`, those lookups would silently return Unknown.
+        //
+        // This matches the `dynamic_fallback` approach used by `of_dynamic_class`.
+        let fallback_mro = || {
+            let mut result = vec![self_base];
+            let mut seen = FxHashSet::default();
+            seen.insert(self_base);
+            for base in &resolved_bases {
+                for item in base.mro(db, None) {
+                    if seen.insert(item) {
+                        result.push(item);
+                    }
+                }
+            }
+            Self::from(result)
+        };
+
+        // Standard C3 linearization: build sequences from each base's MRO, plus the
+        // bases list itself, then merge. See `of_static_class` and `of_dynamic_class`
+        // for the same pattern.
+        let mut seqs = vec![VecDeque::from([self_base])];
+        for base in &resolved_bases {
+            if base.has_cyclic_mro(db) {
+                return Err(DynamicMroError {
+                    kind: DynamicMroErrorKind::InheritanceCycle,
+                    fallback_mro: fallback_mro(),
+                });
+            }
+            seqs.push(base.mro(db, None).collect());
+        }
+        seqs.push(resolved_bases.iter().copied().collect());
+
+        c3_merge(seqs).ok_or_else(|| DynamicMroError {
+            kind: DynamicMroErrorKind::UnresolvableMro,
+            fallback_mro: fallback_mro(),
+        })
+    }
+
     /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
     ///
     /// Iterates over base MROs sequentially with deduplication.
@@ -577,7 +655,10 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicEnum(literal) => {
-                    let mut full_mro_iter = literal.mro(self.db).iter();
+                    let mut full_mro_iter = match literal.try_mro(self.db) {
+                        Ok(mro) => mro.iter(),
+                        Err(error) => error.fallback_mro().iter(),
+                    };
                     full_mro_iter.next();
                     full_mro_iter
                 }

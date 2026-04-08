@@ -9,6 +9,7 @@ use crate::{
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         diagnostic::{INVALID_ARGUMENT_TYPE, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT},
         infer::TypeInferenceBuilder,
+        infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
     },
 };
@@ -251,6 +252,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
+        if let Err(error) = enum_lit.try_mro(db) {
+            report_mro_error_kind(
+                &self.context,
+                error,
+                enum_lit.name(db),
+                call_expr,
+                None,
+                None,
+            );
+        }
         Some(Type::ClassLiteral(ClassLiteral::DynamicEnum(enum_lit)))
     }
 
