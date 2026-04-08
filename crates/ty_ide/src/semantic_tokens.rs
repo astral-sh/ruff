@@ -2714,28 +2714,25 @@ f(int, x)
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-
-        let int_start = TextSize::from(
-            u32::try_from(source.rfind("int").expect("call argument `int` to exist"))
-                .expect("source offset to fit into TextSize"),
-        );
-        let x_start = TextSize::from(
-            u32::try_from(source.rfind("x)").expect("call argument `x` to exist"))
-                .expect("source offset to fit into TextSize"),
-        );
-
-        let int_token = tokens
-            .iter()
-            .find(|token| token.range == TextRange::at(int_start, "int".text_len()))
-            .expect("semantic token for `int` call argument");
-        let x_token = tokens
-            .iter()
-            .find(|token| token.range == TextRange::at(x_start, "x".text_len()))
-            .expect("semantic token for `x` call argument");
-
-        assert_eq!(int_token.token_type, SemanticTokenType::Class);
-        assert_eq!(x_token.token_type, SemanticTokenType::Variable);
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "cast" @ 20..24: Function
+        "flag" @ 26..30: Variable [definition]
+        "bool" @ 33..37: Class
+        "input" @ 38..43: Function
+        "g" @ 51..52: Function [definition]
+        "x" @ 53..54: Parameter [definition]
+        "x" @ 68..69: Parameter
+        "x" @ 71..72: Variable [definition]
+        "\"\"" @ 75..77: String
+        "f" @ 78..79: Variable [definition]
+        "cast" @ 82..86: Function
+        "flag" @ 90..94: Variable
+        "g" @ 100..101: Function
+        "f" @ 102..103: Variable
+        "int" @ 104..107: Class
+        "x" @ 109..110: Variable
+        "#);
     }
 
     #[test]

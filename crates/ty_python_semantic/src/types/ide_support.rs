@@ -939,7 +939,7 @@ pub fn call_argument_forms(
         return Vec::new();
     };
 
-    let argument_count = call_expr.arguments.arguments_source_order().count();
+    let argument_count = call_expr.arguments.len();
 
     // If the function doesn't contain any type forms, for any overloads, short-circuit.
     if !func_type.bindings(model.db()).iter_flat().any(|binding| {
@@ -965,7 +965,7 @@ pub fn call_argument_forms(
         .filter(|binding| binding.errors().is_empty())
         .collect();
 
-    if successful_bindings.is_empty() {
+    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
         // If no binding succeeds, fall back to the merged non-conflicting forms from the full
         // binding result so callers still get the best conservative answer available.
         for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
@@ -978,15 +978,10 @@ pub fn call_argument_forms(
             });
         }
         return argument_forms;
-    }
+    };
 
     // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
     // fall back to `CallArgumentForm::Unknown`.
-    let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
-    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
-        return argument_forms;
-    };
-
     for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
         let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
         if argument_form == CallArgumentForm::Unknown {

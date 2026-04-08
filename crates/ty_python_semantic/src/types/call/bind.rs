@@ -598,7 +598,7 @@ impl<'db> Bindings<'db> {
         self.argument_forms
             .values
             .iter()
-            .zip(self.argument_forms.conflicting.iter())
+            .zip(&self.argument_forms.conflicting)
             .map(|(form, conflicting)| (!conflicting).then_some(*form).flatten())
     }
 
