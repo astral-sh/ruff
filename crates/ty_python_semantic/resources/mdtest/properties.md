@@ -257,6 +257,29 @@ c = C()
 reveal_type(c.attr)  # revealed: Unknown
 ```
 
+### Attempting to write to a read-only manually constructed property
+
+We should emit an error when trying to set an attribute that was created using a manually
+constructed property with `fset=None`, just like we do for decorator-based read-only properties:
+
+```py
+class Foo:
+    myprop = property(fget=lambda self: 42, fset=None)
+
+class Bar:
+    @property
+    def myprop(self) -> int:
+        return 42
+
+f = Foo()
+# TODO: should emit [invalid-assignment], same as `Bar` below
+f.myprop = 56
+
+b = Bar()
+# error: [invalid-assignment]
+b.myprop = 42
+```
+
 ## Behind the scenes
 
 In this section, we trace through some of the steps that make properties work. We start with a
