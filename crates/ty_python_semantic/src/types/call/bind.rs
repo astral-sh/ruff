@@ -4186,6 +4186,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut partially_specialized_declared_type: FxHashSet<BoundTypeVarIdentity<'_>> =
             FxHashSet::default();
 
+        // We keep track of the variance of any assignments to type variables in the type context.
+        let mut tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+            FxHashMap::default();
+
         // Attempt to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes, or callable types.
         //
@@ -4218,10 +4222,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
                 let set = return_ty.when_constraint_set_assignable_to(self.db, tcx, constraints);
 
-                // Use `solutions_with` to determine per-typevar variance from the raw
-                // lower/upper bounds on each BDD path.
-                let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
-                    FxHashMap::default();
                 let solutions = set.solutions_with_inferable(
                     self.db,
                     constraints,
@@ -4232,7 +4232,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let identity = typevar.identity(self.db);
-                        variance_map
+                        tcx_variance
                             .entry(identity)
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
@@ -4255,7 +4255,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // type parameter from the type context, as it can lead to argument
                         // assignability errors if the type variable is constrained by a narrower
                         // parameter type.
-                        if variance_map
+                        if tcx_variance
                             .get(&identity)
                             .is_some_and(|v| v.is_covariant())
                         {
@@ -4370,6 +4370,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // Promotion is only useful if the type variable is in non-covariant position
                 // in the return type.
                 if variance_in_return.is_covariant() {
+                    return None;
+                }
+
+                // Promotion is only useful if the type variable is in non-covariant position
+                // in the declared type.
+                if tcx_variance
+                    .get(&typevar.identity(self.db))
+                    .is_some_and(|v| v.is_covariant())
+                {
                     return None;
                 }
 
