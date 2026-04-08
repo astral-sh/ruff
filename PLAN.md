@@ -1,6 +1,6 @@
 # Plan: Migrate SpecializationBuilder from type_mappings HashMap to ConstraintSet
 
-## Status: In progress (Phases 1–4 complete; Phase 5.1–5.3 complete)
+## Status: In progress (Phases 1–4 complete; Phase 5.1–5.4 complete)
 
 ## Overview
 
@@ -611,7 +611,7 @@ Test expectation updated.
 
 ### Phase 5: Switch internal representation to ConstraintSet
 
-Status: In progress (Steps 5.1–5.3 complete)
+Status: In progress (Steps 5.1–5.4 complete)
 **Difficulty: Medium–Hard** — the mechanical changes are straightforward, but behavioral
 differences in how constraints combine (vs HashMap union) may cause test changes.
 **Dependencies: Phase 4** (callers must be migrated so that `infer_reverse` is gone).
@@ -806,28 +806,34 @@ only the `add_type_mapping` path is dual-written so far.
 - `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
 - `/home/dcreager/bin/jpk run -a`
 
-**Step 5.4**: Convert `add_type_mappings_from_constraint_set` to direct conjunction.
+**Step 5.4 ✅**: Added direct pending-set conjunction for constraint-set-based inference, while
+keeping the existing HashMap extraction path.
 
-Replace the extract-solutions-then-reinsert logic with:
+Implementation details:
 
-```rust
-self.pending.intersect(db, self.constraints, local_set);
-```
+1. `add_type_mappings_from_constraint_set` still performs the existing
+    extract-solutions-then-reinsert logic for the HashMap-backed specialization state, and still
+    returns only `Result<(), ()>`.
+1. Callers now dual-write into `self.pending` by intersecting the same local constraint sets that
+    were passed into that helper:
+    - non-overloaded / single-ParamSpec cases intersect the single local set directly
+    - overloaded callable cases OR together all satisfiable overload-local sets, then intersect the
+        combined set into `self.pending`
+1. The protocol-inference path in `infer_map_impl` likewise intersects `self.pending` only when
+    the local constraint set is satisfiable, preserving the existing “unsatisfiable means no
+    inference” behavior.
+1. `remove_noninferable(...)` remains part of the old HashMap extraction path for now. Pending-set
+    normalization is deferred to the later pending-solve path rather than being threaded through
+    this helper's API.
 
-This is the core simplification — the callable/protocol arms' local constraint sets are AND'd
-directly into the pending set, preserving all structural information instead of collapsing it
-through solution extraction.
+This preserves current test behavior by **adding** the new pending-set updates without removing the
+existing HashMap-based extraction. The old extraction path remains in place until Step 5.8.
 
-For the overloaded callable case (OR across overloads, then AND into pending):
+**Validation**:
 
-```rust
-let combined = overload1_set.or(db, builder, || overload2_set).or(db, builder, || ...);
-self.pending.intersect(db, self.constraints, combined);
-```
-
-The unsatisfiability check (returning `Err(())`) is preserved: check
-`combined.is_never_satisfied(db)` before ANDing. For the non-overloaded case, check the single
-constraint set.
+- `cargo nextest run -p ty_python_semantic --cargo-profile fast-test`
+- `cargo nextest run -p ty_python_semantic -p ty_ide --cargo-profile fast-test`
+- `/home/dcreager/bin/jpk run -a`
 
 **Step 5.5**: Convert `insert_type_mapping` to create constraints.
 
