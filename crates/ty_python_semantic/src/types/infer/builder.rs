@@ -563,11 +563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or(self.fallback_type())
     }
 
-    fn try_expression_type_or_infer(
-        &mut self,
-        expr: &ast::Expr,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
+    fn get_or_infer_expression(&mut self, expr: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         self.try_expression_type(expr)
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
     }
@@ -6579,13 +6575,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,
+        error_node: AnyNodeRef<'ast>,
     ) {
         if arguments.args.len() == 1 && arguments.keywords.is_empty() {
             let target_ty = Type::TypedDict(typed_dict);
-            self.try_expression_type_or_infer(
-                &arguments.args[0],
-                TypeContext::new(Some(target_ty)),
-            );
+            self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
             return;
         }
 
@@ -6597,8 +6591,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .and_then(|arg_name| items.get(arg_name.id.as_str()))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
-            self.try_expression_type_or_infer(&keyword.value, value_tcx);
+            self.get_or_infer_expression(&keyword.value, value_tcx);
         }
+
+        validate_typed_dict_constructor(
+            &self.context,
+            typed_dict,
+            arguments,
+            error_node,
+            |expr, tcx| self.get_or_infer_expression(expr, tcx),
+        );
     }
 
     fn infer_call_expression(
@@ -6912,8 +6914,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
-        let has_positional_dict_literal =
-            arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
 
         // Validate `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
@@ -6921,19 +6921,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && is_typed_dict_constructor
         {
             let typed_dict = TypedDictType::new(class);
-            self.infer_typed_dict_constructor_values(typed_dict, arguments);
-
-            // Positional dict literals are validated during TypedDict-context inference above.
-            // Re-validating them here would duplicate those diagnostics.
-            if !has_positional_dict_literal {
-                validate_typed_dict_constructor(
-                    &self.context,
-                    typed_dict,
-                    arguments,
-                    func.as_ref().into(),
-                    |expr, _| self.expression_type(expr),
-                );
-            }
+            self.infer_typed_dict_constructor_values(typed_dict, arguments, func.as_ref().into());
         }
 
         let bindings_result = self.infer_and_check_argument_types(
@@ -6941,7 +6929,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
                 if is_typed_dict_constructor {
-                    builder.try_expression_type_or_infer(expr, tcx)
+                    builder.get_or_infer_expression(expr, tcx)
                 } else {
                     builder.infer_expression(expr, tcx)
                 }

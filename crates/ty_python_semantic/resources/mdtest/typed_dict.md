@@ -434,6 +434,19 @@ class Record(TypedDict):
 Record({VALUE_KEY: "x"})
 ```
 
+TypedDict constructor validation should combine positional dict literals with keyword arguments:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+    y: str
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+TD({"x": "foo"}, y="bar")
+```
+
 All of these are missing the required `age` field:
 
 ```py
