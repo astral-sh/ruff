@@ -48,11 +48,11 @@ use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
     HasType, SemanticModel,
     semantic_index::definition::DefinitionKind,
-    types::Type,
     types::ide_support::{
         CallArgumentForm, call_argument_forms, definition_for_name,
         static_member_type_for_attribute,
     },
+    types::{SpecialFormType, Type},
 };
 
 /// Semantic token types supported by the language server.
@@ -204,7 +204,7 @@ struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
-    in_type_annotation: bool,
+    in_type_form: bool,
     in_target_creating_definition: bool,
     in_docstring: bool,
     expecting_docstring: bool,
@@ -218,7 +218,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             tokens: Vec::new(),
             in_class_scope: false,
             in_target_creating_definition: false,
-            in_type_annotation: false,
+            in_type_form: false,
             in_docstring: false,
             range_filter,
             expecting_docstring: false,
@@ -392,7 +392,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> (SemanticTokenType, SemanticTokenModifier) {
         let mut modifiers = SemanticTokenModifier::empty();
 
-        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+        if let Some(classification) = self.classify_type_form_expr(ty) {
             return classification;
         }
 
@@ -420,16 +420,16 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
-    fn classify_annotation_type_expr(
+    fn classify_type_form_expr(
         &self,
         ty: Type,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
-        if !self.in_type_annotation {
+        if !self.in_type_form {
             return None;
         }
 
-        // In annotation contexts, these types all denote class-like type expressions that should
-        // be highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
+        // In type-form contexts, these types all denote class-like type expressions that should be
+        // highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
         match ty {
             Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -476,7 +476,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
 
-        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+        if let Some(classification) = self.classify_type_form_expr(ty) {
             return classification;
         }
 
@@ -750,7 +750,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     }
                 }
 
-                self.visit_expr(&type_alias.value);
+                self.visit_annotation(&type_alias.value);
             }
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
@@ -823,7 +823,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_annotation(&assignment.annotation);
 
                 if let Some(value) = &assignment.value {
-                    self.visit_expr(value);
+                    // PEP 613 alias values are type forms even though they appear as annotated
+                    // assignments rather than dedicated `type` statements.
+                    if matches!(
+                        assignment.annotation.inferred_type(self.model),
+                        Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+                    ) {
+                        self.visit_annotation(value);
+                    } else {
+                        self.visit_expr(value);
+                    }
                 }
                 self.expecting_docstring = true;
             }
@@ -884,11 +893,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         }
     }
 
+    /// Visit an annotation or other expression that should be interpreted as a type form.
     fn visit_annotation(&mut self, expr: &'_ Expr) {
-        let prev_in_type_annotation = self.in_type_annotation;
-        self.in_type_annotation = true;
+        let prev_in_type_form = self.in_type_form;
+        self.in_type_form = true;
         self.visit_expr(expr);
-        self.in_type_annotation = prev_in_type_annotation;
+        self.in_type_form = prev_in_type_form;
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -964,8 +974,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             ast::Expr::Call(call) => {
                 self.visit_expr(call.func.as_ref());
 
-                // Determine whether each argument should be considered a type annotation or a
-                // value based on the position.
+                // Determine whether each argument should be considered a type form or a value
+                // based on the position.
                 let argument_forms = call_argument_forms(self.model, call);
                 for (argument, form) in call.arguments.arguments_source_order().zip(argument_forms)
                 {
@@ -2510,6 +2520,49 @@ y: Optional[str] = None
         "str" @ 150..153: Class
         "None" @ 157..161: BuiltinConstant
         "#);
+    }
+
+    #[test]
+    fn type_alias_values_use_type_form_highlighting() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import IO, TypeAlias
+
+def takes_file(x: IO[str]) -> None: ...
+
+type NewStyle = IO[str]
+LegacyStyle: TypeAlias = IO[str]
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let io_ranges: Vec<_> = source
+            .match_indices("IO")
+            .skip(1)
+            .map(|(offset, _)| {
+                TextRange::at(
+                    TextSize::from(
+                        u32::try_from(offset).expect("source offset to fit into TextSize"),
+                    ),
+                    "IO".text_len(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            io_ranges.len(),
+            3,
+            "expected annotation and alias RHS `IO` uses"
+        );
+
+        for io_range in io_ranges {
+            let token = tokens
+                .iter()
+                .find(|token| token.range == io_range)
+                .expect("semantic token for `IO` type-form use");
+            assert_eq!(token.token_type, SemanticTokenType::Class);
+        }
     }
 
     #[test]
