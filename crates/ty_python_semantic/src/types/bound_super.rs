@@ -197,9 +197,10 @@ enum DescriptorReceiverKind {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
-    /// attribute lookup. Depending on `receiver`, it is passed either as the
-    /// instance in `__get__(owner, type(owner))` or as the owner in
-    /// `__get__(None, owner)`.
+    /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
+    /// is passed as the first argument to `__get__` in a `__get__(owner, type(owner))`
+    /// call; if `receiver` is [`DescriptorReceiverKind::Class`], it is passed as the
+    /// second argument to `__get__` in a `__get__(None, owner)` call.
     owner_type: Type<'db>,
     /// The class whose MRO is searched for attributes after the pivot class.
     lookup_anchor: ClassType<'db>,
