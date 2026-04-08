@@ -36,7 +36,6 @@ error[invalid-assignment]: Object of type `str | None` is not assignable to `str
 4 |     target: str | None = source  # error: [invalid-assignment]
   |
 info: element `None` of union `str | None` is not assignable to `str`
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -53,7 +52,6 @@ error[invalid-assignment]: Object of type `int` is not assignable to `str | None
 5 | def _(source: str | None):
 6 |     target: bytes | None = source  # error: [invalid-assignment]
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -69,6 +67,5 @@ error[invalid-assignment]: Object of type `str | None` is not assignable to `byt
   |             Declared type
   |
 info: element `str` of union `str | None` is not assignable to `bytes | None`
-info: rule `invalid-assignment` is enabled by default
 
 ```

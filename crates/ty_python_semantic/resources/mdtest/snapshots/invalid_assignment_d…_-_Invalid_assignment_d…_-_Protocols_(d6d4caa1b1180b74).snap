@@ -54,7 +54,6 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
    |
 info: type `DoesNotHaveCheck` is not compatible with protocol `SupportsCheck`
       └── protocol member `check` is not defined on type `DoesNotHaveCheck`
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -86,6 +85,5 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
 info: type `CheckWithWrongSignature` is not compatible with protocol `SupportsCheck`
       ├── protocol member `check` is incompatible
       └── incompatible parameter types `bytes` and `str`
-info: rule `invalid-assignment` is enabled by default
 
 ```

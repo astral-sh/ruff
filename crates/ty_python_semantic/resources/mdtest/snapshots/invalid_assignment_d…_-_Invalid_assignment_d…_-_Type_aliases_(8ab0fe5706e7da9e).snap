@@ -43,6 +43,5 @@ error[invalid-assignment]: Object of type `HasName` is not assignable to `String
 info: type `HasName` is not compatible with protocol `SupportsName`
       ├── protocol member `name` is incompatible
       └── incompatible return types `bytes` and `str`
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -35,7 +35,6 @@ error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assigna
   |
 info: the second tuple element is not compatible
       └── type `str` is not assignable to `bytes`
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -51,6 +50,5 @@ error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to
   |             Declared type
   |
 info: a tuple of length 2 is not assignable to a tuple of length 3
-info: rule `invalid-assignment` is enabled by default
 
 ```
