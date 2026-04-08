@@ -6571,16 +6571,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
-    fn infer_typed_dict_constructor_values(
+    fn infer_typed_dict_constructor_values<'expr>(
         &mut self,
         typed_dict: TypedDictType<'db>,
-        arguments: &ast::Arguments,
-        error_node: AnyNodeRef<'ast>,
+        arguments: &'expr ast::Arguments,
+        error_node: AnyNodeRef<'expr>,
     ) {
         if arguments.args.len() == 1 && arguments.keywords.is_empty() {
             let target_ty = Type::TypedDict(typed_dict);
-            self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
-            return;
+            let argument = &arguments.args[0];
+            self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
+            if argument.is_dict_expr() {
+                return;
+            }
+        } else if arguments.args.len() == 1
+            && let ast::Expr::Dict(dict_expr) = &arguments.args[0]
+        {
+            self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
         }
 
         let items = typed_dict.items(self.db());
@@ -6599,8 +6606,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typed_dict,
             arguments,
             error_node,
-            |expr, tcx| self.get_or_infer_expression(expr, tcx),
+            |expr, _| self.expression_type(expr),
         );
+    }
+
+    fn infer_typed_dict_constructor_dict_literal_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        dict_expr: &ast::ExprDict,
+    ) {
+        let items = typed_dict.items(self.db());
+
+        for item in &dict_expr.items {
+            let value_tcx = item
+                .key
+                .as_ref()
+                .map(|key| self.get_or_infer_expression(key, TypeContext::default()))
+                .and_then(Type::as_string_literal)
+                .and_then(|key| items.get(key.value(self.db())))
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            self.get_or_infer_expression(&item.value, value_tcx);
+        }
     }
 
     fn infer_call_expression(
@@ -6914,6 +6941,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
+        let has_mixed_typed_dict_literal_argument = is_typed_dict_constructor
+            && arguments.args.len() == 1
+            && arguments.args[0].is_dict_expr()
+            && !arguments.keywords.is_empty();
 
         // Validate `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
@@ -6928,7 +6959,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if is_typed_dict_constructor {
+                if has_mixed_typed_dict_literal_argument && expr.is_dict_expr() {
+                    builder.try_expression_type(expr).unwrap_or(Type::unknown())
+                } else if is_typed_dict_constructor {
                     builder.get_or_infer_expression(expr, tcx)
                 } else {
                     builder.infer_expression(expr, tcx)

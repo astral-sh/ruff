@@ -999,11 +999,10 @@ fn validate_from_dict_literal<'db, 'ast>(
         // Validate dict entries
         for dict_item in &dict_expr.items {
             if let Some(ref key_expr) = dict_item.key
-                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_value, ..
-                }) = key_expr
+                && let Some(key_value) =
+                    expression_type_fn(key_expr, TypeContext::default()).as_string_literal()
             {
-                let key = key_value.to_str();
+                let key = key_value.value(context.db());
                 provided_keys.insert(Name::new(key));
 
                 let value_tcx = items

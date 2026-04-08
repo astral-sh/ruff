@@ -447,6 +447,23 @@ class TD(TypedDict):
 TD({"x": "foo"}, y="bar")
 ```
 
+TypedDict constructor validation should preserve string-valued constant keys in mixed calls:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+    count: int
+
+Record({VALUE_KEY: "x"}, count=1)
+
+# error: [invalid-argument-type] "Invalid argument to key "value" with declared type `str` on TypedDict `Record`: value of type `Literal[1]`"
+Record({VALUE_KEY: 1}, count=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
