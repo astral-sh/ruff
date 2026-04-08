@@ -673,6 +673,7 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, anyhow};
+    use ruff_db::diagnostic::Severity;
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
@@ -820,6 +821,7 @@ x = 1 \
             let mut diagnostic = MissingNewlineAtEndOfFile.into_diagnostic(
                 TextRange::default(),
                 &SourceFileBuilder::new("<filename>", "<code>").finish(),
+                Severity::Error,
             );
             diagnostic.set_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,

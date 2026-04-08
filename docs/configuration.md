@@ -638,10 +638,16 @@ Rule selection:
       --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all
           rules)
+      --warn <RULE_CODE>
+          Comma-separated list of rule codes to enable (or ALL, to enable all
+          rules) with severity `warning`
       --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
       --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of those already
+          specified
+      --extend-warn <RULE_CODE>
+          Like --warn, but adds additional rule codes on top of those already
           specified
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude

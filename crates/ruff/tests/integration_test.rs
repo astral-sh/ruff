@@ -927,7 +927,7 @@ fn full_output_preview() {
       | ^
       |
 
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###);
@@ -956,7 +956,7 @@ preview = true
       | ^
       |
 
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###);
@@ -1211,41 +1211,41 @@ fn show_statistics_syntax_errors() {
     // ParseError
     assert_cmd_snapshot!(
         cmd.pass_stdin("x ="),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     1		invalid-syntax
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
-    ");
+    "###);
 
     // match before 3.10, UnsupportedSyntaxError
     assert_cmd_snapshot!(
         cmd.pass_stdin("match 2:\n  case 1: ..."),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     1		invalid-syntax
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
-    ");
+    "###);
 
     // rebound comprehension variable, SemanticSyntaxError
     assert_cmd_snapshot!(
         cmd.pass_stdin("[x := 1 for x in range(0)]"),
-        @"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     1		invalid-syntax
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
-    ");
+    "###);
 }
 
 #[test]
@@ -1264,7 +1264,7 @@ fn preview_enabled_prefix() {
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.
     -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
-    Found 6 errors.
+    Found 6 diagnostics.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1288,7 +1288,7 @@ fn preview_enabled_all() {
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.
     -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
-    Found 8 errors.
+    Found 8 diagnostics.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1308,7 +1308,7 @@ fn preview_enabled_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:1: error[RUF911] Hey this is a preview test rule.
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###);
@@ -1427,7 +1427,7 @@ fn preview_enabled_group_ignore() {
     -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
     -:1:1: error[RUF911] Hey this is a preview test rule.
     -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
-    Found 6 errors.
+    Found 6 diagnostics.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -2411,7 +2411,7 @@ select = ["RUF017"]
       |
     help: Replace with `functools.reduce`
 
-    Found 1 error.
+    Found 1 diagnostic.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -2452,7 +2452,7 @@ unfixable = ["RUF"]
       |
     help: Replace with `functools.reduce`
 
-    Found 1 error.
+    Found 1 diagnostic.
 
     ----- stderr -----
     "###);
