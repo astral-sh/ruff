@@ -563,6 +563,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or(self.fallback_type())
     }
 
+    /// Return an already-inferred type for `expr`, or infer it with `tcx` if needed.
+    ///
+    /// This is used in places where an expression may already have been inferred earlier with a
+    /// more specific type context, and re-inferencing it would be redundant or would duplicate
+    /// diagnostics.
     fn get_or_infer_expression(&mut self, expr: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         self.try_expression_type(expr)
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
@@ -6571,6 +6576,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
+    /// Infer subexpressions of a `TypedDict` constructor call before general argument inference.
+    ///
+    /// This gives constructor values the declared field type as context, then validates the full
+    /// call once. A lone positional dict literal is inferred as a `TypedDict` expression directly,
+    /// while mixed dict-literal and keyword calls infer the nested key and value expressions
+    /// without re-inferring the outer dict literal later during argument binding.
     fn infer_typed_dict_constructor_values<'expr>(
         &mut self,
         typed_dict: TypedDictType<'db>,
@@ -6610,6 +6621,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
+    /// Infer the key and value expressions of a positional dict literal passed to a
+    /// `TypedDict` constructor alongside keyword arguments.
+    ///
+    /// The outer dict literal is intentionally left for later call binding; this helper only
+    /// pre-infers its nested expressions so full constructor validation can still combine keys
+    /// from the dict literal and keyword arguments without double-inferencing the dict itself.
     fn infer_typed_dict_constructor_dict_literal_values(
         &mut self,
         typed_dict: TypedDictType<'db>,
