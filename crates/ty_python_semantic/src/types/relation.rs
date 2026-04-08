@@ -1000,17 +1000,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
                     // constraints that exposes a union; this requires special handling.
                     match source {
-                        Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
-                            match typevar.typevar(db).bound_or_constraints(db) {
-                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                                    self.check_type_pair(db, bound, target)
-                                }
-                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                    self.check_type_pair(db, constraints.as_type(db), target)
-                                }
-                                None => self.never(),
-                            }
-                        }
                         Type::Intersection(intersection)
                             if intersection.positive(db).iter().any(|t| {
                                 matches!(t, Type::NewTypeInstance(_) | Type::TypeVar(_))
@@ -1021,6 +1010,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 intersection.with_expanded_typevars_and_newtypes(db),
                                 target,
                             )
+                        }
+                        Type::TypeVar(typevar) if !typevar.is_inferable(db, self.inferable) => {
+                            match typevar.typevar(db).bound_or_constraints(db) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    self.check_type_pair(db, bound, target)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    self.check_type_pair(db, constraints.as_type(db), target)
+                                }
+                                None => self.never(),
+                            }
                         }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
