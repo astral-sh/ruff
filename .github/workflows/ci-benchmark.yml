@@ -1,0 +1,151 @@
+name: CI Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  benchmark:
+    name: "Benchmark @ ${{ matrix.runner }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - monkci-runners-4vcpu
+          - monkci-ubuntu-24.04-4-3600iops
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Record start time
+        id: timer_start
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Build benchmarks
+        run: |
+          cargo build --profile profiling --no-default-features \
+            -p ruff_benchmark \
+            --bench formatter \
+            --bench lexer \
+            --bench linter \
+            --bench parser
+
+      - name: Run benchmarks
+        run: |
+          cargo bench --no-default-features \
+            -p ruff_benchmark \
+            --bench formatter \
+            --bench lexer \
+            --bench linter \
+            --bench parser \
+            -- --output-format bencher 2>&1 | tee benchmark-output.txt
+
+      - name: Record end time and compute duration
+        id: timer_end
+        run: |
+          end=$(date +%s)
+          start=${{ steps.timer_start.outputs.start }}
+          duration=$((end - start))
+          minutes=$((duration / 60))
+          seconds=$((duration % 60))
+          echo "duration_seconds=${duration}" >> "$GITHUB_OUTPUT"
+          echo "duration_human=${minutes}m ${seconds}s" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "======================================"
+          echo "  Runner : ${{ matrix.runner }}"
+          echo "  Total time : ${minutes}m ${seconds}s (${duration}s)"
+          echo "======================================"
+
+      - name: Write timing summary
+        run: |
+          {
+            echo "runner=${{ matrix.runner }}"
+            echo "duration_seconds=${{ steps.timer_end.outputs.duration_seconds }}"
+            echo "duration_human=${{ steps.timer_end.outputs.duration_human }}"
+          } > timing-${{ matrix.runner }}.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ matrix.runner }}
+          path: |
+            benchmark-output.txt
+            timing-${{ matrix.runner }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+  compare:
+    name: "Compare Results Across Runners"
+    needs: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download all benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-results-*
+          merge-multiple: false
+
+      - name: Print timing comparison table
+        run: |
+          echo ""
+          echo "╔══════════════════════════════════════════════╦══════════════════╦══════════════╗"
+          echo "║ Runner                                       ║ Duration (human) ║ Duration (s) ║"
+          echo "╠══════════════════════════════════════════════╬══════════════════╬══════════════╣"
+          for dir in benchmark-results-*/; do
+            timing_file=$(find "$dir" -name "timing-*.txt" | head -1)
+            if [[ -f "$timing_file" ]]; then
+              runner=$(grep '^runner=' "$timing_file" | cut -d= -f2)
+              dur_s=$(grep '^duration_seconds=' "$timing_file" | cut -d= -f2)
+              dur_h=$(grep '^duration_human=' "$timing_file" | cut -d= -f2)
+              printf "║ %-44s ║ %-16s ║ %-12s ║\n" "$runner" "$dur_h" "${dur_s}s"
+            fi
+          done
+          echo "╚══════════════════════════════════════════════╩══════════════════╩══════════════╝"
+
+      - name: Print benchmark output per runner
+        run: |
+          for dir in benchmark-results-*/; do
+            runner=$(basename "$dir" | sed 's/^benchmark-results-//')
+            bench_file="$dir/benchmark-output.txt"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  Runner: ${runner}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            if [[ -f "$bench_file" ]]; then
+              cat "$bench_file"
+            else
+              echo "(no benchmark output found)"
+            fi
+          done
