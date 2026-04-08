@@ -2312,8 +2312,10 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownClass::Property) => {
                             if let [getter, setter, ..] = overload.parameter_types() {
+                                let getter = getter.filter(|ty| !ty.is_none(db));
+                                let setter = setter.filter(|ty| !ty.is_none(db));
                                 overload.set_return_type(Type::PropertyInstance(
-                                    PropertyInstanceType::new(db, *getter, *setter),
+                                    PropertyInstanceType::new(db, getter, setter),
                                 ));
                             }
                         }

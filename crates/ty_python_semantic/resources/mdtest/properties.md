@@ -257,6 +257,29 @@ c = C()
 reveal_type(c.attr)  # revealed: Unknown
 ```
 
+### Attempting to write to a read-only manually constructed property
+
+We should emit an error when trying to set an attribute that was created using a manually
+constructed property with `fset=None`, just like we do for decorator-based read-only properties:
+
+```py
+class Foo:
+    myprop = property(fget=lambda self: 42, fset=None)
+
+class Bar:
+    @property
+    def myprop(self) -> int:
+        return 42
+
+f = Foo()
+# TODO: should emit [invalid-assignment], same as `Bar` below
+f.myprop = 56
+
+b = Bar()
+# error: [invalid-assignment]
+b.myprop = 42
+```
+
 ## Behind the scenes
 
 In this section, we trace through some of the steps that make properties work. We start with a
@@ -491,10 +514,12 @@ empty_b = property()
 getter_only_a = property(get_int)
 getter_only_b = property(get_int)
 getter_only_c = property(get_str)
+getter_only_d = property(get_int, None)
 
 setter_only_a = property(fset=set_int)
 setter_only_b = property(fset=set_int)
 setter_only_c = property(fset=set_str)
+setter_only_d = property(None, set_int)
 
 both_a = property(get_int, set_int)
 both_b = property(get_int, set_int)
@@ -503,7 +528,9 @@ both_d = property(get_str, set_int)
 
 static_assert(is_equivalent_to(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(is_equivalent_to(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(not is_equivalent_to(TypeOf[empty_a], TypeOf[getter_only_a]))
@@ -518,7 +545,9 @@ static_assert(not is_equivalent_to(TypeOf[both_a], TypeOf[both_d]))
 
 static_assert(not is_disjoint_from(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(is_disjoint_from(TypeOf[empty_a], TypeOf[getter_only_a]))
