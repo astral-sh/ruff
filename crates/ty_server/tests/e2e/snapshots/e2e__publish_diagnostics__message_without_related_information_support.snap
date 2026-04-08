@@ -58,7 +58,7 @@ PublishDiagnosticsParams {
             source: Some(
                 "ty",
             ),
-            message: "Type `Literal[\"test\"]` does not match asserted type `list[str]`",
+            message: "Type `Literal[\"test\"]` does not match asserted type `list[str]`\n\ninfo: `list[str]` and `Literal[\"test\"]` are not equivalent types",
             related_information: None,
             tags: None,
             data: None,
