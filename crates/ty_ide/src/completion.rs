@@ -7944,7 +7944,7 @@ from typing import Concatenate as Concatenate
             .filter(|c| {
                 c.name == "Concatenate"
                     && matches!(
-                        c.module_name.map(|m| m.as_str()),
+                        c.module_name.map(ModuleName::as_str),
                         Some("typing" | "thirdparty")
                     )
             });
@@ -7970,7 +7970,7 @@ from collections import ChainMap as ChainMap
             .filter(|c| {
                 c.name == "ChainMap"
                     && matches!(
-                        c.module_name.map(|m| m.as_str()),
+                        c.module_name.map(ModuleName::as_str),
                         Some("collections" | "thirdparty")
                     )
             });
@@ -7997,7 +7997,7 @@ def no_type_check_decorator():
             .filter(|c| {
                 c.name == "no_type_check_decorator"
                     && matches!(
-                        c.module_name.map(|m| m.as_str()),
+                        c.module_name.map(ModuleName::as_str),
                         Some("typing" | "thirdparty")
                     )
             });
@@ -8023,7 +8023,7 @@ from sys import argv as argv
             .filter(|c| {
                 c.name == "argv"
                     && matches!(
-                        c.module_name.map(|m| m.as_str()),
+                        c.module_name.map(ModuleName::as_str),
                         Some("sys" | "thirdparty")
                     )
             });
@@ -8048,7 +8048,10 @@ from os import getpid as getpid
             .module_names()
             .filter(|c| {
                 c.name == "getpid"
-                    && matches!(c.module_name.map(|m| m.as_str()), Some("os" | "thirdparty"))
+                    && matches!(
+                        c.module_name.map(ModuleName::as_str),
+                        Some("os" | "thirdparty")
+                    )
             });
         assert_snapshot!(builder.build().snapshot(), @r"
         getpid :: thirdparty
