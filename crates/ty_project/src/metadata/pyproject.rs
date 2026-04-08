@@ -2,7 +2,6 @@ use crate::metadata::options::Options;
 use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
 use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
-use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
 use std::ops::Deref;
@@ -110,20 +109,8 @@ impl Project {
 
         tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
 
-        let major =
-            u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
-        let minor =
-            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
-
-        let lower_bound = PythonVersion::from((major, minor));
-        let supported_version = SupportedPythonVersion::iter()
-            .find(|supported_version| supported_version.into_inner() >= lower_bound);
-
-        let Some(supported_version) = supported_version else {
-            return Err(ResolveRequiresPythonError::NoSupportedVersion(
-                requires_python.to_string(),
-            ));
-        };
+        let supported_version =
+            SupportedPythonVersion::clamp_release(i128::from(major), i128::from(minor));
 
         Ok(Some(
             requires_python.clone().map_value(|_| supported_version),
@@ -133,18 +120,10 @@ impl Project {
 
 #[derive(Debug, Error)]
 pub enum ResolveRequiresPythonError {
-    #[error("The major version `{0}` is larger than the maximum supported value 255")]
-    TooLargeMajor(u64),
-    #[error("The minor version `{0}` is larger than the maximum supported value 255")]
-    TooLargeMinor(u64),
     #[error(
         "value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`."
     )]
     NoLowerBound(String),
-    #[error(
-        "value `{0}` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly."
-    )]
-    NoSupportedVersion(String),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

@@ -74,6 +74,14 @@ impl SupportedPythonVersion {
         .into_iter()
     }
 
+    pub const fn lowest() -> Self {
+        Self::Py37
+    }
+
+    pub const fn highest() -> Self {
+        Self::Py315
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Py37 => "3.7",
@@ -99,6 +107,24 @@ impl SupportedPythonVersion {
             Self::Py313 => PythonVersion::PY313,
             Self::Py314 => PythonVersion::PY314,
             Self::Py315 => PythonVersion::PY315,
+        }
+    }
+
+    pub fn clamp(version: PythonVersion) -> Self {
+        Self::iter()
+            .find(|supported_version| supported_version.into_inner() >= version)
+            .unwrap_or(Self::highest())
+    }
+
+    pub fn clamp_release(major: i128, minor: i128) -> Self {
+        let lowest = Self::lowest().into_inner();
+        if (major, minor) <= (i128::from(lowest.major), i128::from(lowest.minor)) {
+            return Self::lowest();
+        }
+
+        match (u8::try_from(major), u8::try_from(minor)) {
+            (Ok(major), Ok(minor)) => Self::clamp(PythonVersion::from((major, minor))),
+            _ => Self::highest(),
         }
     }
 }

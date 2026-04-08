@@ -975,7 +975,8 @@ unclosed table, expected `]`
     }
 
     #[test]
-    fn requires_python_too_large_major_version() -> anyhow::Result<()> {
+    fn requires_python_too_large_major_version_uses_highest_supported_version() -> anyhow::Result<()>
+    {
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
 
@@ -990,15 +991,16 @@ unclosed table, expected `]`
             )
             .context("Failed to write file")?;
 
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because of the requires-python major version that is larger than 255."
-            ));
-        };
+        let root = ProjectMetadata::discover(&root, &system)?;
 
-        assert_error_eq(
-            &error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_ref()
+                .map(|python_version| PythonVersion::from(**python_version)),
+            Some(PythonVersion::PY315)
         );
 
         Ok(())
@@ -1036,7 +1038,8 @@ unclosed table, expected `]`
     }
 
     #[test]
-    fn requires_python_unsupported_future_version() -> anyhow::Result<()> {
+    fn requires_python_unsupported_future_version_uses_highest_supported_version()
+    -> anyhow::Result<()> {
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
 
@@ -1051,15 +1054,16 @@ unclosed table, expected `]`
             )
             .context("Failed to write file")?;
 
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because `requires-python` does not include a ty-supported version."
-            ));
-        };
+        let root = ProjectMetadata::discover(&root, &system)?;
 
-        assert_error_eq(
-            &error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_ref()
+                .map(|python_version| PythonVersion::from(**python_version)),
+            Some(PythonVersion::PY315)
         );
 
         Ok(())

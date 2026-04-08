@@ -162,6 +162,7 @@ time.ctime(decimal.Decimal(\"1.5\"))
 
     let builder = TestServerBuilder::new()?;
     let python = builder.file_path("venv/bin/python");
+    let home = builder.file_path("python-home/bin");
     let sys_prefix = builder.file_path("venv");
     let python_uri =
         lsp_types::Url::from_file_path(python.as_std_path()).expect("Path must be a valid URL");
@@ -187,8 +188,13 @@ time.ctime(decimal.Decimal(\"1.5\"))
         .with_workspace(workspace_root, Some(workspace_options))?
         .with_file(foo, foo_content)?
         .with_file("venv/bin/python", "")?
-        .with_file("venv/pyvenv.cfg", "version_info = 3.16.0\n")?
+        .with_file("python-home/bin/.gitkeep", "")?
+        .with_file(
+            "venv/pyvenv.cfg",
+            format!("home = {home}\nversion_info = 3.16.0\n"),
+        )?
         .with_file("venv/lib/python3.16/site-packages/.gitkeep", "")?
+        .with_file("venv/Lib/site-packages/.gitkeep", "")?
         .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -199,28 +205,7 @@ time.ctime(decimal.Decimal(\"1.5\"))
     assert_json_snapshot!(diagnostics, @r#"
     {
       "kind": "full",
-      "resultId": "[RESULT_ID]",
-      "items": [
-        {
-          "range": {
-            "start": {
-              "line": 3,
-              "character": 11
-            },
-            "end": {
-              "line": 3,
-              "character": 33
-            }
-          },
-          "severity": 1,
-          "code": "invalid-argument-type",
-          "codeDescription": {
-            "href": "https://ty.dev/rules#invalid-argument-type"
-          },
-          "source": "ty",
-          "message": "Argument to function `ctime` is incorrect: Expected `SupportsIndex | float | None`, found `Decimal`"
-        }
-      ]
+      "items": []
     }
     "#);
 
