@@ -1032,6 +1032,12 @@ fn typed_dict_without_keys<'db>(
     TypedDictType::from_schema_items(db, filtered_items)
 }
 
+/// Validates a `TypedDict` constructor call.
+///
+/// This handles keyword-only construction, a single positional mapping argument, and mixed
+/// positional-and-keyword calls. Dictionary literals are validated entry-by-entry so we can report
+/// extra keys and per-field type mismatches precisely; non-literal positional arguments fall back
+/// to assignability against the target `TypedDict`.
 pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -1062,9 +1068,9 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             )
         } else {
             let arg = &arguments.args[0];
-            let arg_ty = expression_type_fn(arg, TypeContext::default());
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
             let positional_target_ty = Type::TypedDict(positional_target);
+            let arg_ty = expression_type_fn(arg, TypeContext::new(Some(positional_target_ty)));
 
             if !arg_ty.is_assignable_to(db, positional_target_ty) {
                 if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
