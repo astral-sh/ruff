@@ -35,13 +35,13 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  REF_NAME: ${{ github.ref_name }}
+  ECOSYSTEM_ANALYZER_COMMIT: 73fe4d9a7c940023ac2addc008097758c877b7ec
 
 jobs:
-  ty-ecosystem-analyzer:
-    name: Compute diagnostic diff
+  analyze-base:
+    name: Analyze base branch
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -63,8 +63,70 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Compute diagnostic diff
-        id: compute-diagnostic-diff
+      - name: Analyze base branch
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
+
+          # Copy flaky list from the PR commit before switching to merge base
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+
+          echo "old commit (merge base)"
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+          git checkout -b old_commit "$MERGE_BASE"
+          git rev-list --format=%s --max-count=1 old_commit
+          cp crates/ty_python_semantic/resources/primer/good.txt projects_old.txt
+
+          cd ..
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
+
+          ecosystem-analyzer \
+            --repository ruff \
+            --flaky-runs 10 \
+            analyze \
+            --profile=profiling \
+            --commit old_commit \
+            --projects ruff/projects_old.txt \
+            --projects-flaky ruff/projects_flaky.txt \
+            --output diagnostics-old.json
+
+      - name: Upload base diagnostics
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: diagnostics-old
+          path: diagnostics-old.json
+
+  analyze-pr:
+    name: Analyze PR branch
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: ruff
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          enable-cache: true
+          version: "0.11.3"
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: "ruff"
+          lookup-only: false
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Analyze PR branch
         shell: bash
         run: |
           cd ruff
@@ -79,28 +141,55 @@ jobs:
           cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
           cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
 
-          echo "old commit (merge base)"
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
-          git checkout -b old_commit "$MERGE_BASE"
-          git rev-list --format=%s --max-count=1 old_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_old.txt
-
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@73fe4d9a7c940023ac2addc008097758c877b7ec"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           ecosystem-analyzer \
             --repository ruff \
             --flaky-runs 10 \
-            diff \
+            analyze \
             --profile=profiling \
-            --projects-old ruff/projects_old.txt \
-            --projects-new ruff/projects_new.txt \
+            --commit new_commit \
+            --projects ruff/projects_new.txt \
             --projects-flaky ruff/projects_flaky.txt \
-            --old old_commit \
-            --new new_commit \
-            --output-old diagnostics-old.json \
-            --output-new diagnostics-new.json
+            --output diagnostics-new.json
+
+      - name: Upload PR diagnostics
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: diagnostics-new
+          path: diagnostics-new.json
+
+  generate-report:
+    name: Generate diagnostic diff report
+    needs: [analyze-base, analyze-pr]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          enable-cache: true
+          version: "0.11.3"
+
+      - name: Download base diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: diagnostics-old
+
+      - name: Download PR diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: diagnostics-new
+
+      - name: Generate reports
+        id: generate-reports
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           mkdir dist
 
@@ -167,5 +256,5 @@ jobs:
           path: dist/timing.html
 
       - name: Fail on new abnormal exits
-        if: steps.compute-diagnostic-diff.outputs.diff_statistics_exit_code != '0'
+        if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'
         run: exit 1
