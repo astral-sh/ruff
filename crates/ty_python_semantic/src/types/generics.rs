@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    Solutions,
+    PathBounds, Solutions,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -1722,8 +1722,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// typevar.
     ///
     /// The `choose` hook is called for each typevar on the generic context with the typevar's
-    /// materialized lower and upper bounds. Currently, both bounds are set to the inferred type
-    /// (representing an equality constraint). Unmapped typevars have bounds of `None,` and fallback
+    /// materialized lower and upper bounds.
+    /// Unmapped typevars have bounds of `None,` and fallback
     /// to their default specialization if an alternative default type is not chosen.
     ///
     /// The hook should return `Some(ty)` to use `ty` as the specialization for this typevar, or
@@ -1736,10 +1736,91 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<(Type<'db>, Type<'db>)>,
         ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
-        let types = generic_context
+        let types = self.solve_pending_with(generic_context, &mut choose);
+        let specialization = generic_context
             .variables_inner(self.db)
             .iter()
-            .map(|(identity, variable)| {
+            .map(|(identity, _variable)| types.get(identity).copied());
+
+        generic_context.specialize_recursive(self.db, specialization)
+    }
+
+    fn solve_pending_with(
+        &self,
+        generic_context: GenericContext<'db>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        if generic_context
+            .variables_inner(self.db)
+            .values()
+            .any(|typevar| typevar.is_paramspec(self.db))
+        {
+            return self.solve_hash_map_with(generic_context, choose);
+        }
+
+        let pending = self
+            .pending
+            .remove_noninferable(self.db, self.constraints, self.inferable);
+        let solutions = match pending.solutions_with(
+            self.db,
+            self.constraints,
+            |typevar, _variance, lower, upper| {
+                if let Some(ty) = choose(typevar, Some(lower, upper)) {
+                    return Ok(Some(ty));
+                }
+                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
+            },
+        ) {
+            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                return self.solve_hash_map_with(generic_context, choose);
+            }
+            Solutions::Constrained(solutions) => solutions,
+        };
+
+        let mut types = FxHashMap::default();
+        for solution in solutions {
+            for binding in solution {
+                let identity = binding.bound_typevar.identity(self.db);
+                types
+                    .entry(identity)
+                    .and_modify(|existing| {
+                        *existing =
+                            UnionType::from_two_elements(self.db, *existing, binding.solution);
+                    })
+                    .or_insert(binding.solution);
+            }
+        }
+
+        for (identity, variable) in generic_context.variables_inner(self.db) {
+            if types.contains_key(identity) {
+                continue;
+            }
+
+            match self.types.get(identity).copied() {
+                Some(mapped_ty) => {
+                    if mapped_ty.is_never()
+                        || (mapped_ty == Type::object()
+                            && variable.variance(self.db).is_contravariant())
+                    {
+                        types.insert(*identity, mapped_ty);
+                    }
+                }
+                None => {}
+            }
+        }
+
+        types
+    }
+
+    fn solve_hash_map_with(
+        &self,
+        generic_context: GenericContext<'db>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        generic_context
+            .variables_inner(self.db)
+            .iter()
+            .filter_map(|(identity, variable)| {
                 match self.types.get(identity).copied() {
                     Some(mapped_ty) => {
                         // The typevar was inferred — present both bounds as the inferred type.
@@ -1748,9 +1829,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     None => choose(*variable, None),
                 }
-            });
-
-        generic_context.specialize_recursive(self.db, types)
+            })
+            .collect()
     }
 
     fn insert_hash_map_type_mapping(
