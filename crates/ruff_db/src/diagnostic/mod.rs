@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
@@ -1334,15 +1335,18 @@ impl SubDiagnosticSeverity {
             SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
         }
     }
+}
 
-    pub fn to_string(self) -> &'static str {
-        match self {
+impl Display for SubDiagnosticSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             SubDiagnosticSeverity::Help => "help",
             SubDiagnosticSeverity::Info => "info",
             SubDiagnosticSeverity::Warning => "warning",
             SubDiagnosticSeverity::Error => "error",
             SubDiagnosticSeverity::Fatal => "fatal",
-        }
+        };
+        write!(f, "{}", s)
     }
 }
 

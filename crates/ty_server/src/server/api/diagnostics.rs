@@ -521,9 +521,13 @@ pub(super) fn to_lsp_diagnostic(
                 message.push('\n');
                 first = false;
             }
-            let prefix = sub_diagnostic.severity().to_string();
-            let hint = sub_diagnostic.concise_message();
-            write!(message, "\n{prefix}: {hint}").ok();
+            write!(
+                message,
+                "\n{severity}: {hint}",
+                hint = sub_diagnostic.concise_message(),
+                severity = sub_diagnostic.severity()
+            )
+            .ok();
         }
     }
 
