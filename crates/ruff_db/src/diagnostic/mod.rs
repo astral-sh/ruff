@@ -1346,7 +1346,7 @@ impl Display for SubDiagnosticSeverity {
             SubDiagnosticSeverity::Error => "error",
             SubDiagnosticSeverity::Fatal => "fatal",
         };
-        write!(f, "{}", s)
+        f.write_str(s)
     }
 }
 
