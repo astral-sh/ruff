@@ -316,11 +316,11 @@ def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
 
 type Alias[**P1] = int
 
-def invalid3[**P2](
+def invalid3[**P2, **P3](
     # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
-    x: Foo[Concatenate[P2, P2]],
+    x: Foo[Concatenate[P2, P3]],
     # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
-    y: Alias[Concatenate[P2, P2]],
+    y: Alias[Concatenate[P2, P3]],
 ):
     pass
 ```
