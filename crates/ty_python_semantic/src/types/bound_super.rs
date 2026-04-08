@@ -298,7 +298,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn lookup_anchor(&self, _db: &'db dyn Db) -> Option<ClassType<'db>> {
+    fn lookup_anchor(&self) -> Option<ClassType<'db>> {
         match self {
             SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
             SuperOwnerKind::Resolved(resolved_owner) => Some(resolved_owner.lookup_anchor),
@@ -314,7 +314,7 @@ impl<'db> SuperOwnerKind<'db> {
     }
 
     /// Returns the type representation of this owner.
-    pub(super) fn owner_type(&self, _db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn owner_type(&self) -> Type<'db> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(*dynamic),
             SuperOwnerKind::Divergent(divergent) => Type::Divergent(*divergent),
@@ -433,7 +433,7 @@ impl<'db> BoundSuperType<'db> {
         owner: SuperOwnerKind<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
         if let Some(pivot_class) = pivot_class.into_class()
-            && let Some(owner_class) = owner.lookup_anchor(db)
+            && let Some(owner_class) = owner.lookup_anchor()
             && !Self::mro_contains_pivot(db, owner_class, pivot_class)
         {
             return Err(BoundSuperError::FailingConditionCheck {
