@@ -1429,6 +1429,24 @@ E3 = Enum("E3", [("A", 1), ("A", 2)])
 reveal_type(enum_members(E3))  # revealed: Unknown
 ```
 
+### Unknown members: inherited attribute access
+
+When members are unknown, own member access returns `Unknown`, but inherited attributes from the
+enum base class should still resolve through the MRO.
+
+```py
+from enum import Enum
+
+names: list[str] = ["A", "B"]
+E = Enum("E", names)
+
+# inherited class attributes resolve from Enum base
+reveal_type(E.__members__)  # revealed: MappingProxyType[str, E]
+
+# own member access is unknown (can't tell if it exists)
+reveal_type(E.FOO)  # revealed: Unknown
+```
+
 ### Too many positional args
 
 `Enum(value, names, *, ...)` only accepts two positional args at runtime.

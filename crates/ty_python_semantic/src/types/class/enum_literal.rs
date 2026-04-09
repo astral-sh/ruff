@@ -115,20 +115,29 @@ impl<'db> DynamicEnumLiteral<'db> {
         Mro::of_dynamic_enum(db, self)
     }
 
+    /// Look up an own class member (not inherited) by name.
+    ///
+    /// For known members, returns the `EnumLiteralType` if `name` matches.
+    /// For unknown members, returns `Member::unbound()` — the unknown-member
+    /// fallback is handled in `class_member` as a last resort after checking
+    /// the full MRO (matching the `NamedTuple` pattern).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let spec = self.spec(db);
-        if !spec.has_known_members(db) {
-            return Member::definitely_declared(Type::unknown());
-        }
-        if spec.members(db).iter().any(|(n, _)| n.as_str() == name) {
-            let class_lit = ClassLiteral::DynamicEnum(self);
-            let enum_lit =
-                crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
-            return Member::definitely_declared(Type::enum_literal(enum_lit));
+        if spec.has_known_members(db) {
+            if spec.members(db).iter().any(|(n, _)| n.as_str() == name) {
+                let class_lit = ClassLiteral::DynamicEnum(self);
+                let enum_lit =
+                    crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
+                return Member::definitely_declared(Type::enum_literal(enum_lit));
+            }
         }
         Member::unbound()
     }
 
+    /// Look up a class member by name, checking own members, mixin, and base class.
+    ///
+    /// If members are unknown and nothing was found in the MRO, returns `Unknown`
+    /// as a last resort to avoid false `unresolved-attribute` errors.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let own = self.own_class_member(db, name);
         if !own.is_undefined() {
@@ -142,13 +151,27 @@ impl<'db> DynamicEnumLiteral<'db> {
                 }
             }
         }
-        self.base_class(db)
+        let result = self
+            .base_class(db)
             .to_class_literal(db)
             .as_class_literal()
             .map(|cls| cls.class_member(db, name, MemberLookupPolicy::default()))
-            .unwrap_or_else(|| Place::Undefined.into())
+            .unwrap_or_else(|| Place::Undefined.into());
+
+        // when members are unknown (e.g. `Enum("E", some_var)`), any name could
+        // be a member. return `Unknown` as a last resort after checking the full
+        // MRO so that inherited attributes like `__members__` still resolve.
+        if !self.spec(db).has_known_members(db) && result.place.is_undefined() {
+            return Place::bound(Type::unknown()).into();
+        }
+
+        result
     }
 
+    /// Look up an instance member by name, checking mixin and base class.
+    ///
+    /// If members are unknown and nothing was found, returns `Unknown`
+    /// as a last resort.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         if let Some(mixin) = self.mixin_type(db) {
             if let Some(ClassBase::Class(class)) = ClassBase::try_from_type(db, mixin, None) {
@@ -158,19 +181,22 @@ impl<'db> DynamicEnumLiteral<'db> {
                 }
             }
         }
-        self.base_class(db)
+        let result = self
+            .base_class(db)
             .to_instance(db)
-            .instance_member(db, name)
+            .instance_member(db, name);
+
+        if !self.spec(db).has_known_members(db) && result.place.is_undefined() {
+            return Place::bound(Type::unknown()).into();
+        }
+
+        result
     }
 
-    pub(super) fn own_instance_member(
-        self,
-        db: &'db dyn Db,
-        #[expect(unused)] name: &str,
-    ) -> Member<'db> {
-        if !self.spec(db).has_known_members(db) {
-            return Member::definitely_declared(Type::unknown());
-        }
+    /// Functional enums don't define own instance attributes — `.name`, `.value`
+    /// etc. come from the `Enum` base class, not from the dynamic enum itself.
+    #[expect(clippy::unused_self)]
+    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::unbound()
     }
 }
