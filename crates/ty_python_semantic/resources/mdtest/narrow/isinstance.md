@@ -776,8 +776,8 @@ def _(x: object, y: Movie):
         reveal_type(y)  # revealed: Movie
 ```
 
-When the original type already contains a concrete `TypedDict` arm, runtime narrowing keeps that arm
-directly instead of routing it through the fallback:
+When the original type already contains a concrete `TypedDict` arm, runtime narrowing keeps that
+arm:
 
 ```py
 def _(z: int | Movie):
@@ -799,7 +799,7 @@ def _(value: Movie | T):
         reveal_type(value)  # revealed: (T@_ & Top[dict[Unknown, Unknown]]) | Movie | (T@_ & TypedDictTop)
 ```
 
-This also needs to preserve common dict-key correlations from ecosystem code:
+This also needs to preserve common dict-key correlations:
 
 ```py
 def compare_common_keys(value: object, default: object):
@@ -831,15 +831,15 @@ It should also keep `dict` methods callable for concrete `dict` unions keyed by 
 
 ```py
 from enum import IntEnum
-from typing import Dict, Optional, Protocol, Union
+from typing import Protocol
 
 class DiagnosticField(IntEnum):
     MESSAGE = 77
 
 class PGresult(Protocol):
-    def error_field(self, fieldcode: int) -> Optional[bytes]: ...
+    def error_field(self, fieldcode: int) -> bytes | None: ...
 
-ErrorInfo = Union[PGresult, Dict[int, Optional[bytes]], None]
+ErrorInfo = PGresult | dict[int, bytes | None] | None
 
 def _(info: ErrorInfo):
     if isinstance(info, dict):
@@ -857,6 +857,8 @@ def takes_dict(value: dict[str, object]) -> None: ...
 def mutate_dict_like(value: object) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | TypedDictTop
+        # TODO: Report this more precisely as an unsound TypedDict mutation, rather than as a
+        # missing attribute.
         value.popitem()  # error: [unresolved-attribute]
         takes_dict(value)  # error: [invalid-argument-type]
 ```
