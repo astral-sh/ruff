@@ -38,6 +38,7 @@ where
     F: Borrow<TypedDictField<'db>>,
 {
     match method_name {
+        "__init__" => Some(synthesize_typed_dict_init(db, instance_ty, fields())),
         "__getitem__" => Some(synthesize_typed_dict_getitem(db, instance_ty, fields())),
         "__setitem__" => Some(synthesize_typed_dict_setitem(db, instance_ty, fields())),
         "__delitem__" => Some(synthesize_typed_dict_delitem(db, instance_ty, fields())),
@@ -50,6 +51,70 @@ where
         }
         _ => None,
     }
+}
+
+/// Synthesize the `__init__` method for a `TypedDict`.
+///
+/// overloads:
+/// 1. `__init__(self, __map: TD, /, *, field1: T1 = ..., field2: T2 = ...) -> None`
+///    Allows passing another instance of the `TypedDict` when creating a new instance.
+///    Technically, `__map` could accept a subset of the `TypedDict` if the remaining
+///    fields are provided as keyword arguments, but we don't model that in the
+///    synthesized `__init__`, since this signature is primarily used for IDE support.
+/// 2. `__init__(self, *, field1: T1, field2: T2 = ...) -> None`
+///    Keyword-only.
+fn synthesize_typed_dict_init<'db, N, F>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+    fields: impl IntoIterator<Item = (N, F)>,
+) -> Type<'db>
+where
+    N: Borrow<Name>,
+    F: Borrow<TypedDictField<'db>>,
+{
+    let fields: Vec<_> = fields
+        .into_iter()
+        .map(|(name, field)| (name.borrow().clone(), field.borrow().clone()))
+        .collect();
+
+    let self_param =
+        Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty);
+
+    let map_param = Parameter::positional_only(Some(Name::new_static("__map")))
+        .with_annotated_type(instance_ty);
+    let params_with_default = fields.iter().map(|(name, field)| {
+        Parameter::keyword_only(name.clone())
+            .with_annotated_type(field.declared_ty)
+            .with_default_type(field.declared_ty)
+    });
+    let map_overload = Signature::new(
+        Parameters::new(
+            db,
+            std::iter::once(self_param.clone())
+                .chain(std::iter::once(map_param))
+                .chain(params_with_default),
+        ),
+        Type::none(db),
+    );
+
+    let keyword_field_params = fields.iter().map(|(name, field)| {
+        let param = Parameter::keyword_only(name.clone()).with_annotated_type(field.declared_ty);
+        if field.is_required() {
+            param
+        } else {
+            param.with_default_type(field.declared_ty)
+        }
+    });
+    let keyword_overload = Signature::new(
+        Parameters::new(db, std::iter::once(self_param).chain(keyword_field_params)),
+        Type::none(db),
+    );
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads([map_overload, keyword_overload]),
+        CallableTypeKind::FunctionLike,
+    ))
 }
 
 /// Synthesize the `__getitem__` method for a `TypedDict`.
