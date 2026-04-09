@@ -13,8 +13,7 @@ use crate::semantic_index::{
 };
 use crate::types::IntersectionType;
 use crate::types::{
-    CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
-    TypeDefinition, TypeQualifiers,
+    CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
@@ -154,8 +153,9 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf
             | Self::Unknown
             | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::TypeQualifier(_) => KnownClass::SpecialForm,
+            | Self::AlwaysFalsy => KnownClass::SpecialForm,
+
+            Self::TypeQualifier(qualifier) => qualifier.class(),
 
             // Typeshed says it's an instance of `_SpecialForm`,
             // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
@@ -239,6 +239,7 @@ impl SpecialFormType {
             List,
             Dict,
             FrozenSet,
+            InitVar,
             Set,
             ChainMap,
             Counter,
@@ -306,6 +307,7 @@ impl SpecialFormType {
                         TypeQualifier::ReadOnly => Self::ReadOnly,
                         TypeQualifier::Required => Self::Required,
                         TypeQualifier::NotRequired => Self::NotRequired,
+                        TypeQualifier::InitVar => Self::InitVar,
                     },
                 }
             }
@@ -371,6 +373,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::NotRequired => {
                     Self::TypeQualifier(TypeQualifier::NotRequired)
                 }
+                SpecialFormTypeBuilder::InitVar => Self::TypeQualifier(TypeQualifier::InitVar),
             })
     }
 
@@ -380,8 +383,8 @@ impl SpecialFormType {
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
     pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::TypeQualifier(TypeQualifier::ClassVar)
-            | Self::LegacyStdlibAlias(_)
+            Self::TypeQualifier(qualifier) => qualifier.check_module(module),
+            Self::LegacyStdlibAlias(_)
             | Self::Optional
             | Self::Union
             | Self::NoReturn
@@ -394,12 +397,6 @@ impl SpecialFormType {
             | Self::Literal
             | Self::LiteralString
             | Self::Never
-            | Self::TypeQualifier(
-                TypeQualifier::Final
-                | TypeQualifier::Required
-                | TypeQualifier::NotRequired
-                | TypeQualifier::ReadOnly,
-            )
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -460,6 +457,8 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type => false,
 
+            Self::TypeQualifier(qualifier) => qualifier.is_callable(),
+
             // All other special forms are also not callable
             Self::Annotated
             | Self::Literal
@@ -480,7 +479,6 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf
             | Self::Callable
             | Self::TypingSelf
-            | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -496,6 +494,8 @@ impl SpecialFormType {
     /// to `issubclass()` and `isinstance()` calls.
     pub(super) const fn is_valid_isinstance_target(self) -> bool {
         match self {
+            Self::TypeQualifier(qualifier) => qualifier.is_valid_isinstance_target(),
+
             Self::Callable
             | Self::LegacyStdlibAlias(_)
             | Self::Tuple
@@ -509,7 +509,6 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::CallableTypeOf
             | Self::RegularCallableTypeOf
-            | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Intersection
             | Self::Literal
@@ -536,6 +535,7 @@ impl SpecialFormType {
     /// Return the name of the symbol at runtime
     pub(super) const fn name(self) -> &'static str {
         match self {
+            SpecialFormType::TypeQualifier(qualifier) => qualifier.name(),
             SpecialFormType::Any => "Any",
             SpecialFormType::Annotated => "Annotated",
             SpecialFormType::Literal => "Literal",
@@ -547,13 +547,9 @@ impl SpecialFormType {
             SpecialFormType::Tuple => "Tuple",
             SpecialFormType::Type => "Type",
             SpecialFormType::TypingSelf => "Self",
-            SpecialFormType::TypeQualifier(TypeQualifier::Final) => "Final",
-            SpecialFormType::TypeQualifier(TypeQualifier::ClassVar) => "ClassVar",
             SpecialFormType::Callable => "Callable",
             SpecialFormType::Concatenate => "Concatenate",
             SpecialFormType::Unpack => "Unpack",
-            SpecialFormType::TypeQualifier(TypeQualifier::Required) => "Required",
-            SpecialFormType::TypeQualifier(TypeQualifier::NotRequired) => "NotRequired",
             SpecialFormType::TypeAlias => "TypeAlias",
             SpecialFormType::TypeGuard => "TypeGuard",
             SpecialFormType::TypedDict => "TypedDict",
@@ -567,7 +563,6 @@ impl SpecialFormType {
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Deque) => "Deque",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::ChainMap) => "ChainMap",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::OrderedDict) => "OrderedDict",
-            SpecialFormType::TypeQualifier(TypeQualifier::ReadOnly) => "ReadOnly",
             SpecialFormType::Unknown => "Unknown",
             SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
             SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
@@ -598,7 +593,6 @@ impl SpecialFormType {
             | SpecialFormType::Tuple
             | SpecialFormType::Type
             | SpecialFormType::TypingSelf
-            | SpecialFormType::TypeQualifier(_)
             | SpecialFormType::Callable
             | SpecialFormType::Concatenate
             | SpecialFormType::Unpack
@@ -612,6 +606,8 @@ impl SpecialFormType {
             | SpecialFormType::LegacyStdlibAlias(_) => {
                 &[KnownModule::Typing, KnownModule::TypingExtensions]
             }
+
+            SpecialFormType::TypeQualifier(qualifier) => qualifier.definition_modules(),
 
             SpecialFormType::Unknown
             | SpecialFormType::AlwaysTruthy
@@ -652,7 +648,7 @@ impl SpecialFormType {
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
-    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+    ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),
@@ -676,12 +672,10 @@ impl SpecialFormType {
             Self::TypingSelf => {
                 let index = semantic_index(db, scope_id.file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::InvalidType(Type::SpecialForm(self), scope_id)
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::InvalidType(
+                        Type::SpecialForm(self),
+                        scope_id,
+                    ));
                 };
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
@@ -701,12 +695,7 @@ impl SpecialFormType {
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInStaticMethod
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInStaticMethod);
                 }
 
                 let is_in_metaclass = KnownClass::Type
@@ -718,12 +707,7 @@ impl SpecialFormType {
                             .is_subclass_of(db, type_class)
                     });
                 if is_in_metaclass {
-                    return Err(InvalidTypeExpressionError {
-                        fallback_type: Type::unknown(),
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypingSelfInMetaclass
-                        ],
-                    });
+                    return Err(InvalidTypeExpression::TypingSelfInMetaclass);
                 }
 
                 Ok(typing_self
@@ -733,30 +717,17 @@ impl SpecialFormType {
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type
             // expression is an error.
-            Self::TypeAlias => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypeAlias],
-                fallback_type: Type::unknown(),
-            }),
-            Self::TypedDict => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypedDict],
-                fallback_type: Type::unknown(),
-            }),
+            Self::TypeAlias => Err(InvalidTypeExpression::TypeAlias),
+            Self::TypedDict => Err(InvalidTypeExpression::TypedDict),
 
-            Self::Literal | Self::Union | Self::Intersection => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Literal | Self::Union | Self::Intersection => {
+                Err(InvalidTypeExpression::RequiresArguments(self))
+            }
 
-            Self::Protocol => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Protocol],
-                fallback_type: Type::unknown(),
-            }),
-            Self::Generic => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
-                fallback_type: Type::unknown(),
-            }),
+            Self::Protocol => Err(InvalidTypeExpression::Protocol),
+            Self::Generic => Err(InvalidTypeExpression::Generic),
+            Self::Annotated => Err(InvalidTypeExpression::RequiresTwoArguments(self)),
+            Self::Concatenate => Err(InvalidTypeExpression::Concatenate),
 
             Self::Optional
             | Self::Not
@@ -767,24 +738,7 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::Unpack
             | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresOneArgument(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            Self::Annotated => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::RequiresTwoArguments(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            Self::Concatenate => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Concatenate],
-                fallback_type: Type::unknown(),
-            }),
+            | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
@@ -792,20 +746,7 @@ impl SpecialFormType {
             SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
             SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
             SpecialFormType::TypeQualifier(qualifier) => {
-                let err = match qualifier {
-                    TypeQualifier::Final | TypeQualifier::ClassVar => {
-                        InvalidTypeExpression::TypeQualifier(qualifier)
-                    }
-                    TypeQualifier::ReadOnly
-                    | TypeQualifier::NotRequired
-                    | TypeQualifier::Required => {
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier)
-                    }
-                };
-                Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![err],
-                    fallback_type: Type::unknown(),
-                })
+                Err(InvalidTypeExpression::TypeQualifier(qualifier))
             }
         }
     }
@@ -872,13 +813,104 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumIter)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,
     ClassVar,
     Required,
     NotRequired,
+    /// The symbol `dataclasses.InitVar`.
+    ///
+    /// Typeshed defines this symbol as a class, which is accurate, but we represent it as a
+    /// special form internally as it's more similar semantically to `ClassVar`/`Final` etc.
+    /// than to a regular generic class.
+    InitVar,
+}
+
+impl TypeQualifier {
+    const fn is_callable(self) -> bool {
+        match self {
+            Self::InitVar => true,
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                false
+            }
+        }
+    }
+
+    const fn check_module(self, module: KnownModule) -> bool {
+        match self {
+            Self::InitVar => module.is_dataclasses(),
+            Self::ClassVar => module.is_typing(),
+            Self::ReadOnly | Self::Final | Self::Required | Self::NotRequired => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+        }
+    }
+
+    const fn is_valid_isinstance_target(self) -> bool {
+        match self {
+            Self::InitVar => true,
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                false
+            }
+        }
+    }
+
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::ReadOnly => "ReadOnly",
+            Self::Final => "Final",
+            Self::ClassVar => "ClassVar",
+            Self::Required => "Required",
+            Self::NotRequired => "NotRequired",
+            Self::InitVar => "InitVar",
+        }
+    }
+
+    const fn definition_modules(self) -> &'static [KnownModule] {
+        match self {
+            Self::InitVar => &[KnownModule::Dataclasses],
+            Self::ClassVar | Self::ReadOnly | Self::Final | Self::Required | Self::NotRequired => {
+                &[KnownModule::Typing, KnownModule::TypingExtensions]
+            }
+        }
+    }
+
+    const fn class(self) -> KnownClass {
+        match self {
+            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
+                KnownClass::SpecialForm
+            }
+            Self::InitVar => KnownClass::Type,
+        }
+    }
+
+    /// Return `true` if this type qualifier requires exactly one argument
+    /// when used in a type expression.
+    pub(super) const fn requires_one_argument(self) -> bool {
+        match self {
+            Self::Final | Self::ClassVar => false,
+            Self::Required | Self::NotRequired | Self::InitVar | Self::ReadOnly => true,
+        }
+    }
+    pub(crate) const fn is_valid_for_non_name_targets(self) -> bool {
+        match self {
+            TypeQualifier::ReadOnly
+            | TypeQualifier::Required
+            | TypeQualifier::NotRequired
+            | TypeQualifier::ClassVar
+            | TypeQualifier::InitVar => false,
+            TypeQualifier::Final => true,
+        }
+    }
+
+    pub(crate) const fn is_valid_in_typeddict_field(self) -> bool {
+        match self {
+            TypeQualifier::ReadOnly | TypeQualifier::Required | TypeQualifier::NotRequired => true,
+            TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => false,
+        }
+    }
 }
 
 impl From<TypeQualifier> for SpecialFormType {
@@ -895,6 +927,7 @@ impl From<TypeQualifier> for TypeQualifiers {
             TypeQualifier::ClassVar => TypeQualifiers::CLASS_VAR,
             TypeQualifier::Required => TypeQualifiers::REQUIRED,
             TypeQualifier::NotRequired => TypeQualifiers::NOT_REQUIRED,
+            TypeQualifier::InitVar => TypeQualifiers::INIT_VAR,
         }
     }
 }

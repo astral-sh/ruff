@@ -48,6 +48,10 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-type-form]
 invalid3: Literal[(3, 4)]
+# error: [invalid-type-form]
+invalid4: Literal[-3.14]
+# error: [invalid-type-form]
+invalid5: Literal[-3j]
 
 hello = "hello"
 invalid4: Literal[
@@ -329,8 +333,7 @@ from other import Literal
 #
 # ?
 #
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
+# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in a type expression"
 a1: Literal[26]
 
 def f():

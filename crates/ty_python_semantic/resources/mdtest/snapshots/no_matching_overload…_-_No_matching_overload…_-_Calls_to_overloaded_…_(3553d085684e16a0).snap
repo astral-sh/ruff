@@ -57,6 +57,5 @@ info: Overload implementation defined here
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 8 |     return x
   |
-info: rule `no-matching-overload` is enabled by default
 
 ```

@@ -19,7 +19,7 @@ help: Organize imports
   - from some_module import some_class  # Aside
   - # Above
 2 | from some_module import *  # Aside
-3 + 
+3 +
 4 + # Above
 5 + from some_module import some_class  # Aside
 6 + from some_other_module import *

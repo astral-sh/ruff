@@ -1,6 +1,5 @@
 ---
 source: crates/ty_test/src/lib.rs
-assertion_line: 624
 expression: snapshot
 ---
 
@@ -34,6 +33,5 @@ error[invalid-type-variable-default]: Invalid default for type parameter `U`
 4 |     def g[U = int](self): ...  # OK
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

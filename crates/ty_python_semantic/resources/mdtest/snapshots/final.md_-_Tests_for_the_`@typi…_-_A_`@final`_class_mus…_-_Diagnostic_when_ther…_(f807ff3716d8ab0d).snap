@@ -58,6 +58,5 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
 10 |     def bbbbbbbb(self) -> int: ...
    |
 info: Use `--verbose` to see all 10 unimplemented abstract methods
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

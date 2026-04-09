@@ -11,9 +11,10 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
+    UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -268,6 +269,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
              => true,
             Type::Dynamic(_)
+            | Type::Divergent(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -320,13 +322,17 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             given: assuming,
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
     }
@@ -418,13 +424,17 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
             inferable,
             relation,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
     }
@@ -446,17 +456,51 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    pub(crate) fn is_equivalent_to_with_materialization_visitor(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> bool {
+        self.when_equivalent_to_with_materialization_visitor(
+            db,
+            other,
+            &ConstraintSetBuilder::new(),
+            materialization_visitor,
+        )
+        .is_always_satisfied(db)
+    }
+
     pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        self.when_equivalent_to_with_materialization_visitor(
+            db,
+            other,
+            constraints,
+            &materialization_visitor,
+        )
+    }
+
+    pub(crate) fn when_equivalent_to_with_materialization_visitor<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
@@ -489,12 +533,16 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
+            disjointness_visitor: &disjointness_visitor,
+            relation_visitor: &relation_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
@@ -537,6 +585,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
@@ -545,6 +594,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -553,6 +603,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -560,6 +611,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -568,6 +620,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -603,6 +656,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(source) = source.materialized_divergent_fallback() {
+            return self.check_type_pair(db, source, target);
+        }
+
+        if let Some(target) = target.materialized_divergent_fallback() {
+            return self.check_type_pair(db, source, target);
+        }
+
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -669,8 +730,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, Type::Dynamic(DynamicType::Divergent(_))) => {
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
@@ -728,27 +788,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(dynamic), _) => {
-                // If a `Divergent` type is involved, it must not be eliminated.
-                debug_assert!(
-                    !matches!(dynamic, DynamicType::Divergent(_)),
-                    "DynamicType::Divergent should have been handled in an earlier branch"
-                );
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    match self.relation {
-                        TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            true
-                        }
-                        TypeRelation::Redundancy { .. } => match target {
-                            Type::Dynamic(_) => true,
-                            Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                            _ => false,
-                        },
+            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
+                self.constraints,
+                match self.relation {
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Redundancy { .. } => match target {
+                        Type::Dynamic(_) => true,
+                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        _ => false,
                     },
-                )
-            }
+                },
+            ),
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
@@ -1538,6 +1589,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1548,6 +1600,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 }
@@ -1564,10 +1617,14 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
-    fn as_relation_checker(&self) -> TypeRelationChecker<'_, 'c, 'db> {
+    fn as_relation_checker<'a>(
+        &'a self,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    ) -> TypeRelationChecker<'a, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
@@ -1575,6 +1632,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -1592,11 +1650,18 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_checker = self.as_relation_checker();
-        relation_checker
+        // Recursive materialization fallbacks depend on the comparison root, so each directional
+        // pass needs fresh materialization caches. Nested equivalence checks still share the
+        // materialization-equivalence recursion guard to avoid re-entering the same comparison.
+        let left_to_right_materialization_visitor =
+            self.materialization_visitor.for_new_materialization_root();
+        self.as_relation_checker(&left_to_right_materialization_visitor)
             .check_type_pair(db, left, right)
             .and(db, self.constraints, || {
-                relation_checker.check_type_pair(db, right, left)
+                let right_to_left_materialization_visitor =
+                    self.materialization_visitor.for_new_materialization_root();
+                self.as_relation_checker(&right_to_left_materialization_visitor)
+                    .check_type_pair(db, right, left)
             })
     }
 }
@@ -1614,6 +1679,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
@@ -1622,6 +1688,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -1629,6 +1696,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
+            materialization_visitor,
         }
     }
 
@@ -1643,6 +1711,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1652,6 +1721,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1698,10 +1768,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(left) = left.materialized_divergent_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
+        if let Some(right) = right.materialized_divergent_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);

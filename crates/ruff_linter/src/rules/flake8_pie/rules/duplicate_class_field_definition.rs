@@ -78,7 +78,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
 
         // If this is an unrolled augmented assignment (e.g., `x = x + 1`), skip it.
         if let Some(value) = value
-            && any_over_expr(value, &|expr| {
+            && any_over_expr(value, |expr| {
                 expr.as_name_expr().is_some_and(|name| name.id == target.id)
             })
         {

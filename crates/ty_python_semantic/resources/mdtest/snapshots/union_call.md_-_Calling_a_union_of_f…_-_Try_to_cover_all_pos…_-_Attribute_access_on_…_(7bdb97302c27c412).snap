@@ -45,7 +45,6 @@ error[invalid-argument-type]: Argument to bound method `foo` is incorrect
    |
 info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -60,7 +59,6 @@ error[invalid-argument-type]: Argument to bound method `foo` is incorrect
    |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -83,6 +81,5 @@ info: Method defined here
   |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-info: rule `invalid-argument-type` is enabled by default
 
 ```

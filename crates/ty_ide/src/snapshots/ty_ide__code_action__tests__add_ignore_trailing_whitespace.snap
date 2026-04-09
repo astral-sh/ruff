@@ -1,0 +1,12 @@
+---
+source: crates/ty_ide/src/code_action.rs
+expression: test.code_actions(&UNRESOLVED_REFERENCE)
+---
+info[code-action]: Ignore 'unresolved-reference' for this line
+ --> main.py:1:5
+  |
+1 | b = a / 10  
+  |     ^
+  |
+  - b = a / 10  
+1 + b = a / 10  # ty:ignore[unresolved-reference]

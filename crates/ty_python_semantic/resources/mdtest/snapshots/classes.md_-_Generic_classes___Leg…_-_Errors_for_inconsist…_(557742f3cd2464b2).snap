@@ -82,7 +82,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 14 |
 15 | # The same applies when the explicit base is partially specialized differently:
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -99,7 +98,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 20 |
 21 | # The inconsistency can also come through two intermediate classes (diamond):
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -116,7 +114,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 27 |
 28 | # Implicit specialization is fine:
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -133,7 +130,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 38 |
 39 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -150,7 +146,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 41 |
 42 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -167,7 +162,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 44 |
 45 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -184,7 +178,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 47 |
 48 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -201,7 +194,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 50 |
 51 | # error: [invalid-generic-class]
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -216,6 +208,5 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |               Later class base inherits from `Grandparent[T2@BadChild9, T1@BadChild9]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild9, T2@BadChild9]`
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```

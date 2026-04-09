@@ -70,7 +70,7 @@ a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-z
 
 ```py
 # fmt: off
-def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...  # ty: ignore[fstring-type-annotation, byte-string-type-annotation]
+def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[invalid-type-form, unresolved-reference]
 ```
 
 ## Can't suppress syntax errors

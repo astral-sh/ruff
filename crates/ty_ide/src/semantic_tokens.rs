@@ -38,16 +38,21 @@ use ruff_python_ast::visitor::source_order::{
     walk_interpolated_string_element, walk_stmt,
 };
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, BytesLiteral, Expr, InterpolatedStringElement, Stmt, StringLiteral,
-    TypeParam,
+    self as ast, AnyNodeRef, ArgOrKeyword, BytesLiteral, Expr, InterpolatedStringElement, Stmt,
+    StringLiteral, TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
-    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_for_name,
+    HasType, SemanticModel,
+    semantic_index::definition::DefinitionKind,
+    types::ide_support::{
+        CallArgumentForm, call_argument_forms, definition_for_name,
+        static_member_type_for_attribute,
+    },
+    types::{SpecialFormType, Type},
 };
 
 /// Semantic token types supported by the language server.
@@ -199,7 +204,7 @@ struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
-    in_type_annotation: bool,
+    in_type_form: bool,
     in_target_creating_definition: bool,
     in_docstring: bool,
     expecting_docstring: bool,
@@ -213,7 +218,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             tokens: Vec::new(),
             in_class_scope: false,
             in_target_creating_definition: false,
-            in_type_annotation: false,
+            in_type_form: false,
             in_docstring: false,
             range_filter,
             expecting_docstring: false,
@@ -387,7 +392,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> (SemanticTokenType, SemanticTokenModifier) {
         let mut modifiers = SemanticTokenModifier::empty();
 
-        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+        if let Some(classification) = self.classify_type_form_expr(ty) {
             return classification;
         }
 
@@ -415,16 +420,16 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
-    fn classify_annotation_type_expr(
+    fn classify_type_form_expr(
         &self,
         ty: Type,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
-        if !self.in_type_annotation {
+        if !self.in_type_form {
             return None;
         }
 
-        // In annotation contexts, these types all denote class-like type expressions that should
-        // be highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
+        // In type-form contexts, these types all denote class-like type expressions that should be
+        // highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
         match ty {
             Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -467,20 +472,22 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
         }
 
+        let db = self.model.db();
         let attr_name_str = attr_name.id.as_str();
         let mut modifiers = SemanticTokenModifier::empty();
 
-        if let Some(classification) = self.classify_annotation_type_expr(ty) {
+        if let Some(classification) = self.classify_type_form_expr(ty) {
             return classification;
         }
 
         let elements = if let Some(union) = ty.as_union() {
-            union.elements(self.model.db())
+            union.elements(db)
         } else {
             std::slice::from_ref(&ty)
         };
 
         let mut token_type = UnifiedTokenType::None;
+        let mut all_properties_are_readonly = true;
 
         for element in elements {
             // Classify based on the inferred type of the attribute
@@ -500,8 +507,9 @@ impl<'db> SemanticTokenVisitor<'db> {
                     // Module accessed as an attribute (e.g., from os import path)
                     token_type.add(SemanticTokenType::Namespace);
                 }
-                ty if ty.is_property_instance() => {
+                Type::PropertyInstance(property) => {
                     token_type.add(SemanticTokenType::Property);
+                    all_properties_are_readonly &= property.setter(db).is_none();
                 }
                 _ => {
                     token_type = UnifiedTokenType::Fallback;
@@ -510,6 +518,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         if let Some(uniform) = token_type.into_semantic_token_type() {
+            if uniform == SemanticTokenType::Property && all_properties_are_readonly {
+                modifiers |= SemanticTokenModifier::READONLY;
+            }
             return (uniform, modifiers);
         }
 
@@ -739,7 +750,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     }
                 }
 
-                self.visit_expr(&type_alias.value);
+                self.visit_annotation(&type_alias.value);
             }
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
@@ -812,7 +823,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_annotation(&assignment.annotation);
 
                 if let Some(value) = &assignment.value {
-                    self.visit_expr(value);
+                    // PEP 613 alias values are type forms even though they appear as annotated
+                    // assignments rather than dedicated `type` statements.
+                    if matches!(
+                        assignment.annotation.inferred_type(self.model),
+                        Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+                    ) {
+                        self.visit_annotation(value);
+                    } else {
+                        self.visit_expr(value);
+                    }
                 }
                 self.expecting_docstring = true;
             }
@@ -873,11 +893,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         }
     }
 
+    /// Visit an annotation or other expression that should be interpreted as a type form.
     fn visit_annotation(&mut self, expr: &'_ Expr) {
-        let prev_in_type_annotation = self.in_type_annotation;
-        self.in_type_annotation = true;
+        let prev_in_type_form = self.in_type_form;
+        self.in_type_form = true;
         self.visit_expr(expr);
-        self.in_type_annotation = prev_in_type_annotation;
+        self.in_type_form = prev_in_type_form;
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -895,7 +916,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
+                let ty = static_member_type_for_attribute(self.model, attr)
+                    .unwrap_or_else(|| expr.inferred_type(self.model).unwrap_or(Type::unknown()));
                 let (token_type, modifiers) = self.classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
             }
@@ -947,6 +969,23 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
                     walk_expr(self, expr);
+                }
+            }
+            ast::Expr::Call(call) => {
+                self.visit_expr(call.func.as_ref());
+
+                // Determine whether each argument should be considered a type form or a value
+                // based on the position.
+                let argument_forms = call_argument_forms(self.model, call);
+                for (argument, form) in call.arguments.arguments_source_order().zip(argument_forms)
+                {
+                    match form {
+                        CallArgumentForm::Type => self.visit_annotation(argument.value()),
+                        CallArgumentForm::Unknown | CallArgumentForm::Value => match argument {
+                            ArgOrKeyword::Arg(argument) => self.visit_expr(argument),
+                            ArgOrKeyword::Keyword(keyword) => self.visit_keyword(keyword),
+                        },
+                    }
                 }
             }
             _ => {
@@ -1787,7 +1826,7 @@ b: list["int | str"] | None
 c: "list[int | str] | None"
 d: "list[int | str]" | "None"
 e: 'list["int | str"] | "None"'
-f: """'list["int | str"]' | 'None'""" 
+f: """'list["int | str"]' | 'None'"""
 "#,
         );
 
@@ -1899,7 +1938,7 @@ t = MyClass.prop          # prop should be property on the class itself
         "CONSTANT" @ 413..421: Variable [readonly]
         "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
-        "prop" @ 491..495: Variable
+        "prop" @ 491..495: Property [readonly]
         "v" @ 534..535: Variable [definition]
         "MyClass" @ 538..545: Class
         "method" @ 546..552: Method
@@ -1908,7 +1947,204 @@ t = MyClass.prop          # prop should be property on the class itself
         "__name__" @ 605..613: Variable
         "t" @ 651..652: Variable [definition]
         "MyClass" @ 655..662: Class
-        "prop" @ 663..667: Property
+        "prop" @ 663..667: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn property_with_return_annotation() {
+        let test = SemanticTokenTest::new(
+            "
+class Foo:
+    @property
+    def prop(self) -> int:
+        return 4
+
+foo = Foo()
+w = foo.prop
+x = Foo.prop
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Foo" @ 7..10: Class [definition]
+        "property" @ 17..25: Decorator
+        "prop" @ 34..38: Method [definition]
+        "self" @ 39..43: SelfParameter [definition]
+        "int" @ 48..51: Class
+        "4" @ 68..69: Number
+        "foo" @ 71..74: Variable [definition]
+        "Foo" @ 77..80: Class
+        "w" @ 83..84: Variable [definition]
+        "foo" @ 87..90: Variable
+        "prop" @ 91..95: Property [readonly]
+        "x" @ 96..97: Variable [definition]
+        "Foo" @ 100..103: Class
+        "prop" @ 104..108: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn property_readonly_modifier() {
+        // Verify that the readonly modifier is set for getter-only properties
+        // and NOT set for properties that also have a setter.
+        let test = SemanticTokenTest::new(
+            "
+class Config:
+    @property
+    def read_only(self) -> str:
+        return 'value'
+
+    @property
+    def read_write(self) -> int:
+        return self._x
+
+    @read_write.setter
+    def read_write(self, value: int) -> None:
+        self._x = value
+
+cfg = Config()
+a = cfg.read_only
+b = cfg.read_write
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Config" @ 7..13: Class [definition]
+        "property" @ 20..28: Decorator
+        "read_only" @ 37..46: Method [definition]
+        "self" @ 47..51: SelfParameter [definition]
+        "str" @ 56..59: Class
+        "'value'" @ 76..83: String
+        "property" @ 90..98: Decorator
+        "read_write" @ 107..117: Method [definition]
+        "self" @ 118..122: SelfParameter [definition]
+        "int" @ 127..130: Class
+        "self" @ 147..151: SelfParameter
+        "_x" @ 152..154: Variable
+        "read_write" @ 161..171: Method
+        "setter" @ 172..178: Method
+        "read_write" @ 187..197: Method [definition]
+        "self" @ 198..202: SelfParameter [definition]
+        "value" @ 204..209: Parameter [definition]
+        "int" @ 211..214: Class
+        "None" @ 219..223: BuiltinConstant
+        "self" @ 233..237: SelfParameter
+        "_x" @ 238..240: Variable
+        "value" @ 243..248: Parameter
+        "cfg" @ 250..253: Variable [definition]
+        "Config" @ 256..262: Class
+        "a" @ 265..266: Variable [definition]
+        "cfg" @ 269..272: Variable
+        "read_only" @ 273..282: Property [readonly]
+        "b" @ 283..284: Variable [definition]
+        "cfg" @ 287..290: Variable
+        "read_write" @ 291..301: Property
+        "#);
+    }
+
+    #[test]
+    fn property_union_with_non_property_falls_back() {
+        let test = SemanticTokenTest::new(
+            "
+class WithProperty:
+    @property
+    def value(self) -> int:
+        return 1
+
+class WithAttribute:
+    value = 2
+
+def f(obj: WithProperty | WithAttribute):
+    return obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "WithProperty" @ 7..19: Class [definition]
+        "property" @ 26..34: Decorator
+        "value" @ 43..48: Method [definition]
+        "self" @ 49..53: SelfParameter [definition]
+        "int" @ 58..61: Class
+        "1" @ 78..79: Number
+        "WithAttribute" @ 87..100: Class [definition]
+        "value" @ 106..111: Variable [definition]
+        "2" @ 114..115: Number
+        "f" @ 121..122: Function [definition]
+        "obj" @ 123..126: Parameter [definition]
+        "WithProperty" @ 128..140: Class
+        "WithAttribute" @ 143..156: Class
+        "obj" @ 170..173: Parameter
+        "value" @ 174..179: Variable
+        "#);
+    }
+
+    #[test]
+    fn property_union_readonly_only_if_all_variants_are_readonly() {
+        let test = SemanticTokenTest::new(
+            "
+from random import random
+
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ReadWrite:
+    @property
+    def value(self) -> int:
+        return self._value
+
+    @value.setter
+    def value(self, new_value: int) -> None:
+        self._value = new_value
+
+obj = ReadOnly() if random() else ReadWrite()
+x = obj.value
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "random" @ 6..12: Namespace
+        "random" @ 20..26: Method
+        "ReadOnly" @ 34..42: Class [definition]
+        "property" @ 49..57: Decorator
+        "value" @ 66..71: Method [definition]
+        "self" @ 72..76: SelfParameter [definition]
+        "int" @ 81..84: Class
+        "1" @ 101..102: Number
+        "ReadWrite" @ 110..119: Class [definition]
+        "property" @ 126..134: Decorator
+        "value" @ 143..148: Method [definition]
+        "self" @ 149..153: SelfParameter [definition]
+        "int" @ 158..161: Class
+        "self" @ 178..182: SelfParameter
+        "_value" @ 183..189: Variable
+        "value" @ 196..201: Method
+        "setter" @ 202..208: Method
+        "value" @ 217..222: Method [definition]
+        "self" @ 223..227: SelfParameter [definition]
+        "new_value" @ 229..238: Parameter [definition]
+        "int" @ 240..243: Class
+        "None" @ 248..252: BuiltinConstant
+        "self" @ 262..266: SelfParameter
+        "_value" @ 267..273: Variable
+        "new_value" @ 276..285: Parameter
+        "obj" @ 287..290: Variable [definition]
+        "ReadOnly" @ 293..301: Class
+        "random" @ 307..313: Variable
+        "ReadWrite" @ 321..330: Class
+        "x" @ 333..334: Variable [definition]
+        "obj" @ 337..340: Variable
+        "value" @ 341..346: Property
         "#);
     }
 
@@ -2024,7 +2260,7 @@ x = foobar_cls.prop                              # prop should be property
         "CONSTANT" @ 470..478: Variable [readonly]
         "w" @ 561..562: Variable [definition]
         "foobar" @ 565..571: Variable
-        "prop" @ 572..576: Variable
+        "prop" @ 572..576: Property [readonly]
         "foobar_cls" @ 636..646: Variable [definition]
         "Foo" @ 649..652: Class
         "random" @ 656..662: Variable
@@ -2034,7 +2270,7 @@ x = foobar_cls.prop                              # prop should be property
         "method" @ 689..695: Method
         "x" @ 760..761: Variable [definition]
         "foobar_cls" @ 764..774: Variable
-        "prop" @ 775..779: Property
+        "prop" @ 775..779: Property [readonly]
         "#);
     }
 
@@ -2112,10 +2348,10 @@ q = Baz.prop        # prop should be property on the class as well
         "CONSTANT" @ 502..510: Variable [readonly]
         "r" @ 558..559: Variable [definition]
         "baz" @ 562..565: Variable
-        "prop" @ 566..570: Variable
+        "prop" @ 566..570: Property [readonly]
         "q" @ 604..605: Variable [definition]
         "Baz" @ 608..611: Class
-        "prop" @ 612..616: Property
+        "prop" @ 612..616: Property [readonly]
         "#);
     }
 
@@ -2148,7 +2384,7 @@ class Baz:
         prop: str = \"hello\"
 
 baz = Baz()
-s = baz.method 
+s = baz.method
 t = baz.CONSTANT
 r = baz.prop
 q = Baz.prop
@@ -2189,15 +2425,15 @@ q = Baz.prop
         "s" @ 392..393: Variable [definition]
         "baz" @ 396..399: Variable
         "method" @ 400..406: Variable
-        "t" @ 408..409: Variable [definition]
-        "baz" @ 412..415: Variable
-        "CONSTANT" @ 416..424: Variable [readonly]
-        "r" @ 425..426: Variable [definition]
-        "baz" @ 429..432: Variable
-        "prop" @ 433..437: Variable
-        "q" @ 438..439: Variable [definition]
-        "Baz" @ 442..445: Class
-        "prop" @ 446..450: Variable
+        "t" @ 407..408: Variable [definition]
+        "baz" @ 411..414: Variable
+        "CONSTANT" @ 415..423: Variable [readonly]
+        "r" @ 424..425: Variable [definition]
+        "baz" @ 428..431: Variable
+        "prop" @ 432..436: Variable
+        "q" @ 437..438: Variable [definition]
+        "Baz" @ 441..444: Class
+        "prop" @ 445..449: Variable
         "#);
     }
 
@@ -2287,6 +2523,49 @@ y: Optional[str] = None
     }
 
     #[test]
+    fn type_alias_values_use_type_form_highlighting() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import IO, TypeAlias
+
+def takes_file(x: IO[str]) -> None: ...
+
+type NewStyle = IO[str]
+LegacyStyle: TypeAlias = IO[str]
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let io_ranges: Vec<_> = source
+            .match_indices("IO")
+            .skip(1)
+            .map(|(offset, _)| {
+                TextRange::at(
+                    TextSize::from(
+                        u32::try_from(offset).expect("source offset to fit into TextSize"),
+                    ),
+                    "IO".text_len(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            io_ranges.len(),
+            3,
+            "expected annotation and alias RHS `IO` uses"
+        );
+
+        for io_range in io_ranges {
+            let token = tokens
+                .iter()
+                .find(|token| token.range == io_range)
+                .expect("semantic token for `IO` type-form use");
+            assert_eq!(token.token_type, SemanticTokenType::Class);
+        }
+    }
+
+    #[test]
     fn generic_class_members_in_annotations() {
         let test = SemanticTokenTest::new(
             r#"
@@ -2305,26 +2584,208 @@ z2 = os.PathLike[str]
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
-        let pathlike_types: Vec<_> = tokens
-            .iter()
-            .filter_map(|token| (&source[token.range()] == "PathLike").then_some(token.token_type))
-            .collect();
 
-        assert!(
-            pathlike_types.len() >= 5,
-            "expected import plus annotation tokens, got {pathlike_types:?}"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "x1" @ 36..38: Variable [definition]
+        "os" @ 40..42: Namespace
+        "PathLike" @ 43..51: Class
+        "x2" @ 52..54: Variable [definition]
+        "os" @ 56..58: Namespace
+        "PathLike" @ 59..67: Class
+        "str" @ 68..71: Class
+        "y1" @ 74..76: Variable [definition]
+        "PathLike" @ 78..86: Class
+        "y2" @ 87..89: Variable [definition]
+        "PathLike" @ 91..99: Class
+        "str" @ 100..103: Class
+        "z1" @ 106..108: Class [definition]
+        "os" @ 111..113: Namespace
+        "PathLike" @ 114..122: Class
+        "z2" @ 123..125: Class [definition]
+        "os" @ 128..130: Namespace
+        "PathLike" @ 131..139: Class
+        "str" @ 140..143: Class
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_cast() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import cast
+
+x1 = cast(os.PathLike[str], "")
+x2 = cast(PathLike[str], "")
+x3 = typing.cast(os.PathLike[str], "")
+"#,
         );
 
-        assert_eq!(
-            pathlike_types[1..5],
-            [
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-                SemanticTokenType::Class,
-            ]
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "cast" @ 68..72: Function
+        "x1" @ 74..76: Variable [definition]
+        "cast" @ 79..83: Function
+        "os" @ 84..86: Namespace
+        "PathLike" @ 87..95: Class
+        "str" @ 96..99: Class
+        "\"\"" @ 102..104: String
+        "x2" @ 106..108: Variable [definition]
+        "cast" @ 111..115: Function
+        "PathLike" @ 116..124: Class
+        "str" @ 125..128: Class
+        "\"\"" @ 131..133: String
+        "x3" @ 135..137: Variable [definition]
+        "typing" @ 140..146: Namespace
+        "cast" @ 147..151: Method
+        "os" @ 152..154: Namespace
+        "PathLike" @ 155..163: Class
+        "str" @ 164..167: Class
+        "\"\"" @ 170..172: String
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_assert_type() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+import typing
+from os import PathLike
+from typing import assert_type
+
+x1 = assert_type("", os.PathLike[str])
+x2 = assert_type("", PathLike[str])
+x3 = typing.assert_type("", os.PathLike[str])
+"#,
         );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "typing" @ 18..24: Namespace
+        "os" @ 30..32: Namespace
+        "PathLike" @ 40..48: Class
+        "typing" @ 54..60: Namespace
+        "assert_type" @ 68..79: Function
+        "x1" @ 81..83: Variable [definition]
+        "assert_type" @ 86..97: Function
+        "\"\"" @ 98..100: String
+        "os" @ 102..104: Namespace
+        "PathLike" @ 105..113: Class
+        "str" @ 114..117: Class
+        "x2" @ 120..122: Variable [definition]
+        "assert_type" @ 125..136: Function
+        "\"\"" @ 137..139: String
+        "PathLike" @ 141..149: Class
+        "str" @ 150..153: Class
+        "x3" @ 156..158: Variable [definition]
+        "typing" @ 161..167: Namespace
+        "assert_type" @ 168..179: Method
+        "\"\"" @ 180..182: String
+        "os" @ 184..186: Namespace
+        "PathLike" @ 187..195: Class
+        "str" @ 196..199: Class
+        "#);
+    }
+
+    #[test]
+    fn generic_class_members_in_type_form_keyword_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+import os
+from os import PathLike
+from typing import assert_type, cast
+
+x1 = cast(typ=os.PathLike[str], val="")
+x2 = cast(val="", typ=PathLike[str])
+x3 = assert_type(type=os.PathLike[str], value="")
+x4 = assert_type(value="", type=PathLike[str])
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "os" @ 8..10: Namespace
+        "os" @ 16..18: Namespace
+        "PathLike" @ 26..34: Class
+        "typing" @ 40..46: Namespace
+        "assert_type" @ 54..65: Function
+        "cast" @ 67..71: Function
+        "x1" @ 73..75: Variable [definition]
+        "cast" @ 78..82: Function
+        "os" @ 87..89: Namespace
+        "PathLike" @ 90..98: Class
+        "str" @ 99..102: Class
+        "\"\"" @ 109..111: String
+        "x2" @ 113..115: Variable [definition]
+        "cast" @ 118..122: Function
+        "\"\"" @ 127..129: String
+        "PathLike" @ 135..143: Class
+        "str" @ 144..147: Class
+        "x3" @ 150..152: Variable [definition]
+        "assert_type" @ 155..166: Function
+        "os" @ 172..174: Namespace
+        "PathLike" @ 175..183: Class
+        "str" @ 184..187: Class
+        "\"\"" @ 196..198: String
+        "x4" @ 200..202: Variable [definition]
+        "assert_type" @ 205..216: Function
+        "\"\"" @ 223..225: String
+        "PathLike" @ 232..240: Class
+        "str" @ 241..244: Class
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_ignore_failed_bindings_for_type_form_arguments() {
+        let test = SemanticTokenTest::new(
+            r#"
+from typing import cast
+
+flag = bool(input())
+def g(x):
+    return x
+
+x = ""
+f = cast if flag else g
+f(int, x)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "cast" @ 20..24: Function
+        "flag" @ 26..30: Variable [definition]
+        "bool" @ 33..37: Class
+        "input" @ 38..43: Function
+        "g" @ 51..52: Function [definition]
+        "x" @ 53..54: Parameter [definition]
+        "x" @ 68..69: Parameter
+        "x" @ 71..72: Variable [definition]
+        "\"\"" @ 75..77: String
+        "f" @ 78..79: Variable [definition]
+        "cast" @ 82..86: Function
+        "flag" @ 90..94: Variable
+        "g" @ 100..101: Function
+        "f" @ 102..103: Variable
+        "int" @ 104..107: Class
+        "x" @ 109..110: Variable
+        "#);
     }
 
     #[test]
@@ -2383,7 +2844,7 @@ class MyClass:
     def __init__(self): pass
 
     """unrelated string"""
-    
+
     x: str = "hello"
 "#,
         );
@@ -2414,7 +2875,7 @@ What a good module wooo
 def my_func(): pass
 
 """unrelated string"""
-    
+
 x: str = "hello"
 "#,
         );
@@ -3050,10 +3511,10 @@ class BoundedContainer[T: int, U = str]:
         "wrapper" @ 339..346: Function [definition]
         "args" @ 348..352: Parameter [definition]
         "P" @ 354..355: Variable
-        "args" @ 356..360: Variable
+        "args" @ 356..360: Property [readonly]
         "kwargs" @ 364..370: Parameter [definition]
         "P" @ 372..373: Variable
-        "kwargs" @ 374..380: Variable
+        "kwargs" @ 374..380: Property [readonly]
         "str" @ 385..388: Class
         "str" @ 405..408: Class
         "func" @ 409..413: Parameter

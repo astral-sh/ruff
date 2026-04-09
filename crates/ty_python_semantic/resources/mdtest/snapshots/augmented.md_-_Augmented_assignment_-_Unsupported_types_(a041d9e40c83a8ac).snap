@@ -40,6 +40,5 @@ error[unsupported-operator]: Unsupported `-=` operation
 8 |
 9 | reveal_type(x)  # revealed: int
   |
-info: rule `unsupported-operator` is enabled by default
 
 ```

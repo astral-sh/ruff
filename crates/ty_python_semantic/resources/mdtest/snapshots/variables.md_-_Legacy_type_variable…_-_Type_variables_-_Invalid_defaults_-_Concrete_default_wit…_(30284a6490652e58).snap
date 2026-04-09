@@ -42,7 +42,6 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
 5 |
 6 | S = TypeVar("S", int, str, default=int)
   |
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```
 
@@ -59,6 +58,5 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
 11 |
 12 | # `Any` is always allowed as a default, even for constrained TypeVars.
    |
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

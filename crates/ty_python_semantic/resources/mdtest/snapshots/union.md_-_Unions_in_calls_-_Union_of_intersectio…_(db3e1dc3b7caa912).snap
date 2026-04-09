@@ -58,7 +58,6 @@ info: Method defined here
 info: Intersection element `IntCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -82,7 +81,6 @@ info: Method defined here
 info: Intersection element `StrCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -105,6 +103,5 @@ info: Method defined here
    |
 info: Union variant `BytesCaller` is incompatible with this call site
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
-info: rule `invalid-argument-type` is enabled by default
 
 ```

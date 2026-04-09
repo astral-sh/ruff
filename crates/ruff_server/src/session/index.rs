@@ -54,7 +54,7 @@ enum DocumentController {
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Clone)]
-pub enum DocumentQuery {
+pub(crate) enum DocumentQuery {
     Text {
         file_url: Url,
         document: Arc<TextDocument>,
@@ -575,7 +575,7 @@ impl DocumentQuery {
     }
 
     /// Attempts to access the underlying notebook document that this query is selecting.
-    pub fn as_notebook(&self) -> Option<&NotebookDocument> {
+    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
             Self::Notebook { notebook, .. } => Some(notebook),
             Self::Text { .. } => None,

@@ -43,6 +43,5 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
 16 |         reveal_type(x)  # revealed: int | bytes
    |
 info: It may not have an `__iter__` method or a `__getitem__` method
-info: rule `not-iterable` is enabled by default
 
 ```

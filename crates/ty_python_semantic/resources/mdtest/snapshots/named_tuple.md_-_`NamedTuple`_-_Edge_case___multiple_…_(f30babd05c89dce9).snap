@@ -42,7 +42,6 @@ error[invalid-named-tuple]: NamedTuple field name cannot start with an underscor
  9 |     else:
 10 |         # TODO: there should only be one diagnostic here...
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -56,7 +55,6 @@ error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
    |         ^^^^^^^
    |
 info: This will cause the class creation to fail at runtime
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -70,6 +68,5 @@ error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
    |         ^^^^^^^
    |
 info: This will cause the class creation to fail at runtime
-info: rule `invalid-named-tuple` is enabled by default
 
 ```

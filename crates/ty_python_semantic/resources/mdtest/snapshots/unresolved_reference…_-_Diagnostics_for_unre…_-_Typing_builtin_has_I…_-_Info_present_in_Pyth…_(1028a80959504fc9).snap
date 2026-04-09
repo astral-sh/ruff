@@ -27,7 +27,6 @@ error[unresolved-reference]: Name `List` used when not defined
   |      ^^^^ Did you mean `list`?
 2 | bar: Type  # error: [unresolved-reference]
   |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -39,6 +38,5 @@ error[unresolved-reference]: Name `Type` used when not defined
 2 | bar: Type  # error: [unresolved-reference]
   |      ^^^^ Did you mean `type`?
   |
-info: rule `unresolved-reference` is enabled by default
 
 ```

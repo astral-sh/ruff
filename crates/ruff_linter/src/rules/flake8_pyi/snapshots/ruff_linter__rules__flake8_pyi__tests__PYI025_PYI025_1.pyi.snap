@@ -12,11 +12,11 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
 5  |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
-6  | 
+6  |
 7  | def f():
    -     from collections.abc import Set  # PYI025
 8  +     from collections.abc import Set as AbstractSet  # PYI025
-9  | 
+9  |
 10 | def f():
 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 
@@ -31,11 +31,11 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
 8  |     from collections.abc import Set  # PYI025
-9  | 
+9  |
 10 | def f():
    -     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 11 +     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
-12 | 
+12 |
 13 | def f():
 14 |     """Test: local symbol renaming."""
 
@@ -58,18 +58,18 @@ help: Alias `Set` to `AbstractSet`
 17 |     else:
    -         Set = 1
 18 +         AbstractSet = 1
-19 | 
+19 |
 20 |     x: Set = set()
-21 | 
+21 |
 22 |     x: Set
-23 | 
+23 |
    -     del Set
 24 +     del AbstractSet
-25 | 
+25 |
 26 |     def f():
    -         print(Set)
 27 +         print(AbstractSet)
-28 | 
+28 |
 29 |         def Set():
 30 |             pass
 
@@ -86,32 +86,32 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
 help: Alias `Set` to `AbstractSet`
 17 |     else:
 18 |         Set = 1
-19 | 
+19 |
    -     x: Set = set()
 20 +     x: AbstractSet = set()
-21 | 
+21 |
    -     x: Set
 22 +     x: AbstractSet
-23 | 
+23 |
 24 |     del Set
-25 | 
+25 |
 --------------------------------------------------------------------------------
 30 |             pass
 31 |         print(Set)
-32 | 
+32 |
    - from collections.abc import Set
 33 + from collections.abc import Set as AbstractSet
-34 | 
+34 |
 35 | def f():
 36 |     """Test: global symbol renaming."""
    -     global Set
 37 +     global AbstractSet
-38 | 
+38 |
    -     Set = 1
    -     print(Set)
 39 +     AbstractSet = 1
 40 +     print(AbstractSet)
-41 | 
+41 |
 42 | def f():
 43 |     """Test: nonlocal symbol renaming."""
 
@@ -126,16 +126,16 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
 46 |     def g():
    |
 help: Alias `Set` to `AbstractSet`
-41 | 
+41 |
 42 | def f():
 43 |     """Test: nonlocal symbol renaming."""
    -     from collections.abc import Set
 44 +     from collections.abc import Set as AbstractSet
-45 | 
+45 |
 46 |     def g():
    -         nonlocal Set
 47 +         nonlocal AbstractSet
-48 | 
+48 |
    -         Set = 1
    -         print(Set)
 49 +         AbstractSet = 1

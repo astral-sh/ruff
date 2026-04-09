@@ -23,10 +23,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
-/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
-/// minimize runtime overhead.
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. For first-party imports, they can also contribute to import
+/// cycles. If an import is _only_ used in typing-only contexts, it can instead
+/// be imported conditionally under an `if TYPE_CHECKING:` block to minimize
+/// runtime overhead.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
@@ -107,8 +108,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
@@ -190,8 +191,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// annotations, but aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///

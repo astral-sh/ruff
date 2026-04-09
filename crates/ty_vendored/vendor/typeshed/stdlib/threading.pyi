@@ -5,7 +5,7 @@ import sys
 from _thread import _ExceptHookArgs, get_native_id as get_native_id
 from _typeshed import ProfileFunction, TraceFunction
 from collections.abc import Callable, Iterable, Mapping
-from contextvars import ContextVar
+from contextvars import Context
 from types import TracebackType
 from typing import Any, Final, TypeVar, final
 from typing_extensions import deprecated
@@ -215,7 +215,7 @@ class Thread:
             kwargs: Mapping[str, Any] | None = None,
             *,
             daemon: bool | None = None,
-            context: ContextVar[Any] | None = None,
+            context: Context | None = None,
         ) -> None:
             """This constructor should always be called with keyword arguments. Arguments are:
 

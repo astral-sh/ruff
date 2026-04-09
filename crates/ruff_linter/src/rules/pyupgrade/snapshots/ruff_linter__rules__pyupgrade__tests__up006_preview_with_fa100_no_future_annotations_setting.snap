@@ -21,7 +21,7 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import List
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -36,5 +36,5 @@ help: Add `from __future__ import annotations`
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import List
-4 | 
+4 |
 note: This is an unsafe fix and may change runtime behavior

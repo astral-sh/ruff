@@ -31,7 +31,7 @@ jobs:
     name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
     runs-on: ubuntu-latest
     environment:
-      name: release
+      name: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit && 'release' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +47,7 @@ jobs:
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}

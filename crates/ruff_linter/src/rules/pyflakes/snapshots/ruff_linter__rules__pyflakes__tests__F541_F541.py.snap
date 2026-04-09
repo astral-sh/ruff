@@ -12,7 +12,7 @@ F541 [*] f-string without any placeholders
   |
 help: Remove extraneous `f` prefix
 3 | b = f"ghi{'jkl'}"
-4 | 
+4 |
 5 | # Errors
   - c = f"def"
 6 + c = "def"
@@ -31,7 +31,7 @@ F541 [*] f-string without any placeholders
 9 |     f"def" +
   |
 help: Remove extraneous `f` prefix
-4  | 
+4  |
 5  | # Errors
 6  | c = f"def"
    - d = f"def" + "ghi"
@@ -138,7 +138,7 @@ help: Remove extraneous `f` prefix
 17 +     r"e"
 18 | )
 19 | g = f""
-20 | 
+20 |
 
 F541 [*] f-string without any placeholders
   --> F541.py:19:5
@@ -156,7 +156,7 @@ help: Remove extraneous `f` prefix
 18 | )
    - g = f""
 19 + g = ""
-20 | 
+20 |
 21 | # OK
 22 | g = f"ghi{123:{45}}"
 
@@ -171,13 +171,13 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
 22 | g = f"ghi{123:{45}}"
-23 | 
+23 |
 24 | # Error
    - h = "x" "y" f"z"
 25 + h = "x" "y" "z"
-26 | 
+26 |
 27 | v = 23.234234
-28 | 
+28 |
 
 F541 [*] f-string without any placeholders
   --> F541.py:34:7
@@ -190,7 +190,7 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
 31 | f"{f'{v:0.2f}'}"
-32 | 
+32 |
 33 | # Errors
    - f"{v:{f'0.2f'}}"
 34 + f"{v:{'0.2f'}}"
@@ -209,7 +209,7 @@ F541 [*] f-string without any placeholders
 37 | f'{{ 40 }}'
    |
 help: Remove extraneous `f` prefix
-32 | 
+32 |
 33 | # Errors
 34 | f"{v:{f'0.2f'}}"
    - f"{f''}"

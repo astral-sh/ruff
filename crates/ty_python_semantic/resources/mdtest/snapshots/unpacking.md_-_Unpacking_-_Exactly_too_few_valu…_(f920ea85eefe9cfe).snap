@@ -27,6 +27,5 @@ error[invalid-assignment]: Not enough values to unpack
   | |
   | Expected 2
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

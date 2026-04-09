@@ -71,6 +71,7 @@ if sys.version_info < (3, 12):
         """
 
 if sys.version_info < (3, 10):
+    @deprecated("Unsupported by OpenSSL since 1.1.1; removed in Python 3.10.")
     def RAND_egd(path: str) -> None: ...
 
 def RAND_status() -> bool:

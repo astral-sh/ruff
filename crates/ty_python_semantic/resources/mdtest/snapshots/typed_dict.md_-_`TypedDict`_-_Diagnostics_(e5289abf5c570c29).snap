@@ -56,6 +56,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 41 | def write_to_non_existing_key_single_quotes(person: Person):
 42 |     # error: [invalid-key]
 43 |     person['nane'] = "Alice"  # fmt: skip
+44 | class MovieBase(TypedDict):
+45 |     name: str
+46 | 
+47 | class BadMovie(MovieBase):
+48 |     name: int  # error: [invalid-typed-dict-field]
+49 | 
+50 | class LeftBase(TypedDict):
+51 |     value: int
+52 | 
+53 | class RightBase(TypedDict):
+54 |     value: str
+55 | 
+56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+57 |     pass
 ```
 
 # Diagnostics
@@ -72,15 +86,14 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
  9 |
 10 | NAME_KEY: Final = "nane"
    |
-info: rule `invalid-key` is enabled by default
 5  |     age: int | None
-6  | 
+6  |
 7  | def access_invalid_literal_string_key(person: Person):
    -     person["nane"]  # error: [invalid-key]
 8  +     person["name"]  # error: [invalid-key]
-9  | 
+9  |
 10 | NAME_KEY: Final = "nane"
-11 | 
+11 |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -97,7 +110,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 14 |
 15 | def access_with_str_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -111,7 +123,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
 17 |
 18 | def write_to_key_with_wrong_type(person: Person):
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -138,7 +149,6 @@ info: Item declaration
 6 |
 7 | def access_invalid_literal_string_key(person: Person):
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -154,13 +164,12 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 23 |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
    |
-info: rule `invalid-key` is enabled by default
 19 |     person["age"] = "42"  # error: [invalid-assignment]
-20 | 
+20 |
 21 | def write_to_non_existing_key(person: Person):
    -     person["nane"] = "Alice"  # error: [invalid-key]
 22 +     person["name"] = "Alice"  # error: [invalid-key]
-23 | 
+23 |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
 note: This is an unsafe fix and may change runtime behavior
@@ -177,7 +186,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
 26 |
 27 | def create_with_invalid_string_key():
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -195,7 +203,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
 30 |
 31 |     # error: [invalid-key]
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -208,7 +215,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
    |           ------ TypedDict `Person`  ^^^^^^^^^^^^^ Unknown key "unknown"
 33 | from typing_extensions import ReadOnly
    |
-info: rule `invalid-key` is enabled by default
 
 ```
 
@@ -232,7 +238,6 @@ info: Item declaration
    |     ----------------- Read-only item declared here
 37 |     name: str
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -246,13 +251,71 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean 'name'?
    |     |
    |     TypedDict `Person`
+44 | class MovieBase(TypedDict):
+45 |     name: str
    |
-info: rule `invalid-key` is enabled by default
 40 |     employee["id"] = 42  # error: [invalid-assignment]
 41 | def write_to_non_existing_key_single_quotes(person: Person):
 42 |     # error: [invalid-key]
    -     person['nane'] = "Alice"  # fmt: skip
 43 +     person['name'] = "Alice"  # fmt: skip
+44 | class MovieBase(TypedDict):
+45 |     name: str
+46 |
 note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `name`
+  --> src/mdtest_snippet.py:48:5
+   |
+47 | class BadMovie(MovieBase):
+48 |     name: int  # error: [invalid-typed-dict-field]
+   |     ^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
+49 |
+50 | class LeftBase(TypedDict):
+   |
+info: Field declaration
+  --> src/mdtest_snippet.py:45:5
+   |
+43 |     person['nane'] = "Alice"  # fmt: skip
+44 | class MovieBase(TypedDict):
+45 |     name: str
+   |     --------- Inherited field `name` declared here on base `MovieBase`
+46 |
+47 | class BadMovie(MovieBase):
+   |
+
+```
+
+```
+error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `value` while merging base classes
+  --> src/mdtest_snippet.py:56:7
+   |
+54 |     value: str
+55 |
+56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
+57 |     pass
+   |
+info: Field declaration
+  --> src/mdtest_snippet.py:51:5
+   |
+50 | class LeftBase(TypedDict):
+51 |     value: int
+   |     ---------- Field `value` already inherited from another base here
+52 |
+53 | class RightBase(TypedDict):
+   |
+info: Field declaration
+  --> src/mdtest_snippet.py:54:5
+   |
+53 | class RightBase(TypedDict):
+54 |     value: str
+   |     ---------- Inherited field `value` declared here on base `RightBase`
+55 |
+56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+   |
 
 ```

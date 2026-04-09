@@ -62,12 +62,12 @@ help: Organize imports
    - from b import C
 21 + from b import C, c
 22 | from b import c as d
-   - 
+   -
    - import A
    - import a
    - import b
    - import B
-   - 
+   -
    - import x as y
    - import x as A
    - import x as Y

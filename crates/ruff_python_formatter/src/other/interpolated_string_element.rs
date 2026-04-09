@@ -3,9 +3,10 @@ use std::borrow::Cow;
 use ruff_formatter::{Buffer, FormatOptions as _, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, InterpolatedElement, InterpolatedStringElement,
-    InterpolatedStringLiteralElement,
+    InterpolatedStringLiteralElement, StringFlags,
 };
-use ruff_text_size::{Ranged, TextSlice};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSlice};
 
 use crate::comments::dangling_open_parenthesis_comments;
 use crate::context::{
@@ -16,7 +17,7 @@ use crate::prelude::*;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
 
-use super::interpolated_string::InterpolatedStringContext;
+use super::interpolated_string::{InterpolatedStringContext, InterpolatedStringLayout};
 
 /// Formats an f-string element which is either a literal or a formatted expression.
 ///
@@ -155,8 +156,23 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
         } else {
             let comments = f.context().comments().clone();
             let dangling_item_comments = comments.dangling(self.element);
+            let flags = self.context.flags();
 
-            let multiline = self.context.is_multiline();
+            // Before Python 3.12, non-triple-quoted f-strings cannot introduce new multiline
+            // replacement fields. Preserve existing multiline fields from unsupported syntax
+            // inputs, but keep originally flat fields flat.
+            let multiline = self.context.is_multiline()
+                && (f.options().target_version().supports_pep_701()
+                    || flags.is_triple_quoted()
+                    || f.context()
+                        .source()
+                        .contains_line_break(interpolated_element_expression_range(self.element)));
+
+            let context = if multiline {
+                self.context
+            } else {
+                InterpolatedStringContext::new(flags, InterpolatedStringLayout::Flat)
+            };
 
             // If an expression starts with a `{`, we need to add a space before the
             // curly brace to avoid turning it into a literal curly with `{{`.
@@ -184,10 +200,10 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 let state = match f.context().interpolated_string_state() {
                     InterpolatedStringState::InsideInterpolatedElement(_)
                     | InterpolatedStringState::NestedInterpolatedElement(_) => {
-                        InterpolatedStringState::NestedInterpolatedElement(self.context)
+                        InterpolatedStringState::NestedInterpolatedElement(context)
                     }
                     InterpolatedStringState::Outside => {
-                        InterpolatedStringState::InsideInterpolatedElement(self.context)
+                        InterpolatedStringState::InsideInterpolatedElement(context)
                     }
                 };
                 let f = &mut WithInterpolatedStringState::new(state, f);
@@ -216,7 +232,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                     token(":").fmt(f)?;
 
                     for element in &format_spec.elements {
-                        FormatInterpolatedStringElement::new(element, self.context).fmt(f)?;
+                        FormatInterpolatedStringElement::new(element, context).fmt(f)?;
                     }
                 }
 
@@ -266,6 +282,14 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             token("}").fmt(f)
         }
     }
+}
+
+fn interpolated_element_expression_range(element: &InterpolatedElement) -> TextRange {
+    element
+        .format_spec
+        .as_deref()
+        .map(|format_spec| TextRange::new(element.start(), format_spec.start()))
+        .unwrap_or_else(|| element.range())
 }
 
 fn needs_bracket_spacing(expr: &Expr, context: &PyFormatContext) -> bool {

@@ -11,12 +11,12 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
 10 | s2 = {1, 2, 3}
-11 | 
+11 |
 12 | # Errors
    - for k, v in d:
 13 + for k, v in d.items():
 14 |     pass
-15 | 
+15 |
 16 | for k, v in d_tuple_incorrect_tuple:
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,12 +32,12 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
 help: Add a call to `.items()`
 13 | for k, v in d:
 14 |     pass
-15 | 
+15 |
    - for k, v in d_tuple_incorrect_tuple:
 16 + for k, v in d_tuple_incorrect_tuple.items():
 17 |     pass
-18 | 
-19 | 
+18 |
+19 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
@@ -56,7 +56,7 @@ help: Add a call to `.items()`
    - for k, v in empty_dict:
 37 + for k, v in empty_dict.items():
 38 |     pass
-39 | 
+39 |
 40 | empty_dict_annotated_tuple_keys: dict[tuple[int, str], bool] = {}
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,13 +70,13 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
 47 |     pass
    |
 help: Add a call to `.items()`
-43 | 
+43 |
 44 | empty_dict_unannotated = {}
 45 | empty_dict_unannotated[("x", "y")] = True
    - for k, v in empty_dict_unannotated:
 46 + for k, v in empty_dict_unannotated.items():
 47 |     pass
-48 | 
+48 |
 49 | empty_dict_annotated_str_keys: dict[str, int] = {}
 note: This is an unsafe fix and may change runtime behavior
 
@@ -90,7 +90,7 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
 52 |     pass
    |
 help: Add a call to `.items()`
-48 | 
+48 |
 49 | empty_dict_annotated_str_keys: dict[str, int] = {}
 50 | empty_dict_annotated_str_keys["x"] = 1
    - for k, v in empty_dict_annotated_str_keys:

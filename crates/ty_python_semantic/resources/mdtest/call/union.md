@@ -134,6 +134,32 @@ def _(factory: type[A] | type[B]):
     factory("hello")
 ```
 
+Deferred constructor diagnostics should still be reported per union arm when the arms share the same
+underlying `__init__` callable but have different specializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Self
+
+class DeferredDiagBase[T]:
+    def __new__(cls, x: object) -> Self:
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class IntDiag(DeferredDiagBase[int]): ...
+class StrDiag(DeferredDiagBase[str]): ...
+
+def _(factory: type[IntDiag] | type[StrDiag]):
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `float`"
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `float`"
+    factory(1.2)
+```
+
 ## Any non-callable variant
 
 ```py
@@ -186,13 +212,21 @@ def _(flag: bool):
 
 ## Union including a special-cased function
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
+def identity[T](x: T) -> T:
+    return x
+
 def _(flag: bool):
     if flag:
-        f = str
+        f = identity
     else:
         f = repr
-    reveal_type(str("string"))  # revealed: Literal["string"]
+    reveal_type(identity("string"))  # revealed: Literal["string"]
     reveal_type(repr("string"))  # revealed: Literal["'string'"]
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```

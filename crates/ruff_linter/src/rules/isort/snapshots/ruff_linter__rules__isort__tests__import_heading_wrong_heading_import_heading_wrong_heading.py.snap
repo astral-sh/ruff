@@ -20,11 +20,11 @@ help: Organize imports
 2  + # Standard library imports
 3  | import os
 4  | import sys
-5  | 
+5  |
 6  + # Third party imports
 7  | # Also wrong heading
 8  | import pandas
 9  | import requests
-10 | 
+10 |
 11 + # First party imports
 12 | from my_first_party import my_first_party_object

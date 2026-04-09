@@ -72,7 +72,6 @@ info: Field defined here
 5 |     year: int
   |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -96,7 +95,6 @@ info: Field defined here
 13 |     year: NotRequired[int]
    |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -109,6 +107,5 @@ error[invalid-argument-type]: Cannot delete unknown key "non_existent" from Type
 35 | del mixed["non_existent"]
    |           ^^^^^^^^^^^^^^
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

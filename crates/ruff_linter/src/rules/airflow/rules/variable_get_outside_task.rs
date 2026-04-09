@@ -168,7 +168,7 @@ fn is_operator_task_method(function_def: &StmtFunctionDef, semantic: &SemanticMo
         return false;
     };
 
-    any_qualified_base_class(class_def, semantic, &|qn| {
+    any_qualified_base_class(class_def, semantic, |qn| {
         matches!(
             qn.segments(),
             ["airflow", "models" | "sdk", .., "BaseOperator"]

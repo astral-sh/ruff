@@ -44,7 +44,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Bar`
 10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Foo & Bar` does not match asserted type `Bar`"
    |
 info: `Bar` and `Foo` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```
 
@@ -62,7 +61,6 @@ error[assert-type-unspellable-subtype]: Argument does not have asserted type `Ba
 12 |         # The actual type must be a subtype of the asserted type, as well as being unspellable,
    |
 info: `Foo & Bar` is a subtype of `Bar`, but they are not equivalent
-info: rule `assert-type-unspellable-subtype` is enabled by default
 
 ```
 
@@ -78,6 +76,5 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
    |                     Inferred type is `Foo & Bar`
    |
 info: `Baz` and `Foo & Bar` are not equivalent types
-info: rule `type-assertion-failure` is enabled by default
 
 ```

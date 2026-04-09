@@ -152,7 +152,6 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
 9 |     @property
   |
 help: Remove the override of `foo`
-info: rule `override-of-final-method` is enabled by default
 38 |     # which is different to the verbose diagnostic summary message:
 39 |     #
 40 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
@@ -190,7 +189,6 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
 12 |     @final
    |
 help: Remove the override of `my_property1`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -218,7 +216,6 @@ info: `Parent.my_property2` is decorated with `@final`, forbidding overrides
 15 |     @final
    |
 help: Remove the getter and setter for `my_property2`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -246,7 +243,6 @@ info: `Parent.my_property3` is decorated with `@final`, forbidding overrides
 18 |     @classmethod
    |
 help: Remove the override of `my_property3`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -275,7 +271,6 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
 21 |     @final
    |
 help: Remove the override of `class_method1`
-info: rule `override-of-final-method` is enabled by default
 49 |     def my_property3(self) -> int: ...  # error: [override-of-final-method]
 50 |     @my_property3.deleter
 51 |     def my_proeprty3(self) -> None: ...
@@ -314,7 +309,6 @@ info: `Parent.static_method1` is decorated with `@final`, forbidding overrides
 27 |     @final
    |
 help: Remove the override of `static_method1`
-info: rule `override-of-final-method` is enabled by default
 51 |     def my_proeprty3(self) -> None: ...
 52 |     @classmethod
 53 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
@@ -352,7 +346,6 @@ info: `Parent.class_method2` is decorated with `@final`, forbidding overrides
 24 |     @staticmethod
    |
 help: Remove the override of `class_method2`
-info: rule `override-of-final-method` is enabled by default
 53 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
 54 |     @staticmethod
 55 |     def static_method1() -> int: ...  # error: [override-of-final-method]
@@ -390,7 +383,6 @@ info: `Parent.static_method2` is decorated with `@final`, forbidding overrides
 30 |     @final
    |
 help: Remove the override of `static_method2`
-info: rule `override-of-final-method` is enabled by default
 55 |     def static_method1() -> int: ...  # error: [override-of-final-method]
 56 |     @classmethod
 57 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
@@ -426,7 +418,6 @@ error[invalid-method-override]: Invalid override of method `foo`
    |
 info: `Grandchild.foo` is a staticmethod but `Parent.foo` is an instance method
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -453,7 +444,6 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
 9 |     @property
   |
 help: Remove the override of `foo`
-info: rule `override-of-final-method` is enabled by default
 68 |     # type or on an instance, it will behave the same from the caller's perspective. The only
 69 |     # difference is whether the method body gets access to `self`, which is not a
 70 |     # concern of Liskov.
@@ -494,7 +484,6 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
 12 |     @final
    |
 help: Remove the override of `my_property1`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -523,7 +512,6 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
 21 |     @final
    |
 help: Remove the override of `class_method1`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -554,9 +542,8 @@ info: `Foo.bar` is decorated with `@final`, forbidding overrides
 111 | class Baz(Foo):
     |
 help: Remove the override of `bar`
-info: rule `override-of-final-method` is enabled by default
 109 |     def bar(self): ...
-110 | 
+110 |
 111 | class Baz(Foo):
     -     def bar(self): ...  # error: [override-of-final-method]
 112 +     pass  # error: [override-of-final-method]

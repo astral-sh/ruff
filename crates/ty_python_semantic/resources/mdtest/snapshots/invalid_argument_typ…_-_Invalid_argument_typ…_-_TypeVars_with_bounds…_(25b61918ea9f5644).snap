@@ -49,6 +49,5 @@ info: Function defined here
 3 | def needs_a_foo(x: Foo): ...
   |     ^^^^^^^^^^^ ------ Parameter declared here
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

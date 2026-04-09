@@ -37,6 +37,5 @@ info: Function defined here
   |     ^^^ ------------- Parameter declared here
 2 |     return len(numbers)
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

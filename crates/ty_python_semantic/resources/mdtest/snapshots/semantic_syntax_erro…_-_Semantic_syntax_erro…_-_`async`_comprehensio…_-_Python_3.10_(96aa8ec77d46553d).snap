@@ -59,6 +59,5 @@ error[not-iterable]: Object of type `range` is not async-iterable
 11 |     [x for x in [1]] and [x async for x in elements(1)]
    |
 info: It has no `__aiter__` method
-info: rule `not-iterable` is enabled by default
 
 ```

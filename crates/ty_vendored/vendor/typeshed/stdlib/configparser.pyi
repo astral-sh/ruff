@@ -144,10 +144,10 @@ ConfigParser -- responsible for parsing a list of
 """
 
 import sys
-from _typeshed import MaybeNone, StrOrBytesPath, SupportsWrite
+from _typeshed import BytesPath, GenericPath, MaybeNone, StrOrBytesPath, StrPath, SupportsWrite
 from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from re import Pattern
-from typing import Any, ClassVar, Final, Literal, TypeVar, overload, type_check_only
+from typing import Any, AnyStr, ClassVar, Final, Literal, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, deprecated
 
 if sys.version_info >= (3, 14):
@@ -460,7 +460,8 @@ class RawConfigParser(_Parser):
         assumed. If the specified `section` does not exist, returns False.
         """
 
-    def read(self, filenames: StrOrBytesPath | Iterable[StrOrBytesPath], encoding: str | None = None) -> list[str]:
+    @overload
+    def read(self, filenames: GenericPath[AnyStr], encoding: str | None = None) -> list[AnyStr]:
         """Read and parse a filename or an iterable of filenames.
 
         Files that cannot be opened are silently ignored; this is
@@ -473,6 +474,12 @@ class RawConfigParser(_Parser):
         Return list of successfully read files.
         """
 
+    @overload
+    def read(self, filenames: Iterable[StrPath], encoding: str | None = None) -> list[str]: ...
+    @overload
+    def read(self, filenames: Iterable[BytesPath], encoding: str | None = None) -> list[bytes]: ...
+    @overload
+    def read(self, filenames: Iterable[StrOrBytesPath], encoding: str | None = None) -> list[str | bytes]: ...
     def read_file(self, f: Iterable[str], source: str | None = None) -> None:
         """Like read() but the argument must be a file-like object.
 

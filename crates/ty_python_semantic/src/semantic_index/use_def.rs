@@ -335,7 +335,7 @@ pub(crate) struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, RangeInfo)>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -391,6 +391,13 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// This is used by [`UseDefMap::can_implicitly_return_none`].
     end_of_scope_reachability: ScopedReachabilityConstraintId,
+}
+
+/// Information about a given range of source code.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct RangeInfo {
+    reachability: ScopedReachabilityConstraintId,
+    in_type_checking_block: bool,
 }
 
 pub(crate) enum ApplicableConstraints<'map, 'db> {
@@ -501,8 +508,18 @@ impl<'db> UseDefMap<'db> {
         !self
             .range_reachability
             .iter()
-            .any(|&(entry_range, constraint)| {
-                entry_range.contains_range(range) && !self.is_reachable(db, constraint)
+            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
+            .any(|&(entry_range, RangeInfo { reachability, .. })| {
+                entry_range.contains_range(range) && !self.is_reachable(db, reachability)
+            })
+    }
+
+    pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
+        self.range_reachability
+            .iter()
+            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
+            .any(|&(entry_range, block)| {
+                block.in_type_checking_block && entry_range.contains_range(range)
             })
     }
 
@@ -856,10 +873,35 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: LiveDeclarationsIterator<'map>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
+}
+
+impl<'db> DeclarationsIterator<'_, 'db> {
+    /// Returns `true` if `predicate` holds for at least one declaration whose
+    /// reachability constraint is not statically false.
+    pub(crate) fn any_reachable(
+        mut self,
+        db: &'db dyn crate::Db,
+        mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
+    ) -> bool {
+        let predicates = self.predicates;
+        let reachability_constraints = self.reachability_constraints;
+
+        self.any(
+            |DeclarationWithConstraint {
+                 declaration,
+                 reachability_constraint,
+             }| {
+                predicate(declaration)
+                    && !reachability_constraints
+                        .evaluate(db, predicates, reachability_constraint)
+                        .is_always_false()
+            },
+        )
+    }
 }
 
 impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
@@ -935,7 +977,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
-    range_reachability: Vec<(TextRange, ScopedReachabilityConstraintId)>,
+    range_reachability: Vec<(TextRange, RangeInfo)>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
@@ -1441,17 +1483,26 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_definition_ids_used(binding_definition_ids.into_iter());
     }
 
-    pub(super) fn record_range_reachability(&mut self, range: TextRange) {
-        // If the last entry has the same reachability constraint, extend it
-        // to cover this range too, collapsing consecutive statements in the
-        // same basic block into a single entry.
-        if let Some((last_range, last_reachability)) = self.range_reachability.last_mut()
-            && *last_reachability == self.reachability
+    pub(super) fn record_range_reachability(
+        &mut self,
+        range: TextRange,
+        is_type_checking_block: bool,
+    ) {
+        let this_range_info = RangeInfo {
+            reachability: self.reachability,
+            in_type_checking_block: is_type_checking_block,
+        };
+
+        // If the last entry has the same reachability constraint and the same
+        // "in-TYPE_CHECKING" status, extend it to cover this range too, collapsing
+        // consecutive statements in a contiguous rangfe into a single entry.
+        if let Some((last_range, last_range_info)) = self.range_reachability.last_mut()
+            && *last_range_info == this_range_info
         {
             *last_range = last_range.cover(range);
             return;
         }
-        self.range_reachability.push((range, self.reachability));
+        self.range_reachability.push((range, this_range_info));
     }
 
     pub(super) fn snapshot_enclosing_state(
@@ -1467,11 +1518,23 @@ impl<'db> UseDefMapBuilder<'db> {
         };
 
         let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
+        let is_forwarding_symbol = enclosing_place_expr
+            .as_symbol()
+            .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
+        let stores_visible_bindings = enclosing_place_expr.is_bound()
+            && bindings.iter().any(|binding| !binding.binding.is_unbound());
         // Names bound in class scopes are never visible to nested scopes (but
         // attributes/subscripts are visible), so we never need to save eager scope bindings in a
         // class scope. There is one exception to this rule: annotation scopes can see names
-        // defined in an immediately-enclosing class scope.
-        if (is_class_symbol && !is_parent_of_annotation_scope) || !enclosing_place_expr.is_bound() {
+        // defined in an immediately-enclosing class scope. Likewise, unbound `global` and
+        // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
+        // should continue walking outward instead of treating any bindings here as owned by this
+        // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
+        // state needs to be snapshotted so nested scopes can see the rebound type.
+        if (is_class_symbol && !is_parent_of_annotation_scope)
+            || !enclosing_place_expr.is_bound()
+            || (is_forwarding_symbol && !stores_visible_bindings)
+        {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),
             ))
@@ -1690,8 +1753,8 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for &(_, constraint) in &self.range_reachability {
-            self.reachability_constraints.mark_used(constraint);
+        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
+            self.reachability_constraints.mark_used(reachability);
         }
         for symbol_state in &mut self.symbol_states {
             symbol_state.finish(&mut self.reachability_constraints);

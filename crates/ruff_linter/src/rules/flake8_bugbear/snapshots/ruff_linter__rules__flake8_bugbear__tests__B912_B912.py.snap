@@ -12,7 +12,7 @@ B912 [*] `map()` without an explicit `strict=` parameter
 7 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]))
   |
 help: Add explicit value for parameter `strict=`
-2 | 
+2 |
 3 | # Errors
 4 | map(lambda x: x, [1, 2, 3])
   - map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6])
@@ -61,7 +61,7 @@ help: Add explicit value for parameter `strict=`
 7  | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
 8  + map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
 9  | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True))
-10 | 
+10 |
 11 | # Errors (limited iterators).
 note: This is an unsafe fix and may change runtime behavior
 
@@ -81,7 +81,7 @@ help: Add explicit value for parameter `strict=`
 8  | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
    - map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True))
 9  + map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True), strict=False)
-10 | 
+10 |
 11 | # Errors (limited iterators).
 12 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1))
 note: This is an unsafe fix and may change runtime behavior
@@ -96,12 +96,12 @@ B912 [*] `map()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
 9  | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True))
-10 | 
+10 |
 11 | # Errors (limited iterators).
    - map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1))
 12 + map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1), strict=False)
 13 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4))
-14 | 
+14 |
 15 | import builtins
 note: This is an unsafe fix and may change runtime behavior
 
@@ -116,12 +116,12 @@ B912 [*] `map()` without an explicit `strict=` parameter
 15 | import builtins
    |
 help: Add explicit value for parameter `strict=`
-10 | 
+10 |
 11 | # Errors (limited iterators).
 12 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1))
    - map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4))
 13 + map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4), strict=False)
-14 | 
+14 |
 15 | import builtins
 16 | # Still an error even though it uses the qualified name
 note: This is an unsafe fix and may change runtime behavior
@@ -137,12 +137,12 @@ B912 [*] `map()` without an explicit `strict=` parameter
 19 | # OK
    |
 help: Add explicit value for parameter `strict=`
-14 | 
+14 |
 15 | import builtins
 16 | # Still an error even though it uses the qualified name
    - builtins.map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6])
 17 + builtins.map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], strict=False)
-18 | 
+18 |
 19 | # OK
 20 | map(lambda x: x, [1, 2, 3], strict=True)
 note: This is an unsafe fix and may change runtime behavior
@@ -156,7 +156,7 @@ B912 [*] `map()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
 33 | map(lambda x, y: x + y, [1, 2, 3], count())
-34 | 
+34 |
 35 | # Regression https://github.com/astral-sh/ruff/issues/20997
    - map(f, *lots_of_iterators)
 36 + map(f, *lots_of_iterators, strict=False)

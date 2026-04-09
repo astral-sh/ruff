@@ -44,7 +44,6 @@ error[unsupported-operator]: Unsupported `+` operation
 12 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
 13 | reveal_type(Sub + Sub)  # revealed: Unknown
    |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -61,7 +60,6 @@ error[unsupported-operator]: Unsupported `+` operation
 14 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
 15 | reveal_type(No + No)  # revealed: Unknown
    |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -76,6 +74,5 @@ error[unsupported-operator]: Unsupported `+` operation
    |             |
    |             Both operands have type `<class 'No'>`
    |
-info: rule `unsupported-operator` is enabled by default
 
 ```

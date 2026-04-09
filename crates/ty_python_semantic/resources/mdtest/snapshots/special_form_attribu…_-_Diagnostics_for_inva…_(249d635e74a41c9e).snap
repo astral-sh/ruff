@@ -50,7 +50,6 @@ error[unresolved-attribute]: Special form `typing.Any` has no attribute `foo`
    |
 help: Objects with type `Any` have a `foo` attribute, but the symbol `typing.Any` does not itself inhabit the type `Any`
 help: This error may indicate that `X` was defined as `X = typing.Any` when `X: typing.Any` was intended
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -66,7 +65,6 @@ error[unresolved-attribute]: Special form `typing.Any` has no attribute `aaaaooo
    |
 help: Objects with type `Any` have an `aaaaooooooo` attribute, but the symbol `typing.Any` does not itself inhabit the type `Any`
 help: This error may indicate that `X` was defined as `X = typing.Any` when `X: typing.Any` was intended
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -82,7 +80,6 @@ error[unresolved-attribute]: Special form `typing.LiteralString` has no attribut
    |
 help: Objects with type `LiteralString` have a `startswith` attribute, but the symbol `typing.LiteralString` does not itself inhabit the type `LiteralString`
 help: This error may indicate that `Foo.X` was defined as `Foo.X = typing.LiteralString` when `Foo.X: typing.LiteralString` was intended
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -98,6 +95,5 @@ error[unresolved-attribute]: Special form `typing.LiteralString` has no attribut
 19 | # `Foo().b` resolves `Self` to `Foo`, so `.a` is valid.
    |
 help: Objects with type `LiteralString` have a `startswith` attribute, but the symbol `typing.LiteralString` does not itself inhabit the type `LiteralString`
-info: rule `unresolved-attribute` is enabled by default
 
 ```

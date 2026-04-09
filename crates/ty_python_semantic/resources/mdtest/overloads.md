@@ -498,6 +498,17 @@ if TYPE_CHECKING:
     def b(x: int) -> int: ...
 
 if TYPE_CHECKING:
+    import sys
+
+    if sys.platform == "win32":
+        pass
+    else:
+        @overload
+        def d() -> bytes: ...
+        @overload
+        def d(x: int) -> int: ...
+
+if TYPE_CHECKING:
     @overload
     # not all overloads are in a `TYPE_CHECKING` block, so this is an error
     def c() -> None: ...  # error: [invalid-overload]

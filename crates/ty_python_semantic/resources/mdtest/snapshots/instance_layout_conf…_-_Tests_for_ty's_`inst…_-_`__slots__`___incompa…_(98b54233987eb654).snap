@@ -50,6 +50,5 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
 10 | ): ...
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```

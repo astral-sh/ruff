@@ -35,6 +35,5 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
 7 |     pass
   |
 info: Its `__iter__` attribute has type `None`, which is not callable
-info: rule `not-iterable` is enabled by default
 
 ```

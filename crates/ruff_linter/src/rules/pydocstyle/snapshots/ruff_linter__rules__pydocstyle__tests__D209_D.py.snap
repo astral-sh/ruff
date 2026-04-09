@@ -14,12 +14,12 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
 help: Move closing quotes to new line
 280 | def asdfljdf24():
 281 |     """Summary.
-282 | 
+282 |
     -     Description."""
 283 +     Description.
 284 +     """
-285 | 
-286 | 
+285 |
+286 |
 287 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
 D209 [*] Multi-line docstring closing quotes should be on a separate line
@@ -35,10 +35,10 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
 help: Move closing quotes to new line
 587 | def asdfljdjgf24():
 588 |     """Summary.
-589 | 
+589 |
     -     Description.  """
 590 +     Description.
 591 +     """
-592 | 
-593 | 
+592 |
+593 |
 594 | @expect('D200: One-line docstring should fit on one line with quotes '

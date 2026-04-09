@@ -77,7 +77,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
         return;
     }
 
-    let is_modified = any_over_body(&for_stmt.body, &|expr| {
+    let is_modified = any_over_body(&for_stmt.body, |expr| {
         let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
             return false;
         };

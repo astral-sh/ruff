@@ -23,6 +23,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::InferenceFlags;
+use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
@@ -31,8 +32,8 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, DynamicType, InternedType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
-    StaticClassLiteral, Type, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -206,37 +207,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 SpecialFormType::Annotated => {
-                    let ast::Expr::Tuple(ast::ExprTuple {
-                        elts: ref arguments,
-                        ..
-                    }) = **slice
-                    else {
-                        report_invalid_arguments_to_annotated(&self.context, subscript);
-
-                        return self.infer_expression(slice, TypeContext::default());
-                    };
-
-                    if arguments.len() < 2 {
-                        report_invalid_arguments_to_annotated(&self.context, subscript);
-                    }
-
-                    let [type_expr, metadata @ ..] = &arguments[..] else {
-                        for argument in arguments {
-                            self.infer_expression(argument, TypeContext::default());
-                        }
-                        self.store_expression_type(slice, Type::unknown());
-                        return Type::unknown();
-                    };
-
-                    for element in metadata {
-                        self.infer_expression(element, TypeContext::default());
-                    }
-
-                    let ty = self.infer_type_expression(type_expr);
-
-                    return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                        db, ty,
-                    )));
+                    return self
+                        .parse_subscription_of_annotated_special_form(
+                            subscript,
+                            AnnotatedExprContext::TypeExpression,
+                        )
+                        .inner_type();
                 }
                 SpecialFormType::Optional => {
                     if matches!(**slice, ast::Expr::Tuple(_))
@@ -265,13 +241,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
-                        let mut elements = tuple
-                            .elts
-                            .iter()
-                            .map(|elt| self.infer_type_expression(elt))
-                            .peekable();
+                        let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
-                        let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
@@ -280,7 +251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ),
                         ));
 
-                        if is_empty
+                        if tuple.is_empty()
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                         {
@@ -510,14 +481,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut first_excess_type_argument_index = None;
 
         // Helper to get the AST node corresponding to the type argument at `index`.
-        let get_node = |index: usize| -> ast::AnyNodeRef<'_> {
-            match slice_node {
-                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => elts
-                    .get(index)
-                    .expect("type argument index should not be out of range")
-                    .into(),
-                _ => slice_node.into(),
-            }
+        let get_node = |index| match slice_node {
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => &elts[index],
+            _ => slice_node,
         };
 
         let mut error: Option<ExplicitSpecializationError> = None;
@@ -666,7 +632,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 EitherOrBoth::Right(expr) => {
-                    inferred_type_arguments.push(self.infer_type_expression(expr));
+                    // If there are no typevars at all, this is not a generic type,
+                    // so we should not infer excess arguments as type expressions.
+                    // For example, `list[int][0]` — the `0` is not a type expression.
+                    if typevars_len == 0 {
+                        inferred_type_arguments
+                            .push(self.infer_expression(expr, TypeContext::default()));
+                    } else {
+                        inferred_type_arguments.push(self.infer_type_expression(expr));
+                    }
                     first_excess_type_argument_index.get_or_insert(index);
                 }
             }
@@ -694,8 +668,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
             if let Type::GenericAlias(alias) = value_ty
-                && let spec = alias.specialization(db)
-                && spec
+                && alias
+                    .specialization(db)
                     .types(db)
                     .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
             {
@@ -815,6 +789,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
+                let previously_allowed_paramspec = self
+                    .inference_flags
+                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 for param in elts {
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
@@ -825,13 +802,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }
+                self.inference_flags.set(
+                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                    previously_allowed_paramspec,
+                );
 
                 let parameters = if return_todo {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
                     Parameters::new(
-                        self.db(),
+                        db,
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
                         }),
@@ -875,7 +856,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             diagnostic_builder.into_diagnostic(format_args!(
                                 "ParamSpec `{}` is unbound",
-                                typevar.name(self.db())
+                                typevar.name(db)
                             ));
                         }
                         return Err(());
@@ -891,12 +872,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Foo[ParamSpec]  # P: (ParamSpec, /)
                     // ```
                     Type::NominalInstance(nominal)
-                        if nominal.has_known_class(self.db(), KnownClass::ParamSpec) =>
+                        if nominal.has_known_class(db, KnownClass::ParamSpec) =>
                     {
                         return Ok(Type::paramspec_value_callable(
                             db,
                             Parameters::new(
-                                self.db(),
+                                db,
                                 [
                                     Parameter::positional_only(None)
                                         .with_annotated_type(param_type),
@@ -920,7 +901,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 Parameters::todo()
                             } else {
                                 Parameters::new(
-                                    self.db(),
+                                    db,
                                     [Parameter::positional_only(None)
                                         .with_annotated_type(param_type)],
                                 )
@@ -1693,6 +1674,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             .is_ok()
     }
+
+    pub(super) fn parse_subscription_of_annotated_special_form(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        subscript_context: AnnotatedExprContext,
+    ) -> TypeAndQualifiers<'db> {
+        let slice = &*subscript.slice;
+        let ast::Expr::Tuple(ast::ExprTuple {
+            elts: arguments, ..
+        }) = slice
+        else {
+            report_invalid_arguments_to_annotated(&self.context, subscript);
+            return subscript_context.infer(self, slice);
+        };
+
+        if arguments.len() < 2 {
+            report_invalid_arguments_to_annotated(&self.context, subscript);
+        }
+
+        let Some(first_argument) = arguments.first() else {
+            self.infer_expression(slice, TypeContext::default());
+            return TypeAndQualifiers::declared(Type::unknown());
+        };
+
+        for metadata_element in &arguments[1..] {
+            self.infer_expression(metadata_element, TypeContext::default());
+        }
+
+        subscript_context.infer(self, first_argument)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1815,4 +1826,38 @@ fn legacy_generic_class_context<'db>(
         db,
         validated_typevars,
     ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AnnotatedExprContext {
+    TypeExpression,
+    AnnotationExpression,
+}
+
+impl AnnotatedExprContext {
+    fn infer<'db>(
+        self,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+        argument: &ast::Expr,
+    ) -> TypeAndQualifiers<'db> {
+        match self {
+            AnnotatedExprContext::TypeExpression => {
+                let inner = builder.infer_type_expression(argument);
+                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                    builder.db(),
+                    inner,
+                )));
+                TypeAndQualifiers::declared(outer)
+            }
+            AnnotatedExprContext::AnnotationExpression => {
+                let inner =
+                    builder.infer_annotation_expression_impl(argument, PEP613Policy::Disallowed);
+                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                    builder.db(),
+                    inner.inner_type(),
+                )));
+                TypeAndQualifiers::declared(outer).with_qualifier(inner.qualifiers())
+            }
+        }
+    }
 }

@@ -2,10 +2,11 @@ use crate::Db;
 use crate::semantic_index::definition::{DefinitionKind, DefinitionState};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
+use crate::semantic_index::{get_loop_header, semantic_index};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
+use rustc_hash::FxHashSet;
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -94,13 +95,31 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             function_scope_is_overload_declaration(db, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
+        // Loop headers are synthesized before the loop body definitions they point to;
+        // track used IDs as we go.
+        let mut loop_header_used_definition_ids = FxHashSet::default();
 
-        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
+        for (definition_id, state, is_used) in use_def_map.all_definitions_with_usage() {
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
 
             if is_used {
+                let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
+                    continue;
+                };
+
+                let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+                for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
+                    if use_def_map.is_reachable(db, live_binding.reachability_constraint) {
+                        loop_header_used_definition_ids.insert(live_binding.binding);
+                    }
+                }
+
+                continue;
+            }
+
+            if loop_header_used_definition_ids.contains(&definition_id) {
                 continue;
             }
 
@@ -644,6 +663,79 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_loop_carried_rebinding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def buy_sell_once(prices: list[float]) -> float:
+                assert len(prices) > 1
+                best_buy, best_so_far = prices[0], 0.0
+                for i in range(1, len(prices)):
+                    best_so_far = max(best_so_far, prices[i] - best_buy)
+                    best_buy = min(best_buy, prices[i])
+                return best_so_far
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unreachable_loop_carried_rebinding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f():
+                value = 0
+                for _ in range(3):
+                    print(value)
+                    if False:
+                        value = 1
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let value_start = TextSize::try_from(source.rfind("value = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(value_start, value_start + TextSize::new(5)),
+                name: Name::new("value"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_loop_condition_guarded_rebinding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f():
+                flag = True
+                while flag:
+                    print(x)
+                    x = 1
+                    flag = False
+                x = 2
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let final_x_start = TextSize::try_from(source.rfind("x = 2").unwrap()).unwrap();
+        // TODO: The `x = 1` binding is also unused, but we currently mark it used because it
+        // reaches the synthetic loop header even though the next loop iteration is blocked by the
+        // loop condition.
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(final_x_start, final_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
         Ok(())
     }
 }

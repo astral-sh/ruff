@@ -81,7 +81,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
   |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
 8 | ): ...
   |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -110,7 +109,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 16 | ): ...
 17 | class D(int): ...
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -142,7 +140,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
 22 | ): ...
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -170,7 +167,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 25 |
 26 | @disjoint_base
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -199,7 +195,6 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
    |     - `H` instances have a distinct memory layout because of the way `H` is implemented in a C extension
 35 | ): ...
    |
-info: rule `instance-layout-conflict` is enabled by default
 
 ```
 
@@ -215,7 +210,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among c
    |           |      Later class base inherits from `Sequence[str]`
    |           Earlier class base inherits from `Sequence[int]`
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -228,6 +222,5 @@ error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `ran
 39 | class Foo(range, str): ...  # error: [subclass-of-final-class]
    |           ^^^^^
    |
-info: rule `subclass-of-final-class` is enabled by default
 
 ```

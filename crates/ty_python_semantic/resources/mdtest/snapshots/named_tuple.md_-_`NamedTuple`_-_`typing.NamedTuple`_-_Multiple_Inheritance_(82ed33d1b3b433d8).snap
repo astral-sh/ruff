@@ -60,7 +60,6 @@ error[invalid-named-tuple]: NamedTuple class `C` cannot use multiple inheritance
   |                     ^^^^^^
 5 |     id: int
   |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -74,7 +73,6 @@ error[invalid-named-tuple]: NamedTuple class `D` cannot use multiple inheritance
 11 |     NamedTuple
 12 | ): ...
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```
 
@@ -88,6 +86,5 @@ error[invalid-named-tuple]: NamedTuple class `E` cannot use multiple inheritance
 18 | from abc import ABC
 19 | from collections import namedtuple
    |
-info: rule `invalid-named-tuple` is enabled by default
 
 ```

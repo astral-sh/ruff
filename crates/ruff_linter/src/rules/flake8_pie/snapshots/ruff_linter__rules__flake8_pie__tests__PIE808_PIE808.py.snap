@@ -14,7 +14,7 @@ help: Remove `start` argument
 1 | # PIE808
   - range(0, 10)
 2 + range(10)
-3 | 
+3 |
 4 | import builtins
 5 | builtins.range(0, 10)
 
@@ -29,11 +29,11 @@ PIE808 [*] Unnecessary `start` argument in `range`
   |
 help: Remove `start` argument
 2 | range(0, 10)
-3 | 
+3 |
 4 | import builtins
   - builtins.range(0, 10)
 5 + builtins.range(10)
-6 | 
+6 |
 7 | # OK
 8 | range(x, 10)
 
@@ -46,7 +46,7 @@ PIE808 [*] Unnecessary `start` argument in `range`
    |
 help: Remove `start` argument
 16 | range(0, stop=10)
-17 | 
+17 |
 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
    - range((0), 42)
 19 + range(42)

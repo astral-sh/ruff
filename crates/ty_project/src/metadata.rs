@@ -773,7 +773,7 @@ unclosed table, expected `]`
                 .unwrap_or_default()
                 .python_version
                 .as_deref(),
-            Some(&PythonVersion::from((3, 0)))
+            Some(&PythonVersion::PY37)
         );
 
         Ok(())
@@ -992,6 +992,66 @@ unclosed table, expected `]`
         assert_error_eq(
             &error,
             "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_old_version_uses_lowest_supported_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==2.7"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY37)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_unsupported_future_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==44.44"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!(
+                "Expected project discovery to fail because `requires-python` does not include a ty-supported version."
+            ));
+        };
+
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
         );
 
         Ok(())
