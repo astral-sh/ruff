@@ -157,6 +157,8 @@ f(None)  # error: [invalid-argument-type]
 
 ## Stringified annotations
 
+### Basic
+
 Stringified and partially stringified `type[…]` annotations are supported, even if the latter are
 not explicitly allowed by the [syntax in the typing spec].
 
@@ -166,13 +168,11 @@ def _(
     type_of_foo_2: type["Foo"],
     type_of_foo_or_bar_1: "type[Foo | Bar]",
     type_of_foo_or_bar_2: type["Foo | Bar"],
-    type_of_foo_or_bar_3: type["Foo" | "Bar"],
 ):
     reveal_type(type_of_foo_1)  # revealed: type[Foo]
     reveal_type(type_of_foo_2)  # revealed: type[Foo]
     reveal_type(type_of_foo_or_bar_1)  # revealed: type[Foo | Bar]
     reveal_type(type_of_foo_or_bar_2)  # revealed: type[Foo | Bar]
-    reveal_type(type_of_foo_or_bar_3)  # revealed: type[Foo | Bar]
 
 class Foo: ...
 class Bar: ...
@@ -184,6 +184,42 @@ Illegal stringified annotations lead to a diagnostic:
 # error: [invalid-syntax-in-forward-annotation]
 def _(type_of_invalid: type[""]):
     reveal_type(type_of_invalid)  # revealed: type[Unknown]
+```
+
+### Unions of strings, Python 3.13
+
+"Unions of strings" lead to a runtime error on 3.13 and lower, so we emit a diagnostic:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# TODO: this should be an error
+def _(type_of_invalid: type["Foo" | "Bar"]):
+    # TODO: this should be `type[Unknown]`
+    reveal_type(type_of_invalid)  # revealed: type[Foo | Bar]
+
+class Foo: ...
+class Bar: ...
+```
+
+### Unions of strings, Python 3.14
+
+On Python 3.14 and higher, we support this:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+def _(type_of_foo_or_bar: type["Foo" | "Bar"]):
+    reveal_type(type_of_foo_or_bar)  # revealed: type[Foo | Bar]
+
+class Foo: ...
+class Bar: ...
 ```
 
 ## Illegal parameters
