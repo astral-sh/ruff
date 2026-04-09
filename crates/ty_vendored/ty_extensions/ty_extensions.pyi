@@ -102,6 +102,14 @@ eagerly.
 [Any]: https://typing.python.org/en/latest/spec/special-types.html#any
 """
 
+TypedDictTop: _SpecialForm
+"""
+`TypedDictTop` represents the top type of all `TypedDict` instances.
+
+Use this to describe values that are known to be `TypedDict`s, but whose concrete key set
+is not statically known.
+"""
+
 # ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
 # to mean `complex | float | int`. This is to support a typing-system special case [1].
 # We therefore provide `JustFloat` and `JustComplex` to represent the "bare" `float` and

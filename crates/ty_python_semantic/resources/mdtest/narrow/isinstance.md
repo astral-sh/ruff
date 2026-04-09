@@ -745,7 +745,7 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
-For dict-like runtime checks, we include `Top[TypedDict]` alongside the ordinary top dict-like
+For dict-like runtime checks, we include `TypedDictTop` alongside the ordinary top dict-like
 constraint when it contributes additional information. For `Mapping`, that extra arm simplifies away
 because `TypedDict` is already statically compatible there:
 
@@ -758,13 +758,13 @@ class Movie(TypedDict):
 
 def _(x: object, y: Movie):
     if isinstance(x, dict):
-        reveal_type(x)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+        reveal_type(x)  # revealed: Top[dict[Unknown, Unknown]] | TypedDictTop
 
     if isinstance(x, Mapping):
         reveal_type(x)  # revealed: Top[Mapping[Unknown, object]]
 
     if isinstance(x, MutableMapping):
-        reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]] | Top[TypedDict]
+        reveal_type(x)  # revealed: Top[MutableMapping[Unknown, Unknown]] | TypedDictTop
 
     if isinstance(y, dict):
         reveal_type(y)  # revealed: Movie
@@ -787,7 +787,7 @@ def _(z: int | Movie):
         reveal_type(z)  # revealed: int
 ```
 
-When a gradual arm remains after narrowing, that `Top[TypedDict]` fallback remains visible too.
+When a gradual arm remains after narrowing, that `TypedDictTop` fallback remains visible too.
 
 ```py
 from typing import TypeVar
@@ -796,7 +796,7 @@ T = TypeVar("T")
 
 def _(value: Movie | T):
     if isinstance(value, dict):
-        reveal_type(value)  # revealed: (T@_ & Top[dict[Unknown, Unknown]]) | Movie | (T@_ & Top[TypedDict])
+        reveal_type(value)  # revealed: (T@_ & Top[dict[Unknown, Unknown]]) | Movie | (T@_ & TypedDictTop)
 ```
 
 This also needs to preserve common dict-key correlations from ecosystem code:
@@ -804,12 +804,27 @@ This also needs to preserve common dict-key correlations from ecosystem code:
 ```py
 def compare_common_keys(value: object, default: object):
     if isinstance(value, dict) and isinstance(default, dict):
-        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | TypedDictTop
         for key in value.keys() & default.keys():
             reveal_type(key)  # revealed: Unknown | str
             reveal_type(value[key])  # revealed: object
             reveal_type(default[key])  # revealed: object
             reveal_type(default.get(key))  # revealed: object
+```
+
+The `TypedDictTop` arm also has a stable surface name, so users can refer to it directly in
+annotations:
+
+```py
+from ty_extensions import TypedDictTop
+
+type Alias = TypedDictTop
+
+def takes_typed_dict_top(value: TypedDictTop):
+    reveal_type(value)  # revealed: TypedDictTop
+
+def takes_typed_dict_top_alias(value: Alias):
+    reveal_type(value)  # revealed: TypedDictTop
 ```
 
 It should also keep `dict` methods callable for concrete `dict` unions keyed by `IntEnum` values:
@@ -841,7 +856,7 @@ But plain-dict mutation APIs should still be rejected when the narrowed value ma
 def takes_dict(value: dict[str, object]) -> None: ...
 def mutate_dict_like(value: object) -> None:
     if isinstance(value, dict):
-        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | Top[TypedDict]
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | TypedDictTop
         value.popitem()  # error: [unresolved-attribute]
         takes_dict(value)  # error: [invalid-argument-type]
 ```
