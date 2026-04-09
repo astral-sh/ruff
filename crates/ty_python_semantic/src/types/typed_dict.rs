@@ -10,7 +10,7 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, PARAMETER_ALREADY_ASSIGNED,
@@ -26,6 +26,7 @@ use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::generics::InferableTypeVars;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use ty_python_core::definition::Definition;
 
@@ -858,6 +859,13 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) definition: Option<Definition<'db>>,
 }
 
+impl UnpackedTypedDictKey<'_> {
+    /// Returns whether this unpacked key is guaranteed to be present.
+    pub(super) fn is_required(self) -> bool {
+        self.is_required
+    }
+}
+
 /// Extracts `TypedDict` keys, their value types, and whether they are required when an unpacked
 /// `**kwargs` value has this type, resolving type aliases and handling intersections and unions.
 ///
@@ -1080,6 +1088,7 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     typed_dict: TypedDictType<'db>,
     arguments: &Arguments,
     unpacked_keyword_types: &[Option<Type<'db>>],
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     debug_assert_eq!(arguments.keywords.len(), unpacked_keyword_types.len());
 
@@ -1089,28 +1098,95 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
         .filter_map(|keyword| keyword.arg.as_ref().map(|arg| arg.id.clone()))
         .collect();
 
-    for unpacked_type in unpacked_keyword_types.iter().copied().flatten() {
-        if unpacked_type.is_never() || unpacked_type.is_dynamic() {
-            provided_keys.extend(
-                typed_dict.items(db).iter().filter_map(|(key_name, field)| {
-                    field.is_required().then_some(key_name.clone())
-                }),
-            );
-        // TODO: also extract guaranteed keys from unpacked dict literals like `**{"a": 1}`.
-        // Today we only suppress positional-key diagnostics for explicit keywords and unpacked
-        // TypedDicts, which makes those literal-unpack cases inconsistent with equivalent calls.
-        } else if let Some(unpacked_keys) =
-            extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
-        {
-            provided_keys.extend(
-                unpacked_keys
-                    .into_iter()
-                    .filter_map(|(key, unpacked_key)| unpacked_key.is_required.then_some(key)),
-            );
-        }
+    for (keyword, unpacked_type) in arguments
+        .keywords
+        .iter()
+        .zip(unpacked_keyword_types.iter().copied())
+    {
+        let Some(unpacked_type) = unpacked_type else {
+            continue;
+        };
+
+        provided_keys.extend(collect_guaranteed_keys_from_unpacked_keyword(
+            db,
+            typed_dict,
+            &keyword.value,
+            unpacked_type,
+            expression_type_fn,
+        ));
     }
 
     provided_keys
+}
+
+/// Collects keys definitely present in the final mapping produced by one `**kwargs` argument.
+fn collect_guaranteed_keys_from_unpacked_keyword<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    expr: &ast::Expr,
+    unpacked_type: Type<'db>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+) -> OrderSet<Name> {
+    let mut provided_keys = OrderSet::new();
+    collect_guaranteed_keys_from_merged_unpacked_keyword(
+        db,
+        typed_dict,
+        expr,
+        unpacked_type,
+        &mut provided_keys,
+        expression_type_fn,
+    );
+    provided_keys
+}
+
+/// Collects keys guaranteed by one unpacked constructor argument, honoring merged `**{...}`
+/// overwrite semantics.
+fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    expr: &ast::Expr,
+    unpacked_type: Type<'db>,
+    provided_keys: &mut OrderSet<Name>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+) {
+    if let ast::Expr::Dict(dict_expr) = expr {
+        for item in dict_expr.items.iter().rev() {
+            if let Some(key_expr) = &item.key {
+                let key_ty = expression_type_fn(key_expr, TypeContext::default());
+                if let Some(key_literal) = key_ty.as_string_literal() {
+                    provided_keys.insert(Name::new(key_literal.value(db)));
+                }
+            } else {
+                let nested_ty = expression_type_fn(&item.value, TypeContext::default());
+                collect_guaranteed_keys_from_merged_unpacked_keyword(
+                    db,
+                    typed_dict,
+                    &item.value,
+                    nested_ty,
+                    provided_keys,
+                    expression_type_fn,
+                );
+            }
+        }
+        return;
+    }
+
+    if unpacked_type.is_never() || unpacked_type.is_dynamic() {
+        provided_keys.extend(
+            typed_dict
+                .items(db)
+                .iter()
+                .filter_map(|(key_name, field)| field.is_required().then_some(key_name.clone())),
+        );
+    } else if let Some(unpacked_keys) =
+        extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
+    {
+        for (key, unpacked_key) in unpacked_keys {
+            if unpacked_key.is_required {
+                provided_keys.insert(key);
+            }
+        }
+    }
 }
 
 /// Returns a `TypedDict` schema with `excluded_keys` removed.
@@ -1362,8 +1438,13 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     if has_single_positional_arg && !arguments.keywords.is_empty() {
         // Mixed positional-and-keyword construction: guaranteed keyword-provided keys override the
         // positional mapping, so validate the positional argument against the remaining schema.
-        let keyword_keys =
-            collect_guaranteed_keyword_keys(db, typed_dict, arguments, &unpacked_keyword_types);
+        let keyword_keys = collect_guaranteed_keyword_keys(
+            db,
+            typed_dict,
+            arguments,
+            &unpacked_keyword_types,
+            &mut expression_type_fn,
+        );
         let mut provided_keys = if has_positional_dict_literal {
             validate_from_dict_literal(
                 context,
@@ -1601,45 +1682,370 @@ fn validate_from_keywords<'db, 'ast>(
             let Some(unpacked_type) = unpacked_type else {
                 continue;
             };
-
-            // Never and Dynamic types are special: they can have any keys, so we skip
-            // validation and mark all required keys as provided.
-            if unpacked_type.is_never() || unpacked_type.is_dynamic() {
-                for (key_name, field) in typed_dict.items(db) {
-                    if field.is_required() {
-                        guaranteed_keys.entry(key_name.clone()).or_insert(None);
-                    }
-                }
-            } else if let Some(unpacked_keys) =
-                extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
-            {
-                for key_name in validate_extracted_typed_dict_keys(
-                    context,
-                    typed_dict,
-                    &unpacked_keys,
-                    TypedDictAssignmentNodes {
-                        typed_dict: typed_dict_node,
-                        key: keyword.into(),
-                        value: (&keyword.value).into(),
-                    },
-                    full_object_ty_annotation(unpacked_type),
-                    &OrderSet::new(),
-                )
-                .0
-                {
-                    record_guaranteed_typed_dict_constructor_key(
-                        context,
-                        typed_dict,
-                        &mut guaranteed_keys,
-                        key_name,
-                        keyword_node,
-                    );
-                }
-            }
+            validate_unpacked_keyword_argument(
+                context,
+                typed_dict,
+                &keyword.value,
+                unpacked_type,
+                TypedDictAssignmentNodes {
+                    typed_dict: typed_dict_node,
+                    key: keyword.into(),
+                    value: (&keyword.value).into(),
+                },
+                &mut guaranteed_keys,
+                expression_type_fn,
+            );
         }
     }
 
     guaranteed_keys.into_keys().collect()
+}
+
+/// Validates one unpacked `**kwargs` constructor argument and merges its definite keys into the
+/// constructor-level duplicate tracking.
+fn validate_unpacked_keyword_argument<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    expr: &'ast ast::Expr,
+    unpacked_type: Type<'db>,
+    nodes: TypedDictAssignmentNodes<'ast>,
+    guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+) {
+    let mut unpacked_guaranteed_keys = BTreeMap::new();
+    let mut shadowed_keys = OrderSet::new();
+    validate_merged_unpacked_keyword_argument(
+        context,
+        typed_dict,
+        expr,
+        unpacked_type,
+        nodes,
+        &mut unpacked_guaranteed_keys,
+        &mut shadowed_keys,
+        expression_type_fn,
+    );
+
+    for (key_name, key_node) in unpacked_guaranteed_keys {
+        if let Some(key_node) = key_node {
+            record_guaranteed_typed_dict_constructor_key(
+                context,
+                typed_dict,
+                guaranteed_keys,
+                key_name,
+                key_node,
+            );
+        } else {
+            guaranteed_keys.entry(key_name).or_insert(None);
+        }
+    }
+}
+
+/// Validates one unpacked constructor argument while preserving merged `**{...}` overwrite
+/// semantics.
+#[expect(clippy::too_many_arguments)]
+fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    expr: &'ast ast::Expr,
+    unpacked_type: Type<'db>,
+    nodes: TypedDictAssignmentNodes<'ast>,
+    guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
+    shadowed_keys: &mut OrderSet<Name>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+) {
+    let db = context.db();
+    let items = typed_dict.items(db);
+
+    if let ast::Expr::Dict(dict_expr) = expr {
+        for item in dict_expr.items.iter().rev() {
+            if let Some(key_expr) = &item.key {
+                let key_ty = expression_type_fn(key_expr, TypeContext::default());
+                let Some(key_literal) = key_ty.as_string_literal() else {
+                    continue;
+                };
+
+                let key = Name::new(key_literal.value(db));
+                let is_shadowed = shadowed_keys.contains(&key);
+
+                if !is_shadowed {
+                    let field = items.get(key.as_str());
+                    let value_tcx = items
+                        .get(key.as_str())
+                        .map(|field| TypeContext::new(Some(field.declared_ty)))
+                        .unwrap_or_default();
+                    let value_ty = expression_type_fn(&item.value, value_tcx);
+                    validate_nested_unpacked_typed_dict_literal(
+                        context,
+                        field.map(|field| field.declared_ty),
+                        &item.value,
+                        expression_type_fn,
+                    );
+                    TypedDictKeyAssignment {
+                        context,
+                        typed_dict,
+                        full_object_ty: None,
+                        key: key.as_str(),
+                        value_ty,
+                        typed_dict_node: nodes.typed_dict,
+                        key_node: key_expr.into(),
+                        value_node: (&item.value).into(),
+                        assignment_kind: TypedDictAssignmentKind::Constructor,
+                        emit_diagnostic: true,
+                    }
+                    .validate();
+                }
+                guaranteed_keys
+                    .entry(key.clone())
+                    .and_modify(|node| {
+                        if node.is_none() {
+                            *node = Some(key_expr.into());
+                        }
+                    })
+                    .or_insert(Some(key_expr.into()));
+                shadowed_keys.insert(key);
+            } else {
+                let nested_ty = expression_type_fn(&item.value, TypeContext::default());
+                validate_merged_unpacked_keyword_argument(
+                    context,
+                    typed_dict,
+                    &item.value,
+                    nested_ty,
+                    TypedDictAssignmentNodes {
+                        typed_dict: nodes.typed_dict,
+                        key: (&item.value).into(),
+                        value: (&item.value).into(),
+                    },
+                    guaranteed_keys,
+                    shadowed_keys,
+                    expression_type_fn,
+                );
+            }
+        }
+        return;
+    }
+
+    // Never and Dynamic types are special: they can have any keys, so we skip
+    // validation and mark all required keys as provided.
+    if unpacked_type.is_never() || unpacked_type.is_dynamic() {
+        shadowed_keys.extend(items.keys().cloned());
+        for (key_name, field) in items {
+            if field.is_required() {
+                guaranteed_keys.entry(key_name.clone()).or_insert(None);
+            }
+        }
+    } else if let Some(unpacked_keys) =
+        extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
+    {
+        let ignored_keys = shadowed_keys.clone();
+        validate_extracted_typed_dict_keys(
+            context,
+            typed_dict,
+            &unpacked_keys,
+            nodes,
+            full_object_ty_annotation(unpacked_type),
+            &ignored_keys,
+        );
+
+        for (key_name, unpacked_key) in unpacked_keys {
+            if unpacked_key.is_required() {
+                guaranteed_keys
+                    .entry(key_name.clone())
+                    .and_modify(|node| {
+                        if node.is_none() {
+                            *node = Some(nodes.key);
+                        }
+                    })
+                    .or_insert(Some(nodes.key));
+                shadowed_keys.insert(key_name);
+            }
+        }
+    } else if let Some((key_ty, value_ty)) =
+        extract_unpacked_mapping_key_value_types(db, unpacked_type)
+    {
+        validate_mapping_overwrite(
+            context,
+            typed_dict,
+            unpacked_type,
+            key_ty,
+            value_ty,
+            nodes,
+            shadowed_keys,
+        );
+    }
+}
+
+pub(super) fn extract_unpacked_mapping_key_value_types<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            let mut key_builder = UnionBuilder::new(db);
+            let mut value_builder = UnionBuilder::new(db);
+
+            for element in union.elements(db) {
+                let [key_ty, value_ty] = element
+                    .known_specialization(db, KnownClass::Dict)
+                    .or_else(|| element.known_specialization(db, KnownClass::Mapping))?
+                    .types(db)
+                else {
+                    return None;
+                };
+                key_builder = key_builder.add(*key_ty);
+                value_builder = value_builder.add(*value_ty);
+            }
+
+            Some((key_builder.build(), value_builder.build()))
+        }
+        ty => {
+            let specialization = ty
+                .known_specialization(db, KnownClass::Dict)
+                .or_else(|| ty.known_specialization(db, KnownClass::Mapping))?;
+            let [key_ty, value_ty] = specialization.types(db) else {
+                return None;
+            };
+            Some((*key_ty, *value_ty))
+        }
+    }
+}
+
+fn validate_mapping_overwrite<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    unpacked_type: Type<'db>,
+    key_ty: Type<'db>,
+    value_ty: Type<'db>,
+    nodes: TypedDictAssignmentNodes<'ast>,
+    shadowed_keys: &mut OrderSet<Name>,
+) {
+    let db = context.db();
+    let typed_dict_items = typed_dict.items(db);
+
+    match mapping_string_keys(db, key_ty) {
+        MappingStringKeys::NoString => return,
+        MappingStringKeys::Exact(keys) => {
+            for key in keys {
+                if shadowed_keys.contains(&key) {
+                    continue;
+                }
+                if typed_dict_items.contains_key(&key) {
+                    TypedDictKeyAssignment {
+                        context,
+                        typed_dict,
+                        full_object_ty: full_object_ty_annotation(unpacked_type),
+                        key: key.as_str(),
+                        value_ty,
+                        typed_dict_node: nodes.typed_dict,
+                        key_node: nodes.key,
+                        value_node: nodes.value,
+                        assignment_kind: TypedDictAssignmentKind::Constructor,
+                        emit_diagnostic: true,
+                    }
+                    .validate();
+                    shadowed_keys.insert(key);
+                }
+            }
+        }
+        MappingStringKeys::AnyString => {
+            for (key_name, _) in typed_dict_items {
+                if shadowed_keys.contains(key_name) {
+                    continue;
+                }
+                TypedDictKeyAssignment {
+                    context,
+                    typed_dict,
+                    full_object_ty: full_object_ty_annotation(unpacked_type),
+                    key: key_name.as_str(),
+                    value_ty,
+                    typed_dict_node: nodes.typed_dict,
+                    key_node: nodes.key,
+                    value_node: nodes.value,
+                    assignment_kind: TypedDictAssignmentKind::Constructor,
+                    emit_diagnostic: true,
+                }
+                .validate();
+                shadowed_keys.insert(key_name.clone());
+            }
+        }
+    }
+}
+
+pub(super) enum MappingStringKeys {
+    NoString,
+    Exact(Vec<Name>),
+    AnyString,
+}
+
+pub(super) fn mapping_string_keys<'db>(db: &'db dyn Db, key_ty: Type<'db>) -> MappingStringKeys {
+    let string_overlap = key_ty.filter_disjoint_elements(
+        db,
+        KnownClass::Str.to_instance(db),
+        InferableTypeVars::None,
+    );
+    if string_overlap.is_never() {
+        return MappingStringKeys::NoString;
+    }
+
+    if let Some(key_literal) = string_overlap.as_string_literal() {
+        return MappingStringKeys::Exact(vec![Name::new(key_literal.value(db))]);
+    }
+
+    let Type::Union(union) = string_overlap.resolve_type_alias(db) else {
+        return MappingStringKeys::AnyString;
+    };
+
+    union
+        .elements(db)
+        .iter()
+        .map(|element| {
+            element
+                .as_string_literal()
+                .map(|literal| Name::new(literal.value(db)))
+        })
+        .collect::<Option<Vec<_>>>()
+        .map_or(MappingStringKeys::AnyString, MappingStringKeys::Exact)
+}
+
+fn validate_nested_unpacked_typed_dict_literal<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    declared_ty: Option<Type<'db>>,
+    value_expr: &'ast ast::Expr,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+) {
+    let Some(declared_ty) = declared_ty else {
+        return;
+    };
+    let ast::Expr::Dict(_) = value_expr else {
+        return;
+    };
+    let Some(nested_typed_dict) = declared_ty.resolve_type_alias(context.db()).as_typed_dict()
+    else {
+        return;
+    };
+
+    let nested_typed_dict_node: AnyNodeRef<'ast> = value_expr.into();
+    let mut guaranteed_keys = BTreeMap::new();
+    validate_unpacked_keyword_argument(
+        context,
+        nested_typed_dict,
+        value_expr,
+        Type::TypedDict(nested_typed_dict),
+        TypedDictAssignmentNodes {
+            typed_dict: nested_typed_dict_node,
+            key: nested_typed_dict_node,
+            value: nested_typed_dict_node,
+        },
+        &mut guaranteed_keys,
+        expression_type_fn,
+    );
+    let provided_keys: OrderSet<Name> = guaranteed_keys.into_keys().collect();
+
+    validate_typed_dict_required_keys(
+        context,
+        nested_typed_dict,
+        &provided_keys,
+        nested_typed_dict_node,
+    );
 }
 
 /// Validates a `TypedDict` dictionary literal assignment,

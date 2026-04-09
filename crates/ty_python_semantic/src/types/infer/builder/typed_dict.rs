@@ -1,3 +1,4 @@
+use ordermap::OrderSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex};
 use rustc_hash::FxHashMap;
@@ -14,14 +15,26 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
-    infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
+    MappingStringKeys, TypedDictSchema, collect_guaranteed_keyword_keys,
+    extract_unpacked_mapping_key_value_types, extract_unpacked_typed_dict_keys_from_value_type,
+    functional_typed_dict_field, infer_unpacked_keyword_types, mapping_string_keys,
+    typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
     IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
 };
 use ty_python_core::definition::Definition;
+
+enum TypedDictConstructorValuePlanStep<'expr, 'db> {
+    Infer {
+        expr: &'expr ast::Expr,
+        tcx: TypeContext<'db>,
+    },
+    StoreUnknown {
+        expr: &'expr ast::Expr,
+    },
+}
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
 #[derive(Debug, Clone, Copy)]
@@ -61,6 +74,24 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    fn execute_typed_dict_constructor_value_plan(
+        &mut self,
+        plan: Vec<TypedDictConstructorValuePlanStep<'_, 'db>>,
+    ) {
+        for step in plan {
+            match step {
+                TypedDictConstructorValuePlanStep::Infer { expr, tcx } => {
+                    self.get_or_infer_expression(expr, tcx);
+                }
+                TypedDictConstructorValuePlanStep::StoreUnknown { expr } => {
+                    if self.try_expression_type(expr).is_none() {
+                        self.store_expression_type(expr, Type::unknown());
+                    }
+                }
+            }
+        }
+    }
+
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
     /// This method *does not* call `infer_expression` on the object being called;
@@ -370,6 +401,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     typed_dict,
                     arguments,
                     &unpacked_keyword_types,
+                    &mut |expr, tcx| self.get_or_infer_expression(expr, tcx),
                 );
                 let positional_target =
                     typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
@@ -400,23 +432,165 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer keyword argument values for a `TypedDict` constructor.
     ///
     /// Named keywords are inferred against the declared type of the matching `TypedDict` field.
-    /// Unpacked `**kwargs` and unknown keys fall back to default inference because they do not
-    /// map to a single field declaration at this stage.
+    /// Literal `**{...}` entries are inferred against matching field types as well; other unpacked
+    /// `**kwargs` and unknown keys fall back to default inference.
     pub(super) fn infer_typed_dict_constructor_keyword_values(
         &mut self,
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,
     ) {
         let items = typed_dict.items(self.db());
+        let mut plan = Vec::new();
         for keyword in &arguments.keywords {
-            let value_tcx = keyword
-                .arg
-                .as_ref()
-                .and_then(|arg_name| items.get(arg_name.id.as_str()))
-                .map(|field| TypeContext::new(Some(field.declared_ty)))
-                .unwrap_or_default();
-            self.get_or_infer_expression(&keyword.value, value_tcx);
+            if let Some(arg_name) = &keyword.arg {
+                let value_tcx = items
+                    .get(arg_name.id.as_str())
+                    .map(|field| TypeContext::new(Some(field.declared_ty)))
+                    .unwrap_or_default();
+                plan.push(TypedDictConstructorValuePlanStep::Infer {
+                    expr: &keyword.value,
+                    tcx: value_tcx,
+                });
+            } else {
+                self.plan_typed_dict_constructor_unpacked_keyword_values(
+                    typed_dict,
+                    &keyword.value,
+                    &mut plan,
+                );
+            }
         }
+
+        self.execute_typed_dict_constructor_value_plan(plan);
+    }
+
+    /// Plan value inference for an unpacked `**kwargs` constructor argument.
+    fn plan_typed_dict_constructor_unpacked_keyword_values<'expr>(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        expr: &'expr ast::Expr,
+        plan: &mut Vec<TypedDictConstructorValuePlanStep<'expr, 'db>>,
+    ) {
+        let mut shadowed_keys = OrderSet::new();
+        self.plan_typed_dict_constructor_merged_unpacked_keyword_values(
+            typed_dict,
+            expr,
+            &mut shadowed_keys,
+            plan,
+        );
+        if expr.is_dict_expr() {
+            plan.push(TypedDictConstructorValuePlanStep::StoreUnknown { expr });
+        }
+    }
+
+    fn shadow_typed_dict_constructor_keys_from_mapping(
+        &self,
+        typed_dict: TypedDictType<'db>,
+        key_ty: Type<'db>,
+        shadowed_keys: &mut OrderSet<Name>,
+    ) {
+        let typed_dict_items = typed_dict.items(self.db());
+        match mapping_string_keys(self.db(), key_ty) {
+            MappingStringKeys::NoString => {}
+            MappingStringKeys::Exact(keys) => {
+                for key in keys {
+                    if typed_dict_items.contains_key(&key) {
+                        shadowed_keys.insert(key);
+                    }
+                }
+            }
+            MappingStringKeys::AnyString => {
+                shadowed_keys.extend(typed_dict_items.keys().cloned());
+            }
+        }
+    }
+
+    /// Walks a merged `**{...}` literal from right to left so overwrite semantics match runtime.
+    fn plan_typed_dict_constructor_merged_unpacked_keyword_values<'expr>(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        expr: &'expr ast::Expr,
+        shadowed_keys: &mut OrderSet<Name>,
+        plan: &mut Vec<TypedDictConstructorValuePlanStep<'expr, 'db>>,
+    ) {
+        let items = typed_dict.items(self.db());
+
+        if let ast::Expr::Dict(dict_expr) = expr {
+            for item in dict_expr.items.iter().rev() {
+                if let Some(key_expr) = &item.key {
+                    let key_ty = self.get_or_infer_expression(key_expr, TypeContext::default());
+                    if let Some(key) = key_ty
+                        .as_string_literal()
+                        .map(|key| Name::new(key.value(self.db())))
+                        && !shadowed_keys.contains(&key)
+                    {
+                        shadowed_keys.insert(key.clone());
+                        if let Some(field) = items.get(key.as_str()) {
+                            if item.value.is_dict_expr()
+                                && let Some(nested_typed_dict) = field
+                                    .declared_ty
+                                    .resolve_type_alias(self.db())
+                                    .as_typed_dict()
+                            {
+                                self.plan_typed_dict_constructor_unpacked_keyword_values(
+                                    nested_typed_dict,
+                                    &item.value,
+                                    plan,
+                                );
+                            } else {
+                                plan.push(TypedDictConstructorValuePlanStep::Infer {
+                                    expr: &item.value,
+                                    tcx: TypeContext::new(Some(field.declared_ty)),
+                                });
+                            }
+                        } else {
+                            plan.push(TypedDictConstructorValuePlanStep::Infer {
+                                expr: &item.value,
+                                tcx: TypeContext::default(),
+                            });
+                        }
+                    } else {
+                        plan.push(TypedDictConstructorValuePlanStep::Infer {
+                            expr: &item.value,
+                            tcx: TypeContext::default(),
+                        });
+                    }
+                } else {
+                    if item.value.is_dict_expr() {
+                        self.plan_typed_dict_constructor_merged_unpacked_keyword_values(
+                            typed_dict,
+                            &item.value,
+                            shadowed_keys,
+                            plan,
+                        );
+                    } else {
+                        let unpacked_ty =
+                            self.get_or_infer_expression(&item.value, TypeContext::default());
+                        if unpacked_ty.is_never() || unpacked_ty.is_dynamic() {
+                            shadowed_keys.extend(items.keys().cloned());
+                        } else if let Some(unpacked_keys) =
+                            extract_unpacked_typed_dict_keys_from_value_type(self.db(), unpacked_ty)
+                        {
+                            for (key, unpacked_key) in unpacked_keys {
+                                if unpacked_key.is_required() {
+                                    shadowed_keys.insert(key);
+                                }
+                            }
+                        } else if let Some((key_ty, _)) =
+                            extract_unpacked_mapping_key_value_types(self.db(), unpacked_ty)
+                        {
+                            self.shadow_typed_dict_constructor_keys_from_mapping(
+                                typed_dict,
+                                key_ty,
+                                shadowed_keys,
+                            );
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        self.get_or_infer_expression(expr, TypeContext::default());
     }
 
     /// Infer the key and value expressions of a positional dict literal passed to a
