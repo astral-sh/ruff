@@ -6,6 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::NodeIndex;
 use ruff_python_ast::name::Name;
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -61,8 +62,9 @@ where
 ///    Technically, `__map` could accept a subset of the `TypedDict` if the remaining
 ///    fields are provided as keyword arguments, but we don't model that in the
 ///    synthesized `__init__`, since this signature is primarily used for IDE support.
+///    Fields that are not valid Python identifiers are collapsed into `**kwargs`.
 /// 2. `__init__(self, *, field1: T1, field2: T2 = ...) -> None`
-///    Keyword-only.
+///    Keyword-only. Fields that are not valid Python identifiers are collapsed into `**kwargs`.
 fn synthesize_typed_dict_init<'db, N, F>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
@@ -76,13 +78,20 @@ where
         .into_iter()
         .map(|(name, field)| (name.borrow().clone(), field.borrow().clone()))
         .collect();
+    let keyword_fields: Vec<_> = fields
+        .iter()
+        .filter(|(name, _)| is_identifier(name.as_str()))
+        .cloned()
+        .collect();
+    let keyword_rest_param = (keyword_fields.len() != fields.len())
+        .then(|| Parameter::keyword_variadic(Name::new_static("kwargs")));
 
     let self_param =
         Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty);
 
     let map_param = Parameter::positional_only(Some(Name::new_static("__map")))
         .with_annotated_type(instance_ty);
-    let params_with_default = fields.iter().map(|(name, field)| {
+    let params_with_default = keyword_fields.iter().map(|(name, field)| {
         Parameter::keyword_only(name.clone())
             .with_annotated_type(field.declared_ty)
             .with_default_type(field.declared_ty)
@@ -92,12 +101,13 @@ where
             db,
             std::iter::once(self_param.clone())
                 .chain(std::iter::once(map_param))
-                .chain(params_with_default),
+                .chain(params_with_default)
+                .chain(keyword_rest_param.clone()),
         ),
         Type::none(db),
     );
 
-    let keyword_field_params = fields.iter().map(|(name, field)| {
+    let keyword_field_params = keyword_fields.iter().map(|(name, field)| {
         let param = Parameter::keyword_only(name.clone()).with_annotated_type(field.declared_ty);
         if field.is_required() {
             param
@@ -106,7 +116,12 @@ where
         }
     });
     let keyword_overload = Signature::new(
-        Parameters::new(db, std::iter::once(self_param).chain(keyword_field_params)),
+        Parameters::new(
+            db,
+            std::iter::once(self_param)
+                .chain(keyword_field_params)
+                .chain(keyword_rest_param),
+        ),
         Type::none(db),
     );
 
