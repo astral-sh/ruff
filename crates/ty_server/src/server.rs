@@ -12,7 +12,7 @@ use std::num::NonZeroUsize;
 use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
-mod api;
+pub mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
