@@ -277,3 +277,7 @@ class MetaclassInWhichSelfCannotBeUsed7(django.db.models.base.ModelBase):
 class MetaclassInWhichSelfCannotBeUsed8(django.db.models.base.ModelBase):
     def __new__(cls, name: builtins.str, bases: tuple, attributes: dict, /, **kw) -> MetaclassInWhichSelfCannotBeUsed8:
         ...
+
+
+class StubInPlaceOperationReturningOtherType:
+    def __iadd__(self, other: int) -> int: ...  # Y034 "__iadd__" methods in classes like "StubInPlaceOperationReturningOtherType" usually return "self" at runtime. Consider using "typing_extensions.Self" in "StubInPlaceOperationReturningOtherType.__iadd__", e.g. "def __iadd__(self, other: int) -> Self: ..."
