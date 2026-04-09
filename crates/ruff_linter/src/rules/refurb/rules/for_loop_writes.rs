@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
@@ -195,6 +196,22 @@ fn for_loop_writes(
             )
         }
         (for_target, write_arg) => {
+            // If `write_arg` contains a named expression (`:=`) whose target
+            // rebinds a loop variable, the rewrite to a generator expression
+            // would be a syntax error: "assignment expression cannot rebind
+            // comprehension iteration variable".
+            // See: https://github.com/astral-sh/ruff/issues/21107
+            if any_over_expr(write_arg, |expr| {
+                let Expr::Named(named) = expr else {
+                    return false;
+                };
+                let Expr::Name(target) = named.target.as_ref() else {
+                    return false;
+                };
+                binding_names.iter().any(|b| b.id == target.id)
+            }) {
+                return;
+            }
             format!(
                 "{}.writelines({} for {} in {})",
                 locator.slice(io_object_name),
