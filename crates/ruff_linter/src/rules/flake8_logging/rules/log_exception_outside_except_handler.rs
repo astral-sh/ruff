@@ -39,6 +39,30 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logging.error("Foobar")
 /// ```
 ///
+/// ## Known limitations
+/// This rule checks whether a call is _defined_ inside an exception handler, not
+/// whether it _executes_ inside one. A function defined in an `except` block but
+/// called outside of it will not be flagged, despite the fact that the call may
+/// not have access to an active exception at runtime:
+///
+/// ```python
+/// import logging
+///
+///
+/// def make_handler():
+///     try:
+///         raise ValueError()
+///     except Exception:
+///
+///         def handler():
+///             logging.exception("x")  # LOG004 not raised (false negative)
+///
+///         return handler
+///
+///
+/// make_handler()()
+/// ```
+///
 /// ## Fix safety
 /// The fix, if available, will always be marked as unsafe, as it changes runtime behavior.
 ///
