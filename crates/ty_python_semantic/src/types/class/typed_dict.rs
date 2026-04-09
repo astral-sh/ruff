@@ -79,7 +79,7 @@ where
 
     let map_param = Parameter::positional_only(Some(Name::new_static("__map")))
         .with_annotated_type(instance_ty);
-    let optional_field_params = fields.iter().map(|(name, field)| {
+    let params_with_default = fields.iter().map(|(name, field)| {
         Parameter::keyword_only(name.clone())
             .with_annotated_type(field.declared_ty)
             .with_default_type(field.declared_ty)
@@ -89,7 +89,7 @@ where
             db,
             std::iter::once(self_param.clone())
                 .chain(std::iter::once(map_param))
-                .chain(optional_field_params),
+                .chain(params_with_default),
         ),
         Type::none(db),
     );
