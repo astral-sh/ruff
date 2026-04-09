@@ -1829,7 +1829,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 if self.settings.fully_qualified {
-                    f.write_str("Unknown")
+                    write!(f, "{}", SpecialFormType::TypedDict)
                 } else {
                     f.set_invalid_type_annotation();
                     f.write_char('<')?;
@@ -4594,6 +4594,29 @@ mod tests {
                     .display_with(&db, DisplaySettings::default().fully_qualified())
                     .to_string(),
                 "typing.Protocol"
+            );
+        }
+
+        #[test]
+        fn synthesized_typed_dict() {
+            use crate::types::Type;
+            use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
+            use ruff_python_ast::name::Name;
+
+            let db = setup_db();
+            let typed_dict = Type::TypedDict(TypedDictType::from_schema_items(
+                &db,
+                TypedDictSchema::from_iter([(
+                    Name::new_static("name"),
+                    TypedDictFieldBuilder::new(KnownClass::Str.to_instance(&db)).build(),
+                )]),
+            ));
+
+            assert_eq!(
+                typed_dict
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.TypedDict"
             );
         }
 
