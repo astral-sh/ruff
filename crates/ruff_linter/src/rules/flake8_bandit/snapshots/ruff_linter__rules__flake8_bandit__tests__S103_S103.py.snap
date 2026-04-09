@@ -163,16 +163,6 @@ S103 `os.chmod` setting a permissive mask `0o11` on file or directory
    |
 
 S103 `os.chmod` setting a permissive mask `0o777` on file or directory
-  --> S103.py:31:20
-   |
-30 | def f(path, mode):
-31 |     os.chmod(path, mode | 0o777)  # Error (all dangerous bits known-set)
-   |                    ^^^^^^^^^^^^
-32 |     os.chmod(path, mode | 0o700)  # OK (no dangerous bits known-set)
-33 |     os.chmod(path, mode & 0o700)  # OK (no dangerous bits known-set)
-   |
-
-S103 `os.chmod` setting a permissive mask `0o777` on file or directory
   --> S103.py:37:30
    |
 36 | os.chmod("/etc/secrets.txt", 0o777777 & 0o700)  # OK (partial-AND cancels out-of-range)
@@ -188,4 +178,26 @@ S103 `os.chmod` setting an invalid mask on file or directory
 37 | os.chmod("/etc/secrets.txt", 0o777777 & 0o777)  # Error
 38 | os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
    |                         ^^^^^^^^
+39 |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+   |
+
+S103 `os.chmod` setting an invalid mask on file or directory
+  --> S103.py:40:25
+   |
+38 | os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
+39 |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^
+41 | os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
+42 | os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
+   |
+
+S103 `os.chmod` setting an invalid mask on file or directory
+  --> S103.py:42:25
+   |
+40 | os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+41 | os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
+42 | os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

@@ -28,11 +28,15 @@ os.chmod("/etc/secrets.txt", 0o11)  # Error (S_IXGRP)
 
 
 def f(path, mode):
-    os.chmod(path, mode | 0o777)  # Error (all dangerous bits known-set)
-    os.chmod(path, mode | 0o700)  # OK (no dangerous bits known-set)
-    os.chmod(path, mode & 0o700)  # OK (no dangerous bits known-set)
+    os.chmod(path, mode | 0o777)  # OK (not fully known)
+    os.chmod(path, mode | 0o700)  # OK (not fully known)
+    os.chmod(path, mode & 0o700)  # OK (not fully known)
 
 
 os.chmod("/etc/secrets.txt", 0o777777 & 0o700)  # OK (partial-AND cancels out-of-range)
 os.chmod("/etc/secrets.txt", 0o777777 & 0o777)  # Error
 os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
+
+os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
+os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
+os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)

@@ -89,14 +89,14 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
         // Prefer `Invalid` over `Permissive` to match the legacy behavior
         // where an out-of-range integer short-circuited the permissiveness
         // check.
-        if known.ones & !VALID_BITS != 0 {
+        if known.oversized || known.ones & !VALID_BITS != 0 {
             checker.report_diagnostic(
                 BadFilePermissions {
                     reason: Reason::Invalid,
                 },
                 mode_arg.range(),
             );
-        } else if known.ones & dangerous != 0 {
+        } else if known.is_fully_known() && known.ones & dangerous != 0 {
             checker.report_diagnostic(
                 BadFilePermissions {
                     reason: Reason::Permissive(known.ones),
@@ -120,10 +120,15 @@ const VALID_BITS: u64 = 0o7777;
 /// to be 0. An expression whose value is fully known satisfies
 /// `ones | zeros == u64::MAX`; an expression whose value is entirely unknown
 /// has `ones == 0 && zeros == 0`.
-#[derive(Copy, Clone, Default)]
+///
+/// The `oversized` flag indicates that the value is known to exceed `u64::MAX`
+/// (i.e., it has bits set above bit 63). This is tracked separately because we
+/// cannot represent those high bits in a `u64`.
+#[derive(Copy, Clone)]
 struct KnownBits {
     ones: u64,
     zeros: u64,
+    oversized: bool,
 }
 
 impl KnownBits {
@@ -131,6 +136,27 @@ impl KnownBits {
         Self {
             ones: value,
             zeros: !value,
+            oversized: false,
+        }
+    }
+
+    const fn unknown() -> Self {
+        Self {
+            ones: 0,
+            zeros: 0,
+            oversized: false,
+        }
+    }
+
+    const fn is_fully_known(&self) -> bool {
+        !self.oversized && self.ones | self.zeros == u64::MAX
+    }
+
+    const fn invalid() -> Self {
+        Self {
+            ones: 0,
+            zeros: 0,
+            oversized: true,
         }
     }
 }
@@ -186,21 +212,16 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> KnownBits {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(int),
             ..
-        }) => int.as_u64().map(KnownBits::exact).unwrap_or_else(|| {
-            // Python ints can be arbitrarily large; anything that
-            // doesn't fit in `u64` has at least one bit set above
-            // `VALID_BITS`, so treat it as definitely invalid.
-            KnownBits {
-                ones: !VALID_BITS,
-                zeros: 0,
-            }
-        }),
+        }) => int
+            .as_u64()
+            .map(KnownBits::exact)
+            .unwrap_or_else(KnownBits::invalid),
         Expr::Attribute(_) => semantic
             .resolve_qualified_name(expr)
             .as_ref()
             .and_then(py_stat)
             .map(KnownBits::exact)
-            .unwrap_or_default(),
+            .unwrap_or_else(KnownBits::unknown),
         Expr::BinOp(ast::ExprBinOp {
             left, op, right, ..
         }) => {
@@ -210,19 +231,22 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> KnownBits {
                 Operator::BitOr => KnownBits {
                     ones: left_bits.ones | right_bits.ones,
                     zeros: left_bits.zeros & right_bits.zeros,
+                    oversized: left_bits.oversized || right_bits.oversized,
                 },
                 Operator::BitAnd => KnownBits {
                     ones: left_bits.ones & right_bits.ones,
                     zeros: left_bits.zeros | right_bits.zeros,
+                    oversized: left_bits.oversized && right_bits.oversized,
                 },
                 Operator::BitXor => KnownBits {
                     ones: (left_bits.ones & right_bits.zeros) | (left_bits.zeros & right_bits.ones),
                     zeros: (left_bits.ones & right_bits.ones)
                         | (left_bits.zeros & right_bits.zeros),
+                    oversized: left_bits.oversized || right_bits.oversized,
                 },
-                _ => KnownBits::default(),
+                _ => KnownBits::unknown(),
             }
         }
-        _ => KnownBits::default(),
+        _ => KnownBits::unknown(),
     }
 }
