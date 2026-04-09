@@ -1,7 +1,6 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
 use lsp_types::Position;
-use lsp_types::notification::PublishDiagnostics;
 
 use crate::TestServerBuilder;
 
@@ -29,8 +28,6 @@ fn hover_for_python_noqa() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
     server.open_text_document("test.py", "x = 1  # noqa: RUF100\n", 1);
-
-    server.await_notification::<PublishDiagnostics>();
 
     let result = server.hover_request(
         "test.py",

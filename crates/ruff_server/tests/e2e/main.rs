@@ -26,7 +26,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod code_action;
-mod format;
+mod custom_extension;
 mod hover;
 mod notebook;
 
@@ -55,10 +55,11 @@ use lsp_types::{
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
     InitializeParams, InitializeResult, InitializedParams, NumberOrString, PartialResultParams,
-    Position, PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
+    Position, PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    TextDocumentPositionParams, TextEdit, Url, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
+    WorkspaceFoldersChangeEvent,
 };
 use ruff_server::{ConnectionInitializer, LogLevel, Server, init_logging};
 use rustc_hash::FxHashMap;
@@ -788,7 +789,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
-    #[expect(dead_code)]
     pub(crate) fn document_diagnostic_request(
         &mut self,
         path: impl AsRef<Path>,
@@ -824,6 +824,40 @@ impl TestServer {
         };
         let id = self.send_request::<HoverRequest>(params);
         self.await_response::<HoverRequest>(&id)
+    }
+
+    /// Send a `textDocument/formatting` request for the document at the given path.
+    pub(crate) fn format_request(&mut self, path: impl AsRef<Path>) -> Option<Vec<TextEdit>> {
+        let id = self.send_request::<lsp_types::request::Formatting>(
+            lsp_types::DocumentFormattingParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                options: lsp_types::FormattingOptions::default(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        );
+
+        self.await_response::<lsp_types::request::Formatting>(&id)
+    }
+
+    /// Send a `textDocument/rangeFormatting` request for the document at the given path.
+    pub(crate) fn format_range_request(
+        &mut self,
+        path: impl AsRef<Path>,
+        range: Range,
+    ) -> Option<Vec<TextEdit>> {
+        let id = self.send_request::<lsp_types::request::RangeFormatting>(
+            lsp_types::DocumentRangeFormattingParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                range,
+                options: lsp_types::FormattingOptions::default(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        );
+        self.await_response::<lsp_types::request::RangeFormatting>(&id)
     }
 
     /// Send a `textDocument/codeAction` request for the document at the given path.
@@ -954,9 +988,13 @@ impl TestServerBuilder {
         // These are enabled by default for convenience but can be disabled using the builder
         // methods:
         // - Supports pulling workspace configuration
+        // - Support for pull diagnostics
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
                 publish_diagnostics: Some(PublishDiagnosticsClientCapabilities::default()),
+                // Most clients support pull diagnostics and they're easier to work for in tests because
+                // it doesn't require consuming the publish notifications in each test.
+                diagnostic: Some(DiagnosticClientCapabilities::default()),
                 ..Default::default()
             }),
             workspace: Some(WorkspaceClientCapabilities {
