@@ -201,14 +201,5 @@ S103 `os.chmod` setting an invalid mask on file or directory
 42 | os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 43 |
-44 | # Known false positive: both operands exceed u64, so we can't prove the XOR is
-   |
-
-S103 `os.chmod` setting an invalid mask on file or directory
-  --> S103.py:46:20
-   |
-44 | # Known false positive: both operands exceed u64, so we can't prove the XOR is
-45 | # zero even though the two sides are identical.
-46 | os.chmod("/tmp/x", 18446744073709551616 ^ 18446744073709551616)  # Error (false positive)
-   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | os.chmod("/tmp/x", 18446744073709551616 ^ 18446744073709551616)  # OK (both sides identical)
    |

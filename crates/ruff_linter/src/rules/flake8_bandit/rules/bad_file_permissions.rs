@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -124,7 +125,7 @@ const VALID_BITS: u64 = 0o7777;
 /// The `oversized` flag indicates that the value is known to exceed `u64::MAX`
 /// (i.e., it has bits set above bit 63). This is tracked separately because we
 /// cannot represent those high bits in a `u64`.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 struct KnownBits {
     ones: u64,
     zeros: u64,
@@ -238,12 +239,22 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> KnownBits {
                     zeros: left_bits.zeros | right_bits.zeros,
                     oversized: left_bits.oversized && right_bits.oversized,
                 },
-                Operator::BitXor => KnownBits {
-                    ones: (left_bits.ones & right_bits.zeros) | (left_bits.zeros & right_bits.ones),
-                    zeros: (left_bits.ones & right_bits.ones)
-                        | (left_bits.zeros & right_bits.zeros),
-                    oversized: left_bits.oversized || right_bits.oversized,
-                },
+                Operator::BitXor => {
+                    if left_bits == right_bits
+                        && ComparableExpr::from(left.as_ref())
+                            == ComparableExpr::from(right.as_ref())
+                    {
+                        KnownBits::exact(0)
+                    } else {
+                        KnownBits {
+                            ones: (left_bits.ones & right_bits.zeros)
+                                | (left_bits.zeros & right_bits.ones),
+                            zeros: (left_bits.ones & right_bits.ones)
+                                | (left_bits.zeros & right_bits.zeros),
+                            oversized: left_bits.oversized || right_bits.oversized,
+                        }
+                    }
+                }
                 _ => KnownBits::unknown(),
             }
         }
