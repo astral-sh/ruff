@@ -118,8 +118,8 @@ const VALID_BITS: u64 = 0o7777;
 /// Known-bits abstract value for a `u64`: `ones` are the bits that are
 /// statically known to be 1, `zeros` are the bits that are statically known
 /// to be 0. An expression whose value is fully known satisfies
-/// `ones | zeros == u64::MAX`; an expression whose value is entirely unknown
-/// has `ones == 0 && zeros == 0`.
+/// `!oversized && ones | zeros == u64::MAX`; an expression whose value is
+/// entirely unknown has `ones == 0 && zeros == 0 && !oversized`.
 ///
 /// The `oversized` flag indicates that the value is known to exceed `u64::MAX`
 /// (i.e., it has bits set above bit 63). This is tracked separately because we

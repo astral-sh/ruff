@@ -40,3 +40,7 @@ os.chmod("/etc/passwd", 0o200000)  # Error (bit outside 0o7777)
 os.chmod("/etc/passwd", 99999999999999999999999)  # Error (oversized)
 os.chmod("/etc/passwd", 99999999999999999999999 & 0o200000)  # OK
 os.chmod("/etc/passwd", 99999999999999999999999 | 0o777)  # Error (oversized)
+
+# Known false positive: both operands exceed u64, so we can't prove the XOR is
+# zero even though the two sides are identical.
+os.chmod("/tmp/x", 18446744073709551616 ^ 18446744073709551616)  # Error (false positive)
