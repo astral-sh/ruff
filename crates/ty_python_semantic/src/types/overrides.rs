@@ -12,10 +12,10 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place},
+    place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
-        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -67,6 +67,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
         return;
     }
 
+    if configuration.check_invalid_named_tuple_overrides() {
+        check_named_tuple_subclass_field_conflicts(context, class);
+    }
+
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
@@ -81,6 +85,181 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             scope,
             &member,
         );
+    }
+}
+
+/// Reports `invalid-named-tuple` when a subclass reuses an inherited
+/// `NamedTuple` field name that still participates in attribute assignment.
+fn check_named_tuple_subclass_field_conflicts<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+) {
+    let db = context.db();
+
+    for (field_name, field) in class.own_fields(db, None, CodeGeneratorKind::NamedTuple) {
+        if class_has_definite_writable_shadow(db, ClassType::NonGeneric(class.into()), &field_name)
+        {
+            continue;
+        }
+
+        let Some((superclass, overridden_field_declaration)) =
+            conflicting_named_tuple_field_in_mro(db, class, &field_name)
+        else {
+            continue;
+        };
+
+        let diagnostic_range = field
+            .first_declaration
+            .map(|definition| definition.kind(db).full_range(context.module()))
+            .unwrap_or_else(|| class.header_range(db));
+        let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+            continue;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot override NamedTuple field `{field_name}` inherited from `{}`",
+            superclass.name(db)
+        ));
+        diagnostic
+            .info("Subclass fields are not allowed to reuse inherited NamedTuple field names");
+        if let Some(first_declaration) = overridden_field_declaration
+            && first_declaration.file(db) == context.file()
+        {
+            diagnostic.annotate(
+                Annotation::secondary(
+                    context.span(first_declaration.kind(db).full_range(context.module())),
+                )
+                .message(format_args!(
+                    "Inherited NamedTuple field `{field_name}` declared here",
+                )),
+            );
+        }
+    }
+}
+
+/// Returns the first inherited `NamedTuple` field in the MRO that is still
+/// relevant for writes to `field_name`.
+fn conflicting_named_tuple_field_in_mro<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    field_name: &Name,
+) -> Option<(ClassType<'db>, Option<Definition<'db>>)> {
+    for class_base in class.iter_mro(db, None).skip(1) {
+        let Some(superclass) = class_base.into_class() else {
+            continue;
+        };
+
+        if class_has_definite_writable_shadow(db, superclass, field_name) {
+            return None;
+        }
+
+        if let Some(overridden_field_declaration) =
+            named_tuple_field_declaration(db, superclass, field_name)
+        {
+            return Some((superclass, overridden_field_declaration));
+        }
+    }
+
+    None
+}
+
+/// Returns whether `shadowing_class` definitely handles writes to `field_name`
+/// before an inherited `NamedTuple` field can reject them.
+fn class_has_definite_writable_shadow<'db>(
+    db: &'db dyn Db,
+    shadowing_class: ClassType<'db>,
+    field_name: &Name,
+) -> bool {
+    let (class_literal, specialization) = shadowing_class.class_literal_and_specialization(db);
+
+    match class_literal {
+        ClassLiteral::Static(class_literal) => {
+            if CodeGeneratorKind::NamedTuple.matches(db, class_literal.into(), specialization)
+                && class_literal
+                    .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
+                    .contains_key(field_name)
+            {
+                return false;
+            }
+
+            let body_scope = class_literal.body_scope(db);
+            let Some(symbol_id) = place_table(db, body_scope).symbol_id(field_name.as_str()) else {
+                return false;
+            };
+
+            let Place::Defined(defined) = place_from_bindings(
+                db,
+                use_def_map(db, body_scope).end_of_scope_symbol_bindings(symbol_id),
+            )
+            .place
+            else {
+                return false;
+            };
+
+            defined.is_definitely_defined()
+                && type_definitely_handles_named_tuple_shadow_assignment(db, defined.ty)
+        }
+        ClassLiteral::Dynamic(class_literal) => class_literal
+            .members(db)
+            .iter()
+            .find(|(member_name, _)| member_name == field_name)
+            .is_some_and(|(_, ty)| type_definitely_handles_named_tuple_shadow_assignment(db, *ty)),
+        ClassLiteral::DynamicNamedTuple(_) => false,
+        ClassLiteral::DynamicTypedDict(_) => false,
+        ClassLiteral::DynamicEnum(_) => false,
+    }
+}
+
+/// Returns whether values of `ty` definitely absorb instance writes that would
+/// otherwise hit an inherited `NamedTuple` field.
+fn type_definitely_handles_named_tuple_shadow_assignment<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> bool {
+    match ty {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|elem| type_definitely_handles_named_tuple_shadow_assignment(db, *elem)),
+        Type::PropertyInstance(property) => property.setter(db).is_some(),
+        Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+        _ => {
+            matches!(
+                ty.class_member(db, "__set__".into()).place,
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                })
+            ) || !ty.may_be_data_descriptor(db)
+        }
+    }
+}
+
+/// Returns the declaration for a `NamedTuple` field owned directly by
+/// `superclass`.
+fn named_tuple_field_declaration<'db>(
+    db: &'db dyn Db,
+    superclass: ClassType<'db>,
+    field_name: &Name,
+) -> Option<Option<Definition<'db>>> {
+    let (superclass_literal, superclass_specialization) =
+        superclass.class_literal_and_specialization(db);
+
+    if !CodeGeneratorKind::NamedTuple.matches(db, superclass_literal, superclass_specialization) {
+        return None;
+    }
+
+    match superclass_literal {
+        ClassLiteral::Static(superclass_literal) => superclass_literal
+            .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
+            .get(field_name)
+            .map(|field| field.first_declaration),
+        ClassLiteral::DynamicNamedTuple(namedtuple) => namedtuple
+            .own_field(db, field_name)
+            .map(|_| namedtuple.definition(db)),
+        ClassLiteral::Dynamic(_) | ClassLiteral::DynamicTypedDict(_) | ClassLiteral::DynamicEnum(_) => {
+            None
+        }
     }
 }
 
@@ -156,7 +335,7 @@ fn check_class_declaration<'db>(
     // annotations) or define methods with these names will raise an `AttributeError` at runtime.
     match class_kind {
         Some(CodeGeneratorKind::NamedTuple) => {
-            if configuration.check_prohibited_named_tuple_attrs()
+            if configuration.check_invalid_named_tuple_overrides()
                 && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
                 && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
                 && let Some(bad_definition) = use_def_map(db, class_scope)
@@ -530,7 +709,7 @@ bitflags! {
         const LISKOV_METHODS = 1 << 0;
         const EXPLICIT_OVERRIDE = 1 << 1;
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
-        const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
+        const INVALID_NAMED_TUPLE_OVERRIDE = 1 << 3;
         const INVALID_DATACLASS = 1 << 4;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
         const INVALID_ENUM_VALUE = 1 << 6;
@@ -554,7 +733,7 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE)) {
-            config |= OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR;
+            config |= OverrideRulesConfig::INVALID_NAMED_TUPLE_OVERRIDE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
             config |= OverrideRulesConfig::INVALID_DATACLASS;
@@ -583,8 +762,10 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
     }
 
-    const fn check_prohibited_named_tuple_attrs(self) -> bool {
-        self.contains(OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR)
+    /// Returns whether inherited `NamedTuple` field conflicts should be
+    /// diagnosed.
+    const fn check_invalid_named_tuple_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_NAMED_TUPLE_OVERRIDE)
     }
 
     const fn check_invalid_dataclasses(self) -> bool {

@@ -1067,8 +1067,8 @@ reveal_type(alice.level)  # revealed: int
 alice = SuperUser(1, "Alice", 3)
 ```
 
-TODO: If any fields added by the subclass conflict with those in the base class, that should be
-flagged.
+Bare annotated subclass fields may not reuse `NamedTuple` field names from the base class, but
+ordinary bound overrides still work:
 
 ```py
 from typing import NamedTuple
@@ -1080,34 +1080,175 @@ class User(NamedTuple):
     nickname: str
 
 class SuperUser(User):
-    # TODO: this should be an error because it implies that the `id` attribute on
-    # `SuperUser` is mutable, but the read-only `id` property from the superclass
-    # has not been overridden in the class body
+    level: int
+
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `User`"
     id: int
 
-    # this is fine; overriding a read-only attribute with a mutable one
-    # does not conflict with the Liskov Substitution Principle
     name: str = "foo"
 
-    # this is also fine
     @property
     def age(self) -> int:
         return super().age or 42
 
-    def now_called_robert(self):
-        self.name = "Robert"  # fine because overridden with a mutable attribute
-
-        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
-        self.nickname = "Bob"
-
 james = SuperUser(0, "James", 42, "Jimmy")
+reveal_type(james.age)  # revealed: int
 
-# fine because the property on the superclass was overridden with a mutable attribute
-# on the subclass
-james.name = "Robert"
+james.name = "Bob"
 
 # error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
 james.nickname = "Bob"
+```
+
+Writable descriptor-valued shadows are allowed:
+
+```py
+from typing import Any, NamedTuple
+
+class WritableDescriptorBase(NamedTuple):
+    data: int
+
+class WritableDescriptorChild(WritableDescriptorBase):
+    data: Any = property(lambda self: 0, lambda self, value: None)
+
+class WritableDescriptorMixin:
+    data = property(lambda self: 0, lambda self, value: None)
+
+class WritableMixinChild(WritableDescriptorMixin, WritableDescriptorBase):
+    data: int
+```
+
+Read-only descriptor-valued bound overrides are still rejected:
+
+```py
+from typing import Any, NamedTuple
+
+class ReadOnlyDescriptorBase(NamedTuple):
+    data: int
+
+class ReadOnlyDescriptorChild(ReadOnlyDescriptorBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `data` inherited from `ReadOnlyDescriptorBase`"
+    data: Any = property(lambda self: 0)
+```
+
+The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+TypingBase = NamedTuple("TypingBase", [("id", int), ("name", str)])
+CollectionsBase = namedtuple("CollectionsBase", ["key", "value"])
+
+class TypingChild(TypingBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `TypingBase`"
+    id: int
+
+class CollectionsChild(CollectionsBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `key` inherited from `CollectionsBase`"
+    key: int
+```
+
+An earlier base that already defines the name stops the conflict check:
+
+```py
+from typing import NamedTuple
+
+ShadowTupleBase = NamedTuple("ShadowTupleBase", [("name", str)])
+
+class ShadowingMid(ShadowTupleBase):
+    name = "shadowed"
+
+class ShadowedChild(ShadowingMid):
+    name: int
+```
+
+An annotation-only base does not stop the conflict check:
+
+```py
+from typing import NamedTuple
+
+class AnnotationOnlyMixin:
+    key: int
+
+class AnnotationTupleBase(NamedTuple):
+    key: int
+
+class AnnotationOnlyChild(AnnotationOnlyMixin, AnnotationTupleBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `key` inherited from `AnnotationTupleBase`"
+    key: int
+```
+
+A read-only descriptor in an earlier base does not stop the conflict check:
+
+```py
+from typing import NamedTuple
+
+class ReadOnlyMixin:
+    field = property(lambda self: 0)
+
+class DescriptorTupleBase(NamedTuple):
+    field: int
+
+class DescriptorShadowChild(ReadOnlyMixin, DescriptorTupleBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `field` inherited from `DescriptorTupleBase`"
+    field: int
+```
+
+A conditionally bound earlier base also does not stop the conflict check:
+
+```py
+from typing import NamedTuple
+
+flag = False
+
+class MaybeShadowMixin:
+    if flag:
+        value = 1
+
+class ConditionalTupleBase(NamedTuple):
+    value: int
+
+class ConditionalShadowChild(MaybeShadowMixin, ConditionalTupleBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `value` inherited from `ConditionalTupleBase`"
+    value: int
+```
+
+Mixed writable and read-only bindings in an earlier base do not stop the conflict check:
+
+```py
+from typing import NamedTuple
+
+flag = False
+
+class MixedShadowMixin:
+    if flag:
+        data = 1
+    else:
+        data = property(lambda self: 0)
+
+class MixedShadowTupleBase(NamedTuple):
+    data: int
+
+class MixedShadowChild(MixedShadowMixin, MixedShadowTupleBase):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `data` inherited from `MixedShadowTupleBase`"
+    data: int
+```
+
+Ignoring one conflict does not suppress later ones:
+
+```py
+from typing import NamedTuple
+
+class DoubleConflictBase(NamedTuple):
+    left: int
+    right: int
+
+class DoubleConflictChild(DoubleConflictBase):
+    left: int  # ty: ignore[invalid-named-tuple]
+
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `right` inherited from `DoubleConflictBase`"
+    right: int
 ```
 
 ### Generic named tuples
