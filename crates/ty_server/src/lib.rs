@@ -15,7 +15,7 @@ mod capabilities;
 mod db;
 mod document;
 mod logging;
-mod server;
+pub mod server;
 mod session;
 mod system;
 
