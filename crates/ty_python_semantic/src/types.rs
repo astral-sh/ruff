@@ -5439,7 +5439,6 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeForm(_)
-            | Type::TypedDictTop
             | Type::TypedDict(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                     *self, scope_id
@@ -5586,7 +5585,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::TypedDictTop | Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6529,7 +6528,7 @@ impl<'db> Type<'db> {
                 Protocol::Synthesized(_) => None,
             },
 
-            Self::TypedDictTop => None,
+            Self::TypedDictTop => Type::SpecialForm(SpecialFormType::TypedDictTop).definition(db),
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
 
             Self::Union(_) => None,

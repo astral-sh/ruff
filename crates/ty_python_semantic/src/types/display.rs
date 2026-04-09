@@ -1288,12 +1288,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_char(']')
             }
-            Type::TypedDictTop => {
-                f.set_invalid_type_annotation();
-                f.write_str("Top[")?;
-                f.with_type(self.ty).write_str("TypedDict")?;
-                f.write_char(']')
-            }
+            Type::TypedDictTop => f.with_type(self.ty).write_str("TypedDictTop"),
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
                     .display_with(self.db, self.settings.clone())
