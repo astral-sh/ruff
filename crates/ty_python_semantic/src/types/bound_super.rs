@@ -60,24 +60,6 @@ impl<'db> TypeVarOwnerContext<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TypeVarSuperOwnerKind {
-    Instance,
-    Class,
-}
-
-impl TypeVarSuperOwnerKind {
-    fn diagnostic_context(
-        self,
-        bound_typevar: BoundTypeVarInstance<'_>,
-    ) -> TypeVarOwnerContext<'_> {
-        match self {
-            TypeVarSuperOwnerKind::Instance => TypeVarOwnerContext::Bare(bound_typevar),
-            TypeVarSuperOwnerKind::Class => TypeVarOwnerContext::SubclassOf(bound_typevar),
-        }
-    }
-}
-
 /// Enumeration of ways in which a `super()` call can cause us to emit a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {
@@ -572,8 +554,7 @@ impl<'db> BoundSuperType<'db> {
         // Helper to build a union of bound-super instances for constrained TypeVars.
         // Each constraint must be a subclass of the pivot class.
         let build_constrained_union = |constraints: TypeVarConstraints<'db>,
-                                       bound_typevar: BoundTypeVarInstance<'db>,
-                                       owner_kind: TypeVarSuperOwnerKind|
+                                       typevar: TypeVarOwnerContext<'db>|
          -> Result<Type<'db>, BoundSuperError<'db>> {
             let mut builder = UnionBuilder::new(db);
             for constraint in constraints.elements(db) {
@@ -583,18 +564,18 @@ impl<'db> BoundSuperType<'db> {
                 };
                 match class {
                     Some(class) => {
-                        let owner = match owner_kind {
-                            TypeVarSuperOwnerKind::Instance => {
+                        let owner = match typevar {
+                            TypeVarOwnerContext::Bare(_) => {
                                 SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                                     db,
                                     pivot_class,
                                     pivot_class_type,
                                     owner_type,
                                     class,
-                                    Some(owner_kind.diagnostic_context(bound_typevar)),
+                                    Some(typevar),
                                 )?)
                             }
-                            TypeVarSuperOwnerKind::Class => {
+                            TypeVarOwnerContext::SubclassOf(_) => {
                                 SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                                     db,
                                     pivot_class,
@@ -602,7 +583,7 @@ impl<'db> BoundSuperType<'db> {
                                     owner_type,
                                     owner_type,
                                     class,
-                                    Some(owner_kind.diagnostic_context(bound_typevar)),
+                                    Some(typevar),
                                 )?)
                             }
                         };
@@ -677,8 +658,7 @@ impl<'db> BoundSuperType<'db> {
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                             return build_constrained_union(
                                 constraints,
-                                bound_typevar,
-                                TypeVarSuperOwnerKind::Class,
+                                TypeVarOwnerContext::SubclassOf(bound_typevar),
                             );
                         }
                         None => {
@@ -791,8 +771,7 @@ impl<'db> BoundSuperType<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         return build_constrained_union(
                             constraints,
-                            bound_typevar,
-                            TypeVarSuperOwnerKind::Instance,
+                            TypeVarOwnerContext::Bare(bound_typevar),
                         );
                     }
                     None => {

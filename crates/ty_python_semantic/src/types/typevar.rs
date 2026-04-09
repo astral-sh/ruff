@@ -1380,6 +1380,12 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
+    /// Represent the bound/constraints of this typevar as a single type, by unioning constraints.
+    ///
+    /// Careful with this method! It has both semantic and performance gotchas. Unioning
+    /// constraints provides a conservative upper bound, but it loses precision. And for many use
+    /// cases, it's more efficient to just map over the constraint types directly, rather than
+    /// building a union out of them and mapping over that.
     pub(crate) fn as_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => bound,
