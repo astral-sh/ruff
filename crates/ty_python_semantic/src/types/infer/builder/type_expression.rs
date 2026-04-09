@@ -1091,8 +1091,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                // `type["Foo" | "Bar"]` is a runtime error if annotations are not deferred.
+                // Delegate to `infer_type_argument` which emits a diagnostic for that case.
+                if !self.deferred_state.is_deferred()
+                    && (binary.left.is_string_literal_expr()
+                        || binary.right.is_string_literal_expr())
+                {
+                    return infer_type_argument(self, slice);
+                }
+
                 let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
                     [
@@ -1192,23 +1203,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
-            }
-            ast::Expr::StringLiteral(string) => {
-                match parse_string_annotation(&self.context, self.inference_flags, string) {
-                    Some(parsed) => {
-                        self.string_annotations
-                            .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                        let node_key = self.enclosing_node_key(string.into());
-                        let previous_deferred_state = std::mem::replace(
-                            &mut self.deferred_state,
-                            DeferredExpressionState::InStringAnnotation(node_key),
-                        );
-                        let result = self.infer_subclass_of_type_expression(parsed.expr());
-                        self.deferred_state = previous_deferred_state;
-                        result
-                    }
-                    None => SubclassOfType::subclass_of_unknown(),
-                }
             }
             _ => {
                 self.infer_expression(slice, TypeContext::default());

@@ -188,7 +188,8 @@ def _(type_of_invalid: type[""]):
 
 ### Unions of strings, Python 3.13
 
-"Unions of strings" lead to a runtime error on 3.13 and lower, so we emit a diagnostic:
+"Unions of strings" lead to a runtime error on 3.13 and lower, so we emit a diagnostic. We still
+infer `type[Foo | Bar]` though, since the intention seems clear.
 
 ```toml
 [environment]
@@ -196,10 +197,27 @@ python-version = "3.13"
 ```
 
 ```py
-# TODO: this should be an error
-def _(type_of_invalid: type["Foo" | "Bar"]):
-    # TODO: this should be `type[Unknown]`
+def _(type_of_invalid: type["Foo" | "Bar"]):  # error: [unsupported-operator]
     reveal_type(type_of_invalid)  # revealed: type[Foo | Bar]
+
+class Foo: ...
+class Bar: ...
+```
+
+### Unions of strings, Python 3.13 with `from __future__ import annotations`
+
+On Python 3.13 with `from __future__ import annotations`, there is no error:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+def _(type_of_foo_or_bar: type["Foo" | "Bar"]):
+    reveal_type(type_of_foo_or_bar)  # revealed: type[Foo | Bar]
 
 class Foo: ...
 class Bar: ...
@@ -207,7 +225,7 @@ class Bar: ...
 
 ### Unions of strings, Python 3.14
 
-On Python 3.14 and higher, we support this:
+On Python 3.14 and higher, this is also fine:
 
 ```toml
 [environment]
