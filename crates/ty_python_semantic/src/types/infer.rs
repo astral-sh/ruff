@@ -1001,6 +1001,9 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a parameter annotation
         const IN_PARAMETER_ANNOTATION = 1 << 5;
+
+        /// Whether we are currently in a context where `Concatenate` can be legal
+        const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
     }
 }
 

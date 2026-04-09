@@ -1057,6 +1057,7 @@ impl<'db> Type<'db> {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
             DynamicType::Any
             | DynamicType::Unknown
+            | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar => false,
             DynamicType::Todo(_)
@@ -1839,6 +1840,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoTypeVarTuple
                 | DynamicType::Todo(_)
+                | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::TodoStarredExpression => false,
             },
         }
@@ -5307,10 +5309,24 @@ impl<'db> Type<'db> {
             },
 
             Type::SpecialForm(special_form) => special_form
-                .in_type_expression(db, scope_id, typevar_binding_context)
-                .map_err(|err| InvalidTypeExpressionError {
-                    fallback_type: Type::unknown(),
-                    invalid_expressions: smallvec_inline![err],
+                .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
+                .map_err(|err| {
+                    let fallback_type = if matches!(
+                        err,
+                        InvalidTypeExpression::Concatenate
+                            | InvalidTypeExpression::RequiresTwoArguments(
+                                SpecialFormType::Concatenate
+                            )
+                    ) {
+                        Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
+                    } else {
+                        Type::unknown()
+                    };
+
+                    InvalidTypeExpressionError {
+                        fallback_type,
+                        invalid_expressions: smallvec_inline![err],
+                    }
                 }),
 
             Type::Union(union) => {
@@ -6213,6 +6229,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple
+                | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::UnspecializedTypeVar
             )
             | Self::Callable(_)
@@ -6708,6 +6725,12 @@ pub enum DynamicType<'db> {
     /// calls. For now, we replace unspecialized type variables with this marker type, and ignore them
     /// during generic inference.
     UnspecializedTypeVar,
+    /// A special variant that represents that `Unknown` was inferred due to an invalid use of
+    /// `Concatenate` in a type expression.
+    ///
+    /// TODO: this is a bit of a hack. `infer_type_expression` should really return a `Result`;
+    /// if it did, this variant wouldn't be necessary.
+    InvalidConcatenateUnknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
     /// This variant should eventually be removed once ty is spec-compliant.
@@ -6740,7 +6763,9 @@ impl std::fmt::Display for DynamicType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
-            DynamicType::Unknown | DynamicType::UnknownGeneric(_) => f.write_str("Unknown"),
+            DynamicType::Unknown
+            | DynamicType::UnknownGeneric(_)
+            | DynamicType::InvalidConcatenateUnknown => f.write_str("Unknown"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
@@ -6966,15 +6991,15 @@ impl<'db> InvalidTypeExpression<'db> {
                 match self.error {
                     InvalidTypeExpression::RequiresOneArgument(special_form) => write!(
                         f,
-                        "`{special_form}` requires exactly one argument when used in a type expression",
+                        "`{special_form}` requires exactly one argument when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least one argument when used in a type expression",
+                        "`{special_form}` requires at least one argument when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresTwoArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least two arguments when used in a type expression",
+                        "`{special_form}` requires at least two arguments when used in a {location}",
                     ),
                     InvalidTypeExpression::Protocol => {
                         write!(f, "`typing.Protocol` is not allowed in {location}s")
@@ -7064,11 +7089,12 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::InvalidBareParamSpec(paramspec) => write!(
                         f,
-                        "Bare ParamSpec `{}` is not valid in this context in a type expression",
+                        "Bare ParamSpec `{}` is not valid in this context in a {location}",
                         paramspec.name(self.db)
                     ),
-                    InvalidTypeExpression::Concatenate => f.write_str(
-                        "`typing.Concatenate` is not allowed in this context in a type expression",
+                    InvalidTypeExpression::Concatenate => write!(
+                        f,
+                        "`typing.Concatenate` is not allowed in this context in a {location}",
                     ),
                 }
             }

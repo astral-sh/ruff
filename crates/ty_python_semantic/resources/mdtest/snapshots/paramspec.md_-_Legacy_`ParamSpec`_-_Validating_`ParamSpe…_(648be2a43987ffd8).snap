@@ -103,7 +103,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/paramspe
 # Diagnostics
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:24:9
    |
 22 | def invalid(
@@ -123,7 +123,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:26:19
    |
 24 |     a1: P,
@@ -143,7 +143,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:28:23
    |
 26 |     a3: Callable[[P], int],
@@ -163,7 +163,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:30:30
    |
 28 |     a4: Callable[..., P],
@@ -183,7 +183,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:32:9
    |
 30 |     a5: Callable[Concatenate[P, ...], int],
@@ -203,7 +203,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:34:15
    |
 32 |     a6: P | int,
@@ -223,7 +223,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:36:18
    |
 34 |     a7: Union[P, int],
@@ -243,7 +243,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:38:19
    |
 36 |     a8: Optional[P],
@@ -294,7 +294,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a return type annotation
   --> src/main.py:46:25
    |
 45 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
@@ -352,7 +352,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a return type annotation
   --> src/main.py:58:38
    |
 57 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
@@ -370,7 +370,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/main.py:63:9
    |
 61 | def invalid_stringified_annotation(
@@ -410,7 +410,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a parameter annotation
   --> src/main.py:74:37
    |
 72 | def invalid_specialization(
@@ -430,7 +430,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a type expression
+error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a parameter annotation
   --> src/main.py:76:36
    |
 74 |     a: InvalidSpecializationTarget[[Q]],

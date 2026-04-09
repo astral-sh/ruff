@@ -841,7 +841,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Err(());
                 }
 
+                let previous_concatenate_context = self
+                    .inference_flags
+                    .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
                 let param_type = self.infer_type_expression(expr);
+                self.inference_flags.set(
+                    InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+                    previous_concatenate_context,
+                );
 
                 match param_type {
                     Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
@@ -899,6 +906,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let parameters =
                             if param_type.is_todo() {
                                 Parameters::todo()
+                            } else if param_type.is_dynamic() && param_type != Type::any() {
+                                // If we ended up with an `Unknown` type here, it almost certainly means
+                                // that we already emitted an error elsewhere. Fallback to the more lenient
+                                // type.
+                                Parameters::unknown()
                             } else {
                                 Parameters::new(
                                     db,
@@ -925,6 +937,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             db,
                             Parameters::gradual_form(),
                         ));
+                    }
+
+                    // If we ended up with an `Unknown` type here, it almost certainly means
+                    // that we already emitted an error elsewhere
+                    Type::Dynamic(_) => {
+                        return Ok(Type::paramspec_value_callable(db, Parameters::unknown()));
                     }
 
                     _ => {}
