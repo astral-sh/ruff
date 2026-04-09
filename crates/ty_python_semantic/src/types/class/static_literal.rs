@@ -2366,8 +2366,21 @@ impl<'db> StaticClassLiteral<'db> {
                         // instance attribute, and we trust the declared type, unless
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
+                        //
+                        // If the declared type may be a descriptor, however, returning it here
+                        // would leak the raw descriptor object into instance reads. In that
+                        // case, leave the instance member unbound so the normal descriptor
+                        // protocol can resolve the effective attribute type from the class side.
+                        let declared_ty_mixes_descriptor_branches =
+                            matches!(declared_ty, Type::Union(..) | Type::TypeAlias(..))
+                                && !declared_ty
+                                    .class_member(db, "__get__".into())
+                                    .place
+                                    .is_undefined();
 
-                        if declaredness == Definedness::AlwaysDefined {
+                        if declared_ty_mixes_descriptor_branches {
+                            Member::unbound()
+                        } else if declaredness == Definedness::AlwaysDefined {
                             Member {
                                 inner: declared.with_qualifiers(qualifiers),
                             }

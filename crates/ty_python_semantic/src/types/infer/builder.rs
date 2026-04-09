@@ -2313,7 +2313,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
+                                ty: meta_attr_ty,
+                                origin: meta_attr_origin,
+                                definedness: meta_attr_definedness,
+                                ..
                             }),
                         qualifiers,
                     } => {
@@ -2334,6 +2337,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 object_ty,
                                 attribute,
                                 meta_attr_ty,
+                                meta_attr_origin,
+                                meta_attr_definedness,
                                 value_ty,
                                 &mut infer_value_ty,
                                 emit_diagnostics,
@@ -2480,7 +2485,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
+                                ty: meta_attr_ty,
+                                origin: meta_attr_origin,
+                                definedness: meta_attr_definedness,
+                                ..
                             }),
                         qualifiers,
                     } => {
@@ -2507,6 +2515,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 object_ty,
                                 attribute,
                                 meta_attr_ty,
+                                meta_attr_origin,
+                                meta_attr_definedness,
                                 value_ty,
                                 &mut infer_value_ty,
                                 emit_diagnostics,
@@ -2753,22 +2763,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         object_ty: Type<'db>,
         attribute: &str,
         meta_attr_ty: Type<'db>,
+        meta_attr_origin: TypeOrigin,
+        meta_attr_definedness: Definedness,
         value_ty: Type<'db>,
         infer_value_ty: &mut MultiInferenceGuard<'db, 'ast, 'infer>,
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
+        let attribute_is_dunder = attribute.starts_with("__") && attribute.ends_with("__");
+        let meta_attr_may_be_data_descriptor = meta_attr_ty.may_be_data_descriptor(db);
+        let skip_class_attribute_validation_on_instance =
+            matches!(object_ty, Type::NominalInstance(..) | Type::TypeVar(..))
+                && !meta_attr_origin.is_declared()
+                && (!attribute_is_dunder
+                    || meta_attr_definedness == Definedness::PossiblyUndefined);
+        let skip_dynamic_dunder_set_validation = meta_attr_ty.has_dynamic(db)
+            && skip_class_attribute_validation_on_instance
+            && meta_attr_definedness == Definedness::AlwaysDefined
+            && !self.meta_attribute_may_be_read_only_property(meta_attr_ty)
+            && !self.meta_attribute_has_known_descriptor_and_plain_branches(meta_attr_ty);
         match meta_attr_ty {
             Type::TypeAlias(alias) => self.validate_explicit_meta_attribute_assignment(
                 target,
                 object_ty,
                 attribute,
                 alias.value_type(db),
+                meta_attr_origin,
+                meta_attr_definedness,
                 value_ty,
                 infer_value_ty,
                 emit_diagnostics,
             ),
-            Type::Union(union) if Type::Union(union).may_be_data_descriptor(db) => {
+            Type::Union(union)
+                if meta_attr_may_be_data_descriptor && !skip_dynamic_dunder_set_validation =>
+            {
                 let mut first_failure = None;
                 for element in union.elements(db) {
                     if !self.validate_explicit_meta_attribute_assignment(
@@ -2776,6 +2804,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         object_ty,
                         attribute,
                         *element,
+                        meta_attr_origin,
+                        meta_attr_definedness,
                         value_ty,
                         infer_value_ty,
                         false,
@@ -2792,6 +2822,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             object_ty,
                             attribute,
                             failing_element,
+                            meta_attr_origin,
+                            meta_attr_definedness,
                             value_ty,
                             infer_value_ty,
                             true,
@@ -2801,6 +2833,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     true
                 }
+            }
+            _ if skip_dynamic_dunder_set_validation
+                || (!meta_attr_may_be_data_descriptor
+                    && skip_class_attribute_validation_on_instance) =>
+            {
+                true
             }
             _ => {
                 if let Place::Defined(DefinedPlace {
@@ -2845,6 +2883,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     assignable
                 }
             }
+        }
+    }
+
+    fn meta_attribute_has_known_descriptor_and_plain_branches(
+        &self,
+        meta_attr_ty: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        match meta_attr_ty {
+            Type::TypeAlias(alias) => {
+                self.meta_attribute_has_known_descriptor_and_plain_branches(alias.value_type(db))
+            }
+            Type::Union(union) => {
+                let mut has_descriptor = false;
+                let mut has_plain = false;
+                for element in union.elements(db) {
+                    if element.has_dynamic(db) {
+                        continue;
+                    }
+
+                    if element.may_be_data_descriptor(db) {
+                        has_descriptor = true;
+                    } else {
+                        has_plain = true;
+                    }
+
+                    if has_descriptor && has_plain {
+                        return true;
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    fn meta_attribute_may_be_read_only_property(&self, meta_attr_ty: Type<'db>) -> bool {
+        let db = self.db();
+        match meta_attr_ty {
+            Type::TypeAlias(alias) => {
+                self.meta_attribute_may_be_read_only_property(alias.value_type(db))
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| self.meta_attribute_may_be_read_only_property(*ty)),
+            Type::PropertyInstance(property) => property.setter(db).is_none(),
+            _ => false,
         }
     }
 
