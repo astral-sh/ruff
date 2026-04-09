@@ -381,7 +381,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             generic_context
-                .default_specialization(db, self.known(db))
+                .unknown_specialization(db, self.known(db))
                 .materialize_impl(
                     db,
                     MaterializationKind::Top,
@@ -404,7 +404,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.unknown_specialization(db)
+            generic_context.unknown_specialization(db, self.known(db))
         })
     }
 

@@ -1246,6 +1246,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         generic_context.len(db),
                     )
                     .collect::<Vec<_>>(),
+                    None,
                 ),
             );
             return if in_type_expression {
