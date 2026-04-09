@@ -1287,6 +1287,13 @@ pub(crate) fn check_docstring(
                                     returns,
                                     semantic,
                                 )
+                                && !(
+                                    !body_entries.yields.is_empty()
+                                        && body_entries
+                                            .returns
+                                            .iter()
+                                            .all(ReturnEntry::is_none_return)
+                                )
                             {
                                 checker
                                     .report_diagnostic(DocstringMissingReturns, docstring.range());
