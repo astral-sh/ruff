@@ -234,3 +234,31 @@ def generator_function_4():
 def not_a_generator() -> Iterator[int]:
     """"No returns documented here, oh no"""
     return (x for x in range(42))
+
+
+# DOC201 - OK (generator with only bare return; no Returns section needed)
+def generator_bare_return(x: int):
+    """Yield integers up to x.
+
+    Parameters
+    ----------
+    x : int
+        Upper bound.
+    """
+    for i in range(x):
+        yield i
+    return
+
+
+# DOC201 - OK (generator with explicit return None; no Returns section needed)
+def generator_explicit_none(x: int):
+    """Yield integers up to x.
+
+    Parameters
+    ----------
+    x : int
+        Upper bound.
+    """
+    for i in range(x):
+        yield i
+    return None
