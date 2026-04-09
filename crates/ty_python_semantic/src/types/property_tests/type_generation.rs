@@ -143,6 +143,7 @@ fn create_bound_method<'db>(
         db,
         function.expect_function_literal(),
         builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance(db).unwrap(),
     ))
 }
 

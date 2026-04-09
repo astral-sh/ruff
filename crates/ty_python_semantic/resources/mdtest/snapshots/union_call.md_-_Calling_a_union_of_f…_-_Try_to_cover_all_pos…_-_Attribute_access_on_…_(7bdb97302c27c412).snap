@@ -27,48 +27,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 12 | 
 13 | def _(x: T, y: int) -> T:
 14 |     # error: [invalid-argument-type]
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
-17 |     return x.foo(y)
+15 |     return x.foo(y)
 ```
 
 # Diagnostics
 
 ```
 error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:17:12
+  --> src/mdtest_snippet.py:15:18
    |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
-17 |     return x.foo(y)
-   |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `A` of type variable `Self`
-   |
-info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
-info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-
-```
-
-```
-error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:17:12
-   |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
-17 |     return x.foo(y)
-   |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `B` of type variable `Self`
-   |
-info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
-info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
-
-```
-
-```
-error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:17:18
-   |
-15 |     # error: [invalid-argument-type]
-16 |     # error: [invalid-argument-type]
-17 |     return x.foo(y)
+13 | def _(x: T, y: int) -> T:
+14 |     # error: [invalid-argument-type]
+15 |     return x.foo(y)
    |                  ^ Expected `str`, found `int`
    |
 info: Method defined here
@@ -79,7 +49,7 @@ info: Method defined here
   |         ^^^       ------ Parameter declared here
 9 |         return self
   |
-info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
-info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
+info: Union variant `bound method T@_.foo(x: str) -> T@_ & B` is incompatible with this call site
+info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_ & A) | (bound method T@_.foo(x: str) -> T@_ & B)`
 
 ```

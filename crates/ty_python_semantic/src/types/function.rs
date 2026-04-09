@@ -960,6 +960,35 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(crate) fn rebind_implicit_receiver(
+        self,
+        db: &'db dyn Db,
+        new_receiver_type: Type<'db>,
+    ) -> Self {
+        let updated_signature = CallableSignature::from_overloads(
+            self.signature(db)
+                .overloads
+                .iter()
+                .map(|signature| signature.rebind_implicit_receiver(db, new_receiver_type)),
+        );
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .rebind_implicit_receiver(db, new_receiver_type);
+
+        if updated_signature == *self.signature(db)
+            && updated_last_definition_signature == *self.last_definition_signature(db)
+        {
+            self
+        } else {
+            Self::new(
+                db,
+                self.literal(db),
+                Some(updated_signature),
+                Some(updated_last_definition_signature),
+            )
+        }
+    }
+
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
@@ -1194,7 +1223,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         self_instance: Type<'db>,
     ) -> BoundMethodType<'db> {
-        BoundMethodType::new(db, self, self_instance)
+        BoundMethodType::new(db, self, self_instance, self_instance)
     }
 
     pub(crate) fn find_legacy_typevars_impl(

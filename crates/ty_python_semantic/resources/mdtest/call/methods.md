@@ -447,6 +447,31 @@ The `owner` argument takes precedence over the `instance` argument:
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
 ```
 
+Implicit `cls` parameters should stay in class-object space when a classmethod is accessed through
+`type[T]`:
+
+```py
+from typing import Any, Type, TypeVar
+
+Model = TypeVar("Model", bound="BaseModel")
+
+class BaseModel:
+    @classmethod
+    def normalize(cls, obj: Any) -> Any:
+        return obj
+
+    @classmethod
+    def parse_obj(cls: Type[Model], obj: Any) -> Model:
+        reveal_type(cls.normalize)  # revealed: bound method type[Model@parse_obj].normalize(obj: Any) -> Any
+
+        cls.normalize(obj)
+        cls.normalize.__func__(cls, obj)
+
+        # error: [invalid-argument-type]
+        cls.normalize.__func__(cls(), obj)
+        return cls()
+```
+
 ### Classmethods mixed with other decorators
 
 ```toml
