@@ -272,7 +272,7 @@ class Bar:
         return 42
 
 f = Foo()
-# TODO: should emit [invalid-assignment], same as `Bar` below
+# error: [invalid-assignment]
 f.myprop = 56
 
 b = Bar()

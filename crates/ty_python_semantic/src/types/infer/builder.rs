@@ -2328,39 +2328,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return false;
                         }
 
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                        let assignable_to_meta_attr = self
+                            .validate_explicit_meta_attribute_assignment(
+                                target,
+                                object_ty,
+                                attribute,
+                                meta_attr_ty,
+                                value_ty,
+                                &mut infer_value_ty,
+                                emit_diagnostics,
                             );
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let write_ty = effective_write_type(meta_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-
-                            ensure_assignable_to(self, value_ty, write_ty)
-                        };
 
                         let assignable_to_instance_attribute =
                             if let Some(fallback_attr) = fallback_attr {
@@ -2524,37 +2501,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // applicable type contexts during attribute resolution.
                         let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                        let assignable_to_meta_attr = self
+                            .validate_explicit_meta_attribute_assignment(
+                                target,
+                                object_ty,
+                                attribute,
+                                meta_attr_ty,
+                                value_ty,
+                                &mut infer_value_ty,
+                                emit_diagnostics,
                             );
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
-                            ensure_assignable_to(self, value_ty, meta_attr_ty)
-                        };
 
                         let assignable_to_class_attr = if let Some(fallback_attr) = fallback_attr {
                             let (assignable, boundness) = if let PlaceAndQualifiers {
@@ -2772,6 +2728,124 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         Some((meta_attr, fallback_attr))
+    }
+
+    fn effective_write_type_for_attribute(
+        &self,
+        object_ty: Type<'db>,
+        attribute: &str,
+        attr_ty: Type<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        if let Type::NominalInstance(instance) = object_ty
+            && let Some(converter_ty) = instance
+                .class(db)
+                .converter_input_type_for_field(db, attribute)
+        {
+            return converter_ty;
+        }
+        attr_ty
+    }
+
+    fn validate_explicit_meta_attribute_assignment<'infer>(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        meta_attr_ty: Type<'db>,
+        value_ty: Type<'db>,
+        infer_value_ty: &mut MultiInferenceGuard<'db, 'ast, 'infer>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.db();
+        match meta_attr_ty {
+            Type::TypeAlias(alias) => self.validate_explicit_meta_attribute_assignment(
+                target,
+                object_ty,
+                attribute,
+                alias.value_type(db),
+                value_ty,
+                infer_value_ty,
+                emit_diagnostics,
+            ),
+            Type::Union(union) if Type::Union(union).may_be_data_descriptor(db) => {
+                let mut first_failure = None;
+                for element in union.elements(db) {
+                    if !self.validate_explicit_meta_attribute_assignment(
+                        target,
+                        object_ty,
+                        attribute,
+                        *element,
+                        value_ty,
+                        infer_value_ty,
+                        false,
+                    ) {
+                        first_failure = Some(*element);
+                        break;
+                    }
+                }
+
+                if let Some(failing_element) = first_failure {
+                    if emit_diagnostics {
+                        self.validate_explicit_meta_attribute_assignment(
+                            target,
+                            object_ty,
+                            attribute,
+                            failing_element,
+                            value_ty,
+                            infer_value_ty,
+                            true,
+                        );
+                    }
+                    false
+                } else {
+                    true
+                }
+            }
+            _ => {
+                if let Place::Defined(DefinedPlace {
+                    ty: meta_dunder_set,
+                    ..
+                }) = meta_attr_ty.class_member(db, "__set__".into()).place
+                {
+                    // TODO: We could use the annotated parameter type of `__set__` as
+                    // type context here.
+                    let dunder_set_result = meta_dunder_set.try_call(
+                        db,
+                        &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                    );
+
+                    if emit_diagnostics && let Err(dunder_set_failure) = dunder_set_result.as_ref()
+                    {
+                        report_bad_dunder_set_call(
+                            &self.context,
+                            dunder_set_failure,
+                            attribute,
+                            object_ty,
+                            target,
+                        );
+                    }
+
+                    dunder_set_result.is_ok()
+                } else {
+                    let write_ty =
+                        self.effective_write_type_for_attribute(object_ty, attribute, meta_attr_ty);
+                    let value_ty =
+                        infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
+                    let assignable = value_ty.is_assignable_to(db, write_ty);
+                    if !assignable && emit_diagnostics {
+                        report_invalid_attribute_assignment(
+                            &self.context,
+                            target.into(),
+                            write_ty,
+                            value_ty,
+                            attribute,
+                        );
+                    }
+                    assignable
+                }
+            }
+        }
     }
 
     #[expect(clippy::type_complexity)]

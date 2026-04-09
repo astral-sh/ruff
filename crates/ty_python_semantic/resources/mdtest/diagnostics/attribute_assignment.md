@@ -134,6 +134,26 @@ instance = C()
 instance.attr = 1  # error: [invalid-assignment]
 ```
 
+### Mixed descriptor/plain unions
+
+```py
+def _(flag: bool) -> None:
+    class Descriptor:
+        def __set__(self, instance: object, value: str) -> None:
+            pass
+
+    class C:
+        if flag:
+            attr = Descriptor()
+        else:
+            attr = 1
+
+    instance = C()
+
+    # The write must still be valid when the descriptor branch is active.
+    instance.attr = 1  # error: [invalid-assignment]
+```
+
 ## Setting attributes on union types
 
 ```py

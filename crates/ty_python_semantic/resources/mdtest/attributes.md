@@ -115,6 +115,22 @@ reveal_type(C.only_declared)  # revealed: str
 C.only_declared = "overwritten on class"
 ```
 
+#### Union-typed non-descriptor attributes
+
+Instance writes to ordinary union-typed attributes use normal union assignability:
+
+```py
+class C:
+    value: int | str
+
+c = C()
+c.value = 1
+c.value = "a"
+
+# error: [invalid-assignment]
+c.value = b"a"
+```
+
 #### Mixed declarations/bindings in class body and `__init__`
 
 ```py

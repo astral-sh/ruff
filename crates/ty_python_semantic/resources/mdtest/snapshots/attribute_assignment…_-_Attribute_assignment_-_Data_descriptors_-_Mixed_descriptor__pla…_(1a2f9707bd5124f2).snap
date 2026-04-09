@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Data descriptors - Mixed descriptor/plain unions
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool) -> None:
+ 2 |     class Descriptor:
+ 3 |         def __set__(self, instance: object, value: str) -> None:
+ 4 |             pass
+ 5 | 
+ 6 |     class C:
+ 7 |         if flag:
+ 8 |             attr = Descriptor()
+ 9 |         else:
+10 |             attr = 1
+11 | 
+12 |     instance = C()
+13 | 
+14 |     # The write must still be valid when the descriptor branch is active.
+15 |     instance.attr = 1  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+  --> src/mdtest_snippet.py:15:5
+   |
+14 |     # The write must still be valid when the descriptor branch is active.
+15 |     instance.attr = 1  # error: [invalid-assignment]
+   |     ^^^^^^^^^^^^^
+   |
+
+```
