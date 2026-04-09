@@ -290,7 +290,6 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default().with_disable_language_services(true))
         .with_workspace(workspace_root, None)?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -322,7 +321,6 @@ def foo() -> str:
             workspace_root,
             Some(ClientOptions::default().with_disable_language_services(true)),
         )?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -362,7 +360,6 @@ def bar() -> str:
             Some(ClientOptions::default().with_disable_language_services(true)),
         )?
         .with_workspace(workspace_b, None)?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .with_file(bar, bar_content)?
         .build()

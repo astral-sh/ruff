@@ -41,7 +41,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -87,7 +86,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -135,7 +133,6 @@ def foo() -> str:
             }),
         )?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -188,7 +185,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
