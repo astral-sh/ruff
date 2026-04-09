@@ -912,6 +912,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .check_typevar_subclass_relation_to_target(db, subclass_of, target)
                     .is_never_satisfied(db) =>
             {
+                // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }
 
