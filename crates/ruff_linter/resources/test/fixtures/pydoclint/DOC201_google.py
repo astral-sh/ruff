@@ -214,3 +214,27 @@ class Spam:
     def __new__(cls) -> 'Spam':
         """New!!"""
         return cls()
+
+
+# DOC201 - OK (generator with only bare return; no Returns section needed)
+def generator_bare_return(x: int):
+    """Yield integers up to x.
+
+    Args:
+        x (int): Upper bound.
+    """
+    for i in range(x):
+        yield i
+    return
+
+
+# DOC201 - OK (generator with explicit return None; no Returns section needed)
+def generator_explicit_none(x: int):
+    """Yield integers up to x.
+
+    Args:
+        x (int): Upper bound.
+    """
+    for i in range(x):
+        yield i
+    return None
