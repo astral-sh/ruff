@@ -264,6 +264,19 @@ impl Notebook {
                 Ordering::Equal => (),
             }
         }
+
+        // Ensure offsets remain monotonically non-decreasing after adjustment.
+        // Adjacent offsets can invert when different source markers with opposing
+        // deltas are applied to consecutive cell boundaries, causing a panic in
+        // `update_cell_content`. Clamp each offset to be at least as large as the
+        // preceding one so that every cell spans a valid (possibly empty) range.
+        // See: https://github.com/astral-sh/ruff/issues/24406
+        for i in 1..self.cell_offsets.len() {
+            let prev = self.cell_offsets[i - 1];
+            if self.cell_offsets[i] < prev {
+                self.cell_offsets[i] = prev;
+            }
+        }
     }
 
     /// Update the cell contents with the transformed content.
