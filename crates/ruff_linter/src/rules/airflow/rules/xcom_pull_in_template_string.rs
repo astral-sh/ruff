@@ -2,6 +2,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
+use ruff_python_trivia::Cursor;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,6 +44,10 @@ use crate::{FixAvailability, Violation};
 ///     op_args=task_1.output,
 /// )
 /// ```
+///
+/// ## Fix safety
+/// The fix is always unsafe because the variable in scope that matches the
+/// task ID may not be the Airflow task object that produced the XCom value.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct AirflowXcomPullInTemplateString {
@@ -84,10 +89,18 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
         return;
     }
 
-    // Check keyword arguments for xcom_pull template strings.
-    for keyword in &*call.arguments.keywords {
-        // Skip non-string-literal values.
-        let Some(string_literal) = keyword.value.as_string_literal_expr() else {
+    // Check all arguments for xcom_pull template strings. Any operator
+    // argument can be a Jinja template field (determined by the operator's
+    // `template_fields` attribute), so we check both positional and keyword
+    // arguments.
+    let arg_values = call
+        .arguments
+        .args
+        .iter()
+        .chain(call.arguments.keywords.iter().map(|kw| &kw.value));
+
+    for arg_value in arg_values {
+        let Some(string_literal) = arg_value.as_string_literal_expr() else {
             continue;
         };
 
@@ -98,7 +111,7 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
                 AirflowXcomPullInTemplateString {
                     task_id: task_id.clone(),
                 },
-                keyword.value.range(),
+                arg_value.range(),
             );
 
             // If the task_id matches a variable in scope, provide an unsafe fix
@@ -106,7 +119,7 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
             if checker.semantic().lookup_symbol(&task_id).is_some() {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     format!("{task_id}.output"),
-                    keyword.value.range(),
+                    arg_value.range(),
                 )));
             }
         }
@@ -122,97 +135,152 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
 /// Returns `None` if the string contains other content, multiple task IDs, or
 /// non-default keyword arguments.
 fn parse_xcom_pull_template(s: &str) -> Option<String> {
-    let s = s.trim();
-    let s = s.strip_prefix("{{")?;
-    let s = s.strip_suffix("}}")?;
-    let s = s.trim();
+    let mut cursor = Cursor::new(s);
+    eat_whitespace(&mut cursor);
 
-    // Strip the object and method call prefix.
-    let s = s
-        .strip_prefix("ti.")
-        .or_else(|| s.strip_prefix("task_instance."))?;
-    let s = s.strip_prefix("xcom_pull(")?;
-    let s = s.strip_suffix(')')?;
-    let s = s.trim();
+    if !cursor.eat_char2('{', '{') {
+        return None;
+    }
+    eat_whitespace(&mut cursor);
+
+    let receiver = parse_identifier(&mut cursor)?;
+    if receiver != "ti" && receiver != "task_instance" {
+        return None;
+    }
+    eat_whitespace(&mut cursor);
+    if !cursor.eat_char('.') {
+        return None;
+    }
+    eat_whitespace(&mut cursor);
+    if parse_identifier(&mut cursor)? != "xcom_pull" {
+        return None;
+    }
+
+    eat_whitespace(&mut cursor);
+    if !cursor.eat_char('(') {
+        return None;
+    }
+    eat_whitespace(&mut cursor);
 
     // Handle keyword argument: `task_ids=` or `task_id=`.
-    // Check `task_ids` first since `task_id` is a prefix of it.
-    let s = if let Some(rest) = s.strip_prefix("task_ids") {
-        rest.trim_start().strip_prefix('=')?.trim_start()
-    } else if let Some(rest) = s.strip_prefix("task_id") {
-        rest.trim_start().strip_prefix('=')?.trim_start()
-    } else {
-        // Positional argument.
-        s
-    };
+    if let Some(identifier) = parse_identifier(&mut cursor) {
+        if identifier != "task_ids" && identifier != "task_id" {
+            return None;
+        }
+        eat_whitespace(&mut cursor);
+        if !cursor.eat_char('=') {
+            return None;
+        }
+        eat_whitespace(&mut cursor);
+    }
 
     // Check for list or tuple wrapping: `['task']`, `('task')`, `('task',)`.
-    let (s, closing_bracket) = if let Some(rest) = s.strip_prefix('[') {
-        (rest.trim_start(), Some(']'))
-    } else if let Some(rest) = s.strip_prefix('(') {
-        (rest.trim_start(), Some(')'))
+    let closing_bracket = if cursor.eat_char('[') {
+        eat_whitespace(&mut cursor);
+        Some(']')
+    } else if cursor.eat_char('(') {
+        eat_whitespace(&mut cursor);
+        Some(')')
     } else {
-        (s, None)
+        None
     };
 
-    // Extract the quoted string value.
-    let (quote_char, inner) = if let Some(rest) = s.strip_prefix('\'') {
-        ('\'', rest)
-    } else if let Some(rest) = s.strip_prefix('"') {
-        ('"', rest)
-    } else {
-        return None;
-    };
-
-    // Find the closing quote.
-    let end = inner.find(quote_char)?;
-    let task_id = &inner[..end];
-    let mut remaining = inner[end + 1..].trim();
+    let task_id = parse_quoted_string(&mut cursor)?;
+    eat_whitespace(&mut cursor);
 
     // If the value was wrapped in a list or tuple, consume the closing bracket.
     if let Some(bracket) = closing_bracket {
         // Allow optional trailing comma for tuples: `('task',)`.
-        remaining = remaining
-            .strip_prefix(',')
-            .map_or(remaining, |r| r.trim_start());
-        remaining = remaining.strip_prefix(bracket)?.trim();
+        if cursor.eat_char(',') {
+            eat_whitespace(&mut cursor);
+        }
+        if !cursor.eat_char(bracket) {
+            return None;
+        }
+        eat_whitespace(&mut cursor);
     }
 
     // Allow an optional `key='return_value'` argument (the default XCom key).
-    if let Some(rest) = remaining.strip_prefix(',') {
-        remaining = parse_key_return_value(rest.trim_start())?;
+    if cursor.eat_char(',') {
+        eat_whitespace(&mut cursor);
+        parse_key_return_value(&mut cursor)?;
+        eat_whitespace(&mut cursor);
     }
 
-    // Ensure nothing else follows.
-    if !remaining.is_empty() {
+    if !cursor.eat_char(')') {
         return None;
     }
+    eat_whitespace(&mut cursor);
 
-    if task_id.is_empty() {
+    if !cursor.eat_char2('}', '}') {
+        return None;
+    }
+    eat_whitespace(&mut cursor);
+
+    if !cursor.is_eof() || task_id.is_empty() {
         return None;
     }
 
     Some(task_id.to_string())
 }
 
-/// If `s` starts with `key='return_value'` (or `key="return_value"`), consume it
-/// and return the remaining text. Returns `None` if `key=` is present but the
-/// value is not `return_value`.
-fn parse_key_return_value(s: &str) -> Option<&str> {
-    let s = s.strip_prefix("key")?;
-    let s = s.trim_start().strip_prefix('=')?.trim_start();
+fn eat_whitespace(cursor: &mut Cursor) {
+    cursor.eat_while(|c| c.is_ascii_whitespace());
+}
 
-    let (quote_char, inner) = if let Some(rest) = s.strip_prefix('\'') {
-        ('\'', rest)
-    } else if let Some(rest) = s.strip_prefix('"') {
-        ('"', rest)
+fn parse_identifier<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
+    let source = cursor.as_str();
+    if !cursor.eat_if(|c| c.is_ascii_alphabetic() || c == '_') {
+        return None;
+    }
+    cursor.eat_while(|c| c.is_ascii_alphanumeric() || c == '_');
+    let len = source.len() - cursor.as_str().len();
+    Some(&source[..len])
+}
+
+/// Parse a quoted string delimited by single or double quotes.
+///
+/// Returns `None` if the string contains escape sequences (e.g. `\'`),
+/// since Jinja supports them and correctly handling escaped content is
+/// out of scope for this rule.
+fn parse_quoted_string<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
+    let quote_char = if cursor.eat_char('\'') {
+        '\''
+    } else if cursor.eat_char('"') {
+        '"'
     } else {
         return None;
     };
 
-    let inner = inner.strip_prefix("return_value")?;
-    let remaining = inner.strip_prefix(quote_char)?;
-    Some(remaining.trim())
+    let remaining = cursor.as_str();
+    let end = remaining.find(quote_char)?;
+    let value = &remaining[..end];
+
+    // Bail if the string contains escape sequences.
+    if value.contains('\\') {
+        return None;
+    }
+
+    cursor.skip_bytes(end + quote_char.len_utf8());
+    Some(value)
+}
+
+/// If the cursor starts with `key='return_value'` (or `key="return_value"`),
+/// consume it. Returns `None` if `key=` is present but the value is not
+/// `return_value`.
+fn parse_key_return_value(cursor: &mut Cursor) -> Option<()> {
+    if parse_identifier(cursor)? != "key" {
+        return None;
+    }
+    eat_whitespace(cursor);
+    if !cursor.eat_char('=') {
+        return None;
+    }
+    eat_whitespace(cursor);
+    if parse_quoted_string(cursor)? != "return_value" {
+        return None;
+    }
+    Some(())
 }
 
 #[cfg(test)]
@@ -263,6 +331,22 @@ mod tests {
     fn test_extra_whitespace() {
         assert_eq!(
             parse_xcom_pull_template("{{  ti.xcom_pull( task_ids = 'my_task' )  }}"),
+            Some("my_task".to_string())
+        );
+    }
+
+    #[test]
+    fn test_whitespace_around_dot() {
+        assert_eq!(
+            parse_xcom_pull_template("{{ ti . xcom_pull(task_ids='my_task') }}"),
+            Some("my_task".to_string())
+        );
+    }
+
+    #[test]
+    fn test_whitespace_before_open_paren() {
+        assert_eq!(
+            parse_xcom_pull_template("{{ ti.xcom_pull (task_ids='my_task') }}"),
             Some("my_task".to_string())
         );
     }
@@ -376,6 +460,22 @@ mod tests {
     fn test_rejects_list_with_non_default_key() {
         assert_eq!(
             parse_xcom_pull_template("{{ ti.xcom_pull(task_ids=['my_task'], key='custom_key') }}"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_rejects_escaped_quotes() {
+        assert_eq!(
+            parse_xcom_pull_template(r"{{ ti.xcom_pull(task_ids='my\_task') }}"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_rejects_unknown_keyword() {
+        assert_eq!(
+            parse_xcom_pull_template("{{ ti.xcom_pull(dag_id='my_task') }}"),
             None
         );
     }
