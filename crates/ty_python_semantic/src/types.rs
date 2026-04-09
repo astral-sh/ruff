@@ -4063,61 +4063,6 @@ impl<'db> Type<'db> {
                 )
             }
 
-            KnownClass::Str => {
-                // ```py
-                // class str(Sequence[str]):
-                //     @overload
-                //     def __new__(cls, object: object = ...) -> Self: ...
-                //     @overload
-                //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
-                // ```
-                Some(
-                    CallableBinding::from_overloads(
-                        self,
-                        [
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_or_keyword(Name::new_static("object"))
-                                        .with_annotated_type(Type::object())
-                                        .with_default_type(Type::string_literal(db, ""))],
-                                ),
-                                KnownClass::Str.to_instance(db),
-                            ),
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "object",
-                                        ))
-                                        // TODO: Should be `ReadableBuffer` instead of this union type:
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            KnownClass::Bytes.to_instance(db),
-                                            KnownClass::Bytearray.to_instance(db),
-                                        ))
-                                        .with_default_type(Type::bytes_literal(db, b"")),
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "encoding",
-                                        ))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db))
-                                        .with_default_type(Type::string_literal(db, "utf-8")),
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "errors",
-                                        ))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db))
-                                        .with_default_type(Type::string_literal(db, "strict")),
-                                    ],
-                                ),
-                                KnownClass::Str.to_instance(db),
-                            ),
-                        ],
-                    )
-                    .into(),
-                )
-            }
-
             KnownClass::Object => {
                 // ```py
                 // class object:
@@ -4458,7 +4403,6 @@ impl<'db> Type<'db> {
             known,
             Some(
                 KnownClass::Bool
-                    | KnownClass::Str
                     | KnownClass::Type
                     | KnownClass::Object
                     | KnownClass::Property

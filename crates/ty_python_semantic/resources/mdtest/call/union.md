@@ -212,13 +212,21 @@ def _(flag: bool):
 
 ## Union including a special-cased function
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
+def identity[T](x: T) -> T:
+    return x
+
 def _(flag: bool):
     if flag:
-        f = str
+        f = identity
     else:
         f = repr
-    reveal_type(str("string"))  # revealed: Literal["string"]
+    reveal_type(identity("string"))  # revealed: Literal["string"]
     reveal_type(repr("string"))  # revealed: Literal["'string'"]
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
