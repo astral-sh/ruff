@@ -48,6 +48,7 @@ libc = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters", "json"] }
+ruff_linter = { workspace = true, features = ["test-rules"] }
 dunce = { workspace = true }
 regex = { workspace = true }
 smallvec = { workspace = true }

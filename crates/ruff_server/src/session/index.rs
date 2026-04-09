@@ -561,12 +561,15 @@ impl DocumentQuery {
         }
     }
 
-    /// Generate a source kind used by the linter.
-    pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
+    /// Generate a Python source kind used by the linter.
+    pub(crate) fn make_python_source_kind(
+        &self,
+        source_type: ruff_python_ast::PySourceType,
+    ) -> ruff_linter::source_kind::SourceKind {
         match self {
             Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
                 code: document.contents().to_string(),
-                is_stub: ruff_python_ast::PySourceType::from(self.virtual_file_path()).is_stub(),
+                is_stub: source_type.is_stub(),
             },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
@@ -582,10 +585,26 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the source type of the document associated with this query.
-    pub(crate) fn source_type(&self) -> ruff_python_ast::SourceType {
+    /// Get the source type for linter-oriented operations.
+    pub(crate) fn source_type_for_lint(&self) -> ruff_python_ast::SourceType {
         match self {
-            Self::Text { .. } => ruff_python_ast::SourceType::from(self.virtual_file_path()),
+            Self::Text { settings, .. } => settings
+                .linter
+                .extension
+                .get_source_type(&self.virtual_file_path()),
+            Self::Notebook { .. } => {
+                ruff_python_ast::SourceType::Python(ruff_python_ast::PySourceType::Ipynb)
+            }
+        }
+    }
+
+    /// Get the source type for formatter-oriented operations.
+    pub(crate) fn source_type_for_format(&self) -> ruff_python_ast::SourceType {
+        match self {
+            Self::Text { settings, .. } => settings
+                .formatter
+                .extension
+                .get_source_type(&self.virtual_file_path()),
             Self::Notebook { .. } => {
                 ruff_python_ast::SourceType::Python(ruff_python_ast::PySourceType::Ipynb)
             }

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_types::notification::PublishDiagnostics;
 
 use crate::TestServerBuilder;
 
@@ -24,8 +23,6 @@ fn code_actions_for_python() -> Result<()> {
     let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
 
     server.open_text_document("test.py", "import os\n", 1);
-
-    server.await_notification::<PublishDiagnostics>();
 
     let actions = server
         .code_action_request("test.py", vec![])
