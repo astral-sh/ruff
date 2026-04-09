@@ -13,8 +13,8 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
-    UnionType, UpcastPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -649,6 +649,41 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    fn check_typevar_subclass_relation_to_target(
+        &self,
+        db: &'db dyn Db,
+        source_subclass: SubclassOfType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source_subclass
+            .into_type_var()
+            .when_some_and(db, self.constraints, |source_i| match target {
+                Type::NominalInstance(target_instance)
+                    if KnownClass::Type
+                        .to_class_literal(db)
+                        .to_class_type(db)
+                        .is_some_and(|type_class| {
+                            target_instance.class(db).is_subclass_of(db, type_class)
+                        }) =>
+                {
+                    // Get the instance type of the metaclass of the upper bound of `T`. So e.g.
+                    // for an unbounded `type[T]`, this would be `type`; for a `type[T]` where `T`
+                    // has an upper bound `C` which has a metaclass `M`, this would be `M`. This is
+                    // then directly comparable to the target type, which is also a metaclass.
+                    let source_metaclass_instance = Type::SubclassOf(source_subclass)
+                        .to_meta_type(db)
+                        .to_instance(db)
+                        .expect("the metatype of `type[T]` should be an instance-like type");
+                    self.check_type_pair(db, source_metaclass_instance, target)
+                }
+                _ => target
+                    .to_instance(db)
+                    .when_some_and(db, self.constraints, |target_i| {
+                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
+                    }),
+            })
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -867,26 +902,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
-            // of `A`, and vice versa.
+            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype
+            // of an instance of `A`. If `A` is a metaclass instance (a subclass of `type`), we
+            // instead compare in the metaclass-instance domain, since collapsing `A` through
+            // `to_instance()` would erase it to `object` (we have no precise representation for
+            // "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
-                if !subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
+                if !self
+                    .check_typevar_subclass_relation_to_target(db, subclass_of, target)
                     .is_never_satisfied(db) =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
-                subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
+                self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }
 
+            // And vice versa. (No special metaclass handling is needed in this direction, since
+            // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
                 if !subclass_of
                     .into_type_var()
