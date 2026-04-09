@@ -216,8 +216,9 @@ class Spam:
         return cls()
 
 
-# DOC201 - OK (generator with only bare return; no Returns section needed)
-def generator_bare_return(x: int):
+# DOC201 - OK (generator with only bare return; Iterable annotation is not Iterator/Generator)
+# Regression test for https://github.com/astral-sh/ruff/issues/21336
+def generator_bare_return(x: int) -> Iterable[int]:
     """Yield integers up to x.
 
     Args:
@@ -228,8 +229,8 @@ def generator_bare_return(x: int):
     return
 
 
-# DOC201 - OK (generator with explicit return None; no Returns section needed)
-def generator_explicit_none(x: int):
+# DOC201 - OK (generator with explicit return None; same annotation)
+def generator_explicit_none(x: int) -> Iterable[int]:
     """Yield integers up to x.
 
     Args:
