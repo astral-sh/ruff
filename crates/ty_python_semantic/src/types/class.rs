@@ -1770,11 +1770,18 @@ impl<'db> ClassType<'db> {
             ..
         }) = metaclass_dunder_call_function_symbol
         {
-            // TODO: this intentionally diverges from step 1 in
-            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-            // by always respecting the signature of the metaclass `__call__`, rather than
-            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+            let is_enum_class = KnownClass::Enum
+                .to_class_literal(db)
+                .to_class_type(db)
+                .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
+            // For Enum don't use metaclass `__call__` as constructor.
+            if !is_enum_class {
+                // TODO: this intentionally diverges from step 1 in
+                // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+                // by always respecting the signature of the metaclass `__call__`, rather than
+                // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+            }
         }
 
         let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);

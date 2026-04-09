@@ -1098,7 +1098,6 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Color(value: object)`
     // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_enum_constructor() {
@@ -1115,68 +1114,11 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        class Color(
-            value: Any,
-            names: None = None
-        )
-        ---------------------------------------------
-        Either returns an existing member, or creates a new enum class.
-
-        This method is used both when an enum class is given a value to match
-        to an enumeration member (i.e. Color(3)) and for the functional API
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
-
-        The value lookup branch is chosen if the enum is final.
-
-        When used for the functional API:
-
-        `value` will be the name of the new class.
-
-        `names` should be either a string of white-space/comma delimited names
-        (values will start at `start`), or an iterator/mapping of name, value pairs.
-
-        `module` should be set to the module this class is being created in;
-        if it is not set, an attempt to find that module will be made, but if
-        it fails the class will not be picklable.
-
-        `qualname` should be set to the actual location this class can be found
-        at in its module; by default it is set to the global scope.  If this is
-        not correct, unpickling will fail in some circumstances.
-
-        `type`, if set, will be mixed in as the first base class.
-
+        class Color(value: object)
         ---------------------------------------------
         ```python
-        class Color(
-            value: Any,
-            names: None = None
-        )
+        class Color(value: object)
         ```
-        ---
-        Either returns an existing member, or creates a new enum class.<HB>
-        <HB>
-        This method is used both when an enum class is given a value to match<HB>
-        to an enumeration member (i.e. Color(3)) and for the functional API<HB>
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).<HB>
-        <HB>
-        The value lookup branch is chosen if the enum is final.<HB>
-        <HB>
-        When used for the functional API:<HB>
-        <HB>
-        `value` will be the name of the new class.<HB>
-        <HB>
-        `names` should be either a string of white-space/comma delimited names<HB>
-        (values will start at `start`), or an iterator/mapping of name, value pairs.<HB>
-        <HB>
-        `module` should be set to the module this class is being created in;<HB>
-        if it is not set, an attempt to find that module will be made, but if<HB>
-        it fails the class will not be picklable.<HB>
-        <HB>
-        `qualname` should be set to the actual location this class can be found<HB>
-        at in its module; by default it is set to the global scope.  If this is<HB>
-        not correct, unpickling will fail in some circumstances.<HB>
-        <HB>
-        `type`, if set, will be mixed in as the first base class.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:8:5
