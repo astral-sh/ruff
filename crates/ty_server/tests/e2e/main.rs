@@ -1181,10 +1181,12 @@ impl TestServerBuilder {
         // These are enabled by default for convenience but can be disabled using the builder
         // methods:
         // - Supports pulling workspace configuration
+        // - Support for pull diagnostics
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
                 publish_diagnostics: Some(PublishDiagnosticsClientCapabilities::default()),
-                ..Default::default()
+                diagnostic: Some(DiagnosticClientCapabilities::default()),
+                ..TextDocumentClientCapabilities::default()
             }),
             workspace: Some(WorkspaceClientCapabilities {
                 configuration: Some(true),

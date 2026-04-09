@@ -17,7 +17,6 @@ fn folding_range_basic_functionality() -> Result<()> {
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()

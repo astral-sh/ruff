@@ -173,18 +173,6 @@ impl LspDiagnostics {
     }
 }
 
-pub(super) fn clear_diagnostics_if_needed(
-    document: &DocumentHandle,
-    session: &Session,
-    client: &Client,
-) {
-    if session.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
-    {
-        return;
-    }
-    session.clear_diagnostics(client, document.url());
-}
-
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification] .
 ///

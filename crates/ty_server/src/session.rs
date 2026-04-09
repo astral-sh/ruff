@@ -845,12 +845,20 @@ impl Session {
             })
             .collect();
         for doc in documents_to_clear {
-            self.clear_diagnostics(client, doc.url());
+            self.clear_diagnostics_if_needed(&doc, client);
         }
 
         self.bump_revision();
 
         Ok(())
+    }
+
+    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+        if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+        {
+            return;
+        }
+        self.clear_diagnostics(client, document.url());
     }
 
     /// Clears the diagnostics for the document identified by `uri`.
