@@ -1091,18 +1091,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                let union_ty = UnionType::from_elements_leave_aliases(
-                    self.db(),
-                    [
-                        self.infer_subclass_of_type_expression(&binary.left),
-                        self.infer_subclass_of_type_expression(&binary.right),
-                    ],
-                );
-                self.store_expression_type(slice, union_ty);
-
-                union_ty
+                infer_type_argument(self, slice)
             }
             ast::Expr::Tuple(_) => {
                 if !self.in_string_annotation() {
@@ -1193,7 +1186,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
             }
-            // TODO: subscripts, etc.
             _ => {
                 self.infer_expression(slice, TypeContext::default());
                 todo_type!("unsupported type[X] special form")
