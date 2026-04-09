@@ -268,9 +268,30 @@ TypedDi<CURSOR>
         "insertText": "typing.is_typeddict"
       },
       {
+        "label": "TypedDictTop (import ty_extensions)",
+        "kind": 6,
+        "sortText": "2",
+        "insertText": "TypedDictTop",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from ty_extensions import TypedDictTop\n"
+          }
+        ]
+      },
+      {
         "label": "_FilterConfigurationTypedDict (import logging.config)",
         "kind": 7,
-        "sortText": "2",
+        "sortText": "3",
         "insertText": "_FilterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -291,7 +312,7 @@ TypedDi<CURSOR>
       {
         "label": "_FormatterConfigurationTypedDict (import logging.config)",
         "kind": 6,
-        "sortText": "3",
+        "sortText": "4",
         "insertText": "_FormatterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -382,9 +403,30 @@ TypedDi<CURSOR>
         ]
       },
       {
+        "label": "TypedDictTop (import ty_extensions)",
+        "kind": 6,
+        "sortText": "2",
+        "insertText": "TypedDictTop",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from ty_extensions import TypedDictTop\n"
+          }
+        ]
+      },
+      {
         "label": "_FilterConfigurationTypedDict (import logging.config)",
         "kind": 7,
-        "sortText": "2",
+        "sortText": "3",
         "insertText": "_FilterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -405,7 +447,7 @@ TypedDi<CURSOR>
       {
         "label": "_FormatterConfigurationTypedDict (import logging.config)",
         "kind": 6,
-        "sortText": "3",
+        "sortText": "4",
         "insertText": "_FormatterConfigurationTypedDict",
         "additionalTextEdits": [
           {
