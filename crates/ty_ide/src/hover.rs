@@ -1253,8 +1253,8 @@ mod tests {
         assert_snapshot!(test.hover(), @r#"
         class Movie(
             __map: Movie,
-            *,
             /,
+            *,
             title: str = ...,
             year: int = ...
         )
@@ -1262,8 +1262,8 @@ mod tests {
         ```python
         class Movie(
             __map: Movie,
-            *,
             /,
+            *,
             title: str = ...,
             year: int = ...
         )
@@ -1303,8 +1303,8 @@ mod tests {
         assert_snapshot!(test.hover(), @r#"
         class Movie(
             __map: Movie,
-            *,
             /,
+            *,
             title: str = ...,
             year: int = ...
         )
@@ -1312,8 +1312,8 @@ mod tests {
         ```python
         class Movie(
             __map: Movie,
-            *,
             /,
+            *,
             title: str = ...,
             year: int = ...
         )
