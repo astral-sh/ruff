@@ -72,10 +72,7 @@ impl SideEffect {
     }
 
     /// Classify a single expression node's side effect.
-    ///
-    /// Returns `Some(effect)` if this node determines the side effect level,
-    /// or `None` to continue walking child expressions.
-    fn from_expr(expr: &Expr, is_builtin: &dyn Fn(&str) -> bool) -> Option<Self> {
+    fn from_expr(expr: &Expr, is_builtin: &dyn Fn(&str) -> bool) -> Self {
         match expr {
             // Empty initializers for known builtins are side-effect-free.
             Expr::Call(ast::ExprCall {
@@ -83,39 +80,39 @@ impl SideEffect {
             }) if arguments.is_empty() => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        return None;
+                        return Self::Absent;
                     }
                 }
-                Some(Self::Present)
+                Self::Present
             }
 
             // Overloaded operators: only side-effect-free if both sides are literals.
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
                 if is_known_safe_binop_operand(left) && is_known_safe_binop_operand(right) {
-                    None
+                    Self::Absent
                 } else {
-                    Some(Self::Present)
+                    Self::Present
                 }
             }
 
             // Non-literal f-string interpolation may invoke `__format__`/`__str__`.
             Expr::FString(ast::ExprFString { value, .. }) => {
                 if value.elements().any(has_uncertain_interpolation) {
-                    Some(Self::Possible)
+                    Self::Possible
                 } else {
-                    None
+                    Self::Absent
                 }
             }
             Expr::TString(ast::ExprTString { value, .. }) => {
                 if value.elements().any(has_uncertain_interpolation) {
-                    Some(Self::Possible)
+                    Self::Possible
                 } else {
-                    None
+                    Self::Absent
                 }
             }
 
             // Named expressions (walrus operator) are assignments.
-            Expr::Named(_) => Some(Self::Present),
+            Expr::Named(_) => Self::Present,
 
             // Complex expressions that are assumed to have side effects.
             Expr::Await(_)
@@ -127,31 +124,69 @@ impl SideEffect {
             | Expr::Subscript(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
-            | Expr::IpyEscapeCommand(_) => Some(Self::Present),
+            | Expr::IpyEscapeCommand(_) => Self::Present,
 
-            _ => None,
-        }
-    }
-}
-
-fn is_known_safe_binop_operand(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::StringLiteral(_)
+            // Side-effect-free expressions — continue walking child nodes.
+            Expr::BoolOp(_)
+            | Expr::Compare(_)
+            | Expr::Dict(_)
+            | Expr::If(_)
+            | Expr::Lambda(_)
+            | Expr::List(_)
+            | Expr::Set(_)
+            | Expr::Slice(_)
+            | Expr::Starred(_)
+            | Expr::Tuple(_)
+            | Expr::UnaryOp(_)
+            | Expr::Attribute(_)
+            | Expr::Name(_)
+            | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
             | Expr::BooleanLiteral(_)
             | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::FString(_)
-            | Expr::List(_)
-            | Expr::Tuple(_)
-            | Expr::Set(_)
-            | Expr::Dict(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-    )
+            | Expr::EllipsisLiteral(_) => Self::Absent,
+        }
+    }
+}
+
+const fn is_known_safe_binop_operand(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::FString(_)
+        | Expr::List(_)
+        | Expr::Tuple(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_) => true,
+
+        Expr::BoolOp(_)
+        | Expr::Named(_)
+        | Expr::BinOp(_)
+        | Expr::UnaryOp(_)
+        | Expr::Lambda(_)
+        | Expr::If(_)
+        | Expr::Compare(_)
+        | Expr::Call(_)
+        | Expr::Generator(_)
+        | Expr::Await(_)
+        | Expr::Yield(_)
+        | Expr::YieldFrom(_)
+        | Expr::Attribute(_)
+        | Expr::Subscript(_)
+        | Expr::Starred(_)
+        | Expr::Name(_)
+        | Expr::Slice(_)
+        | Expr::IpyEscapeCommand(_)
+        | Expr::TString(_) => false,
+    }
 }
 
 fn is_definitely_side_effect_free_interpolation_expr(expr: &Expr) -> bool {
@@ -204,15 +239,15 @@ where
     let mut effect = SideEffect::Absent;
     any_over_expr(expr, |expr| {
         match SideEffect::from_expr(expr, &is_builtin) {
-            Some(SideEffect::Present) => {
+            SideEffect::Present => {
                 effect = SideEffect::Present;
                 true
             }
-            Some(SideEffect::Possible) => {
+            SideEffect::Possible => {
                 effect = effect.merge(SideEffect::Possible);
                 false
             }
-            Some(SideEffect::Absent) | None => false,
+            SideEffect::Absent => false,
         }
     });
     effect
