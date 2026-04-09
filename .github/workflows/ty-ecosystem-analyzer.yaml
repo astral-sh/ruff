@@ -38,7 +38,19 @@ env:
   ECOSYSTEM_ANALYZER_COMMIT: 73fe4d9a7c940023ac2addc008097758c877b7ec
 
 jobs:
+  record-timestamp:
+    name: Record timestamp
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      timestamp: ${{ steps.timestamp.outputs.timestamp }}
+    steps:
+      - name: Record timestamp
+        id: timestamp
+        run: echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
   analyze-branches:
+    needs: [record-timestamp]
     strategy:
       matrix:
         branch: [base, PR]
@@ -103,6 +115,7 @@ jobs:
         shell: bash
         env:
           BRANCH: ${{ matrix.branch }}
+          EXCLUDE_NEWER: ${{ needs.record-timestamp.outputs.timestamp }}
         run: |
           uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
@@ -114,6 +127,7 @@ jobs:
             --commit "${COMMIT_TO_TEST}" \
             --projects ruff/projects.txt \
             --projects-flaky ruff/projects_flaky.txt \
+            --exclude-newer "${EXCLUDE_NEWER}" \
             --output "diagnostics-${BRANCH}.json"
 
       - name: Upload base diagnostics
