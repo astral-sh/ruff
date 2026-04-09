@@ -856,6 +856,9 @@ Narrowing can leave a bounded typevar represented as an intersection, but it sho
 assignable to its upper bound.
 
 ```py
+from typing import Callable
+from ty_extensions import Intersection, Not
+
 class A: ...
 
 class SomeClass[T: int | str]:
@@ -882,6 +885,17 @@ def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
     return class_or_tuple
 
 def check(check_type: type): ...
+
+# In this scenario, we do not expand the intersection,
+# because it only has inferrable type variables in it.
+# This ensures that we continue to infer a precise type on the last line here:
+def higher[U](f: Callable[[U], type]) -> U:
+    raise NotImplementedError
+
+def source[T: type | tuple[type, ...]](x: T) -> Intersection[T, Not[tuple[object, ...]]]:
+    raise NotImplementedError
+
+reveal_type(higher(source))  # revealed: type
 ```
 
 ## Constrained typevars remain assignable to the union of their constraints after narrowing

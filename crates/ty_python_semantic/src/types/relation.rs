@@ -11,7 +11,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
     PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
     UnionType, UpcastPolicy,
@@ -710,6 +710,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
+        let should_expand_intersection = |intersection: IntersectionType<'db>| {
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| match element {
+                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                    _ => false,
+                })
+        };
+
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1000,21 +1011,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
                     // constraints that exposes a union; this requires special handling.
                     match source {
-                        Type::Intersection(intersection) => {
-                            if intersection.positive(db).iter().any(|element| {
-                                element.is_type_var()
-                                    || element.as_new_type().is_some_and(|newtype| {
-                                        newtype.concrete_base_type(db).is_union()
-                                    })
-                            }) {
-                                self.check_type_pair(
-                                    db,
-                                    intersection.with_expanded_typevars_and_newtypes(db),
-                                    target,
-                                )
-                            } else {
-                                self.never()
-                            }
+                        Type::Intersection(intersection)
+                            if should_expand_intersection(intersection) =>
+                        {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
                         }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
@@ -1088,12 +1092,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         self.check_type_pair(db, elem_ty, target)
                     })
                     .or(db, self.constraints, || {
-                        if intersection.positive(db).iter().any(|element| {
-                            element.is_type_var()
-                                || element.as_new_type().is_some_and(|newtype| {
-                                    newtype.concrete_base_type(db).is_union()
-                                })
-                        }) {
+                        if should_expand_intersection(intersection) {
                             self.check_type_pair(
                                 db,
                                 intersection.with_expanded_typevars_and_newtypes(db),
