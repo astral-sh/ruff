@@ -16,6 +16,18 @@ use ty_project::ProjectDatabase;
 
 pub(crate) struct ProvideTypeRequestHandler;
 
+/// The `types/provide-type` request is sent from the client to the server to get types of expressions
+/// in a document.
+/// Each range in `ranges` represents a start and an end of an expression for which the type
+/// is requested.
+///
+/// A fully qualified name of a type is returned for each `range`.
+/// Everything that can be fully qualified should be fully qualified, including class and function
+/// names, function types, and type parameters
+/// This name follows the format of Python type annotations, except in some cases in which it's easier
+/// to represent them differently. For example, callables are represented
+/// as `def mod.f(x: builtins.str) -> builtins.int`
+///
 #[derive(Debug)]
 pub enum ProvideTypeRequest {}
 
