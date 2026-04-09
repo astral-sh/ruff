@@ -1193,7 +1193,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
             }
-            // TODO: subscripts, etc.
+            ast::Expr::StringLiteral(string) => {
+                match parse_string_annotation(&self.context, self.inference_flags, string) {
+                    Some(parsed) => {
+                        self.string_annotations
+                            .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
+                        let node_key = self.enclosing_node_key(string.into());
+                        let previous_deferred_state = std::mem::replace(
+                            &mut self.deferred_state,
+                            DeferredExpressionState::InStringAnnotation(node_key),
+                        );
+                        let result = self.infer_subclass_of_type_expression(parsed.expr());
+                        self.deferred_state = previous_deferred_state;
+                        result
+                    }
+                    None => SubclassOfType::subclass_of_unknown(),
+                }
+            }
             _ => {
                 self.infer_expression(slice, TypeContext::default());
                 todo_type!("unsupported type[X] special form")
