@@ -649,6 +649,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    /// Check the relation between a `type[T]` and a target type `A`.
+    ///
+    /// In the common case, we can just project both types through `.to_instance()`, and check `T`
+    /// vs `instance-of-A`. But if `A` is a metaclass (a subclass of `builtins.type`),
+    /// `.to_instance()` is quite lossy (just returns `object`), since we have no precise
+    /// representation for "all instances of any classes with a given metaclass". In that case, we
+    /// instead resolve `type[T]` to the metaclass of the upper bound of `T`, and compare that
+    /// directly to `A`.
     fn check_typevar_subclass_relation_to_target(
         &self,
         db: &'db dyn Db,
@@ -657,15 +665,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         source_subclass
             .into_type_var()
-            .when_some_and(db, self.constraints, |source_i| match target {
-                Type::NominalInstance(target_instance)
-                    if KnownClass::Type
-                        .to_class_literal(db)
-                        .to_class_type(db)
-                        .is_some_and(|type_class| {
-                            target_instance.class(db).is_subclass_of(db, type_class)
-                        }) =>
-                {
+            .when_some_and(db, self.constraints, |source_i| {
+                if target.is_metaclass_instance(db) {
                     // Get the instance type of the metaclass of the upper bound of `T`. So e.g.
                     // for an unbounded `type[T]`, this would be `type`; for a `type[T]` where `T`
                     // has an upper bound `C` which has a metaclass `M`, this would be `M`. This is
@@ -675,12 +676,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .to_instance(db)
                         .expect("the metatype of `type[T]` should be an instance-like type");
                     self.check_type_pair(db, source_metaclass_instance, target)
+                } else {
+                    target
+                        .to_instance(db)
+                        .when_some_and(db, self.constraints, |target_i| {
+                            self.check_type_pair(db, Type::TypeVar(source_i), target_i)
+                        })
                 }
-                _ => target
-                    .to_instance(db)
-                    .when_some_and(db, self.constraints, |target_i| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    }),
             })
     }
 
