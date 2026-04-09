@@ -555,20 +555,61 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     }
 }
 
-/// A recursion guard for structural protocol checks keyed by class origins rather than full
-/// specializations.
+/// A recursion guard for structural protocol checks keyed by protocol origins plus a shallow
+/// specialization shape.
 ///
-/// Recursive self-type protocols can keep producing fresh `(source, target)` pairs even though the
-/// underlying source and target class definitions are the same. In those cases we conservatively
-/// assume compatibility once we revisit the same class origins through a nested protocol check.
+/// Recursive protocol self-types can keep growing wrappers like `Factory[Tagged[Wrapped[...]]]`.
+/// Keying only on exact protocol instances misses those cycles, while keying only on class origins
+/// is too aggressive and conflates incompatible specializations like `Source[bool]` and
+/// `Source[list[bool]]`. A shallow shape keeps enough specialization information to distinguish
+/// those cases while still collapsing wrapper growth.
 pub(crate) type ProtocolRelationVisitor<'db, 'c> = CycleDetector<
     ProtocolRelation,
-    (ClassLiteral<'db>, ClassLiteral<'db>, TypeRelation),
+    (ProtocolRelationKey<'db>, TypeRelation),
     ConstraintSet<'db, 'c>,
 >;
 
 #[derive(Debug)]
 pub(crate) struct ProtocolRelation;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct ProtocolRelationKey<'db> {
+    source: ProtocolRelationProtocolShape<'db>,
+    target: ProtocolRelationProtocolShape<'db>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum ProtocolRelationProtocolShape<'db> {
+    Class {
+        class: ClassLiteral<'db>,
+        specialization: Box<[ProtocolRelationTypeShape<'db>]>,
+    },
+    Exact(ProtocolInstanceType<'db>),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct ProtocolRelationTypeShape<'db> {
+    kind: ProtocolRelationTypeShapeKind,
+    class: Option<ClassLiteral<'db>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum ProtocolRelationTypeShapeKind {
+    Nominal,
+    ClassLiteral,
+    Dynamic,
+    Divergent,
+    TypeVar,
+    Union,
+    Intersection,
+    Callable,
+    SpecialForm,
+    SubclassOf,
+    TypedDict,
+    Property,
+    BoundSuper,
+    Other,
+}
 
 impl<'db, 'c> ProtocolRelationVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -679,25 +720,115 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: ProtocolInstanceType<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(source_class) = (match source {
-            Type::NominalInstance(nominal) => Some(nominal.class_literal(db)),
-            Type::ProtocolInstance(protocol) => protocol
-                .to_nominal_instance()
-                .map(|nominal| nominal.class_literal(db)),
+        let Some(source_protocol) = (match source {
+            Type::ProtocolInstance(protocol) => Some(protocol),
             _ => None,
         }) else {
             return work();
         };
 
-        let Some(target_class) = target
-            .to_nominal_instance()
-            .map(|nominal| nominal.class_literal(db))
-        else {
-            return work();
+        self.protocol_relation_visitor.visit(
+            (
+                ProtocolRelationKey {
+                    source: Self::protocol_relation_shape(db, source_protocol),
+                    target: Self::protocol_relation_shape(db, target),
+                },
+                self.relation,
+            ),
+            work,
+        )
+    }
+
+    fn protocol_relation_shape(
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> ProtocolRelationProtocolShape<'db> {
+        let protocol_type = Type::ProtocolInstance(protocol);
+
+        let Some(class) = protocol_type.nominal_class(db) else {
+            return ProtocolRelationProtocolShape::Exact(protocol);
         };
 
-        self.protocol_relation_visitor
-            .visit((source_class, target_class, self.relation), work)
+        let specialization = protocol_type
+            .class_specialization(db)
+            .map(|specialization| {
+                specialization
+                    .types(db)
+                    .iter()
+                    .map(|ty| Self::protocol_relation_type_shape(db, *ty))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        ProtocolRelationProtocolShape::Class {
+            class: class.class_literal(db),
+            specialization,
+        }
+    }
+
+    fn protocol_relation_type_shape(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> ProtocolRelationTypeShape<'db> {
+        if let Some(class) = ty
+            .literal_fallback_instance(db)
+            .and_then(|fallback| fallback.nominal_class(db))
+            .or_else(|| ty.nominal_class(db))
+        {
+            return ProtocolRelationTypeShape {
+                kind: ProtocolRelationTypeShapeKind::Nominal,
+                class: Some(class.class_literal(db)),
+            };
+        }
+
+        if let Some(class) = ty.as_class_literal() {
+            return ProtocolRelationTypeShape {
+                kind: ProtocolRelationTypeShapeKind::ClassLiteral,
+                class: Some(class),
+            };
+        }
+
+        if let Type::GenericAlias(alias) = ty {
+            return ProtocolRelationTypeShape {
+                kind: ProtocolRelationTypeShapeKind::ClassLiteral,
+                class: Some(ClassType::Generic(alias).class_literal(db)),
+            };
+        }
+
+        let kind = match ty {
+            Type::Dynamic(_) => ProtocolRelationTypeShapeKind::Dynamic,
+            Type::Divergent(_) => ProtocolRelationTypeShapeKind::Divergent,
+            Type::TypeVar(_) => ProtocolRelationTypeShapeKind::TypeVar,
+            Type::Union(_) => ProtocolRelationTypeShapeKind::Union,
+            Type::Intersection(_) => ProtocolRelationTypeShapeKind::Intersection,
+            Type::Callable(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_) => ProtocolRelationTypeShapeKind::Callable,
+            Type::SpecialForm(_) => ProtocolRelationTypeShapeKind::SpecialForm,
+            Type::SubclassOf(_) => ProtocolRelationTypeShapeKind::SubclassOf,
+            Type::TypedDict(_) => ProtocolRelationTypeShapeKind::TypedDict,
+            Type::PropertyInstance(_) => ProtocolRelationTypeShapeKind::Property,
+            Type::BoundSuper(_) => ProtocolRelationTypeShapeKind::BoundSuper,
+            Type::AlwaysTruthy | Type::AlwaysFalsy => ProtocolRelationTypeShapeKind::Other,
+            Type::Never
+            | Type::ModuleLiteral(_)
+            | Type::LiteralValue(_)
+            | Type::KnownInstance(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::GenericAlias(_)
+            | Type::ClassLiteral(_)
+            | Type::TypeAlias(_)
+            | Type::NewTypeInstance(_) => ProtocolRelationTypeShapeKind::Other,
+        };
+
+        ProtocolRelationTypeShape { kind, class: None }
     }
 
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.

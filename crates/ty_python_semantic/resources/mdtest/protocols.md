@@ -3314,6 +3314,30 @@ def f(c: C[int]) -> None:
     takes_c(c)
 ```
 
+### Recursive generic protocols preserve specialization differences
+
+Recursive protocol checks still need to distinguish incompatible specializations instead of
+collapsing everything to the same protocol origin:
+
+```py
+from typing import List, Protocol, TypeVar
+
+T_co = TypeVar("T_co")
+U_co = TypeVar("U_co")
+
+class Source(Protocol[T_co]):
+    def value(self) -> T_co: ...
+    def next(self) -> "Source[List[T_co]]": ...
+
+class Target(Protocol[U_co]):
+    def value(self) -> U_co: ...
+    def next(self) -> "Target[List[U_co]]": ...
+
+def takes_target(x: Target[int]) -> None: ...
+def f(x: Source[bool]) -> None:
+    takes_target(x)  # error: [invalid-argument-type]
+```
+
 ### Recursive generic protocols with multiple growing self-type wrappers
 
 This regression test covers <https://github.com/astral-sh/ty/issues/3208>. Unlike issue #1736, the
