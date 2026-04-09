@@ -464,7 +464,7 @@ def f(x: C | D):
     s.b
 
 def f(flag: bool):
-    x = str() if flag else str("hello")
+    x = "" if flag else "hello"
     reveal_type(x)  # revealed: Literal["", "hello"]
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 

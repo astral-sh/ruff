@@ -351,6 +351,7 @@ impl<'db> ConstructorBinding<'db> {
         if self.constructor_kind().is_init() || self.constructed_class_literal(db).is_none() {
             return None;
         }
+
         let matching_overloads = self
             .callable()
             .matching_overloads()
@@ -501,6 +502,7 @@ impl<'db> ConstructorBinding<'db> {
     fn constructed_class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         self.constructed_instance_type()
             .as_nominal_instance()
+            // TODO may need to handle `Type::KnownInstance` here as well?
             .map(|instance| instance.class(db).class_literal(db))
     }
 
