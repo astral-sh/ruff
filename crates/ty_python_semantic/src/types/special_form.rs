@@ -89,6 +89,8 @@ pub enum SpecialFormType {
     RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,
+    /// The symbol `ty_extensions.TypedDictTop`
+    TypedDictTop,
     /// The symbol `ty_extensions.Bottom`
     Bottom,
     /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self`)
@@ -148,6 +150,7 @@ impl SpecialFormType {
             | Self::TypeOf
             | Self::Not
             | Self::Top
+            | Self::TypedDictTop
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
@@ -225,6 +228,7 @@ impl SpecialFormType {
             CallableTypeOf,
             RegularCallableTypeOf,
             Top,
+            TypedDictTop,
             Bottom,
             #[strum(serialize = "Self")]
             TypingSelf,
@@ -287,6 +291,7 @@ impl SpecialFormType {
                     SpecialFormType::Any => Self::Any,
                     SpecialFormType::Bottom => Self::Bottom,
                     SpecialFormType::Top => Self::Top,
+                    SpecialFormType::TypedDictTop => Self::TypedDictTop,
                     SpecialFormType::Unpack => Self::Unpack,
                     SpecialFormType::Tuple => Self::Tuple,
                     SpecialFormType::TypedDict => Self::TypedDict,
@@ -344,6 +349,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Any => Self::Any,
                 SpecialFormTypeBuilder::Bottom => Self::Bottom,
                 SpecialFormTypeBuilder::Top => Self::Top,
+                SpecialFormTypeBuilder::TypedDictTop => Self::TypedDictTop,
                 SpecialFormTypeBuilder::Unpack => Self::Unpack,
                 SpecialFormTypeBuilder::Tuple => Self::Tuple,
                 SpecialFormTypeBuilder::TypedDict => Self::TypedDict,
@@ -416,6 +422,7 @@ impl SpecialFormType {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
+            | Self::TypedDictTop
             | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
@@ -473,6 +480,7 @@ impl SpecialFormType {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
+            | Self::TypedDictTop
             | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
@@ -522,6 +530,7 @@ impl SpecialFormType {
             | Self::NamedTuple
             | Self::Optional
             | Self::Top
+            | Self::TypedDictTop
             | Self::TypeIs
             | Self::TypedDict
             | Self::TypingSelf
@@ -573,6 +582,7 @@ impl SpecialFormType {
             SpecialFormType::CallableTypeOf => "CallableTypeOf",
             SpecialFormType::RegularCallableTypeOf => "RegularCallableTypeOf",
             SpecialFormType::Top => "Top",
+            SpecialFormType::TypedDictTop => "TypedDictTop",
             SpecialFormType::Bottom => "Bottom",
             SpecialFormType::Protocol => "Protocol",
             SpecialFormType::Generic => "Generic",
@@ -619,6 +629,7 @@ impl SpecialFormType {
             | SpecialFormType::CallableTypeOf
             | SpecialFormType::RegularCallableTypeOf
             | SpecialFormType::Top
+            | SpecialFormType::TypedDictTop
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
         }
     }
@@ -658,6 +669,7 @@ impl SpecialFormType {
             Self::Unknown => Ok(Type::unknown()),
             Self::AlwaysTruthy => Ok(Type::AlwaysTruthy),
             Self::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+            Self::TypedDictTop => Ok(Type::TypedDictTop),
 
             // Special case: `NamedTuple` in a type expression is understood to describe the type
             // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.

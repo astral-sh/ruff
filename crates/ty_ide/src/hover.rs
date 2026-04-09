@@ -5733,6 +5733,48 @@ except <CURSOR># Trigger completion/hover here
         assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
+    #[test]
+    fn hover_ty_extensions_typed_dict_top_special_form() {
+        let test = hover_test(
+            r#"
+            from ty_extensions import TypedDictTop
+
+            value: TypedDic<CURSOR>tTop
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        TypedDictTop
+        ---------------------------------------------
+        `TypedDictTop` represents the top type of all `TypedDict` instances.
+
+        Use this to describe values that are known to be `TypedDict`s, but whose concrete key set
+        is not statically known.
+
+        ---------------------------------------------
+        ```python
+        TypedDictTop
+        ```
+        ---
+        `TypedDictTop` represents the top type of all `TypedDict` instances.<HB>
+        <HB>
+        Use this to describe values that are known to be `TypedDict`s, but whose concrete key set<HB>
+        is not statically known.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:8
+          |
+        2 | from ty_extensions import TypedDictTop
+        3 |
+        4 | value: TypedDictTop
+          |        ^^^^^^^^-^^^
+          |        |       |
+          |        |       Cursor offset
+          |        source
+          |
+        ");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

@@ -190,6 +190,38 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_ty_extensions_typed_dict_top_special_form() {
+        let test = cursor_test(
+            r#"
+            from ty_extensions import TypedDictTop
+
+            value: TypedDic<CURSOR>tTop
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+         --> main.py:4:8
+          |
+        2 | from ty_extensions import TypedDictTop
+        3 |
+        4 | value: TypedDictTop
+          |        ^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 type definition
+           --> stdlib/ty_extensions.pyi:105:1
+            |
+        103 | \"\"\"
+        104 |
+        105 | TypedDictTop: _SpecialForm
+            | ------------
+        106 | \"\"\"
+        107 | `TypedDictTop` represents the top type of all `TypedDict` instances.
+            |
+        ");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_function_type() {
         let test = cursor_test(
             r#"

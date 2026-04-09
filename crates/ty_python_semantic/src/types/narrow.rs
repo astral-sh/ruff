@@ -378,7 +378,7 @@ impl<'db> Conjunctions<'db> {
     }
 }
 
-/// Return the portion of a subject type that should preserve the `Top[TypedDict]` fallback arm
+/// Return the portion of a subject type that should preserve the `TypedDictTop` fallback arm
 /// for dict-like `isinstance()` narrowing.
 ///
 /// This keeps explicit `TypedDict` content and gradual/top-like sources such as `object`,
@@ -402,12 +402,12 @@ fn typed_dict_fallback_portion<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db>
     }
 }
 
-/// Return `true` if this type should keep participating in the `Top[TypedDict]` fallback arm
+/// Return `true` if this type should keep participating in the `TypedDictTop` fallback arm
 /// produced by dict-like `isinstance()` narrowing.
 ///
 /// The intent is to preserve the fallback only for types where it still models a real
 /// possibility after narrowing, and to reject interface-only types like `Mapping` or
-/// `Iterable` that would otherwise create impossible `... & Top[TypedDict]` intersections.
+/// `Iterable` that would otherwise create impossible `... & TypedDictTop` intersections.
 fn preserves_typed_dict_fallback<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty.resolve_type_alias(db) {
         Type::Dynamic(_) | Type::Divergent(_) | Type::TypedDict(_) | Type::TypedDictTop => true,
