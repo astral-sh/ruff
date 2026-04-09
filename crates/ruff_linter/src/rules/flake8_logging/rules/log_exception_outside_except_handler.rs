@@ -49,18 +49,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// import logging
 ///
 ///
-/// def make_handler():
-///     try:
-///         raise ValueError()
-///     except Exception:
+/// try:
+///     raise ValueError()
+/// except Exception:
 ///
-///         def handler():
-///             logging.exception("x")  # LOG004 not raised (false negative)
-///
-///         return handler
+///     def handler():
+///         logging.exception("Foobar")  # LOG004 not raised (false negative)
 ///
 ///
-/// make_handler()()
+/// handler()
 /// ```
 ///
 /// ## Fix safety
