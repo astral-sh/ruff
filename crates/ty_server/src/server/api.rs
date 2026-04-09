@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
-mod requests;
+pub mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
