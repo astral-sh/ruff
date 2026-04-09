@@ -214,3 +214,23 @@ def _():
     with open("file", "w") as f:
         for line in ((1,) if True else (2,)):
             f.write(f"{line}")
+
+
+# Named expression rebinding loop variable — fix would be a syntax error
+# https://github.com/astral-sh/ruff/issues/21107
+def _():
+    with (
+        open("furb122.py", encoding="utf-8") as src,
+        open("furb122.txt", "w", encoding="utf-8") as dst,
+    ):
+        for line in src:
+            dst.write(line := line.upper())
+
+
+def _():
+    with (
+        open("furb122.py", encoding="utf-8") as src,
+        open("furb122.txt", "w", encoding="utf-8") as dst,
+    ):
+        for line in src:
+            dst.write(str(line := line.upper()))
