@@ -57,7 +57,10 @@ where
 ///
 /// overloads:
 /// 1. `__init__(self, __map: TD, /, *, field1: T1 = ..., field2: T2 = ...) -> None`
-///    Allows passing another instance of the type dict when creating a new instance.
+///    Allows passing another instance of the `TypedDict` when creating a new instance.
+///    Technically, `__map` could accept a subset of the `TypedDict` if the remaining
+///    fields are provided as keyword arguments, but we don't model that in the
+///    synthesized `__init__`, since this signature is primarily used for IDE support.
 /// 2. `__init__(self, *, field1: T1, field2: T2 = ...) -> None`
 ///    Keyword-only.
 fn synthesize_typed_dict_init<'db, N, F>(
