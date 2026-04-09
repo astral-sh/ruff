@@ -1282,10 +1282,6 @@ mod tests {
         "#);
     }
 
-    // TODO: We currently cannot match arguments with overload when dict expression is used inside
-    // the constructor.
-    // The reason is that the synthesized constructor is only used for server. Not in the type
-    // inference. During inference the type context when checking dict expression is not TypedDict.
     #[test]
     fn hover_typeddict_constructor_positional_map_dict_literal_in_constructor() {
         let test = hover_test(
