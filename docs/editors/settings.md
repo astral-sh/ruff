@@ -652,7 +652,7 @@ Whether to display Quick Fix actions to autofix violations.
           "initialization_options": {
             "settings": {
               "codeAction": {
-                "fixViolation": = {
+                "fixViolation": {
                   "enable": false
                 }
               }
