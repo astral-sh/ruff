@@ -1095,25 +1095,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 infer_type_argument(self, slice)
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                // `type["Foo" | "Bar"]` is a runtime error if annotations are not deferred.
-                // Delegate to `infer_type_argument` which emits a diagnostic for that case.
-                if !self.deferred_state.is_deferred()
-                    && (binary.left.is_string_literal_expr()
-                        || binary.right.is_string_literal_expr())
-                {
-                    return infer_type_argument(self, slice);
-                }
-
-                let union_ty = UnionType::from_elements_leave_aliases(
-                    self.db(),
-                    [
-                        self.infer_subclass_of_type_expression(&binary.left),
-                        self.infer_subclass_of_type_expression(&binary.right),
-                    ],
-                );
-                self.store_expression_type(slice, union_ty);
-
-                union_ty
+                infer_type_argument(self, slice)
             }
             ast::Expr::Tuple(_) => {
                 if !self.in_string_annotation() {
