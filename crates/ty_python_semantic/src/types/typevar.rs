@@ -994,10 +994,6 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
-    pub(super) const fn is_self(self) -> bool {
-        matches!(self, Self::TypingSelf)
-    }
-
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
     }
@@ -1381,6 +1377,13 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     visitor,
                 ))
             }
+        }
+    }
+
+    pub(crate) fn as_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db),
         }
     }
 }

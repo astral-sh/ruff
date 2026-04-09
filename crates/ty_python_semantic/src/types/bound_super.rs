@@ -21,6 +21,63 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TypeVarOwnerContext<'db> {
+    Bare(BoundTypeVarInstance<'db>),
+    SubclassOf(BoundTypeVarInstance<'db>),
+}
+
+impl<'db> TypeVarOwnerContext<'db> {
+    fn typevar(self, db: &'db dyn Db) -> TypeVarInstance<'db> {
+        match self {
+            TypeVarOwnerContext::Bare(bound_typevar)
+            | TypeVarOwnerContext::SubclassOf(bound_typevar) => bound_typevar.typevar(db),
+        }
+    }
+
+    fn has_implicit_upper_bound(self, db: &'db dyn Db) -> bool {
+        self.typevar(db).bound_or_constraints(db).is_none()
+    }
+
+    /// The bound or constraints of this typevar, as a type (i.e. constraints are unioned), wrapped
+    /// in `SubclassOf` if this is a `SubclassOf` context. `object` if no bound/constraints.
+    /// Used for error messages.
+    fn bound_or_constraints_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeVarOwnerContext::Bare(typevar) => typevar
+                .typevar(db)
+                .require_bound_or_constraints(db)
+                .as_type(db),
+            TypeVarOwnerContext::SubclassOf(typevar) => SubclassOfType::try_from_instance(
+                db,
+                typevar
+                    .typevar(db)
+                    .require_bound_or_constraints(db)
+                    .as_type(db),
+            )
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TypeVarSuperOwnerKind {
+    Instance,
+    Class,
+}
+
+impl TypeVarSuperOwnerKind {
+    fn diagnostic_context(
+        self,
+        bound_typevar: BoundTypeVarInstance<'_>,
+    ) -> TypeVarOwnerContext<'_> {
+        match self {
+            TypeVarSuperOwnerKind::Instance => TypeVarOwnerContext::Bare(bound_typevar),
+            TypeVarSuperOwnerKind::Class => TypeVarOwnerContext::SubclassOf(bound_typevar),
+        }
+    }
+}
+
 /// Enumeration of ways in which a `super()` call can cause us to emit a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {
@@ -32,7 +89,7 @@ pub(crate) enum BoundSuperError<'db> {
         owner_type: Type<'db>,
         pivot_class: Type<'db>,
         /// If `owner_type` is a type variable, this contains the type variable instance
-        typevar_context: Option<TypeVarInstance<'db>>,
+        typevar_context: Option<TypeVarOwnerContext<'db>>,
     },
     /// The first argument to `super()` (which may have been implicitly provided by
     /// the Python interpreter) is not a valid class type.
@@ -43,7 +100,7 @@ pub(crate) enum BoundSuperError<'db> {
         pivot_class: Type<'db>,
         owner: Type<'db>,
         /// If `owner_type` is a type variable, this contains the type variable instance
-        typevar_context: Option<TypeVarInstance<'db>>,
+        typevar_context: Option<TypeVarOwnerContext<'db>>,
     },
     /// It was a single-argument `super()` call, but we were unable to determine
     /// the implicit arguments provided by the Python interpreter.
@@ -114,20 +171,18 @@ impl<'db> BoundSuperError<'db> {
                         owner = owner.display(context.db()),
                     ));
                     if let Some(typevar_context) = typevar_context {
-                        let bound_or_constraints_union =
-                            Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
                         diagnostic.info(format_args!(
                             "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
                             bounds_or_constraints =
-                                bound_or_constraints_union.display(context.db()),
+                                typevar_context.bound_or_constraints_type(context.db()).display(context.db()),
                             pivot_class = pivot_class.display(context.db()),
                         ));
-                        if typevar_context.bound_or_constraints(context.db()).is_none()
-                            && !typevar_context.kind(context.db()).is_self()
-                        {
+                        let typevar = typevar_context.typevar(context.db());
+                        if typevar_context.has_implicit_upper_bound(context.db()) {
                             diagnostic.help(format_args!(
                                 "Consider adding an upper bound to type variable `{}`",
-                                typevar_context.name(context.db())
+                                typevar.name(context.db())
                             ));
                         }
                     }
@@ -150,9 +205,17 @@ impl<'db> BoundSuperError<'db> {
     fn describe_typevar(
         db: &'db dyn Db,
         diagnostic: &mut Diagnostic,
-        type_var: TypeVarInstance<'db>,
+        type_var_context: TypeVarOwnerContext<'db>,
     ) -> Type<'db> {
-        match type_var.bound_or_constraints(db) {
+        let type_var = type_var_context.typevar(db);
+        match type_var_context.typevar(db).bound_or_constraints(db) {
+            None => {
+                diagnostic.info(format_args!(
+                    "Type variable `{}` has `object` as its implicit upper bound",
+                    type_var.name(db),
+                ));
+                Type::object()
+            }
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 diagnostic.info(format_args!(
                     "Type variable `{}` has upper bound `{}`",
@@ -172,13 +235,6 @@ impl<'db> BoundSuperError<'db> {
                         .join(", ")
                 ));
                 constraints.as_type(db)
-            }
-            None => {
-                diagnostic.info(format_args!(
-                    "Type variable `{}` has `object` as its implicit upper bound",
-                    type_var.name(db)
-                ));
-                Type::object()
             }
         }
     }
@@ -364,7 +420,7 @@ impl<'db> BoundSuperType<'db> {
         owner_for_error: Type<'db>,
         owner: ResolvedSuperOwner<'db>,
         metaclass_owner: Option<ResolvedSuperOwner<'db>>,
-        typevar_context: Option<TypeVarInstance<'db>>,
+        typevar_context: Option<TypeVarOwnerContext<'db>>,
     ) -> Result<ResolvedSuperOwner<'db>, BoundSuperError<'db>> {
         [Some(owner), metaclass_owner]
             .into_iter()
@@ -384,7 +440,7 @@ impl<'db> BoundSuperType<'db> {
         owner_for_error: Type<'db>,
         owner_display_type: Type<'db>,
         owner_class: ClassType<'db>,
-        typevar_context: Option<TypeVarInstance<'db>>,
+        typevar_context: Option<TypeVarOwnerContext<'db>>,
     ) -> Result<ResolvedSuperOwner<'db>, BoundSuperError<'db>> {
         Self::validate_resolved_super_owner(
             db,
@@ -416,7 +472,7 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
         owner_class: ClassType<'db>,
-        typevar_context: Option<TypeVarInstance<'db>>,
+        typevar_context: Option<TypeVarOwnerContext<'db>>,
     ) -> Result<ResolvedSuperOwner<'db>, BoundSuperError<'db>> {
         Self::validate_resolved_super_owner(
             db,
@@ -449,17 +505,12 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        enum TypeVarOwnerKind {
-            Instance,
-            Class,
-        }
-
         let delegate_to =
             |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
 
         // Delegate but rewrite errors to preserve TypeVar context.
         let delegate_with_error_mapped =
-            |type_to_delegate_to, error_context: Option<TypeVarInstance<'db>>| {
+            |type_to_delegate_to, error_context: Option<TypeVarOwnerContext<'db>>| {
                 delegate_to(type_to_delegate_to).map_err(|err| match err {
                     BoundSuperError::AbstractOwnerType {
                         owner_type: _,
@@ -521,9 +572,8 @@ impl<'db> BoundSuperType<'db> {
         // Helper to build a union of bound-super instances for constrained TypeVars.
         // Each constraint must be a subclass of the pivot class.
         let build_constrained_union = |constraints: TypeVarConstraints<'db>,
-                                       _bound_typevar: BoundTypeVarInstance<'db>,
-                                       typevar: TypeVarInstance<'db>,
-                                       owner_kind: TypeVarOwnerKind|
+                                       bound_typevar: BoundTypeVarInstance<'db>,
+                                       owner_kind: TypeVarSuperOwnerKind|
          -> Result<Type<'db>, BoundSuperError<'db>> {
             let mut builder = UnionBuilder::new(db);
             for constraint in constraints.elements(db) {
@@ -534,17 +584,17 @@ impl<'db> BoundSuperType<'db> {
                 match class {
                     Some(class) => {
                         let owner = match owner_kind {
-                            TypeVarOwnerKind::Instance => {
+                            TypeVarSuperOwnerKind::Instance => {
                                 SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                                     db,
                                     pivot_class,
                                     pivot_class_type,
                                     owner_type,
                                     class,
-                                    Some(typevar),
+                                    Some(owner_kind.diagnostic_context(bound_typevar)),
                                 )?)
                             }
-                            TypeVarOwnerKind::Class => {
+                            TypeVarSuperOwnerKind::Class => {
                                 SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                                     db,
                                     pivot_class,
@@ -552,7 +602,7 @@ impl<'db> BoundSuperType<'db> {
                                     owner_type,
                                     owner_type,
                                     class,
-                                    Some(typevar),
+                                    Some(owner_kind.diagnostic_context(bound_typevar)),
                                 )?)
                             }
                         };
@@ -613,20 +663,22 @@ impl<'db> BoundSuperType<'db> {
                                     owner_type,
                                     owner_type,
                                     class,
-                                    Some(typevar),
+                                    Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
                                 )?)
                             } else {
                                 let subclass_of = SubclassOfType::try_from_instance(db, bound)
                                     .unwrap_or_else(SubclassOfType::subclass_of_unknown);
-                                return delegate_with_error_mapped(subclass_of, Some(typevar));
+                                return delegate_with_error_mapped(
+                                    subclass_of,
+                                    Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
+                                );
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                             return build_constrained_union(
                                 constraints,
                                 bound_typevar,
-                                typevar,
-                                TypeVarOwnerKind::Class,
+                                TypeVarSuperOwnerKind::Class,
                             );
                         }
                         None => {
@@ -638,7 +690,7 @@ impl<'db> BoundSuperType<'db> {
                                 owner_type,
                                 owner_type,
                                 ClassType::object(db),
-                                Some(typevar),
+                                Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
                             )?)
                         }
                     }
@@ -727,18 +779,20 @@ impl<'db> BoundSuperType<'db> {
                                 pivot_class_type,
                                 owner_type,
                                 class,
-                                Some(typevar),
+                                Some(TypeVarOwnerContext::Bare(bound_typevar)),
                             )?)
                         } else {
-                            return delegate_with_error_mapped(bound, Some(typevar));
+                            return delegate_with_error_mapped(
+                                bound,
+                                Some(TypeVarOwnerContext::Bare(bound_typevar)),
+                            );
                         }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         return build_constrained_union(
                             constraints,
                             bound_typevar,
-                            typevar,
-                            TypeVarOwnerKind::Instance,
+                            TypeVarSuperOwnerKind::Instance,
                         );
                     }
                     None => {
@@ -749,7 +803,7 @@ impl<'db> BoundSuperType<'db> {
                             pivot_class_type,
                             owner_type,
                             ClassType::object(db),
-                            Some(typevar),
+                            Some(TypeVarOwnerContext::Bare(bound_typevar)),
                         )?)
                     }
                 }

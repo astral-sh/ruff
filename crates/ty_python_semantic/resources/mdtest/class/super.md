@@ -315,6 +315,8 @@ When the second argument to `super()` is a class object, the call can still be v
 object is an instance of the pivot metaclass. This includes both concrete class objects and
 `type[T]`-style annotations in metaclass methods:
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Any, TypeVar
 
@@ -350,6 +352,12 @@ class OtherBase(metaclass=OtherMeta):
     pass
 
 super(Meta, OtherBase)  # error: [invalid-super-argument]
+
+T = TypeVar("T", bound=int)
+
+class BoundIntMeta(type):
+    def __call__(cls: type[T]) -> T:
+        return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 
 ### Unbound Super Object
