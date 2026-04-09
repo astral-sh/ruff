@@ -1340,10 +1340,15 @@ pub(crate) fn check_docstring(
 
             if !docstring_sections.raises.as_ref().is_some_and(|section| {
                 section.raised_exceptions.iter().any(|exception| {
-                    body_raise
-                        .qualified_name
-                        .segments()
-                        .ends_with(exception.segments())
+                    {
+                        let body_segs = body_raise.qualified_name.segments();
+                        let exc_segs = exception.segments();
+                        // Direct match, or classmethod constructor pattern
+                        // (e.g., `raise Foo.from_bar(...)` should match `Foo` in docstring)
+                        body_segs.ends_with(exc_segs)
+                            || (body_segs.len() > exc_segs.len()
+                                && body_segs[..body_segs.len() - 1].ends_with(exc_segs))
+                    }
                 })
             }) {
                 checker.report_diagnostic(
@@ -1404,10 +1409,15 @@ pub(crate) fn check_docstring(
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {
                     if !body_entries.raised_exceptions.iter().any(|exception| {
-                        exception
-                            .qualified_name
-                            .segments()
-                            .ends_with(docstring_raise.segments())
+                        {
+                            let body_segs = exception.qualified_name.segments();
+                            let doc_segs = docstring_raise.segments();
+                            // Direct match, or classmethod constructor pattern
+                            // (e.g., `raise Foo.from_bar(...)` should match `Foo` in docstring)
+                            body_segs.ends_with(doc_segs)
+                                || (body_segs.len() > doc_segs.len()
+                                    && body_segs[..body_segs.len() - 1].ends_with(doc_segs))
+                        }
                     }) {
                         extraneous_exceptions.push(docstring_raise.to_string());
                     }
