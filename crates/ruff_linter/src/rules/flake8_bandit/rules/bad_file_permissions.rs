@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
