@@ -1316,22 +1316,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 },
                 Protocol::Synthesized(synthetic) => {
-                    f.set_invalid_type_annotation();
-                    f.write_char('<')?;
-                    f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
-                        .write_str("Protocol")?;
-                    f.write_str(" with members ")?;
-                    let interface = synthetic.interface();
-                    let member_list = interface.members(self.db);
-                    let num_members = member_list.len();
-                    for (i, member) in member_list.enumerate() {
-                        let is_last = i == num_members - 1;
-                        write!(f, "'{}'", member.name())?;
-                        if !is_last {
-                            f.write_str(", ")?;
+                    if self.settings.fully_qualified {
+                        write!(f, "{}", SpecialFormType::Protocol)
+                    } else {
+                        f.set_invalid_type_annotation();
+                        f.write_char('<')?;
+                        f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
+                            .write_str("Protocol")?;
+                        f.write_str(" with members ")?;
+                        let interface = synthetic.interface();
+                        let member_list = interface.members(self.db);
+                        let num_members = member_list.len();
+                        for (i, member) in member_list.enumerate() {
+                            let is_last = i == num_members - 1;
+                            write!(f, "'{}'", member.name())?;
+                            if !is_last {
+                                f.write_str(", ")?;
+                            }
                         }
+                        f.write_char('>')
                     }
-                    f.write_char('>')
                 }
             },
             Type::PropertyInstance(_) => f.write_str("property"),
@@ -4573,6 +4577,24 @@ mod tests {
 
             // This should not hang or overflow the stack
             assert_eq!(display.to_string(), "Unknown");
+        }
+
+        #[test]
+        fn synthesized_protocol() {
+            use crate::types::Type;
+            let db = setup_db();
+
+            let protocol = Type::protocol_with_readonly_members(
+                &db,
+                [("name", KnownClass::Str.to_instance(&db))],
+            );
+
+            assert_eq!(
+                protocol
+                    .display_with(&db, DisplaySettings::default().fully_qualified())
+                    .to_string(),
+                "typing.Protocol"
+            );
         }
 
         #[test]
