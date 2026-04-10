@@ -73,41 +73,38 @@ pub(crate) fn url_path_with_leading_slash(checker: &Checker, call: &ast::ExprCal
         return;
     };
 
-    // Check if it's a string literal
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = route_arg {
-        let route = value.to_str();
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = route_arg else {
+        return;
+    };
 
-        // Skip empty strings and root path "/"
-        if route.is_empty() || route == "/" {
-            return;
-        }
+    let route = value.to_str();
 
-        // Check if route starts with a leading slash
-        if route.starts_with('/') {
-            // Report diagnostic for routes with leading slash
-            let mut diagnostic = checker.report_diagnostic(
-                DjangoURLPathWithLeadingSlash {
-                    url_pattern: route.to_string(),
-                },
-                route_arg.range(),
-            );
-
-            // Determine the quote style to find the insertion point for removal
-            let string_content = checker.locator().slice(route_arg.range());
-            let quote_len =
-                if string_content.starts_with("'''") || string_content.starts_with("\"\"\"") {
-                    3
-                } else if string_content.starts_with('\'') || string_content.starts_with('"') {
-                    1
-                } else {
-                    return; // Invalid string format
-                };
-
-            // Remove the leading slash (after the opening quote(s))
-            let removal_start = route_arg.range().start() + TextSize::new(quote_len);
-            let removal_end = removal_start + TextSize::new(1); // Remove one character (the slash)
-
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(removal_start, removal_end)));
-        }
+    if route.is_empty() || route == "/" || !route.starts_with('/') {
+        return;
     }
+
+    let Some(first_literal) = value.iter().next() else {
+        return;
+    };
+    if !checker
+        .locator()
+        .slice(first_literal.content_range())
+        .starts_with('/')
+    {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
+        DjangoUrlPathWithLeadingSlash {
+            url_pattern: route.to_string(),
+        },
+        route_arg.range(),
+    );
+
+    let slash_pos = first_literal.content_range().start();
+
+    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+        slash_pos,
+        slash_pos + TextSize::new(1),
+    )));
 }
