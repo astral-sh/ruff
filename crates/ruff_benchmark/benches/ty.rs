@@ -17,8 +17,8 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> Case {
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
         }),
         analysis: Some(AnalysisOptions {
@@ -242,7 +242,7 @@ fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> 
             name,
             dependencies,
             &venv_path,
-            PythonVersion::PY312,
+            SupportedPythonVersion::Py312,
             "2025-06-17",
         )
         .expect("Failed to install dependencies");
@@ -267,7 +267,7 @@ fn setup_micro_case_inner(code: &str, dependencies: Option<(&str, &[&str])>) -> 
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python,
             ..EnvironmentOptions::default()
         }),
@@ -956,7 +956,7 @@ fn hydra(criterion: &mut Criterion) {
             paths: &["src"],
             dependencies: &["pydantic", "beartype", "hydra-core"],
             max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            python_version: SupportedPythonVersion::Py313,
         },
         100,
     );
@@ -973,7 +973,7 @@ fn attrs(criterion: &mut Criterion) {
             paths: &["src"],
             dependencies: &[],
             max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            python_version: SupportedPythonVersion::Py313,
         },
         120,
     );
@@ -990,7 +990,7 @@ fn anyio(criterion: &mut Criterion) {
             paths: &["src"],
             dependencies: &[],
             max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY313,
+            python_version: SupportedPythonVersion::Py313,
         },
         150,
     );
@@ -1007,7 +1007,7 @@ fn datetype(criterion: &mut Criterion) {
             paths: &["src"],
             dependencies: &[],
             max_dep_date: "2025-07-04",
-            python_version: PythonVersion::PY313,
+            python_version: SupportedPythonVersion::Py313,
         },
         10,
     );
