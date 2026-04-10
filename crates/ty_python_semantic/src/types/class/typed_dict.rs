@@ -107,8 +107,8 @@ fn synthesize_typed_dict_init<'db>(
     let self_param =
         Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty);
 
-    let map_param = Parameter::positional_only(Some(Name::new_static("__map")))
-        .with_annotated_type(instance_ty);
+    let map_param =
+        Parameter::positional_only(Some(Name::new_static("map"))).with_annotated_type(instance_ty);
 
     let params_with_default = keyword_fields.iter().map(|(name, field)| {
         Parameter::keyword_only((*name).clone())
