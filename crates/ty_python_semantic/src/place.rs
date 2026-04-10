@@ -1042,8 +1042,8 @@ pub(crate) fn place_by_id<'db>(
             // gradual guarantee would suggest that if not annotated, all such external mutations
             // should be valid. However, external modifications (or modifications through `global`
             // statements) that would require a different public type are relatively rare. From a
-            // practical perspective, we get a better user experience by trusting the (promoted)
-            // inferred type by default, and only requiring annotation for the rare case.
+            // practical perspective, we get a better user experience by trusting the inferred type
+            // by default, and only requiring annotation for the rare case.
             let is_module_global = scope.node(db).scope_kind().is_module();
 
             // If the visibility of the scope is private (like for a function scope), we also keep

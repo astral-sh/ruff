@@ -85,6 +85,31 @@ reveal_type(w.value)
 w.value = "a"
 ```
 
+## Declaring a narrower type to avoid promotion
+
+It's also possible to declare a narrower type to avoid promotion. For example, if we know that an
+attribute will always hold one of two literal values, we may want to avoid promotion of the literal:
+
+```py
+from typing import Literal
+
+class Constant:
+    value: Literal[0, 1] = 0
+
+# We would have promoted this to `int` without the explicit annotation:
+reveal_type(Constant().value)  # revealed: Literal[0, 1]
+```
+
+This also works to avoid widening of singleton types, if for some reason you want an attribute that
+can only ever hold that one singleton value:
+
+```py
+class NoneWrapper:
+    value: None = None
+
+reveal_type(NoneWrapper().value)  # revealed: None
+```
+
 ## What is meant by 'public' type?
 
 We apply different semantics depending on whether a symbol is accessed from the same scope in which
