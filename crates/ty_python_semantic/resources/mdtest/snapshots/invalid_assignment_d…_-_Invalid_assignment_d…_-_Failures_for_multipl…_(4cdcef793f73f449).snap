@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Failures for multiple intersection elements
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from ty_extensions import Intersection
+ 2 | from typing import Protocol
+ 3 | 
+ 4 | class SupportsFoo(Protocol):
+ 5 |     def foo(self, x: int) -> bool: ...
+ 6 | 
+ 7 | class DoesNotSupportFoo1: ...
+ 8 | class DoesNotSupportFoo2: ...
+ 9 | 
+10 | def _(source: Intersection[DoesNotSupportFoo1, DoesNotSupportFoo2]):
+11 |     target: SupportsFoo = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFoo2` is not assignable to `SupportsFoo`
+  --> src/mdtest_snippet.py:11:13
+   |
+10 | def _(source: Intersection[DoesNotSupportFoo1, DoesNotSupportFoo2]):
+11 |     target: SupportsFoo = source  # error: [invalid-assignment]
+   |             -----------   ^^^^^^ Incompatible value of type `DoesNotSupportFoo1 & DoesNotSupportFoo2`
+   |             |
+   |             Declared type
+   |
+
+```
