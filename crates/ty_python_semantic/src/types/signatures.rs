@@ -1016,12 +1016,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         upper,
                     );
                     let return_types_match = || {
-                        target_overloads
-                            .iter()
-                            .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |target_return| {
-                                self.check_type_pair(db, source_return, target_return)
-                            })
+                        // TODO: Similar to how we do this for unions, we should collect error
+                        // context for all elements and report it if *all* checks fail.
+                        self.without_error_context(|| {
+                            target_overloads
+                                .iter()
+                                .map(|signature| signature.return_ty)
+                                .when_any(db, self.constraints, |target_return| {
+                                    self.check_type_pair(db, source_return, target_return)
+                                })
+                        })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
@@ -1048,12 +1052,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         Type::object(),
                     );
                     let return_types_match = || {
-                        source_overloads
-                            .iter()
-                            .map(|signature| signature.return_ty)
-                            .when_any(db, self.constraints, |source_return| {
-                                self.check_type_pair(db, source_return, target_return)
-                            })
+                        // TODO: Similar to how we do this for unions, we should collect error
+                        // context for all elements and report it if *all* checks fail.
+                        self.without_error_context(|| {
+                            source_overloads
+                                .iter()
+                                .map(|signature| signature.return_ty)
+                                .when_any(db, self.constraints, |source_return| {
+                                    self.check_type_pair(db, source_return, target_return)
+                                })
+                        })
                     };
                     return param_spec_matches.and(db, self.constraints, return_types_match);
                 }
@@ -1091,8 +1099,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return aggregate_relation;
                 }
 
-                // TODO: Similar to how we do this for unions, collect error
-                // context for all overloads and report it if *all* checks fail.
+                // TODO: Similar to how we do this for unions, we should collect error
+                // context for all elements and report it if *all* checks fail.
                 self.without_error_context(|| {
                     source_overloads
                         .iter()

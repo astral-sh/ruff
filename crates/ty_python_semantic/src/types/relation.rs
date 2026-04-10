@@ -1117,7 +1117,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
                     .or(db, self.constraints, is_new_type_of_union);
 
-                if context_collection_enabled && result.is_never_satisfied(db) {
+                if context_collection_enabled
+                    && elements_context.len() > 0
+                    && result.is_never_satisfied(db)
+                {
                     let elements_without_context = elements.len() - elements_context.len();
                     if elements_without_context > 0 && elements_without_context < elements.len() {
                         elements_context.push(
@@ -1193,7 +1196,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                // TODO: Similar to how we do this for unions, collect error
+                // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
 
                 self.without_error_context(|| {
