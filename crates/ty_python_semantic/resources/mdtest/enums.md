@@ -2361,6 +2361,50 @@ class MyEnum[T](MyEnumBase):
     A = 1
 ```
 
+## Constructor signature
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Enum can be created by subclassing:
+
+```py
+from enum import Enum, IntEnum
+from ty_extensions import into_regular_callable
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+# revealed: (value: object) -> Color
+reveal_type(into_regular_callable(Color))
+
+class Priority(IntEnum):
+    HIGH = 1
+    LOW = 2
+
+# revealed: (value: int) -> Priority
+reveal_type(into_regular_callable(Priority))
+```
+
+Or calling the `Enum` class directly
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(Enum))
+
+# revealed: (value: int) -> IntEnum
+reveal_type(into_regular_callable(IntEnum))
+
+# revealed: (value: str) -> StrEnum
+reveal_type(into_regular_callable(StrEnum))
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>

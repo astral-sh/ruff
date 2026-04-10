@@ -1778,6 +1778,7 @@ impl<'db> ClassType<'db> {
                 });
 
             // For enum subclasses, skip the metaclass `__call__`.
+            // TODO This won't return correct constructor for `Enum`, `IntEnum`, etc.
             if !is_enum_class {
                 // TODO: this intentionally diverges from step 1 in
                 // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
