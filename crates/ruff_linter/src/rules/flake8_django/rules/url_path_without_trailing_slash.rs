@@ -69,8 +69,7 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
         return;
     }
 
-    // Get the first argument (the route pattern)
-    let Some(route_arg) = call.arguments.args.first() else {
+    let Some(route_arg) = call.arguments.find_positional(0) else {
         return;
     };
 
