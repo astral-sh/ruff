@@ -190,9 +190,9 @@ Public.a = None
 
 ### Undeclared but bound
 
-If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
-treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
-possibly due to the usage of an unknown name in the annotation:
+If a symbol is *undeclared*, we use the inferred type directly. Note that we treat this case
+differently from the case where a symbol is implicitly declared with `Unknown`, possibly due to the
+usage of an unknown name in the annotation:
 
 ```py
 class Public:
@@ -202,10 +202,11 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+# error: [invalid-assignment]
 Public.a = None
 ```
 
@@ -225,10 +226,11 @@ class Public:
 
 # TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+# error: [invalid-assignment]
 Public.a = None
 ```
 

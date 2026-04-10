@@ -5831,7 +5831,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Promote singleton types to `T | Unknown` in inferred type parameters,
                     // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
                     if elt_tcx_constraints.is_empty() {
-                        return Some(lower.promote_singletons(self.db()));
+                        return Some(lower.promote_singletons_recursively(self.db()));
                     }
                     None
                 })

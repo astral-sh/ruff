@@ -40,7 +40,7 @@ use crate::types::{
 use crate::{
     Db, FxIndexMap, FxOrderSet,
     place::{
-        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, Widening,
+        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
     },
     semantic_index::{place_table, use_def_map},
@@ -2311,7 +2311,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ty: union.build(),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(union_qualifiers)
         };

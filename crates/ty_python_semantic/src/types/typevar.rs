@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening},
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
     semantic_index::{
         definition::{Definition, DefinitionKind},
         semantic_index,
@@ -1294,7 +1294,7 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,

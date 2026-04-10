@@ -202,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: SupportedPythonVersion::Py312,
     },
-    14100,
+    14150,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
