@@ -3605,7 +3605,6 @@ pub(super) fn report_invalid_assignment<'db>(
     definition: Definition<'db>,
     target_ty: Type,
     value_ty: Type<'db>,
-    error_context: &TypeRelationErrorContext<'db>,
 ) {
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
@@ -3677,6 +3676,7 @@ pub(super) fn report_invalid_assignment<'db>(
             value_ty.display(context.db()),
         ));
 
+        let error_context = value_ty.assignability_error_context(context.db(), target_ty);
         for message in error_context.info_messages(context.db()) {
             diag.info(message);
         }
@@ -5379,7 +5379,7 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
-    error_context: &TypeRelationErrorContext<'db>,
+    error_context: impl FnOnce() -> TypeRelationErrorContext<'db>,
 ) {
     let db = context.db();
 
@@ -5450,7 +5450,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    for message in error_context.info_messages(context.db()) {
+    for message in error_context().info_messages(context.db()) {
         diagnostic.info(message);
     }
 

@@ -1220,22 +1220,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                if let Err(error_context) =
-                    inferred_ty.check_assignability_to(self.db(), declared_ty.inner_type())
-                {
+                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
+                    (declared_ty, inferred_ty)
+                } else {
                     report_invalid_assignment(
                         &self.context,
                         node,
                         definition,
                         declared_ty.inner_type(),
                         inferred_ty,
-                        &error_context,
                     );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_ty.inner_type())
-                } else {
-                    (declared_ty, inferred_ty)
                 }
             }
         };
@@ -9337,14 +9334,13 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if let Err(error_context) = bound_ty.check_assignability_to(db, declared_ty) {
+        if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(
                 &builder.context,
                 self.node,
                 self.binding,
                 declared_ty,
                 bound_ty,
-                &error_context,
             );
 
             // Allow declarations to override inference in case of invalid assignment.

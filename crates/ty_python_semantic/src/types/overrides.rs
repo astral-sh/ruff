@@ -424,11 +424,9 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            let Err(error_context) =
-                type_on_subclass_instance.check_assignability_to(db, superclass_type_as_type)
-            else {
+            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
                 continue;
-            };
+            }
 
             // If this superclass is not the immediate parent for this method,
             // check if the immediate parent itself already has an LSP violation with this ancestor.
@@ -457,7 +455,10 @@ fn check_class_declaration<'db>(
                 superclass,
                 superclass_type,
                 method_kind,
-                &error_context,
+                || {
+                    type_on_subclass_instance
+                        .assignability_error_context(db, superclass_type_as_type)
+                },
             );
 
             liskov_diagnostic_emitted = true;

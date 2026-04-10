@@ -54,8 +54,8 @@ use crate::types::{
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeRelationErrorContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -4483,16 +4483,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();
-            let error_context = argument_type
-                .check_assignability_to(self.db, expected_ty)
-                .err()
-                .unwrap_or_else(TypeRelationErrorContext::disabled);
             self.errors.push(BindingError::InvalidArgumentType {
                 parameter: ParameterContext::new(parameter, parameter_index, positional),
                 argument_index: adjusted_argument_index,
                 expected_ty,
                 provided_ty: argument_type,
-                error_context,
             });
         }
         // We still update the actual type of the parameter in this binding to match the
@@ -5418,7 +5413,6 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
-        error_context: TypeRelationErrorContext<'db>,
     },
     /// The type of the keyword-variadic argument's key is not `str`.
     InvalidKeyType {
@@ -5601,7 +5595,6 @@ impl<'db> BindingError<'db> {
                 argument_index,
                 expected_ty,
                 provided_ty,
-                error_context,
             } => {
                 // Certain special forms in the typing module are aliases for classes
                 // elsewhere in the standard library. These special forms are not instances of `type`,
@@ -5658,6 +5651,8 @@ impl<'db> BindingError<'db> {
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
 
+                let error_context =
+                    provided_ty.assignability_error_context(context.db(), *expected_ty);
                 for message in error_context.info_messages(context.db()) {
                     diag.info(message);
                 }

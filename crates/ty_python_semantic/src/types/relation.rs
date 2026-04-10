@@ -350,15 +350,18 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub fn check_assignability_to(
+    /// Re-run the assignability check with error context collection enabled.
+    ///
+    /// This should normally be called when `is_assignable_to` has returned `false` and we
+    /// are now about to emit a diagnostic where additional context could be useful.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    pub fn assignability_error_context(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> Result<(), TypeRelationErrorContext<'db>> {
-        if self.is_assignable_to(db, target) {
-            return Ok(());
-        }
-
+    ) -> TypeRelationErrorContext<'db> {
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             constraints: &builder,
@@ -370,13 +373,8 @@ impl<'db> Type<'db> {
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
-        let constraints = checker.check_type_pair(db, self, target);
-
-        if constraints.is_always_satisfied(db) {
-            Ok(())
-        } else {
-            Err(checker.error_context)
-        }
+        checker.check_type_pair(db, self, target);
+        checker.error_context
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set assignability.
