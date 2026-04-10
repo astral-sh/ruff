@@ -141,3 +141,15 @@ InvalidEmptyAnnotated = Annotated[]
 def _(a: InvalidEmptyAnnotated):
     reveal_type(a)  # revealed: Unknown
 ```
+
+## Invalid subscript expressions
+
+```py
+from ty_extensions import Not
+
+A = list["Not[A] | A"]
+
+def _(x: A):
+    # error: [invalid-syntax] "Expected index or slice expression"
+    reveal_type(x[])  # revealed: Unknown
+```

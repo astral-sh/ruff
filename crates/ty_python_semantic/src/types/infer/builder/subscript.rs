@@ -50,12 +50,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx,
         } = subscript;
 
+        let is_recovered_empty_subscript =
+            slice.as_name_expr().is_some_and(ast::ExprName::is_invalid);
+
         match ctx {
             ExprContext::Load => self.infer_subscript_load(subscript),
+            // The parser recovers `x[]` as a subscript whose slice is an invalid empty name.
+            // The syntax error is already reported, so avoid write-side subscript inference here.
+            ExprContext::Store if is_recovered_empty_subscript => {
+                self.infer_expression(value, TypeContext::default());
+                self.infer_expression(slice, TypeContext::default());
+                Type::Never
+            }
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
+                Type::Never
+            }
+            ExprContext::Del if is_recovered_empty_subscript => {
+                self.infer_expression(value, TypeContext::default());
+                self.infer_expression(slice, TypeContext::default());
                 Type::Never
             }
             ExprContext::Del => {
@@ -63,6 +78,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 self.validate_subscript_deletion(subscript, value_ty, slice_ty);
                 Type::Never
+            }
+            ExprContext::Invalid if is_recovered_empty_subscript => {
+                self.infer_expression(value, TypeContext::default());
+                self.infer_expression(slice, TypeContext::default());
+                Type::unknown()
             }
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
