@@ -230,6 +230,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     scope: ScopeId<'db>,
@@ -338,6 +340,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: None,
             qualifiers: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
+            expected_types: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
@@ -386,6 +389,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
             self.qualifiers.extend(extra.qualifiers.iter());
         }
     }
@@ -405,6 +409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings.extend(extra.bindings.iter().copied());
@@ -420,6 +425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
         }
     }
 
@@ -5062,6 +5068,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
+    fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        self.expected_types.insert(expression.into(), ty);
+    }
+
     fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral {
             range: _,
@@ -5096,6 +5106,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         literal: &ast::ExprStringLiteral,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if let Some(expected) = tcx.annotation {
+            self.store_expected_type(ast::ExprRef::from(literal), expected);
+        }
+
         if tcx.is_typealias() {
             let aliased_type = self.infer_string_type_expression(literal);
             return Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
@@ -8526,6 +8540,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             qualifiers: _,
             string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -8560,7 +8575,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let extra =
-            (!string_annotations.is_empty() || cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty()).then(|| {
+            (!string_annotations.is_empty()
+                || !expected_types.is_empty()
+                || cycle_recovery.is_some()
+                || !bindings.is_empty()
+                || !diagnostics.is_empty())
+            .then(|| {
                 if bindings.len() > 20 {
                     tracing::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
@@ -8571,6 +8591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 Box::new(ExpressionInferenceExtra {
                     string_annotations,
+                    expected_types,
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_recovery,
@@ -8619,6 +8640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             scope: _,
             string_annotations: _,
+            expected_types: _,
             return_types_and_ranges: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
@@ -8652,6 +8674,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             mut qualifiers,
             string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -8676,6 +8699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
+            || !expected_types.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty()
@@ -8685,6 +8709,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers.shrink_to_fit();
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
+                expected_types,
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
@@ -8731,6 +8756,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             string_annotations,
+            expected_types,
             mut expressions,
             scope,
             cycle_recovery,
@@ -8759,15 +8785,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!string_annotations.is_empty() || !diagnostics.is_empty() || cycle_recovery.is_some())
-                .then(|| {
-                    Box::new(ScopeInferenceExtra {
-                        string_annotations,
-                        cycle_recovery,
-                        diagnostics,
-                    })
-                });
+        let extra = (!string_annotations.is_empty()
+            || !expected_types.is_empty()
+            || !diagnostics.is_empty()
+            || cycle_recovery.is_some())
+        .then(|| {
+            Box::new(ScopeInferenceExtra {
+                string_annotations,
+                expected_types,
+                cycle_recovery,
+                diagnostics,
+            })
+        });
 
         expressions.shrink_to_fit();
 
@@ -8796,6 +8825,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: _,
             expressions: _,
             string_annotations: _,
+            expected_types: _,
             scope: _,
             bindings: _,
             declarations: _,
@@ -8832,6 +8862,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -8871,6 +8902,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
             .extend(string_annotations.iter().copied());
+        self.expected_types.extend(expected_types.iter());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings

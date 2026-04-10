@@ -30,14 +30,59 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, DynamicType, InternedType, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, DynamicType, InternedType,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
     StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
+        struct TypedDictKeyExpectedType;
+        type TypedDictKeyExpectedTypeVisitor<'db> =
+            CycleDetector<TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>>;
+
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &TypedDictKeyExpectedTypeVisitor<'db>,
+        ) -> Option<Type<'db>> {
+            match ty {
+                Type::TypedDict(typed_dict) => {
+                    let keys = typed_dict
+                        .items(db)
+                        .keys()
+                        .map(|key| Type::string_literal(db, key.as_str()))
+                        .collect_vec();
+                    (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
+                }
+                Type::Union(union) => {
+                    let keys = union
+                        .elements(db)
+                        .iter()
+                        .filter_map(|element| imp(db, *element, visitor))
+                        .collect_vec();
+                    (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
+                }
+                Type::Intersection(intersection) => {
+                    let keys = intersection
+                        .positive(db)
+                        .iter()
+                        .filter_map(|element| imp(db, *element, visitor))
+                        .collect_vec();
+                    (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
+                }
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
+                }
+                _ => None,
+            }
+        }
+
+        imp(self.db(), ty, &TypedDictKeyExpectedTypeVisitor::default())
+    }
+
     pub(super) fn infer_subscript_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -100,6 +145,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             slice,
             ctx,
         } = subscript;
+
+        if let Some(expected_key_ty) = self.typed_dict_key_expected_type(value_ty) {
+            self.store_expected_type(slice.as_ref(), expected_key_ty);
+        }
 
         let mut constraint_keys = vec![];
 
