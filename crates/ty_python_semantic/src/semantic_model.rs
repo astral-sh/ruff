@@ -535,14 +535,6 @@ impl<'db> SemanticModel<'db> {
                         }]
                     })
                     .unwrap_or_default(),
-                Type::TypedDict(typed_dict) => typed_dict
-                    .items(db)
-                    .keys()
-                    .map(|key| ExpectedStringLiteralCompletion {
-                        ty: Type::string_literal(db, key.as_str()),
-                        value: key.to_string(),
-                    })
-                    .collect(),
                 Type::Union(union) => union
                     .elements(db)
                     .iter()

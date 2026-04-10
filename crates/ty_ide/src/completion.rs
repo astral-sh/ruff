@@ -1670,6 +1670,27 @@ fn add_string_literal_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
+    fn force_escape_quote(body: &str, quote: Quote) -> String {
+        let quote_char = quote.as_char();
+        let mut escaped = String::with_capacity(body.len());
+        let mut consecutive_backslashes = 0usize;
+
+        for ch in body.chars() {
+            if ch == '\\' {
+                consecutive_backslashes += 1;
+                escaped.push(ch);
+                continue;
+            }
+
+            if ch == quote_char && consecutive_backslashes % 2 == 0 {
+                escaped.push('\\');
+            }
+            consecutive_backslashes = 0;
+            escaped.push(ch);
+        }
+
+        escaped
+    }
 
     // When we insert a completion for a string literal, we need to make sure
     // to properly escape any special characters in the completion value and
@@ -1678,7 +1699,7 @@ fn add_string_literal_completions<'db>(
         let escaped = UnicodeEscape::with_preferred_quote(value, quote);
         let mut out = String::new();
         escaped.write_body(&mut out).ok()?;
-        Some(out)
+        Some(force_escape_quote(&out, quote))
     }
 
     let Some(string_expr) = cursor.enclosing_string_literal_expr() else {
@@ -6942,6 +6963,26 @@ td["<CURSOR>"]
     }
 
     #[test]
+    fn string_literal_completions_do_not_offer_typed_dict_keys_for_typed_dict_value_context() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+x: TD = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
     fn string_literal_completions_typed_dict_union_keys() {
         let builder = completion_test_builder(
             r#"
@@ -7016,14 +7057,20 @@ from typing import Literal
 x: Literal["can't", "won't"] = '<CURSOR>'
 "#,
         );
-
-        assert_snapshot!(
-            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"
-        can't
-        won't
-        ",
-        );
+        let builder = builder.skip_keywords().skip_builtins().skip_auto_import();
+        let test = builder.build();
+        let inserts = test
+            .completions()
+            .iter()
+            .map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .unwrap_or(completion.name.as_str())
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inserts, vec![r"can\'t", r"won\'t"]);
     }
 
     #[test]
@@ -7034,14 +7081,20 @@ from typing import Literal
 x: Literal['say "hi"', 'say "bye"'] = "<CURSOR>"
 "#,
         );
-
-        assert_snapshot!(
-            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r#"
-        say "bye"
-        say "hi"
-        "#,
-        );
+        let builder = builder.skip_keywords().skip_builtins().skip_auto_import();
+        let test = builder.build();
+        let inserts = test
+            .completions()
+            .iter()
+            .map(|completion| {
+                completion
+                    .insert
+                    .as_deref()
+                    .unwrap_or(completion.name.as_str())
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inserts, vec![r#"say \"bye\""#, r#"say \"hi\""#]);
     }
 
     #[test]
