@@ -44,3 +44,10 @@ urlpatterns_params_bad = [
     path("bad/<slug:slug>", views.bad_view),  # DJ100
     path("<slug:slug>", views.bad_view),  # DJ100
 ]
+
+# Edge case - backslash continuation: value is "path" (no trailing slash)
+# and the fix inserts "/" before the closing quote.
+urlpatterns_backslash = [
+    path("path\
+", views.view),  # DJ100
+]

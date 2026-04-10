@@ -52,3 +52,9 @@ urlpatterns_params_bad = [
     path("/bad/<slug:slug>/", views.bad_view),  # DJ101
     path("/<slug:slug>", views.bad_view),  # DJ101
 ]
+
+# OK - escape sequences that happen to produce a leading slash are ignored
+urlpatterns_escape = [
+    path("\x2fpath/", views.view),
+    path("\N{SOLIDUS}path/", views.view),
+]
