@@ -3784,14 +3784,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         let variadic_type = match argument_type {
-            // When accessing an instance attribute that is a `P.args`, the type we infer is
-            // `Unknown | P.args`. This needs to be special cased here to avoid calling
-            // `iterate` on it which will lose the `ParamSpec` information as it will return
-            // `object` that comes from the upper bound of `P.args`. What we want is to always
-            // use the `P.args` type to perform type checking against the parameter type. This
-            // will allow us to error when `*args: P.args` is matched against, for example,
-            // `n: int` and correctly type check when `*args: P.args` is matched against
-            // `*args: P.args` (another ParamSpec).
             Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
                 Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
                 None => match argument_type {
