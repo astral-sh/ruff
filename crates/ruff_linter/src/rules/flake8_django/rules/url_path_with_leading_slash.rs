@@ -46,15 +46,15 @@ pub(crate) struct DjangoUrlPathWithLeadingSlash {
     url_pattern: String,
 }
 
-impl Violation for DjangoUrlPathWithLeadingSlash {
+impl AlwaysFixableViolation for DjangoUrlPathWithLeadingSlash {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DjangoUrlPathWithLeadingSlash { url_pattern } = self;
         format!("URL route `{url_pattern}` has an unnecessary leading slash")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Remove the leading slash".to_string())
+    fn fix_title(&self) -> String {
+        "Remove the leading slash".to_string()
     }
 }
 
