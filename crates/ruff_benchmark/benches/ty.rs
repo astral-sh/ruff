@@ -534,6 +534,7 @@ fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
                     class GridOut:
                         def __init__(self: "GridOut") -> None:
                             self._buffer = b""
+                            self._position = 0
 
                         def _read_size_or_line(self: "GridOut", size: int = -1):
                             if size > self._position:
