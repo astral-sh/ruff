@@ -19,7 +19,7 @@ help: Add a trailing slash
 6 +     mypath("help/", views.help_view),  # DJ100
 7 |     mypath("about", views.about_view),  # DJ100
 8 | ]
-9 | 
+9 |
 
 DJ100 [*] URL route `about` is missing a trailing slash
  --> DJ100_custom_paths.py:7:12
@@ -37,7 +37,7 @@ help: Add a trailing slash
    -     mypath("about", views.about_view),  # DJ100
 7  +     mypath("about/", views.about_view),  # DJ100
 8  | ]
-9  | 
+9  |
 10 | # OK - custom path with trailing slash
 
 DJ100 [*] URL route `api/users` is missing a trailing slash
