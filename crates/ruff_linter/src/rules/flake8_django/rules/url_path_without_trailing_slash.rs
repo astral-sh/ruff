@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::{self as ast, Expr, StringFlags};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_django::helpers::is_path_function;
@@ -73,44 +73,30 @@ pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::Exp
         return;
     };
 
-    // Check if it's a string literal
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = route_arg {
-        let route = value.to_str();
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = route_arg else {
+        return;
+    };
 
-        // Skip empty strings
-        if route.is_empty() {
-            return;
-        }
+    let route = value.to_str();
 
-        // Skip routes that are just "/" or already end with "/"
-        if route == "/" || route.ends_with('/') {
-            return;
-        }
-
-        // Report diagnostic for routes without trailing slash
-        let mut diagnostic = checker.report_diagnostic(
-            DjangoURLPathWithoutTrailingSlash {
-                url_pattern: route.to_string(),
-            },
-            route_arg.range(),
-        );
-
-        // Determine the quote style to find the insertion point for the slash
-        // (just before the closing quotes)
-        let string_content = checker.locator().slice(route_arg.range());
-        let quote_len = if string_content.ends_with("'''") || string_content.ends_with("\"\"\"") {
-            3
-        } else if string_content.ends_with('\'') || string_content.ends_with('"') {
-            1
-        } else {
-            return; // Invalid string format
-        };
-
-        // Insert "/" just before the closing quote(s)
-        let insertion_point = route_arg.range().end() - TextSize::new(quote_len);
-        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-            "/".to_string(),
-            insertion_point,
-        )));
+    if route.is_empty() || route == "/" || route.ends_with('/') {
+        return;
     }
+
+    let mut diagnostic = checker.report_diagnostic(
+        DjangoUrlPathWithoutTrailingSlash {
+            url_pattern: route.to_string(),
+        },
+        route_arg.range(),
+    );
+
+    let Some(last_literal) = value.iter().last() else {
+        return;
+    };
+    let insertion_point = last_literal.end() - last_literal.flags.closer_len();
+
+    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+        "/".to_string(),
+        insertion_point,
+    )));
 }
