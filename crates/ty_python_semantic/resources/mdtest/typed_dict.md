@@ -45,6 +45,17 @@ reveal_type(bob["age"])  # revealed: int | None
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
+Functional `TypedDict`s with non-identifier keys should synthesize `__init__` without turning those
+keys into invalid named parameters:
+
+```py
+from typing import TypedDict
+
+Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+reveal_type(Config.__init__)
+```
+
 If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 

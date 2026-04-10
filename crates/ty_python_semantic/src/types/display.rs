@@ -1085,9 +1085,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         "property",
                         Type::PropertyInstance(property),
                         property
-                            .getter(self.db)
+                            .setter(self.db)
                             .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
+                            .map(|setter| &**setter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderDelete(property) => (
+                        KnownClass::Property,
+                        "__delete__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .deleter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|deleter| &**deleter.name(self.db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
                         KnownClass::Property,
@@ -1152,6 +1162,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     WrapperDescriptorKind::PropertyDunderSet => {
                         ("__set__", "property", KnownClass::Property)
+                    }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        ("__delete__", "property", KnownClass::Property)
                     }
                 };
                 f.write_char('<')?;
@@ -1238,7 +1251,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str(", ")?;
                 bound_super
                     .owner(self.db)
-                    .owner_type(self.db)
+                    .owner_type()
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")

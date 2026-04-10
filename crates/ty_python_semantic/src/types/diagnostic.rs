@@ -3749,6 +3749,71 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     }
 }
 
+pub(super) fn report_bad_dunder_delete_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_delete_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    if let Some(property) = dunder_delete_failure.as_attempt_to_delete_property_with_no_deleter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot delete read-only property `{attribute}` on object of type `{object_type}`",
+        ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no deleter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted deletion of `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Invalid deletion of data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__delete__` method",
+            object_type.display(db)
+        ));
+    }
+}
+
+pub(super) fn report_bad_dunder_delattr_call(
+    context: &InferContext<'_, '_>,
+    attribute: &str,
+    object_type: Type,
+    target: &ast::ExprAttribute,
+    binding_error: bool,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method",
+        object_type.display(db),
+    ));
+    if binding_error {
+        diagnostic.info(format_args!(
+            "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
+            object_type.display(db)
+        ));
+        diagnostic.info(
+            "Expected a signature at least as permissive as \
+            `def __delattr__(self, name: str, /) -> None`",
+        );
+    }
+}
+
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
@@ -5640,8 +5705,8 @@ pub(super) fn report_overridden_final_method<'db>(
     diagnostic.sub(sub);
 
     // It's tempting to autofix properties as well,
-    // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
-    // and we don't model property deleters at all right now.
+    // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
+    // and we don't yet track those definitions precisely enough to offer a safe fix.
     //
     // We also only provide autofixes if the subclass member is a function definition (not an
     // assignment like `method = some_function`). If it's an assignment, the function type

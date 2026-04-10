@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
@@ -20,7 +21,7 @@ use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
@@ -167,7 +168,7 @@ impl Options {
                 .python_version
                 .as_ref()
                 .map(|ranged_version| PythonVersionWithSource {
-                    version: **ranged_version,
+                    version: PythonVersion::from(**ranged_version),
                     source: match ranged_version.source() {
                         ValueSource::Cli => PythonVersionSource::Cli,
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
@@ -176,7 +177,6 @@ impl Options {
                         ValueSource::Editor => PythonVersionSource::Editor,
                     },
                 });
-
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -257,6 +257,16 @@ impl Options {
                     .cloned()
             })
             .or_else(|| site_packages_paths.python_version_from_layout())
+            .filter(|python_version| {
+                let is_supported = SupportedPythonVersion::try_from(python_version.version).is_ok();
+                if !is_supported {
+                    tracing::warn!(
+                        "Ignoring unsupported inferred Python version: {}",
+                        python_version.version
+                    );
+                }
+                is_supported
+            })
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
@@ -542,29 +552,6 @@ impl Options {
     }
 }
 
-fn deserialize_supported_python_version<'de, D>(
-    deserializer: D,
-) -> Result<Option<RangedValue<PythonVersion>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let python_version = Option::<RangedValue<PythonVersion>>::deserialize(deserializer)?;
-
-    if let Some(python_version) = &python_version
-        && !PythonVersion::iter().any(|supported_version| supported_version == **python_version)
-    {
-        return Err(serde::de::Error::custom(format!(
-            "unsupported value `{python_version}` for `python-version`; expected one of {}",
-            PythonVersion::iter()
-                .map(|version| format!("`{version}`"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )));
-    }
-
-    Ok(python_version)
-}
-
 /// Return the site-packages from the environment ty is installed in, as derived from ty's
 /// executable.
 ///
@@ -647,7 +634,7 @@ pub struct EnvironmentOptions {
 
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
-    /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
+    /// and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
     ///
@@ -662,19 +649,15 @@ pub struct EnvironmentOptions {
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
     /// to reflect the differing contents of the standard library across Python versions.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_supported_python_version"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.14""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"
         "#
     )]
-    pub python_version: Option<RangedValue<PythonVersion>>,
+    pub python_version: Option<RangedValue<SupportedPythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
@@ -2066,7 +2049,7 @@ impl OptionDiagnostic {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
-    pub fallback_python_version: Option<RangedValue<PythonVersion>>,
+    pub fallback_python_version: Option<RangedValue<SupportedPythonVersion>>,
     pub fallback_python: Option<RelativePathBuf>,
     pub options: Options,
 }

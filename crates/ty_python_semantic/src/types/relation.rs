@@ -279,7 +279,8 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_),
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::PropertyDunderDelete(_),
             )
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
@@ -1619,7 +1620,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         check_optional_methods(source.getter(db), target.getter(db)).and(
             db,
             self.constraints,
-            || check_optional_methods(source.setter(db), target.setter(db)),
+            || {
+                check_optional_methods(source.setter(db), target.setter(db)).and(
+                    db,
+                    self.constraints,
+                    || check_optional_methods(source.deleter(db), target.deleter(db)),
+                )
+            },
         )
     }
 
@@ -1990,6 +1997,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(right)),
             ) => self.check_property_instance_pair(db, left, right),
 
             // any single-valued type is disjoint from another single-valued type
@@ -2500,7 +2511,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         };
 
         check_optional_methods(left.getter(db), right.getter(db)).or(db, self.constraints, || {
-            check_optional_methods(left.setter(db), right.setter(db))
+            check_optional_methods(left.setter(db), right.setter(db)).or(
+                db,
+                self.constraints,
+                || check_optional_methods(left.deleter(db), right.deleter(db)),
+            )
         })
     }
 }

@@ -40,7 +40,7 @@ use crate::types::{
 use crate::{
     Db, FxIndexMap, FxOrderSet,
     place::{
-        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, Widening,
+        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
     },
     semantic_index::{place_table, use_def_map},
@@ -1029,13 +1029,18 @@ impl<'db> ClassType<'db> {
                     method.function(db).as_abstract_method(db, defining_class)
                 }
                 Type::PropertyInstance(property) => {
-                    // A property is abstract if either its getter or setter is abstract.
+                    // A property is abstract if any of its accessors is abstract.
                     property
                         .getter(db)
                         .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
                         .or_else(|| {
                             property.setter(db).and_then(|setter| {
                                 type_as_abstract_method(db, setter, defining_class)
+                            })
+                        })
+                        .or_else(|| {
+                            property.deleter(db).and_then(|deleter| {
+                                type_as_abstract_method(db, deleter, defining_class)
                             })
                         })
                 }
@@ -2311,7 +2316,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ty: union.build(),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(union_qualifiers)
         };

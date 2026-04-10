@@ -692,12 +692,12 @@ class Foo[**P]:
 
 def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo)  # revealed: Foo[P@bar]
-    reveal_type(foo.args)  # revealed: Unknown | P@bar.args
-    reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
+    reveal_type(foo.args)  # revealed: P@bar.args
+    reveal_type(foo.kwargs)  # revealed: P@bar.kwargs
 ```
 
-ty will check whether the argument after `**` is a mapping type but as instance attribute are
-unioned with `Unknown`, it shouldn't error here.
+ty will check whether the argument after `**` is a mapping type, but the inferred attribute type
+preserves the parameter pack here, so it shouldn't error.
 
 ```py
 from typing import Callable

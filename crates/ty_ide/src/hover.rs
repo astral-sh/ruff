@@ -1192,8 +1192,6 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Movie(title: str, year: int)`
-    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_typeddict_constructor() {
         let test = hover_test(
@@ -1209,10 +1207,18 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ---------------------------------------------
         ```python
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1221,6 +1227,186 @@ mod tests {
         6 |     year: int
         7 |
         8 | x = Movie(title="Alien", year=1979)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_positional_map() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        m: Movie = {"title": "Alien", "year": 1979}
+        x = Mov<CURSOR>ie(m)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:5
+          |
+        8 | m: Movie = {"title": "Alien", "year": 1979}
+        9 | x = Movie(m)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_positional_map_dict_literal_in_constructor() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie({"title": "Alien", "year": 1979})
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie({"title": "Alien", "year": 1979})
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_not_required() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict, NotRequired
+
+        class Movie(TypedDict):
+            title: str
+            year: NotRequired[int]
+
+        x = Mov<CURSOR>ie(title="Alien")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: NotRequired[int]
+        7 |
+        8 | x = Movie(title="Alien")
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_total_false() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict, total=False):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie()
           |     ^^^-^
           |     |  |
           |     |  Cursor offset
@@ -3400,8 +3586,8 @@ def function():
 
         // See the comment in the `hover_augmented_assignment` test above. The same
         // reasoning applies here.
-        assert_snapshot!(test.hover(), @r#"
-        Unknown | Literal[1]
+        assert_snapshot!(test.hover(), @r###"
+        int
         ---------------------------------------------
         This is the docs for this value
 
@@ -3409,7 +3595,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Unknown | Literal[1]
+        int
         ```
         ---
         This is the docs for this value<HB>
@@ -3427,7 +3613,7 @@ def function():
            |   source
         10 | """Other docs???
            |
-        "#);
+        "###);
     }
 
     #[test]

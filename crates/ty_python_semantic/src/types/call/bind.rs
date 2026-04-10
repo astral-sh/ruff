@@ -17,6 +17,7 @@ use std::fmt;
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
@@ -59,7 +60,7 @@ use crate::types::{
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
+use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
@@ -908,7 +909,8 @@ impl<'db> Bindings<'db> {
     ) {
         // If all elements are not callable, report that the type as a whole is not callable.
         if self.elements.iter().all(|e| !e.is_callable()) {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type().display(context.db())
@@ -1264,6 +1266,26 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderDelete) => {
+                        if let [Some(Type::PropertyInstance(property)), Some(instance), ..] =
+                            overload.parameter_types()
+                        {
+                            if let Some(deleter) = property.deleter(db) {
+                                if let Err(_call_error) =
+                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the deleter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoDeleter(*property));
+                            }
+                        }
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
@@ -1278,6 +1300,26 @@ impl<'db> Bindings<'db> {
                                 overload
                                     .errors
                                     .push(BindingError::PropertyHasNoSetter(property));
+                            }
+                        }
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
+                        property,
+                    )) => {
+                        if let [Some(instance), ..] = overload.parameter_types() {
+                            if let Some(deleter) = property.deleter(db) {
+                                if let Err(_call_error) =
+                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the deleter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoDeleter(property));
                             }
                         }
                     }
@@ -1339,6 +1381,7 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 property.getter(db),
                                                 Some(*setter),
+                                                property.deleter(db),
                                             ));
                                     }
                                     overload.set_return_type(ty_property);
@@ -1353,15 +1396,26 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 Some(*getter),
                                                 property.setter(db),
+                                                property.deleter(db),
                                             ));
                                     }
                                     overload.set_return_type(ty_property);
                                 }
                             }
                             "deleter" => {
-                                // TODO: we do not store deleters yet
-                                let ty_property = bound_method.self_instance(db);
-                                overload.set_return_type(ty_property);
+                                if let [Some(_), Some(deleter)] = overload.parameter_types() {
+                                    let mut ty_property = bound_method.self_instance(db);
+                                    if let Type::PropertyInstance(property) = ty_property {
+                                        ty_property =
+                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                                db,
+                                                property.getter(db),
+                                                property.setter(db),
+                                                Some(*deleter),
+                                            ));
+                                    }
+                                    overload.set_return_type(ty_property);
+                                }
                             }
                             _ => {
                                 // Fall back to typeshed stubs for all other methods
@@ -2311,11 +2365,12 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownClass::Property) => {
-                            if let [getter, setter, ..] = overload.parameter_types() {
+                            if let [getter, setter, deleter, ..] = overload.parameter_types() {
                                 let getter = getter.filter(|ty| !ty.is_none(db));
                                 let setter = setter.filter(|ty| !ty.is_none(db));
+                                let deleter = deleter.filter(|ty| !ty.is_none(db));
                                 overload.set_return_type(Type::PropertyInstance(
-                                    PropertyInstanceType::new(db, getter, setter),
+                                    PropertyInstanceType::new(db, getter, setter, deleter),
                                 ));
                             }
                         }
@@ -3277,7 +3332,8 @@ impl<'db> CallableBinding<'db> {
         compound_diag: Option<&dyn CompoundDiagnostic>,
     ) {
         if !self.is_callable() {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type.display(context.db()),
@@ -3290,7 +3346,8 @@ impl<'db> CallableBinding<'db> {
         }
 
         if self.dunder_call_is_possibly_unbound {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly missing `__call__` method)",
                     self.callable_type.display(context.db()),
@@ -3380,7 +3437,8 @@ impl<'db> CallableBinding<'db> {
                     return;
                 }
 
-                let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) else {
+                let range = all_arguments_range(node);
+                let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, range) else {
                     return;
                 };
                 let callable_description =
@@ -3784,15 +3842,13 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         let variadic_type = match argument_type {
-            // When accessing an instance attribute that is a `P.args`, the type we infer is
-            // `Unknown | P.args`. This needs to be special cased here to avoid calling
-            // `iterate` on it which will lose the `ParamSpec` information as it will return
-            // `object` that comes from the upper bound of `P.args`. What we want is to always
-            // use the `P.args` type to perform type checking against the parameter type. This
-            // will allow us to error when `*args: P.args` is matched against, for example,
-            // `n: int` and correctly type check when `*args: P.args` is matched against
-            // `*args: P.args` (another ParamSpec).
             Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
+                // If the argument is a `ParamSpec` `P.args`, we should not call `iterate` on it.
+                // This would lose the `ParamSpec` information and just flatten to `object` from
+                // the upper bound. What we want is to always use the `P.args` type to perform type
+                // checking against the parameter type. This will allow us to error when `*args:
+                // P.args` is matched against, for example, `n: int` and correctly type check when
+                // `*args: P.args` is matched against `*args: P.args` (another `ParamSpec`).
                 Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
                 None => match argument_type {
                     // `Type::iterate` unions tuple specs in a way that can invent additional
@@ -5338,12 +5394,19 @@ impl<'db> CallableDescription<'db> {
                     name: "`__get__` of property",
                 })
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
+                Some(CallableDescription {
+                    kind: "method wrapper",
+                    name: "`__delete__` of property",
+                })
+            }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
                 kind: "wrapper descriptor",
                 name: match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
+                    WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
                 },
             }),
             _ => None,
@@ -5454,6 +5517,7 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
     },
     PropertyHasNoSetter(PropertyInstanceType<'db>),
+    PropertyHasNoDeleter(PropertyInstanceType<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
     /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
     /// can occur when the call to the underlying getter/setter fails.
@@ -5510,7 +5574,8 @@ impl BindingError<'_> {
             | BindingError::InvalidDataclassApplication(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
-            | BindingError::PropertyHasNoSetter(..) => {}
+            | BindingError::PropertyHasNoSetter(..)
+            | BindingError::PropertyHasNoDeleter(..) => {}
         }
     }
 }
@@ -5558,6 +5623,7 @@ impl<'db> BindingError<'db> {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
             | Self::PropertyHasNoSetter(_)
+            | Self::PropertyHasNoDeleter(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
 
@@ -5810,7 +5876,8 @@ impl<'db> BindingError<'db> {
                 parameters,
                 paramspec,
             } => {
-                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
+                let range = all_arguments_range(node);
+                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, range) {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
@@ -6013,6 +6080,17 @@ impl<'db> BindingError<'db> {
                 );
             }
 
+            Self::PropertyHasNoDeleter(_) => {
+                BindingError::InternalCallError("property has no deleter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    compound_diag,
+                    matching_overload,
+                );
+            }
+
             Self::InternalCallError(reason) => {
                 let node = Self::get_node(node, None);
                 if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
@@ -6081,10 +6159,15 @@ impl<'db> BindingError<'db> {
     fn get_node(node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> ast::AnyNodeRef<'_> {
         // If we have a Call node and an argument index, report the diagnostic on the correct
         // argument node; otherwise, report it on the entire provided node.
-        match Self::get_argument_node(node, argument_index) {
-            Some(ast::ArgOrKeyword::Arg(expr)) => expr.into(),
-            Some(ast::ArgOrKeyword::Keyword(expr)) => expr.into(),
-            None => node,
+        match (Self::get_argument_node(node, argument_index), node) {
+            (Some(ast::ArgOrKeyword::Arg(expr)), _) => expr.into(),
+            (Some(ast::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
+            (None, ast::AnyNodeRef::StmtClassDef(class_def)) => class_def
+                .arguments
+                .as_deref()
+                .map(ast::AnyNodeRef::Arguments)
+                .unwrap_or(node),
+            (None, _) => node,
         }
     }
 
@@ -6096,10 +6179,26 @@ impl<'db> BindingError<'db> {
             (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node
                     .arguments
-                    .arguments_source_order()
+                    .iter_source_order()
                     .nth(argument_index)
                     .expect("argument index should not be out of range"),
             ),
+            // If we've been passed a `ClassDef` node, it indicates that we're reporting an error
+            // relating to the class's keyword arguments. Keyword arguments are passed to `__init_subclass__`,
+            // or `__new__`/`__prepare__` on the metaclass -- but positional arguments are not, and neither
+            // is the special keyword argument `metaclass`. These need to be excluded from the
+            // argument index when looking up the relevant keyword-argument node.
+            (ast::AnyNodeRef::StmtClassDef(class_def), Some(argument_index)) => {
+                class_def.arguments.as_deref().and_then(|args| {
+                    args.iter_source_order()
+                        .filter_map(ArgOrKeyword::as_keyword)
+                        .filter(|keyword| {
+                            keyword.arg.as_deref().is_none_or(|arg| arg != "metaclass")
+                        })
+                        .nth(argument_index)
+                        .map(ast::ArgOrKeyword::Keyword)
+                })
+            }
             _ => None,
         }
     }
@@ -6376,4 +6475,26 @@ fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<
     }
 
     Some(elements)
+}
+
+/// Return the range for a binding diagnostic that is not related to one specific
+/// argument.
+///
+/// For a normal function call, this is just the range of the entire call.
+/// If we're reporting diagnostics for bad arguments in a class definition,
+/// however,
+/// restrict the range to just the range of the class name + its arguments.
+fn all_arguments_range(node: AnyNodeRef) -> TextRange {
+    node.as_stmt_class_def()
+        .map(|class| {
+            TextRange::new(
+                class.start(),
+                class
+                    .arguments
+                    .as_deref()
+                    .map(Ranged::end)
+                    .unwrap_or(class.name.end()),
+            )
+        })
+        .unwrap_or(node.range())
 }

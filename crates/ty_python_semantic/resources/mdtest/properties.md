@@ -112,8 +112,7 @@ c.my_property = "b"
 
 ## `property.deleter`
 
-We do not support `property.deleter` yet, but we make sure that it does not invalidate the getter or
-setter:
+We support `property.deleter`, and it preserves the getter and setter:
 
 ```py
 class C:
@@ -131,6 +130,7 @@ class C:
 
 c = C()
 reveal_type(c.my_property)  # revealed: int
+del c.my_property
 c.my_property = 2
 # error: [invalid-assignment]
 c.my_property = "a"
@@ -199,7 +199,7 @@ c.attr = 1
 
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
-reveal_type(c.attr)  # revealed: Unknown
+reveal_type(c.attr)  # revealed: Never
 ```
 
 ### Wrong setter signature
@@ -229,7 +229,7 @@ class C:
 
 ### Manually constructed property
 
-Properties can also be constructed manually using the `property` class. We partially support this:
+Properties can also be constructed manually using the `property` class. We support this:
 
 ```py
 class C:
@@ -238,14 +238,12 @@ class C:
     attr = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Unknown | int
+reveal_type(c.attr)  # revealed: int
 ```
 
-But note that we return `Unknown | int` because we did not declare the `attr` attribute. This is
-consistent with how we usually treat attributes, but here, if we try to declare `attr` as
-`property`, we fail to understand the property, since the `property` declaration shadows the more
-precise type that we infer for `property(attr_getter)` (which includes the actual information about
-the getter).
+If we try to declare `attr` as `property`, we fail to understand the property, since the `property`
+declaration shadows the more precise type that we infer for `property(attr_getter)` (which includes
+the actual information about the getter).
 
 ```py
 class C:
@@ -272,7 +270,7 @@ class Bar:
         return 42
 
 f = Foo()
-# TODO: should emit [invalid-assignment], same as `Bar` below
+# error: [invalid-assignment]
 f.myprop = 56
 
 b = Bar()

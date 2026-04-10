@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening},
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
     semantic_index::{
         definition::{Definition, DefinitionKind},
         semantic_index,
@@ -994,10 +994,6 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
-    pub(super) const fn is_self(self) -> bool {
-        matches!(self, Self::TypingSelf)
-    }
-
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
     }
@@ -1298,7 +1294,7 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
@@ -1381,6 +1377,19 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     visitor,
                 ))
             }
+        }
+    }
+
+    /// Represent the bound/constraints of this typevar as a single type, by unioning constraints.
+    ///
+    /// Careful with this method! It has both semantic and performance gotchas. Unioning
+    /// constraints provides a conservative upper bound, but it loses precision. And for many use
+    /// cases, it's more efficient to just map over the constraint types directly, rather than
+    /// building a union out of them and mapping over that.
+    pub(crate) fn as_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db),
         }
     }
 }

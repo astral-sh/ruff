@@ -1145,14 +1145,35 @@ fn config_file_unsupported_python_version() -> anyhow::Result<()> {
       |
     3 | python-version = "2.7"
       |                  ^^^^^
-    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
 
       Cause: TOML parse error at line 3, column 18
       |
     3 | python-version = "2.7"
       |                  ^^^^^
-    unsupported value `2.7` for `python-version`; expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn cli_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "")?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=2.7"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '2.7' for '--python-version <VERSION>'
+      [possible values: 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.15]
+
+      tip: a similar value exists: '3.7'
+
+    For more information, try '--help'.
+    ");
 
     Ok(())
 }
@@ -1189,6 +1210,49 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
       |
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn config_file_python_setting_directory_with_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"
+            version_info = 3.16.0
+            home = base/bin
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("base/bin/python.exe", "")
+        } else {
+            ("base/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.16/site-packages/foo.py", "")
+        },
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN Ignoring unsupported inferred Python version: 3.16
+    ");
 
     Ok(())
 }
