@@ -667,15 +667,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .into_type_var()
             .when_some_and(db, self.constraints, |source_i| {
                 if target.is_metaclass_instance(db) {
-                    // Get the instance type of the metaclass of the upper bound of `T`. So e.g.
-                    // for an unbounded `type[T]`, this would be `type`; for a `type[T]` where `T`
-                    // has an upper bound `C` which has a metaclass `M`, this would be `M`. This is
-                    // then directly comparable to the target type, which is also a metaclass.
-                    let source_metaclass_instance = Type::SubclassOf(source_subclass)
-                        .to_meta_type(db)
-                        .to_instance(db)
-                        .expect("the metatype of `type[T]` should be an instance-like type");
-                    self.check_type_pair(db, source_metaclass_instance, target)
+                    self.check_type_pair(db, source_subclass.to_metaclass_instance(db), target)
                 } else {
                     target
                         .to_instance(db)
