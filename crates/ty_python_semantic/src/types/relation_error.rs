@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
@@ -215,6 +215,7 @@ impl<'db> ErrorContextNode<'db> {
 #[derive(Clone, Debug)]
 pub struct TypeRelationErrorContext<'db> {
     root: Rc<RefCell<ErrorContextNode<'db>>>,
+    enabled: Cell<bool>,
 }
 
 impl PartialEq for TypeRelationErrorContext<'_> {
@@ -227,17 +228,33 @@ impl Eq for TypeRelationErrorContext<'_> {}
 
 impl<'db> From<TypeRelationHint<'db>> for TypeRelationErrorContext<'db> {
     fn from(hint: TypeRelationHint<'db>) -> Self {
-        let context = TypeRelationErrorContext::new();
+        let context = TypeRelationErrorContext::enabled();
         context.push(hint);
         context
     }
 }
 
 impl<'db> TypeRelationErrorContext<'db> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn disabled() -> Self {
         Self {
-            root: Rc::new(RefCell::new(ErrorContextNode::default())),
+            root: Rc::default(),
+            enabled: Cell::new(false),
         }
+    }
+
+    pub(crate) fn enabled() -> Self {
+        Self {
+            root: Rc::default(),
+            enabled: Cell::new(true),
+        }
+    }
+
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.enabled.get()
+    }
+
+    pub(crate) fn set_enabled(&self, enabled: bool) {
+        self.enabled.set(enabled);
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -245,6 +262,9 @@ impl<'db> TypeRelationErrorContext<'db> {
     }
 
     pub(crate) fn push(&self, hint: TypeRelationHint<'db>) {
+        if !self.is_enabled() {
+            return;
+        }
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
         *self.root.borrow_mut() = ErrorContextNode { hint, children };
@@ -255,6 +275,9 @@ impl<'db> TypeRelationErrorContext<'db> {
         hint: TypeRelationHint<'db>,
         children: Vec<TypeRelationErrorContext<'db>>,
     ) {
+        if !self.is_enabled() {
+            return;
+        }
         *self.root.borrow_mut() = ErrorContextNode {
             hint,
             children: children
@@ -268,6 +291,7 @@ impl<'db> TypeRelationErrorContext<'db> {
     pub(crate) fn take(&self) -> Self {
         TypeRelationErrorContext {
             root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
+            enabled: Cell::new(self.enabled.get()),
         }
     }
 

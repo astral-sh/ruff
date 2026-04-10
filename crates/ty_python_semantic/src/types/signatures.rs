@@ -1091,15 +1091,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return aggregate_relation;
                 }
 
-                source_overloads
-                    .iter()
-                    .when_any(db, self.constraints, |self_signature| {
-                        self.check_callable_signature_pair_inner(
-                            db,
-                            std::slice::from_ref(self_signature),
-                            target_overloads,
-                        )
-                    })
+                // TODO: Similar to how we do this for unions, collect error
+                // context for all overloads and report it if *all* checks fail.
+                self.without_error_context(|| {
+                    source_overloads
+                        .iter()
+                        .when_any(db, self.constraints, |self_signature| {
+                            self.check_callable_signature_pair_inner(
+                                db,
+                                std::slice::from_ref(self_signature),
+                                target_overloads,
+                            )
+                        })
+                })
             }
 
             // source is definitely not overloaded while target is possibly overloaded.

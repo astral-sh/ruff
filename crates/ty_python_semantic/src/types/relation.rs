@@ -332,7 +332,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -364,7 +364,7 @@ impl<'db> Type<'db> {
             constraints: &builder,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
-            error_context: Some(TypeRelationErrorContext::new()),
+            error_context: TypeRelationErrorContext::enabled(),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -374,11 +374,7 @@ impl<'db> Type<'db> {
         if constraints.is_always_satisfied(db) {
             Ok(())
         } else {
-            if let Some(error_context) = checker.error_context {
-                Err(error_context)
-            } else {
-                unreachable!("TypeRelationChecker was constructed with an error context");
-            }
+            Err(checker.error_context)
         }
     }
 
@@ -467,7 +463,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -612,7 +608,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    error_context: Option<TypeRelationErrorContext<'db>>,
+    error_context: TypeRelationErrorContext<'db>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -638,7 +634,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -656,7 +652,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -680,9 +676,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn provide_hint(&self, get_hint: impl FnOnce() -> TypeRelationHint<'db>) {
-        if let Some(error_context) = &self.error_context {
-            error_context.push(get_hint());
-        }
+        self.error_context.push(get_hint());
     }
 
     pub(super) fn set_hint(
@@ -690,13 +684,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         hint: TypeRelationHint<'db>,
         children: Vec<TypeRelationErrorContext<'db>>,
     ) {
-        if let Some(error_context) = &self.error_context {
-            error_context.set_root(hint, children);
-        }
+        self.error_context.set_root(hint, children);
     }
 
-    pub(super) fn collects_error_context(&self) -> bool {
-        self.error_context.is_some()
+    pub(super) fn is_context_collection_enabled(&self) -> bool {
+        self.error_context.is_enabled()
+    }
+
+    /// Temporarily suppress error context collection for the duration of `f`.
+    ///
+    /// TODO: we may eventually not need this when we properly restore error
+    /// context everywhere.
+    pub(super) fn without_error_context<R>(&self, f: impl FnOnce() -> R) -> R {
+        let was_enabled = self.error_context.is_enabled();
+        self.error_context.set_enabled(false);
+        let result = f();
+        self.error_context.set_enabled(was_enabled);
+        result
     }
 
     fn with_recursion_guard(
@@ -1096,14 +1100,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 };
 
                 let mut elements_context = vec![];
+                let context_collection_enabled = self.is_context_collection_enabled();
 
                 let elements = union.elements(db);
                 let result = elements
                     .iter()
                     .when_any(db, self.constraints, |&elem_ty| {
                         let result = self.check_type_pair(db, source, elem_ty);
-                        if let Some(ctx) = self.error_context.as_ref() {
-                            let ctx = ctx.take();
+                        if context_collection_enabled {
+                            let ctx = self.error_context.take();
                             if !ctx.is_empty() {
                                 elements_context.push(ctx);
                             }
@@ -1112,7 +1117,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
                     .or(db, self.constraints, is_new_type_of_union);
 
-                if self.error_context.is_some() && result.is_never_satisfied(db) {
+                if context_collection_enabled && result.is_never_satisfied(db) {
                     let elements_without_context = elements.len() - elements_context.len();
                     if elements_without_context > 0 && elements_without_context < elements.len() {
                         elements_context.push(
@@ -1753,7 +1758,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -1834,7 +1839,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
-            error_context: None,
+            error_context: TypeRelationErrorContext::disabled(),
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,

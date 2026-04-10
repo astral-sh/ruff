@@ -4486,7 +4486,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let error_context = argument_type
                 .check_assignability_to(self.db, expected_ty)
                 .err()
-                .unwrap_or_else(TypeRelationErrorContext::new);
+                .unwrap_or_else(TypeRelationErrorContext::disabled);
             self.errors.push(BindingError::InvalidArgumentType {
                 parameter: ParameterContext::new(parameter, parameter_index, positional),
                 argument_index: adjusted_argument_index,

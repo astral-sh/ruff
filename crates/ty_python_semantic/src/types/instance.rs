@@ -496,7 +496,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Fast path: skip expensive per-member type comparisons when members are plainly
         // missing. When collecting error context, we skip this and let the structural check
         // below report per-member errors instead.
-        if !self.collects_error_context() && !has_all_protocol_members_defined(db, ty, protocol) {
+        if !self.is_context_collection_enabled()
+            && !has_all_protocol_members_defined(db, ty, protocol)
+        {
             return result;
         }
 
