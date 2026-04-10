@@ -52,7 +52,7 @@ keys into invalid named parameters:
 from typing import TypedDict
 
 Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
-# revealed: Overload[(self: Config, __map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
 reveal_type(Config.__init__)
 ```
 
