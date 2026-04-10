@@ -93,13 +93,11 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
     // argument can be a Jinja template field (determined by the operator's
     // `template_fields` attribute), so we check both positional and keyword
     // arguments.
-    let arg_values = call
+    for arg_value in call
         .arguments
-        .args
-        .iter()
-        .chain(call.arguments.keywords.iter().map(|kw| &kw.value));
-
-    for arg_value in arg_values {
+        .iter_source_order()
+        .map(ruff_python_ast::ArgOrKeyword::value)
+    {
         let Some(string_literal) = arg_value.as_string_literal_expr() else {
             continue;
         };
@@ -131,9 +129,9 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
 /// Returns the task ID if the entire string is a single `{{ ti.xcom_pull(task_ids='...') }}`
 /// or `{{ task_instance.xcom_pull(task_ids='...') }}` template. The `task_ids` value may also
 /// be wrapped in a list or tuple (e.g. `task_ids=['...']`), and an optional
-/// `key='return_value'` argument is allowed (since it is the default).
-/// Returns `None` if the string contains other content, multiple task IDs, or
-/// non-default keyword arguments.
+/// `key='return_value'` argument is allowed in either order (since it is the
+/// default). Returns `None` if the string contains other content, multiple
+/// task IDs, or non-default keyword arguments.
 fn parse_xcom_pull_template(s: &str) -> Option<String> {
     let mut cursor = Cursor::new(s);
     eat_whitespace(&mut cursor);
@@ -162,50 +160,65 @@ fn parse_xcom_pull_template(s: &str) -> Option<String> {
     }
     eat_whitespace(&mut cursor);
 
-    // Handle keyword argument: `task_ids=` or `task_id=`.
-    if let Some(identifier) = parse_identifier(&mut cursor) {
-        if identifier != "task_ids" && identifier != "task_id" {
-            return None;
+    // Parse xcom_pull arguments. Keywords can appear in either order:
+    //   xcom_pull('task_1')
+    //   xcom_pull(task_ids='task_1', key='return_value')
+    //   xcom_pull(key='return_value', task_ids='task_1')
+    let task_id = if let Some(identifier) = parse_identifier(&mut cursor) {
+        match identifier {
+            "task_ids" | "task_id" => {
+                eat_whitespace(&mut cursor);
+                if !cursor.eat_char('=') {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                let task_id = parse_task_id_value(&mut cursor)?;
+                if cursor.eat_char(',') {
+                    eat_whitespace(&mut cursor);
+                    parse_key_return_value(&mut cursor)?;
+                    eat_whitespace(&mut cursor);
+                }
+                task_id
+            }
+            "key" => {
+                // `key='return_value'` before `task_ids` — keyword form only,
+                // since positional arguments after keyword arguments are invalid.
+                eat_whitespace(&mut cursor);
+                if !cursor.eat_char('=') {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                if parse_quoted_string(&mut cursor)? != "return_value" {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                if !cursor.eat_char(',') {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                let kw = parse_identifier(&mut cursor)?;
+                if kw != "task_ids" && kw != "task_id" {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                if !cursor.eat_char('=') {
+                    return None;
+                }
+                eat_whitespace(&mut cursor);
+                parse_task_id_value(&mut cursor)?
+            }
+            _ => return None,
         }
-        eat_whitespace(&mut cursor);
-        if !cursor.eat_char('=') {
-            return None;
-        }
-        eat_whitespace(&mut cursor);
-    }
-
-    // Check for list or tuple wrapping: `['task']`, `('task')`, `('task',)`.
-    let closing_bracket = if cursor.eat_char('[') {
-        eat_whitespace(&mut cursor);
-        Some(']')
-    } else if cursor.eat_char('(') {
-        eat_whitespace(&mut cursor);
-        Some(')')
     } else {
-        None
-    };
-
-    let task_id = parse_quoted_string(&mut cursor)?;
-    eat_whitespace(&mut cursor);
-
-    // If the value was wrapped in a list or tuple, consume the closing bracket.
-    if let Some(bracket) = closing_bracket {
-        // Allow optional trailing comma for tuples: `('task',)`.
+        // Positional argument (no keyword).
+        let task_id = parse_task_id_value(&mut cursor)?;
         if cursor.eat_char(',') {
             eat_whitespace(&mut cursor);
+            parse_key_return_value(&mut cursor)?;
+            eat_whitespace(&mut cursor);
         }
-        if !cursor.eat_char(bracket) {
-            return None;
-        }
-        eat_whitespace(&mut cursor);
-    }
-
-    // Allow an optional `key='return_value'` argument (the default XCom key).
-    if cursor.eat_char(',') {
-        eat_whitespace(&mut cursor);
-        parse_key_return_value(&mut cursor)?;
-        eat_whitespace(&mut cursor);
-    }
+        task_id
+    };
 
     if !cursor.eat_char(')') {
         return None;
@@ -225,7 +238,7 @@ fn parse_xcom_pull_template(s: &str) -> Option<String> {
 }
 
 fn eat_whitespace(cursor: &mut Cursor) {
-    cursor.eat_while(|c| c.is_ascii_whitespace());
+    cursor.eat_while(char::is_whitespace);
 }
 
 fn parse_identifier<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
@@ -263,6 +276,36 @@ fn parse_quoted_string<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
 
     cursor.skip_bytes(end + quote_char.len_utf8());
     Some(value)
+}
+
+/// Parse a task ID value, which may be a plain quoted string or wrapped in
+/// a single-element list or tuple: `'task'`, `['task']`, `('task',)`.
+fn parse_task_id_value<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
+    let closing_bracket = if cursor.eat_char('[') {
+        eat_whitespace(cursor);
+        Some(']')
+    } else if cursor.eat_char('(') {
+        eat_whitespace(cursor);
+        Some(')')
+    } else {
+        None
+    };
+
+    let task_id = parse_quoted_string(cursor)?;
+    eat_whitespace(cursor);
+
+    if let Some(bracket) = closing_bracket {
+        // Allow optional trailing comma for tuples: `('task',)`.
+        if cursor.eat_char(',') {
+            eat_whitespace(cursor);
+        }
+        if !cursor.eat_char(bracket) {
+            return None;
+        }
+        eat_whitespace(cursor);
+    }
+
+    Some(task_id)
 }
 
 /// If the cursor starts with `key='return_value'` (or `key="return_value"`),
@@ -476,6 +519,32 @@ mod tests {
     fn test_rejects_unknown_keyword() {
         assert_eq!(
             parse_xcom_pull_template("{{ ti.xcom_pull(dag_id='my_task') }}"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_key_return_value_before_task_ids() {
+        assert_eq!(
+            parse_xcom_pull_template("{{ ti.xcom_pull(key='return_value', task_ids='my_task') }}"),
+            Some("my_task".to_string())
+        );
+    }
+
+    #[test]
+    fn test_key_return_value_before_task_ids_list() {
+        assert_eq!(
+            parse_xcom_pull_template(
+                "{{ ti.xcom_pull(key='return_value', task_ids=['my_task']) }}"
+            ),
+            Some("my_task".to_string())
+        );
+    }
+
+    #[test]
+    fn test_rejects_non_default_key_before_task_ids() {
+        assert_eq!(
+            parse_xcom_pull_template("{{ ti.xcom_pull(key='custom_key', task_ids='my_task') }}"),
             None
         );
     }

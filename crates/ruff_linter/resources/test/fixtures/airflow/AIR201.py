@@ -91,6 +91,12 @@ task_22 = BashOperator(
     bash_command='{{ task_instance.xcom_pull(task_ids=["task_1"], key="return_value") }}',  # AIR201 (fix: task_1.output)
 )
 
+# Reordered keyword arguments (key before task_ids)
+task_25 = BashOperator(
+    task_id="task_25",
+    bash_command="{{ ti.xcom_pull(key='return_value', task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+)
+
 # Pulling output from a @task-decorated function
 @task
 def extract_data():
@@ -111,7 +117,8 @@ task_17 = BashOperator(
 
 # Cases that should NOT trigger AIR201:
 
-# Mixed content (not just xcom_pull)
+# Mixed content (not just xcom_pull) — the modern replacement
+# for this pattern is: bash_command="echo {{ task_1.output }}"
 task_10 = BashOperator(
     task_id="task_10",
     bash_command="echo {{ ti.xcom_pull(task_ids='task_1') }}",
