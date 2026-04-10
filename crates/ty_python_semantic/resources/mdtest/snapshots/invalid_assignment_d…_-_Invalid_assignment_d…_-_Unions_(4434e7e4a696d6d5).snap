@@ -53,8 +53,6 @@ error[invalid-assignment]: Object of type `int` is not assignable to `str | None
 6 |     target: bytes | None = source  # error: [invalid-assignment]
   |
 info: type `int` is not assignable to any element of the union `str | None`
-info: ├── type `int` is not assignable to `str`
-info: └── type `int` is not assignable to `None`
 
 ```
 
@@ -71,7 +69,5 @@ error[invalid-assignment]: Object of type `str | None` is not assignable to `byt
   |
 info: element `str` of union `str | None` is not assignable to `bytes | None`
 info: └── type `str` is not assignable to any element of the union `bytes | None`
-info:     ├── type `str` is not assignable to `bytes`
-info:     └── type `str` is not assignable to `None`
 
 ```

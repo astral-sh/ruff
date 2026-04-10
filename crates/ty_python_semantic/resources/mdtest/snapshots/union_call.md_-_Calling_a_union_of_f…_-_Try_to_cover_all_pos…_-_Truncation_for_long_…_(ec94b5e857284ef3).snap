@@ -43,20 +43,6 @@ error[invalid-argument-type]: Argument to function `f1` is incorrect
    |        ^ Expected `Literal[1, 2, 3, 4, 5, ... omitted 3 literals] | A | B | ... omitted 4 union elements`, found `int`
    |
 info: type `int` is not assignable to any element of the union `Literal[1, 2, 3, 4, 5, ... omitted 3 literals] | A | B | ... omitted 4 union elements`
-info: ├── type `int` is not assignable to `Literal[1]`
-info: ├── type `int` is not assignable to `Literal[2]`
-info: ├── type `int` is not assignable to `Literal[3]`
-info: ├── type `int` is not assignable to `Literal[4]`
-info: ├── type `int` is not assignable to `Literal[5]`
-info: ├── type `int` is not assignable to `Literal[6]`
-info: ├── type `int` is not assignable to `Literal[7]`
-info: ├── type `int` is not assignable to `Literal[8]`
-info: ├── type `int` is not assignable to `A`
-info: ├── type `int` is not assignable to `B`
-info: ├── type `int` is not assignable to `C`
-info: ├── type `int` is not assignable to `D`
-info: ├── type `int` is not assignable to `E`
-info: └── type `int` is not assignable to `F`
 info: Function defined here
   --> src/mdtest_snippet.py:10:5
    |

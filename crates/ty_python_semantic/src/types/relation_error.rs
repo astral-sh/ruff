@@ -10,10 +10,6 @@ use crate::types::tuple::TupleLength;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TypeRelationHint<'db> {
     Root,
-    NotAssignable {
-        source: Type<'db>,
-        target: Type<'db>,
-    },
     NotAllUnionElementsAssignable {
         element: Type<'db>,
         union: Type<'db>,
@@ -22,6 +18,9 @@ pub(crate) enum TypeRelationHint<'db> {
     NotAssignableToAnyUnionElement {
         source: Type<'db>,
         union: Type<'db>,
+    },
+    NotAssignableToNOtherUnionElements {
+        n: usize,
     },
     TypedDictNotAssignableToDict,
     IncompatibleReturnTypes {
@@ -72,11 +71,6 @@ impl<'db> TypeRelationHint<'db> {
             Self::Root => {
                 return None;
             }
-            Self::NotAssignable { source, target } => format!(
-                "type `{}` is not assignable to `{}`",
-                source.display(db),
-                target.display(db),
-            ),
             Self::NotAllUnionElementsAssignable {
                 element,
                 union,
@@ -91,6 +85,10 @@ impl<'db> TypeRelationHint<'db> {
                 "type `{}` is not assignable to any element of the union `{}`",
                 source.display(db),
                 union.display(db),
+            ),
+            Self::NotAssignableToNOtherUnionElements { n } => format!(
+                "... omitted {n} union element{} without additional context",
+                if *n == 1 { "" } else { "s" }
             ),
             Self::TypedDictNotAssignableToDict => {
                 "`TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)"

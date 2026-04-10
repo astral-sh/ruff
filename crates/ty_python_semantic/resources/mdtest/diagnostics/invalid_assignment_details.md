@@ -286,6 +286,30 @@ def _(source: int):
     target: str | bytes | bool | None = source  # error: [invalid-assignment]
 ```
 
+## Assigning an overload set
+
+```py
+from typing import Protocol, overload
+
+class SupportsX(Protocol):
+    def x(self): ...
+
+class SupportsFooAndBar(Protocol):
+    def foo(self, name: str): ...
+    def bar(self, x: bytes): ...
+
+class IncompatibleFooAndBar:
+    def foo(self, name_: str): ...
+    @overload
+    def bar(self, x: SupportsX): ...
+    @overload
+    def bar(self, x: bytes): ...
+    def bar(self, x: SupportsX | bytes): ...
+
+def _(source: IncompatibleFooAndBar):
+    target: SupportsFooAndBar = source  # error: [invalid-assignment]
+```
+
 ## Invariant generic classes
 
 We show a special diagnostic hint for invariant generic classes. For example, if you try to assign a

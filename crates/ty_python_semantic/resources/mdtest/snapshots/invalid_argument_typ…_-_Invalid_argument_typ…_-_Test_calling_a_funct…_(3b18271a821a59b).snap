@@ -30,9 +30,6 @@ error[invalid-argument-type]: Argument to function `loads` is incorrect
   |            ^ Expected `str | bytes | bytearray`, found `Literal[5]`
   |
 info: type `Literal[5]` is not assignable to any element of the union `str | bytes | bytearray`
-info: ├── type `Literal[5]` is not assignable to `str`
-info: ├── type `Literal[5]` is not assignable to `bytes`
-info: └── type `Literal[5]` is not assignable to `bytearray`
 info: Function defined here
    --> stdlib/json/__init__.pyi:224:5
     |

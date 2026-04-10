@@ -1095,25 +1095,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     }
                 };
 
-                let mut child_context = vec![];
+                let mut elements_context = vec![];
 
-                let result = union
-                    .elements(db)
+                let elements = union.elements(db);
+                let result = elements
                     .iter()
                     .when_any(db, self.constraints, |&elem_ty| {
                         let result = self.check_type_pair(db, source, elem_ty);
                         if let Some(ctx) = self.error_context.as_ref() {
                             let ctx = ctx.take();
-                            if ctx.is_empty() {
-                                child_context.push(
-                                    TypeRelationHint::NotAssignable {
-                                        source,
-                                        target: elem_ty,
-                                    }
-                                    .into(),
-                                );
-                            } else {
-                                child_context.push(ctx);
+                            if !ctx.is_empty() {
+                                elements_context.push(ctx);
                             }
                         }
                         result
@@ -1121,12 +1113,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .or(db, self.constraints, is_new_type_of_union);
 
                 if self.error_context.is_some() && result.is_never_satisfied(db) {
+                    let elements_without_context = elements.len() - elements_context.len();
+                    if elements_without_context > 0 && elements_without_context < elements.len() {
+                        elements_context.push(
+                            TypeRelationHint::NotAssignableToNOtherUnionElements {
+                                n: elements_without_context,
+                            }
+                            .into(),
+                        );
+                    }
                     self.set_hint(
                         TypeRelationHint::NotAssignableToAnyUnionElement {
                             source,
                             union: target,
                         },
-                        child_context,
+                        elements_context,
                     );
                 }
 
