@@ -69,8 +69,7 @@ pub(crate) fn url_path_with_leading_slash(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    // Get the first argument (the route pattern)
-    let Some(route_arg) = call.arguments.args.first() else {
+    let Some(route_arg) = call.arguments.find_positional(0) else {
         return;
     };
 
