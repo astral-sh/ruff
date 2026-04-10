@@ -45,9 +45,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let class_ty = object_ty
-            .nominal_class(db)
-            .or_else(|| object_ty.to_class_type(db))?;
+        let class_ty = object_ty.nominal_class(db)?;
 
         for base in class_ty.iter_mro(db) {
             let Some(class) = base.into_class() else {
@@ -123,11 +121,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Use the full assignment statement range for these diagnostics instead of
         // just the attribute target range.
 
-        let is_in_init = self
+        let is_in_allowed_initializer = self
             .current_function_definition()
-            .is_some_and(|func| func.name.id == "__init__");
+            .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
 
         let report_not_in_init = || {
+            let is_dataclass_like = object_ty
+                .nominal_class(db)
+                .or_else(|| object_ty.to_class_type(db))
+                .and_then(|cls| cls.static_class_literal(db))
+                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
@@ -138,15 +141,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
                 object_ty.display(db)
             ));
-            diagnostic.set_primary_message(
-                "`Final` attributes can only be assigned in the class body or `__init__`",
-            );
+            diagnostic.set_primary_message(if is_dataclass_like {
+                "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
+            } else {
+                "`Final` attributes can only be assigned in the class body or `__init__`"
+            });
             if let Some(final_declaration) = final_declaration {
                 self.annotate_final_declaration(&mut diagnostic, final_declaration);
             }
         };
 
-        if !is_in_init {
+        if !is_in_allowed_initializer {
             report_not_in_init();
             return true;
         }
