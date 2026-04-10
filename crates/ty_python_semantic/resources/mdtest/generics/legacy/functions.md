@@ -941,12 +941,11 @@ def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
 def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
-reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
-# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
-reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[LiteralString | int]
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[LiteralString | Literal[1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
-    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[LiteralString | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]

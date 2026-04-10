@@ -1643,6 +1643,14 @@ impl NodeId {
                     interior.source_order,
                     |path, _| {
                         interior.if_true.for_each_path_inner(db, builder, f, path);
+                    },
+                );
+                path.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_unconstrained(),
+                    interior.source_order,
+                    |path, _| {
                         interior
                             .if_uncertain
                             .for_each_path_inner(db, builder, f, path);
@@ -1655,9 +1663,6 @@ impl NodeId {
                     interior.source_order,
                     |path, _| {
                         interior.if_false.for_each_path_inner(db, builder, f, path);
-                        interior
-                            .if_uncertain
-                            .for_each_path_inner(db, builder, f, path);
                     },
                 );
             }
