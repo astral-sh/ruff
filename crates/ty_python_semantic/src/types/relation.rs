@@ -1193,22 +1193,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                intersection
-                    .positive_elements_or_object(db)
-                    .when_any(db, self.constraints, |elem_ty| {
-                        self.check_type_pair(db, elem_ty, target)
-                    })
-                    .or(db, self.constraints, || {
-                        if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
-                        } else {
-                            self.never()
-                        }
-                    })
+                // TODO: Similar to how we do this for unions, collect error
+                // context for all elements and report it if *all* checks fail.
+
+                self.without_error_context(|| {
+                    intersection
+                        .positive_elements_or_object(db)
+                        .when_any(db, self.constraints, |elem_ty| {
+                            self.check_type_pair(db, elem_ty, target)
+                        })
+                        .or(db, self.constraints, || {
+                            if should_expand_intersection(intersection) {
+                                self.check_type_pair(
+                                    db,
+                                    intersection.with_expanded_typevars_and_newtypes(db),
+                                    target,
+                                )
+                            } else {
+                                self.never()
+                            }
+                        })
+                })
             }
 
             // `Never` is the bottom type, the empty set.
