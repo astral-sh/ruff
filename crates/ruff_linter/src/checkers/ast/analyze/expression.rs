@@ -1217,10 +1217,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DjangoLocalsInRenderFunction) {
                 flake8_django::rules::locals_in_render_function(checker, call);
             }
-            if checker.is_rule_enabled(Rule::DjangoURLPathWithoutTrailingSlash) {
+            if checker.is_rule_enabled(Rule::DjangoUrlPathWithoutTrailingSlash) {
                 flake8_django::rules::url_path_without_trailing_slash(checker, call);
             }
-            if checker.is_rule_enabled(Rule::DjangoURLPathWithLeadingSlash) {
+            if checker.is_rule_enabled(Rule::DjangoUrlPathWithLeadingSlash) {
                 flake8_django::rules::url_path_with_leading_slash(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnsupportedMethodCallOnAll) {

@@ -42,14 +42,14 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Django documentation: URL dispatcher](https://docs.djangoproject.com/en/stable/topics/http/urls/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.14.4")]
-pub(crate) struct DjangoURLPathWithLeadingSlash {
+pub(crate) struct DjangoUrlPathWithLeadingSlash {
     url_pattern: String,
 }
 
-impl AlwaysFixableViolation for DjangoURLPathWithLeadingSlash {
+impl Violation for DjangoUrlPathWithLeadingSlash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DjangoURLPathWithLeadingSlash { url_pattern } = self;
+        let DjangoUrlPathWithLeadingSlash { url_pattern } = self;
         format!("URL route `{url_pattern}` has an unnecessary leading slash")
     }
 
