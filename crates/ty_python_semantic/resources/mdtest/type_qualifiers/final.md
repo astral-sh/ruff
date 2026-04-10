@@ -751,8 +751,14 @@ class C:
         self.x = 2
 
 reveal_type(C().x)  # revealed: int
+```
 
-class D:
+`__post_init__` methods in non-dataclasses are not affected:
+
+```py
+from typing import Final
+
+class NonDataclass:
     def __post_init__(self):
         # error: [invalid-assignment]
         self.x: Final[int] = 1
