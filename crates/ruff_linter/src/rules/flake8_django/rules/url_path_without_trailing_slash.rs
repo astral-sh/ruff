@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_django::helpers::is_path_function;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -60,29 +61,11 @@ impl AlwaysFixableViolation for DjangoUrlPathWithoutTrailingSlash {
 
 /// DJ100
 pub(crate) fn url_path_without_trailing_slash(checker: &Checker, call: &ast::ExprCall) {
-    // Check if this is a call to django.urls.path or any additional configured path functions
-    let is_path_function = checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            let segments = qualified_name.segments();
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
+        return;
+    };
 
-            // Check if it's the default django.urls.path
-            if matches!(segments, ["django", "urls", "path"]) {
-                return true;
-            }
-
-            // Check if it matches any additional configured path functions
-            let qualified_name_str = segments.join(".");
-            checker
-                .settings()
-                .flake8_django
-                .additional_path_functions
-                .iter()
-                .any(|path| path == &qualified_name_str)
-        });
-
-    if !is_path_function {
+    if !is_path_function(&qualified_name, checker) {
         return;
     }
 
