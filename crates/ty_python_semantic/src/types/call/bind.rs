@@ -6096,7 +6096,7 @@ impl<'db> BindingError<'db> {
             (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node
                     .arguments
-                    .arguments_source_order()
+                    .iter_source_order()
                     .nth(argument_index)
                     .expect("argument index should not be out of range"),
             ),

@@ -1895,7 +1895,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
@@ -1912,7 +1912,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
@@ -1957,7 +1957,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::TypeAliasType) => {
                         // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
-                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),

@@ -977,8 +977,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Determine whether each argument should be considered a type form or a value
                 // based on the position.
                 let argument_forms = call_argument_forms(self.model, call);
-                for (argument, form) in call.arguments.arguments_source_order().zip(argument_forms)
-                {
+                for (argument, form) in call.arguments.iter_source_order().zip(argument_forms) {
                     match form {
                         CallArgumentForm::Type => self.visit_annotation(argument.value()),
                         CallArgumentForm::Unknown | CallArgumentForm::Value => match argument {

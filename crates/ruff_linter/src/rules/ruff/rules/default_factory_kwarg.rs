@@ -159,7 +159,7 @@ fn convert_to_positional(
         let insertion_edit = Edit::insertion(
             format!("{}, ", locator.slice(&default_factory.value)),
             call.arguments
-                .arguments_source_order()
+                .iter_source_order()
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("`default_factory` keyword argument not found"))?
                 .start(),
