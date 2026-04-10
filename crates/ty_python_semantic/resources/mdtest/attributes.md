@@ -216,6 +216,19 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Singleton promotion happens after unioning implicit assignments
+
+```py
+class C:
+    def __init__(self, flag: bool = False) -> None:
+        if flag:
+            self.x = None
+        else:
+            self.x = 1
+
+reveal_type(C().x)  # revealed: None | int
+```
+
 #### Attributes defined in multi-target assignments
 
 ```py

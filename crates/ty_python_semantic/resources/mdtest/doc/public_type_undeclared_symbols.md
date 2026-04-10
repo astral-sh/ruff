@@ -54,6 +54,17 @@ def f(w: Wrapper) -> None:
     c = accepts_int(w.value)
 ```
 
+The same widening also applies to undeclared instance attributes that are only assigned inside
+`__init__`:
+
+```py
+class InstanceWrapper:
+    def __init__(self) -> None:
+        self.value = None
+
+reveal_type(InstanceWrapper().value)  # revealed: None | Unknown
+```
+
 ## Declaring a wider type
 
 Users can always opt in to a wider public type by adding annotations. For the `Wrapper` class, this

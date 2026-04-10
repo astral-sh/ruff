@@ -1922,8 +1922,8 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of the promoted types inferred from all bindings of that
-        // attribute.
+        // any method, we build a union of the raw types inferred from all bindings of that
+        // attribute, then apply public-type promotion to the final union.
         let mut union_of_inferred_types = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
@@ -2089,112 +2089,85 @@ impl<'db> StaticClassLiteral<'db> {
                     is_attribute_bound = true;
                 }
 
-                match binding.kind(db) {
+                let inferred_ty = match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
                         // Annotated assignments were handled above. This branch is not
                         // unreachable (because of the `continue` above), but there is
                         // nothing to do here.
+                        None
                     }
-                    DefinitionKind::Assignment(assign) => {
-                        match assign.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     .., self.name, .. = <value>
-                                //     (.., self.name, ..) = <value>
-                                //     [.., self.name, ..] = <value>
+                    DefinitionKind::Assignment(assign) => match assign.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     .., self.name, .. = <value>
+                            //     (.., self.name, ..) = <value>
+                            //     [.., self.name, ..] = <value>
 
-                                let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty = unpacked.expression_type(assign.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
-                            TargetKind::Single => {
-                                // We found an un-annotated attribute assignment of the form:
-                                //
-                                //     self.name = <value>
-
-                                let inferred_ty = infer_expression_type(
-                                    db,
-                                    index.expression(assign.value(&module)),
-                                    TypeContext::default(),
-                                );
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(assign.target(&module)))
                         }
-                    }
-                    DefinitionKind::For(for_stmt) => {
-                        match for_stmt.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     for .., self.name, .. in <iterable>:
+                        TargetKind::Single => {
+                            // We found an un-annotated attribute assignment of the form:
+                            //
+                            //     self.name = <value>
 
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(for_stmt.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     for self.name in <iterable>:
-
-                                let iterable_ty = infer_expression_type(
-                                    db,
-                                    index.expression(for_stmt.iterable(&module)),
-                                    TypeContext::default(),
-                                );
-                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
+                            Some(infer_expression_type(
+                                db,
+                                index.expression(assign.value(&module)),
+                                TypeContext::default(),
+                            ))
                         }
-                    }
-                    DefinitionKind::WithItem(with_item) => {
-                        match with_item.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     with <context_manager> as .., self.name, ..:
+                    },
+                    DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     for .., self.name, .. in <iterable>:
 
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(with_item.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     with <context_manager> as self.name:
-
-                                let context_ty = infer_expression_type(
-                                    db,
-                                    index.expression(with_item.context_expr(&module)),
-                                    TypeContext::default(),
-                                );
-                                let inferred_ty = if with_item.is_async() {
-                                    context_ty.aenter(db)
-                                } else {
-                                    context_ty.enter(db)
-                                };
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
-                            }
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(for_stmt.target(&module)))
                         }
-                    }
+                        TargetKind::Single => {
+                            // We found an attribute assignment like:
+                            //
+                            //     for self.name in <iterable>:
+
+                            let iterable_ty = infer_expression_type(
+                                db,
+                                index.expression(for_stmt.iterable(&module)),
+                                TypeContext::default(),
+                            );
+                            // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                            Some(iterable_ty.iterate(db).homogeneous_element_type(db))
+                        }
+                    },
+                    DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     with <context_manager> as .., self.name, ..:
+
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(with_item.target(&module)))
+                        }
+                        TargetKind::Single => {
+                            // We found an attribute assignment like:
+                            //
+                            //     with <context_manager> as self.name:
+
+                            let context_ty = infer_expression_type(
+                                db,
+                                index.expression(with_item.context_expr(&module)),
+                                TypeContext::default(),
+                            );
+                            Some(if with_item.is_async() {
+                                context_ty.aenter(db)
+                            } else {
+                                context_ty.enter(db)
+                            })
+                        }
+                    },
                     DefinitionKind::Comprehension(comprehension) => {
                         match comprehension.target_kind() {
                             TargetKind::Sequence(_, unpack) => {
@@ -2203,12 +2176,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty =
-                                    unpacked.expression_type(comprehension.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
+                                Some(unpacked.expression_type(comprehension.target(&module)))
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2221,28 +2189,36 @@ impl<'db> StaticClassLiteral<'db> {
                                     TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types
-                                    .add(inferred_ty.promote(db).promote_singletons(db));
+                                Some(iterable_ty.iterate(db).homogeneous_element_type(db))
                             }
                         }
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
                         // TODO:
+                        None
                     }
                     DefinitionKind::NamedExpression(_) => {
                         // A named expression whose target is an attribute is syntactically prohibited
+                        None
                     }
-                    _ => {}
+                    _ => None,
+                };
+
+                if let Some(inferred_ty) = inferred_ty {
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
         }
 
         Member {
             inner: if is_attribute_bound {
-                Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
+                Place::bound(
+                    union_of_inferred_types
+                        .build()
+                        .promote(db)
+                        .promote_singletons(db),
+                )
+                .with_qualifiers(qualifiers)
             } else {
                 Place::Undefined.with_qualifiers(qualifiers)
             },
