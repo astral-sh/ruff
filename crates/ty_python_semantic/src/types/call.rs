@@ -121,6 +121,24 @@ impl<'db> CallError<'db> {
                 _ => None,
             })
     }
+
+    /// Returns `Some(property)` if the call error was caused by an attempt to delete a property
+    /// that has no deleter, and `None` otherwise.
+    pub(crate) fn as_attempt_to_delete_property_with_no_deleter(
+        &self,
+    ) -> Option<PropertyInstanceType<'db>> {
+        if self.0 != CallErrorKind::BindingError {
+            return None;
+        }
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .find_map(|error| match error {
+                BindingError::PropertyHasNoDeleter(property) => Some(*property),
+                _ => None,
+            })
+    }
 }
 
 /// The reason why calling a type failed.

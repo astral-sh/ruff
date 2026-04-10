@@ -543,6 +543,7 @@ pub(crate) use todo_type;
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
     pub setter: Option<Type<'db>>,
+    pub deleter: Option<Type<'db>>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -555,6 +556,9 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
     if let Some(setter) = property.setter(db) {
         visitor.visit_type(db, setter);
+    }
+    if let Some(deleter) = property.deleter(db) {
+        visitor.visit_type(db, deleter);
     }
 }
 
@@ -575,7 +579,10 @@ impl<'db> PropertyInstanceType<'db> {
         let setter = self
             .setter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        Self::new(db, getter, setter)
+        let deleter = self
+            .deleter(db)
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        Self::new(db, getter, setter, deleter)
     }
 
     fn recursive_type_normalized_impl(
@@ -600,7 +607,15 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(Self::new(db, getter, setter))
+        let deleter = match self.deleter(db) {
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) => Some(
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
+        Some(Self::new(db, getter, setter, deleter))
     }
 
     fn find_legacy_typevars_impl(
@@ -614,6 +629,9 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
         if let Some(ty) = self.setter(db) {
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        }
+        if let Some(ty) = self.deleter(db) {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
@@ -2411,6 +2429,12 @@ impl<'db> Type<'db> {
                         ))
                         .into(),
                     ),
+                    (Some(KnownClass::Property), "__delete__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderDelete,
+                        ))
+                        .into(),
+                    ),
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
@@ -3178,6 +3202,10 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
             )
             .into(),
+            Type::PropertyInstance(property) if name == "__delete__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)),
+            )
+            .into(),
 
             Type::LiteralValue(literal) if literal.is_string() && name == "startswith" => {
                 let string_literal = literal.as_string().unwrap();
@@ -3260,6 +3288,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::ClassLiteral(class)
+                if name == "__delete__" && class.is_known(db, KnownClass::Property) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::PropertyDunderDelete,
+                ))
+                .into()
+            }
             Type::BoundMethod(bound_method) => match name_str {
                 "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                 "__func__" => Place::bound(Type::FunctionLiteral(bound_method.function(db))).into(),
@@ -3316,6 +3352,9 @@ impl<'db> Type<'db> {
             }
             Type::PropertyInstance(property) if name == "fset" => {
                 Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
+            }
+            Type::PropertyInstance(property) if name == "fdel" => {
+                Place::bound(property.deleter(db).unwrap_or(Type::none(db))).into()
             }
 
             Type::LiteralValue(literal)
@@ -5648,6 +5687,11 @@ impl<'db> Type<'db> {
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
 
             Type::Callable(callable) => {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -5893,7 +5937,8 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(property)
-                | KnownBoundMethodType::PropertyDunderSet(property),
+                | KnownBoundMethodType::PropertyDunderSet(property)
+                | KnownBoundMethodType::PropertyDunderDelete(property),
             ) => {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -6189,8 +6234,9 @@ impl<'db> Type<'db> {
 
             Self::PropertyInstance(property) => property
                 .getter(db)
-                .and_then(|getter|getter.definition(db))
-                .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
+                .and_then(|getter| getter.definition(db))
+                .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+                .or_else(|| property.deleter(db).and_then(|deleter| deleter.definition(db))),
 
             Self::LiteralValue(_)
             // TODO: For enum literals, it would be even better to jump to the definition of the specific member
@@ -6392,6 +6438,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .getter(db)
                 .iter()
                 .chain(&property_instance_type.setter(db))
+                .chain(&property_instance_type.deleter(db))
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),

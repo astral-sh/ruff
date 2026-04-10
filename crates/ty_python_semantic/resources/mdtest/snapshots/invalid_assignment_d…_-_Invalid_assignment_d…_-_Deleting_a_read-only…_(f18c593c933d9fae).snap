@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Deleting a read-only property
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     @property
+3 |     def attr(self) -> int:
+4 |         return 1
+5 | 
+6 | c = C()
+7 | del c.attr  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Cannot delete read-only property `attr` on object of type `C`
+ --> src/mdtest_snippet.py:7:5
+  |
+6 | c = C()
+7 | del c.attr  # error: [invalid-assignment]
+  |     ^^^^^^ Attempted deletion of `C.attr` here
+  |
+ ::: src/mdtest_snippet.py:3:9
+  |
+1 | class C:
+2 |     @property
+3 |     def attr(self) -> int:
+  |         ---- Property `C.attr` defined here with no deleter
+4 |         return 1
+  |
+
+```

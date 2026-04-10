@@ -217,7 +217,7 @@ impl<'db> ProtocolInterface<'db> {
                     ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
                 (
                     Name::new(name),
                     ProtocolMemberData {
@@ -555,7 +555,12 @@ impl<'db> ProtocolMemberKind<'db> {
                     (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
                     (None, _) => None,
                 };
-                Self::Property(PropertyInstanceType::new(db, getter, setter))
+                let deleter = match (curr.deleter(db), prev.deleter(db)) {
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
+                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (None, _) => None,
+                };
+                Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))
             }
             (Self::Other(curr), Self::Other(prev)) => {
                 Self::Other(curr.cycle_normalized(db, *prev, cycle))
