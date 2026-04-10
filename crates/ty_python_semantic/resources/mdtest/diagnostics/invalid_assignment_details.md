@@ -355,6 +355,15 @@ def _(source: IncompatibleFoo):
     target: SupportsFooAndBar = source  # error: [invalid-assignment]
 ```
 
+## Assigning to `Iterable`
+
+```py
+from collections.abc import Iterable
+
+def _(source: list[str]):
+    target: Iterable[bytes] = source  # error: [invalid-assignment]
+```
+
 ## Invariant generic classes
 
 We show a special diagnostic hint for invariant generic classes. For example, if you try to assign a
