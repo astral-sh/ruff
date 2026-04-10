@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use crate::{
     Db, FxIndexMap, FxIndexSet, Program, TypeQualifiers,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
         place_from_bindings, place_from_declarations,
     },
     semantic_index::{
@@ -1117,7 +1117,7 @@ impl<'db> StaticClassLiteral<'db> {
         if member
             .inner
             .place
-            .unwidened_type()
+            .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
             && CodeGeneratorKind::from_static_class(db, self, None)
                 .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
@@ -1128,7 +1128,7 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.unwidened_type() {
+        if let Some(ty) = member.inner.place.raw_type() {
             if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
                 if is_enum_class_by_inheritance(db, self) {
                     return Member::definitely_declared(value_ty);
@@ -1922,9 +1922,8 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of `Unknown` with the inferred types of all bindings of
-        // that attribute. We include `Unknown` in that union to account for the fact that the
-        // attribute might be externally modified.
+        // any method, we build a union of the promoted types inferred from all bindings of that
+        // attribute.
         let mut union_of_inferred_types = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
@@ -2032,10 +2031,6 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if !qualifiers.contains(TypeQualifiers::FINAL) {
-            union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
-        }
-
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
@@ -2113,7 +2108,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                                 let inferred_ty = unpacked.expression_type(assign.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                             TargetKind::Single => {
                                 // We found an un-annotated attribute assignment of the form:
@@ -2126,7 +2122,8 @@ impl<'db> StaticClassLiteral<'db> {
                                     TypeContext::default(),
                                 );
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                         }
                     }
@@ -2141,7 +2138,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(for_stmt.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2157,7 +2155,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                         }
                     }
@@ -2172,7 +2171,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(with_item.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2190,7 +2190,8 @@ impl<'db> StaticClassLiteral<'db> {
                                     context_ty.enter(db)
                                 };
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                         }
                     }
@@ -2206,7 +2207,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     unpacked.expression_type(comprehension.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2222,7 +2224,8 @@ impl<'db> StaticClassLiteral<'db> {
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.promote(db).promote_singletons(db));
                             }
                         }
                     }
@@ -2328,7 +2331,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
+                                        public_type_policy: PublicTypePolicy::Raw,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -2391,7 +2394,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
+                                        public_type_policy: PublicTypePolicy::Raw,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }

@@ -65,40 +65,37 @@ impl TypeOrigin {
     }
 }
 
-/// Whether a place's type should be widened with `Unknown` when accessed publicly.
+/// How a place's raw type should be adjusted when accessed publicly.
 ///
 /// For undeclared public symbols (e.g., class attributes without type annotations),
-/// the gradual typing guarantee requires that we consider them as potentially
-/// modified externally, so their type is widened to a union with `Unknown`.
-///
-/// This enum tracks whether such widening should be applied, allowing callers
-/// to access either the raw inferred type or the widened public type.
+/// we store the raw inferred type and lazily apply the public-type policy when
+/// converting the place into a public lookup result.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default, get_size2::GetSize)]
-pub(crate) enum Widening {
-    /// The type should not be widened with `Unknown`.
+pub(crate) enum PublicTypePolicy {
+    /// Public lookup should expose the raw stored type.
     #[default]
-    None,
-    /// The type should be widened with `Unknown` when accessed publicly.
-    WithUnknown,
+    Raw,
+    /// Public lookup should expose the promoted stored type.
+    Promote,
 }
 
-impl Widening {
-    /// Apply widening to the type if this is `WithUnknown`.
+impl PublicTypePolicy {
+    /// Apply the public-type policy to the raw type.
     pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
-            Self::None => ty,
-            Self::WithUnknown => UnionType::from_two_elements(db, Type::unknown(), ty),
+            Self::Raw => ty,
+            Self::Promote => ty.promote(db).promote_singletons(db),
         }
     }
 }
 
-/// A defined place with its type, origin, definedness, and widening information.
+/// A defined place with its raw type, origin, definedness, and public-type policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
-    pub(crate) widening: Widening,
+    pub(crate) public_type_policy: PublicTypePolicy,
 }
 
 impl<'db> DefinedPlace<'db> {
@@ -107,7 +104,7 @@ impl<'db> DefinedPlace<'db> {
             ty,
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
-            widening: Widening::None,
+            public_type_policy: PublicTypePolicy::Raw,
         }
     }
 
@@ -121,8 +118,8 @@ impl<'db> DefinedPlace<'db> {
         self
     }
 
-    pub(crate) fn with_widening(mut self, widening: Widening) -> Self {
-        self.widening = widening;
+    pub(crate) fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
+        self.public_type_policy = public_type_policy;
         self
     }
 
@@ -193,11 +190,10 @@ impl<'db> Place<'db> {
         }
     }
 
-    /// Returns the type of the place without widening applied.
+    /// Returns the raw stored type of the place.
     ///
-    /// The stored type is always the unwidened type. Widening (union with `Unknown`)
-    /// is applied lazily when converting to `LookupResult`.
-    pub(crate) fn unwidened_type(&self) -> Option<Type<'db>> {
+    /// Any public-type adjustment is applied lazily when converting to `LookupResult`.
+    pub(crate) fn raw_type(&self) -> Option<Type<'db>> {
         match self {
             Place::Defined(defined) => Some(defined.ty),
             Place::Undefined => None,
@@ -222,11 +218,16 @@ impl<'db> Place<'db> {
         }
     }
 
-    /// Set the widening mode for this place.
+    /// Set the public-type policy for this place.
     #[must_use]
-    pub(crate) fn with_widening(self, new_widening: Widening) -> Place<'db> {
+    pub(crate) fn with_public_type_policy(
+        self,
+        new_public_type_policy: PublicTypePolicy,
+    ) -> Place<'db> {
         match self {
-            Place::Defined(defined) => Place::Defined(defined.with_widening(new_widening)),
+            Place::Defined(defined) => {
+                Place::Defined(defined.with_public_type_policy(new_public_type_policy))
+            }
             Place::Undefined => Place::Undefined,
         }
     }
@@ -739,15 +740,15 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// a [`Result`] type in which the `Ok` variant represents a definitely defined place
     /// and the `Err` variant represents a place that is either definitely or possibly undefined.
     ///
-    /// For places marked with `Widening::WithUnknown`, this applies the gradual typing guarantee
-    /// by creating a union with `Unknown`.
+    /// For places whose public type differs from their raw stored type, this applies the
+    /// public-type policy lazily during lookup.
     pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.widening.apply_if_needed(db, place.ty);
+                let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
@@ -916,14 +917,14 @@ pub(crate) fn place_by_id<'db>(
                     ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
                     ty: Type::unknown(),
                     origin,
                     definedness,
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
                 .with_qualifiers(qualifiers),
             }
@@ -962,7 +963,7 @@ pub(crate) fn place_by_id<'db>(
                         ty: declared_ty,
                         origin,
                         definedness: Definedness::AlwaysDefined,
-                        widening: Widening::None,
+                        public_type_policy: PublicTypePolicy::Raw,
                     })
                 }
                 // Place is possibly undeclared and (possibly) bound
@@ -979,7 +980,7 @@ pub(crate) fn place_by_id<'db>(
                     } else {
                         boundness
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 }),
             };
 
@@ -1007,8 +1008,8 @@ pub(crate) fn place_by_id<'db>(
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
             // a diagnostic if we see it being modified externally. In type inference, we
-            // can assign a "narrow" type to it even if it is not *declared*. This means, we
-            // do not have to union with `Unknown`.
+            // can assign a "narrow" type to it even if it is not *declared*. This means we do
+            // not have to adjust its public type.
             //
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
@@ -1020,25 +1021,19 @@ pub(crate) fn place_by_id<'db>(
                 )
             });
 
-            // Module-level globals can be mutated externally. A `MY_CONSTANT = 1` global might
-            // be changed to `"some string"` from code outside of the module that we're looking
-            // at, and so from a gradual-guarantee perspective, it makes sense to infer a type
-            // of `Literal[1] | Unknown` for global symbols. This allows the code that does the
-            // mutation to type check correctly, and for code that uses the global, it accurately
-            // reflects the lack of knowledge about the type.
-            //
-            // However, external modifications (or modifications through `global` statements) that
-            // would require a wider type are relatively rare. From a practical perspective, we can
-            // therefore achieve a better user experience by trusting the inferred type. Users who
-            // need the external mutation to work can always annotate the global with the wider
-            // type. And everyone else benefits from more precise type inference.
+            // Module-level globals can be mutated externally, and strict application of the
+            // gradual guarantee would suggest that if not annotated, all such external mutations
+            // should be valid. However, external modifications (or modifications through `global`
+            // statements) that would require a different public type are relatively rare. From a
+            // practical perspective, we get a better user experience by trusting the (promoted)
+            // inferred type by default, and only requiring annotation for the rare case.
             let is_module_global = scope.node(db).scope_kind().is_module();
 
-            // If the visibility of the scope is private (like for a function scope), we also do
-            // not union with `Unknown`, because the symbol cannot be modified externally.
+            // If the visibility of the scope is private (like for a function scope), we also keep
+            // the raw type, because the symbol cannot be modified externally.
             let scope_has_private_visibility = scope.scope(db).visibility().is_private();
 
-            // We generally trust undeclared places in stubs and do not union with `Unknown`.
+            // We generally trust undeclared places in stubs and expose the raw type.
             let in_stub_file = scope.file(db).is_stub(db);
 
             if is_considered_non_modifiable
@@ -1048,10 +1043,12 @@ pub(crate) fn place_by_id<'db>(
             {
                 inferred.into()
             } else {
-                // Gradual typing guarantee: Mark undeclared public symbols for widening.
-                // The actual union with `Unknown` is applied lazily when converting to
-                // LookupResult via `into_lookup_result`.
-                inferred.with_widening(Widening::WithUnknown).into()
+                // Public inferred types should expose a promoted view rather than their raw
+                // inferred literal form. The adjustment is applied lazily when converting to
+                // `LookupResult` via `into_lookup_result`.
+                inferred
+                    .with_public_type_policy(PublicTypePolicy::Promote)
+                    .into()
             }
         }
     }
@@ -2099,7 +2096,7 @@ mod tests {
                 ty: ty1,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2108,7 +2105,7 @@ mod tests {
                 ty: ty2,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2118,7 +2115,7 @@ mod tests {
                 ty: ty1,
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2127,7 +2124,7 @@ mod tests {
                 ty: ty2,
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2151,7 +2148,7 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None
+                public_type_policy: PublicTypePolicy::Raw
             })
             .into()
         );
@@ -2161,7 +2158,7 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None
+                public_type_policy: PublicTypePolicy::Raw
             })
             .into()
         );

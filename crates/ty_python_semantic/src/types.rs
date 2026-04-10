@@ -1900,11 +1900,16 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
+    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+        self.promote_singletons_impl(db)
+    }
+
     /// Recursively promote singleton types (like `None`, `EllipsisType`) to
-    /// `T | Unknown` within type parameters, without recursing into unions.
+    /// `T | Unknown` within nominal type parameters, without recursing into unions.
     /// Used for collection literal inference so that `[None]` is inferred as
     /// `list[None | Unknown]` rather than `list[None]`.
-    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote_singletons_recursively(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly),
@@ -1917,6 +1922,16 @@ impl<'db> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            _ => self,
+        }
+    }
+
+    /// Like [`Type::promote_singletons_recursively`], but does not recurse into nested types.
+    fn promote_singletons_impl(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::NominalInstance(instance) if instance.is_singleton(db) => {
+                UnionType::from_two_elements(db, self, Type::unknown())
+            }
             _ => self,
         }
     }
@@ -2790,7 +2805,7 @@ impl<'db> Type<'db> {
                     ty,
                     origin,
                     definedness,
-                    widening,
+                    public_type_policy,
                 }),
             qualifiers,
         } = attribute
@@ -2802,7 +2817,7 @@ impl<'db> Type<'db> {
                     ty: fallback,
                     origin,
                     definedness,
-                    widening,
+                    public_type_policy,
                 })
                 .with_qualifiers(qualifiers),
                 instance,
@@ -2834,7 +2849,7 @@ impl<'db> Type<'db> {
                         ty: Type::Union(union),
                         origin,
                         definedness: boundness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers,
             } => (
@@ -2846,7 +2861,7 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             definedness: boundness,
-                            widening,
+                            public_type_policy,
                         })
                     })
                     .with_qualifiers(qualifiers),
@@ -2867,7 +2882,7 @@ impl<'db> Type<'db> {
                         ty: Type::Intersection(intersection),
                         origin,
                         definedness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers,
             } => (
@@ -2882,7 +2897,7 @@ impl<'db> Type<'db> {
                                     .map_or(*elem, |(ty, _)| ty),
                                 origin,
                                 definedness,
-                                widening,
+                                public_type_policy,
                             })
                         })
                         .with_qualifiers(qualifiers)
@@ -2897,7 +2912,7 @@ impl<'db> Type<'db> {
                         ty: attribute_ty,
                         origin,
                         definedness: boundness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers: _,
             } => {
@@ -2909,7 +2924,7 @@ impl<'db> Type<'db> {
                             ty: return_ty,
                             origin,
                             definedness: boundness,
-                            widening,
+                            public_type_policy,
                         })
                         .into(),
                         attribute_kind,
@@ -3038,13 +3053,13 @@ impl<'db> Type<'db> {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
+                    public_type_policy: fallback_public_type_policy,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
-                widening: fallback_widening,
+                public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -3082,13 +3097,13 @@ impl<'db> Type<'db> {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
+                    public_type_policy: fallback_public_type_policy,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
-                widening: fallback_widening,
+                public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -5543,7 +5558,7 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // `SingletonsOnly` promotion only recurses into `NominalInstance` types (tuples
+        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
             type_mapping,
@@ -5595,7 +5610,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
                 if instance.is_singleton(db) {
-                    UnionType::from_two_elements(db, self, Type::unknown())
+                    self.promote_singletons_impl(db)
                 } else {
                     instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
@@ -6442,7 +6457,8 @@ impl PromotionMode {
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
-    /// Singleton promotion is shallow: it doesn't recurse
+    /// Singleton-only promotion recursively descends through nominal instances
+    /// without recursing into unions or non-nominal types.
     SingletonsOnly,
 }
 
