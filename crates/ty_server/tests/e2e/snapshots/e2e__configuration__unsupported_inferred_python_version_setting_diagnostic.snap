@@ -1,0 +1,24 @@
+---
+source: crates/ty_server/tests/e2e/configuration.rs
+expression: diagnostics
+---
+{
+  "file://<temp_dir>/project/.venv/pyvenv.cfg": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 0
+        }
+      },
+      "severity": 2,
+      "code": "unsupported-python-version",
+      "source": "ty",
+      "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
+    }
+  ]
+}

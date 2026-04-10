@@ -211,6 +211,10 @@ reveal_type(sys.version_info[:2])
         .build()
         .wait_until_workspaces_are_initialized();
 
+    // The unsupported version inferred from the selected environment now surfaces as a
+    // settings diagnostic on the environment's `pyvenv.cfg`.
+    server.collect_publish_diagnostic_notifications(1);
+
     server.open_text_document(main, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(main, None);
 
@@ -238,6 +242,50 @@ reveal_type(sys.version_info[:2])
       ]
     }
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn unsupported_inferred_python_version_setting_diagnostic() -> Result<()> {
+    let workspace_root = SystemPath::new("project");
+    let main = SystemPath::new("project/main.py");
+    let python_home = "base/bin";
+    let base_python = if cfg!(target_os = "windows") {
+        "base/bin/python.exe"
+    } else {
+        "base/bin/python"
+    };
+    let python = if cfg!(target_os = "windows") {
+        "project/.venv/Scripts/python.exe"
+    } else {
+        "project/.venv/bin/python"
+    };
+    let site_packages = if cfg!(target_os = "windows") {
+        "project/.venv/Lib/site-packages/foo.py"
+    } else {
+        "project/.venv/lib/python3.16/site-packages/foo.py"
+    };
+
+    let builder = TestServerBuilder::new()?;
+    let python_home = builder.file_path(python_home);
+
+    let mut server = builder
+        .with_workspace(workspace_root, None)?
+        .with_file(main, "x = 1\n")?
+        .with_file(base_python, "")?
+        .with_file(python, "")?
+        .with_file(
+            "project/.venv/pyvenv.cfg",
+            format!("home = {python_home}\n"),
+        )?
+        .with_file(site_packages, "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+
+    assert_json_snapshot!(diagnostics);
 
     Ok(())
 }

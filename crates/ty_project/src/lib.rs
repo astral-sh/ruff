@@ -165,17 +165,27 @@ impl ProgressReporter for CollectReporter {
     }
 }
 
+fn merge_settings_diagnostics(
+    mut diagnostics: Vec<OptionDiagnostic>,
+    program_settings_diagnostics: Vec<OptionDiagnostic>,
+) -> Vec<OptionDiagnostic> {
+    diagnostics.extend(program_settings_diagnostics);
+    diagnostics
+}
+
 #[salsa::tracked]
 impl Project {
     pub fn from_metadata<Strategy: MisconfigurationStrategy>(
         db: &dyn Db,
         metadata: ProjectMetadata,
+        program_settings_diagnostics: Vec<OptionDiagnostic>,
         strategy: &Strategy,
     ) -> Result<Self, Strategy::Error<ToSettingsError>> {
         let (settings, diagnostics) =
             metadata
                 .options()
                 .to_settings(db, metadata.root(), strategy)?;
+        let diagnostics = merge_settings_diagnostics(diagnostics, program_settings_diagnostics);
 
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
@@ -237,7 +247,12 @@ impl Project {
         )
     }
 
-    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
+    pub fn reload(
+        self,
+        db: &mut dyn Db,
+        metadata: ProjectMetadata,
+        program_settings_diagnostics: Vec<OptionDiagnostic>,
+    ) {
         tracing::debug!("Reloading project");
 
         self.reload_files(db);
@@ -251,6 +266,9 @@ impl Project {
             .to_settings(db, metadata.root(), &FallibleStrategy)
         {
             Ok((settings, settings_diagnostics)) => {
+                let settings_diagnostics =
+                    merge_settings_diagnostics(settings_diagnostics, program_settings_diagnostics);
+
                 if self.settings(db) != &settings {
                     self.set_settings(db).to(Box::new(settings));
                 }
@@ -264,7 +282,10 @@ impl Project {
                     "Keeping old project configuration because loading the new settings failed with: {error}"
                 );
                 self.set_settings_diagnostics(db)
-                    .to(vec![error.into_diagnostic()]);
+                    .to(merge_settings_diagnostics(
+                        vec![error.into_diagnostic()],
+                        program_settings_diagnostics,
+                    ));
             }
         }
 

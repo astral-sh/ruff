@@ -106,15 +106,18 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = strategy.to_anyhow(project_metadata.to_program_settings(
-            db.system(),
-            db.vendored(),
-            strategy,
-        ))?;
+        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
+            project_metadata.to_program_settings(&db, db.system(), db.vendored(), strategy),
+        )?;
         Program::from_settings(&db, program_settings);
 
         db.project = Some(strategy.map_err(
-            Project::from_metadata(&db, project_metadata, strategy),
+            Project::from_metadata(
+                &db,
+                project_metadata,
+                program_settings_diagnostics,
+                strategy,
+            ),
             |error| anyhow::anyhow!("{}", error.pretty(&db)),
         )?);
 
@@ -631,7 +634,8 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project, &FallibleStrategy).unwrap();
+            let project =
+                Project::from_metadata(&db, project, Vec::new(), &FallibleStrategy).unwrap();
             db.project = Some(project);
             db
         }
