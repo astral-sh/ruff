@@ -1682,7 +1682,7 @@ fn add_string_literal_completions<'db>(
                 continue;
             }
 
-            if ch == quote_char && consecutive_backslashes % 2 == 0 {
+            if ch == quote_char && consecutive_backslashes.is_multiple_of(2) {
                 escaped.push('\\');
             }
             consecutive_backslashes = 0;
