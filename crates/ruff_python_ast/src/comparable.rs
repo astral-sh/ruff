@@ -517,19 +517,23 @@ pub enum ComparableInterpolatedStringElement<'a> {
     InterpolatedElement(InterpolatedElement<'a>),
 }
 
+/// Comparable wrapper for [`ast::DebugText`].
+///
+/// Compares the full debug text (leading + expression source + trailing) rather than only the
+/// expression source, because whitespace is part of the f-string's runtime output: `f"{x =}"`
+/// produces `"x =<value>"` while `f"{x=}"` produces `"x=<value>"`, making them distinct
+/// `Literal` types.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableDebugText<'a> {
-    leading: Cow<'a, str>,
-    source: Cow<'a, str>,
-    trailing: Cow<'a, str>,
+    text: Cow<'a, str>,
 }
 
 impl<'a> From<&'a ast::DebugText> for ComparableDebugText<'a> {
     fn from(debug_text: &'a ast::DebugText) -> Self {
+        // Normalizing newlines is safe because Python normalizes `\r\n` and `\r` to `\n`
+        // at compile time, so they produce identical runtime values.
         Self {
-            leading: normalize_newlines(debug_text.leading()),
-            source: normalize_newlines(debug_text.source()),
-            trailing: normalize_newlines(debug_text.trailing()),
+            text: normalize_newlines(debug_text.as_str()),
         }
     }
 }

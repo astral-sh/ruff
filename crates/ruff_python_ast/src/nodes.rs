@@ -387,12 +387,19 @@ impl ConversionFlag {
     }
 }
 
+/// The debug text of a self-documenting f-string expression (e.g., `f"{x=}"`).
+///
+/// Stores the concatenation of leading text, expression source, and trailing text as a single
+/// [`CompactString`], with byte offsets to split them. The offsets are needed because the leading
+/// and trailing portions can contain non-whitespace characters (grouping parentheses, comments in
+/// triple-quoted f-strings) that cannot be distinguished from expression content by scanning.
+///
+/// [`CompactString`]: compact_str::CompactString
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DebugText {
     /// The full text between the `{` and the conversion / `format_spec` / `}`.
-    /// Contains leading whitespace, the expression source, and trailing whitespace + `=`.
-    expression: String,
+    expression: compact_str::CompactString,
     /// Byte offset where the leading portion ends and the expression source begins.
     leading_end: u32,
     /// Byte offset where the expression source ends and the trailing portion begins.
@@ -403,27 +410,35 @@ impl std::fmt::Debug for DebugText {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DebugText")
             .field("leading", &self.leading())
-            .field("source", &self.source())
+            .field("expression", &self.expression())
             .field("trailing", &self.trailing())
             .finish()
     }
 }
 
 impl DebugText {
-    pub fn new(leading: &str, source: &str, trailing: &str) -> Self {
+    pub fn new(leading: &str, expression: &str, trailing: &str) -> Self {
         let leading_end =
             u32::try_from(leading.len()).expect("DebugText leading exceeds u32::MAX bytes");
         let trailing_start = leading_end
-            + u32::try_from(source.len()).expect("DebugText source exceeds u32::MAX bytes");
-        let mut expression = String::with_capacity(leading.len() + source.len() + trailing.len());
-        expression.push_str(leading);
-        expression.push_str(source);
-        expression.push_str(trailing);
+            + u32::try_from(expression.len())
+                .expect("DebugText expression exceeds u32::MAX bytes");
+        let mut buf = compact_str::CompactString::with_capacity(
+            leading.len() + expression.len() + trailing.len(),
+        );
+        buf.push_str(leading);
+        buf.push_str(expression);
+        buf.push_str(trailing);
         Self {
-            expression,
+            expression: buf,
             leading_end,
             trailing_start,
         }
+    }
+
+    /// The full debug text between the `{` and the conversion / `format_spec` / `}`.
+    pub fn as_str(&self) -> &str {
+        &self.expression
     }
 
     /// The text between the `{` and the expression node.
@@ -432,7 +447,7 @@ impl DebugText {
     }
 
     /// The source text of the expression (e.g., `0x0` in `f"{0x0=}"`).
-    pub fn source(&self) -> &str {
+    pub fn expression(&self) -> &str {
         &self.expression[self.leading_end as usize..self.trailing_start as usize]
     }
 
@@ -441,12 +456,15 @@ impl DebugText {
         &self.expression[self.trailing_start as usize..]
     }
 
-    /// Replace `\r\n` and `\r` with `\n` in the leading and trailing portions.
+    /// Replace `\r\n` and `\r` with `\n` in the leading and trailing portions,
+    /// preserving the expression source text as-is.
     pub fn normalize_newlines(&mut self) {
-        let leading = self.leading().replace("\r\n", "\n").replace('\r', "\n");
-        let source = self.source().to_string();
-        let trailing = self.trailing().replace("\r\n", "\n").replace('\r', "\n");
-        *self = Self::new(&leading, &source, &trailing);
+        if self.expression.contains('\r') {
+            let leading = self.leading().replace("\r\n", "\n").replace('\r', "\n");
+            let expr = self.expression().to_string();
+            let trailing = self.trailing().replace("\r\n", "\n").replace('\r', "\n");
+            *self = Self::new(&leading, &expr, &trailing);
+        }
     }
 }
 

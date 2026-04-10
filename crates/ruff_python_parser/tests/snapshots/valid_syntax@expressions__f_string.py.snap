@@ -607,7 +607,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
-                                                                source: "foo",
+                                                                expression: "foo",
                                                                 trailing: " =  ",
                                                             },
                                                         ),
@@ -660,7 +660,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
-                                                                source: "foo",
+                                                                expression: "foo",
                                                                 trailing: " =  ",
                                                             },
                                                         ),
@@ -727,7 +727,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
-                                                                source: "foo",
+                                                                expression: "foo",
                                                                 trailing: " =  ",
                                                             },
                                                         ),
@@ -800,7 +800,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "  ",
-                                                                source: "1, 2",
+                                                                expression: "1, 2",
                                                                 trailing: "  =  ",
                                                             },
                                                         ),
@@ -869,7 +869,7 @@ Module(
                                                                                             debug_text: Some(
                                                                                                 DebugText {
                                                                                                     leading: "",
-                                                                                                    source: "3.1415",
+                                                                                                    expression: "3.1415",
                                                                                                     trailing: "=",
                                                                                                 },
                                                                                             ),
@@ -1395,7 +1395,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: " (  ",
-                                                                source: "foo",
+                                                                expression: "foo",
                                                                 trailing: " )  = ",
                                                             },
                                                         ),
@@ -1943,7 +1943,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
-                                                                source: "x",
+                                                                expression: "x",
                                                                 trailing: " =",
                                                             },
                                                         ),
@@ -1996,7 +1996,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "    ",
-                                                                source: "x",
+                                                                expression: "x",
                                                                 trailing: " = ",
                                                             },
                                                         ),
@@ -2049,7 +2049,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
-                                                                source: "x",
+                                                                expression: "x",
                                                                 trailing: "=",
                                                             },
                                                         ),
@@ -2163,7 +2163,7 @@ Module(
                                                         debug_text: Some(
                                                             DebugText {
                                                                 leading: "",
-                                                                source: "x",
+                                                                expression: "x",
                                                                 trailing: " = ",
                                                             },
                                                         ),

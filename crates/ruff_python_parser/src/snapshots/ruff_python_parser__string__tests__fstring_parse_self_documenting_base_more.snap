@@ -40,7 +40,7 @@ expression: suite
                                                 debug_text: Some(
                                                     DebugText {
                                                         leading: "",
-                                                        source: "user",
+                                                        expression: "user",
                                                         trailing: "=",
                                                     },
                                                 ),
@@ -70,7 +70,7 @@ expression: suite
                                                 debug_text: Some(
                                                     DebugText {
                                                         leading: "",
-                                                        source: "second",
+                                                        expression: "second",
                                                         trailing: "=",
                                                     },
                                                 ),

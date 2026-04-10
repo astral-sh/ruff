@@ -32,7 +32,7 @@ expression: suite
                                             debug_text: Some(
                                                 DebugText {
                                                     leading: "",
-                                                    source: "user",
+                                                    expression: "user",
                                                     trailing: "=",
                                                 },
                                             ),

@@ -128,7 +128,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
-                                                            source: "foo",
+                                                            expression: "foo",
                                                             trailing: "=",
                                                         },
                                                     ),
