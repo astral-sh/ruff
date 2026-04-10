@@ -753,6 +753,22 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
+Redeclaring an existing dataclass field as `Final` in `__post_init__` should ideally be an error,
+since the field is not actually `Final`:
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class D:
+    x: str
+
+    def __post_init__(self):
+        # TODO: this should be an error (conflicting declaration)
+        self.x: Final[str] = "bar"
+```
+
 `__post_init__` methods in non-dataclasses are not affected:
 
 ```py
