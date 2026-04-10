@@ -42,14 +42,14 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Django documentation: URL dispatcher](https://docs.djangoproject.com/en/stable/topics/http/urls/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.14.4")]
-pub(crate) struct DjangoURLPathWithoutTrailingSlash {
+pub(crate) struct DjangoUrlPathWithoutTrailingSlash {
     url_pattern: String,
 }
 
-impl AlwaysFixableViolation for DjangoURLPathWithoutTrailingSlash {
+impl AlwaysFixableViolation for DjangoUrlPathWithoutTrailingSlash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DjangoURLPathWithoutTrailingSlash { url_pattern } = self;
+        let DjangoUrlPathWithoutTrailingSlash { url_pattern } = self;
         format!("URL route `{url_pattern}` is missing a trailing slash")
     }
 
