@@ -516,12 +516,11 @@ with Child().create() as child:
 
 ### `__init_subclass__`
 
-The [`__init_subclass__`] method is implicitly a classmethod:
+#### Basics
 
-```toml
-[environment]
-python-version = "3.12"
-```
+<!-- snapshot-diagnostics -->
+
+The [`__init_subclass__`] method is implicitly a classmethod:
 
 ```py
 class Base:
@@ -554,10 +553,27 @@ class Valid(RequiresArg, arg=1): ...
 
 # error: [missing-argument]
 # error: [unknown-argument]
-class IncorrectArg(RequiresArg, not_arg="foo"): ...
+class IncorrectArg(RequiresArg, not_arg="foo"):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+    f = 6
+    g = 7
+    h = 8
+    i = 9
+    j = 10
 ```
 
+#### Multiple inheritance
+
 For multiple inheritance, the first resolved `__init_subclass__` method is used.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Empty: ...
