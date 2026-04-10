@@ -42,9 +42,8 @@ use ruff_text_size::Ranged;
 /// Specifically, this check enforces that the return type of the following
 /// methods is `Self`:
 ///
-/// 1. In stub files, in-place binary-operation dunder methods, like `__iadd__`,
-///    `__imul__`, etc. In runtime files, these methods are only flagged if they
-///    return the enclosing class name.
+/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.,
+///    if those methods return the class name.
 /// 1. `__new__`, `__enter__`, and `__aenter__`, if those methods return the
 ///    class name.
 /// 1. `__iter__` methods that return `Iterator`, despite the class inheriting
@@ -194,7 +193,7 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if is_bad_inplace_return_type(checker, returns, &class_def.name) {
+        if is_name_or_stringized_name(returns, &class_def.name, checker) {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
@@ -321,15 +320,6 @@ fn is_inplace_bin_op(name: &str) -> bool {
     )
 }
 
-/// Return `true` if the return type for an in-place operator should be replaced with `Self`.
-fn is_bad_inplace_return_type(checker: &Checker, returns: &ast::Expr, class_name: &str) -> bool {
-    if checker.source_type.is_stub() {
-        !is_self(returns, checker)
-    } else {
-        is_name_or_stringized_name(returns, class_name, checker)
-    }
-}
-
 /// Return `true` if the given expression resolves to the given name.
 fn is_name(expr: &ast::Expr, name: &str) -> bool {
     let ast::Expr::Name(ast::ExprName { id, .. }) = expr else {
@@ -341,13 +331,6 @@ fn is_name(expr: &ast::Expr, name: &str) -> bool {
 /// Return `true` if the given expression resolves to the given name,
 fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -> bool {
     checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
-}
-
-/// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
-    checker.match_maybe_stringized_annotation(expr, |expr| {
-        checker.semantic().match_typing_expr(expr, "Self")
-    })
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.

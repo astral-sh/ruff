@@ -453,18 +453,3 @@ help: Use `Self` as return type
 256 |
 257 | # Test case based on issue #20781 - metaclass that triggers IsMetaclass::Maybe
 note: This is a display-only fix and is likely to be incorrect
-
-PYI034 [*] `__iadd__` methods in classes like `StubInPlaceOperationReturningOtherType` usually return `self` at runtime
-   --> PYI034.pyi:283:9
-    |
-282 | class StubInPlaceOperationReturningOtherType:
-283 |     def __iadd__(self, other: int) -> int: ...  # Y034 "__iadd__" methods in classes like "StubInPlaceOperationReturningOtherType" us…
-    |         ^^^^^^^^
-    |
-help: Use `Self` as return type
-280 |
-281 |
-282 | class StubInPlaceOperationReturningOtherType:
-    -     def __iadd__(self, other: int) -> int: ...  # Y034 "__iadd__" methods in classes like "StubInPlaceOperationReturningOtherType" usually return "self" at runtime. Consider using "typing_extensions.Self" in "StubInPlaceOperationReturningOtherType.__iadd__", e.g. "def __iadd__(self, other: int) -> Self: ..."
-283 +     def __iadd__(self, other: int) -> typing.Self: ...  # Y034 "__iadd__" methods in classes like "StubInPlaceOperationReturningOtherType" usually return "self" at runtime. Consider using "typing_extensions.Self" in "StubInPlaceOperationReturningOtherType.__iadd__", e.g. "def __iadd__(self, other: int) -> Self: ..."
-note: This is an unsafe fix and may change runtime behavior
