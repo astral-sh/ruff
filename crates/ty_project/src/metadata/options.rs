@@ -252,10 +252,6 @@ impl Options {
                 tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
             }).ok()
         });
-        let layout_inference_source = python_environment
-            .as_ref()
-            .and_then(ty_python_semantic::PythonEnvironment::pyvenv_cfg_path);
-
         let python_version = options_python_version
             .or_else(|| {
                 python_environment
@@ -263,17 +259,13 @@ impl Options {
                     .python_version_from_metadata()
                     .cloned()
             })
-            .or_else(|| site_packages_paths.python_version_from_layout())
+            .or_else(|| site_packages_paths.python_version_from_layout(system))
             .filter(|python_version| {
                 if SupportedPythonVersion::try_from(python_version.version).is_ok() {
                     return true;
                 }
 
-                diagnostics.push(unsupported_inferred_python_version_diagnostic(
-                    db,
-                    python_version,
-                    layout_inference_source.as_deref(),
-                ));
+                diagnostics.push(unsupported_inferred_python_version_diagnostic(db, python_version));
 
                 tracing::warn!(
                     "Ignoring unsupported inferred Python version `{}`; ty will use Python {} instead.",
@@ -574,7 +566,6 @@ impl Options {
 fn unsupported_inferred_python_version_diagnostic(
     db: &dyn Db,
     python_version: &PythonVersionWithSource,
-    layout_inference_source: Option<&SystemPath>,
 ) -> OptionDiagnostic {
     let expected = SupportedPythonVersion::iter()
         .map(|version| format!("`{version}`"))
@@ -614,12 +605,9 @@ fn unsupported_inferred_python_version_diagnostic(
             )),
         PythonVersionSource::InstallationDirectoryLayout {
             site_packages_parent_dir,
+            source,
         } => diagnostic
-            .with_annotation(
-                layout_inference_source
-                    .and_then(|path| system_path_to_file(db, path).ok())
-                    .map(|file| Annotation::primary(Span::from(file))),
-            )
+            .with_annotation(source.as_ref().and_then(|source| source.span(db)).map(Annotation::primary))
             .sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 format!(

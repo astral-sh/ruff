@@ -24,7 +24,10 @@ pub enum PythonVersionSource {
     /// This only ever applies on Unix. On Unix, the `site-packages` directory
     /// will always be at `sys.prefix/lib/pythonX.Y/site-packages`,
     /// so we can infer the Python version from the parent directory of `site-packages`.
-    InstallationDirectoryLayout { site_packages_parent_dir: Box<str> },
+    InstallationDirectoryLayout {
+        site_packages_parent_dir: Box<str>,
+        source: Option<PythonVersionFileSource>,
+    },
 
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.

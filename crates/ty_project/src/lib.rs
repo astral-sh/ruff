@@ -165,14 +165,6 @@ impl ProgressReporter for CollectReporter {
     }
 }
 
-fn merge_settings_diagnostics(
-    mut diagnostics: Vec<OptionDiagnostic>,
-    program_settings_diagnostics: Vec<OptionDiagnostic>,
-) -> Vec<OptionDiagnostic> {
-    diagnostics.extend(program_settings_diagnostics);
-    diagnostics
-}
-
 #[salsa::tracked]
 impl Project {
     pub fn from_metadata<Strategy: MisconfigurationStrategy>(
@@ -181,11 +173,11 @@ impl Project {
         program_settings_diagnostics: Vec<OptionDiagnostic>,
         strategy: &Strategy,
     ) -> Result<Self, Strategy::Error<ToSettingsError>> {
-        let (settings, diagnostics) =
+        let (settings, mut diagnostics) =
             metadata
                 .options()
                 .to_settings(db, metadata.root(), strategy)?;
-        let diagnostics = merge_settings_diagnostics(diagnostics, program_settings_diagnostics);
+        diagnostics.extend(program_settings_diagnostics);
 
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
@@ -254,20 +246,16 @@ impl Project {
         program_settings_diagnostics: Vec<OptionDiagnostic>,
     ) {
         tracing::debug!("Reloading project");
+        let metadata_changed = &metadata != self.metadata(db);
 
         self.reload_files(db);
-
-        if &metadata == self.metadata(db) {
-            return;
-        }
 
         match metadata
             .options()
             .to_settings(db, metadata.root(), &FallibleStrategy)
         {
-            Ok((settings, settings_diagnostics)) => {
-                let settings_diagnostics =
-                    merge_settings_diagnostics(settings_diagnostics, program_settings_diagnostics);
+            Ok((settings, mut settings_diagnostics)) => {
+                settings_diagnostics.extend(program_settings_diagnostics);
 
                 if self.settings(db) != &settings {
                     self.set_settings(db).to(Box::new(settings));
@@ -281,12 +269,14 @@ impl Project {
                 tracing::warn!(
                     "Keeping old project configuration because loading the new settings failed with: {error}"
                 );
-                self.set_settings_diagnostics(db)
-                    .to(merge_settings_diagnostics(
-                        vec![error.into_diagnostic()],
-                        program_settings_diagnostics,
-                    ));
+                let mut settings_diagnostics = vec![error.into_diagnostic()];
+                settings_diagnostics.extend(program_settings_diagnostics);
+                self.set_settings_diagnostics(db).to(settings_diagnostics);
             }
+        }
+
+        if !metadata_changed {
+            return;
         }
 
         self.set_metadata(db).to(Box::new(metadata));
@@ -768,7 +758,10 @@ where
 mod tests {
     use crate::ProjectMetadata;
     use crate::check_file_impl;
+    use crate::db::Db;
     use crate::db::tests::TestDb;
+    use crate::metadata::options::OptionDiagnostic;
+    use ruff_db::diagnostic::{DiagnosticId, Severity};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -819,5 +812,51 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn reload_updates_settings_diagnostics_when_metadata_is_unchanged() {
+        let project_metadata =
+            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
+        let mut db = TestDb::new(project_metadata);
+        let project = db.project();
+
+        project.reload(
+            &mut db,
+            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/")),
+            vec![OptionDiagnostic::new(
+                DiagnosticId::UnsupportedPythonVersion,
+                "first diagnostic".to_string(),
+                Severity::Warning,
+            )],
+        );
+
+        assert_eq!(
+            project
+                .check_settings(&db)
+                .iter()
+                .map(|diagnostic| diagnostic.primary_message().to_string())
+                .collect::<Vec<_>>(),
+            vec!["first diagnostic".to_string()]
+        );
+
+        project.reload(
+            &mut db,
+            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/")),
+            vec![OptionDiagnostic::new(
+                DiagnosticId::UnsupportedPythonVersion,
+                "second diagnostic".to_string(),
+                Severity::Warning,
+            )],
+        );
+
+        assert_eq!(
+            project
+                .check_settings(&db)
+                .iter()
+                .map(|diagnostic| diagnostic.primary_message().to_string())
+                .collect::<Vec<_>>(),
+            vec!["second diagnostic".to_string()]
+        );
     }
 }
