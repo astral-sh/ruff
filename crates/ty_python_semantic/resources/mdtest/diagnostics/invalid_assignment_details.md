@@ -42,6 +42,35 @@ def _(source: str | None):
     target: bytes | None = source  # error: [invalid-assignment]
 ```
 
+## Intersections
+
+Assigning an intersection to a non-intersection:
+
+```py
+from ty_extensions import Intersection
+
+class P: ...
+class Q: ...
+class R: ...
+
+def _(source: Intersection[P, Q]):
+    target: int = source  # error: [invalid-assignment]
+```
+
+Assigning a non-intersection to an intersection:
+
+```py
+def _(source: P):
+    target: Intersection[P, Q] = source  # error: [invalid-assignment]
+```
+
+Assigning an intersection to an intersection:
+
+```py
+def _(source: Intersection[P, R]):
+    target: Intersection[P, Q] = source  # error: [invalid-assignment]
+```
+
 ## Tuples
 
 Wrong element types:
@@ -286,27 +315,43 @@ def _(source: int):
     target: str | bytes | bool | None = source  # error: [invalid-assignment]
 ```
 
-## Assigning an overload set
+## Failures for multiple intersection elements
 
 ```py
-from typing import Protocol, overload
+from ty_extensions import Intersection
+from typing import Protocol
 
-class SupportsX(Protocol):
-    def x(self): ...
+class SupportsFoo(Protocol):
+    def foo(self, x: int) -> bool: ...
+
+class DoesNotSupportFoo1: ...
+class DoesNotSupportFoo2: ...
+
+def _(source: Intersection[DoesNotSupportFoo1, DoesNotSupportFoo2]):
+    target: SupportsFoo = source  # error: [invalid-assignment]
+```
+
+## Assigning an overload set
+
+This test makes sure that error context from failed overload candidates does not leak
+(`IncompatibleFoo.bar` is assignable to `SupportsFooAndBar.bar`):
+
+```py
+from typing import Protocol, overload, SupportsIndex
 
 class SupportsFooAndBar(Protocol):
     def foo(self, name: str): ...
     def bar(self, x: bytes): ...
 
-class IncompatibleFooAndBar:
+class IncompatibleFoo:
     def foo(self, name_: str): ...
     @overload
-    def bar(self, x: SupportsX): ...
+    def bar(self, x: SupportsIndex): ...
     @overload
     def bar(self, x: bytes): ...
-    def bar(self, x: SupportsX | bytes): ...
+    def bar(self, x: SupportsIndex | bytes): ...
 
-def _(source: IncompatibleFooAndBar):
+def _(source: IncompatibleFoo):
     target: SupportsFooAndBar = source  # error: [invalid-assignment]
 ```
 
