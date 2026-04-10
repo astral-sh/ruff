@@ -52,37 +52,41 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
 37 | class NotCallableInitSubclass:
 38 |     __init_subclass__ = None
 39 | 
-40 | # TODO: this should be an error because `__init_subclass__` on the superclass is not callable
-41 | class Bad(NotCallableInitSubclass):
-42 |     a = 1
-43 |     b = 2
-44 |     c = 3
-45 | class Base:
-46 |     def __init_subclass__(cls, arg: int): ...
-47 | 
-48 | class Valid(Base, arg=5, metaclass=object): ...
-49 | 
-50 | # error: [invalid-argument-type]
-51 | class Invalid(Base, metaclass=type, arg="foo"): ...
-52 | from typing import Literal, overload
+40 | # TODO: terrible diagnostic message and annotations,
+41 | # we should at least add a subdiagnostic pointing to where
+42 | # `__init_subclass__ = None` on the superclass
+43 | #
+44 | # error: [call-non-callable] "Object of type `None` is not callable"
+45 | class Bad(NotCallableInitSubclass):
+46 |     a = 1
+47 |     b = 2
+48 |     c = 3
+49 | class Base:
+50 |     def __init_subclass__(cls, arg: int): ...
+51 | 
+52 | class Valid(Base, arg=5, metaclass=object): ...
 53 | 
-54 | class Base:
-55 |     @overload
-56 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-59 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
-60 | 
-61 | class Valid(Base, mode="a", arg=5): ...
-62 | class Valid(Base, mode="b", arg="foo"): ...
-63 | 
-64 | # error: [no-matching-overload]
-65 | class InvalidType(Base, mode="b", arg=5):
-66 |     a = 1
-67 |     b = 2
-68 |     c = 3
-69 |     d = 4
-70 |     e = 5
+54 | # error: [invalid-argument-type]
+55 | class Invalid(Base, metaclass=type, arg="foo"): ...
+56 | from typing import Literal, overload
+57 | 
+58 | class Base:
+59 |     @overload
+60 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+61 |     @overload
+62 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+63 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+64 | 
+65 | class Valid(Base, mode="a", arg=5): ...
+66 | class Valid(Base, mode="b", arg="foo"): ...
+67 | 
+68 | # error: [no-matching-overload]
+69 | class InvalidType(Base, mode="b", arg=5):
+70 |     a = 1
+71 |     b = 2
+72 |     c = 3
+73 |     d = 4
+74 |     e = 5
 ```
 
 # Diagnostics
@@ -178,59 +182,75 @@ info: Function signature here
 ```
 
 ```
-error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
-  --> src/mdtest_snippet.py:51:37
+error[call-non-callable]: Object of type `None` is not callable
+  --> src/mdtest_snippet.py:45:1
    |
-50 | # error: [invalid-argument-type]
-51 | class Invalid(Base, metaclass=type, arg="foo"): ...
+43 | #
+44 | # error: [call-non-callable] "Object of type `None` is not callable"
+45 | class Bad(NotCallableInitSubclass):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 |     a = 1
+47 |     b = 2
+   |
+info: Union variant `None` is incompatible with this call site
+info: Attempted to call union type `None | Unknown`
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:55:37
+   |
+54 | # error: [invalid-argument-type]
+55 | class Invalid(Base, metaclass=type, arg="foo"): ...
    |                                     ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-52 | from typing import Literal, overload
+56 | from typing import Literal, overload
    |
 info: Function defined here
-  --> src/mdtest_snippet.py:46:9
+  --> src/mdtest_snippet.py:50:9
    |
-44 |     c = 3
-45 | class Base:
-46 |     def __init_subclass__(cls, arg: int): ...
+48 |     c = 3
+49 | class Base:
+50 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-47 |
-48 | class Valid(Base, arg=5, metaclass=object): ...
+51 |
+52 | class Valid(Base, arg=5, metaclass=object): ...
    |
 
 ```
 
 ```
 error[no-matching-overload]: No overload of function `__init_subclass__` matches arguments
-  --> src/mdtest_snippet.py:65:1
+  --> src/mdtest_snippet.py:69:1
    |
-64 | # error: [no-matching-overload]
-65 | class InvalidType(Base, mode="b", arg=5):
+68 | # error: [no-matching-overload]
+69 | class InvalidType(Base, mode="b", arg=5):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 |     a = 1
-67 |     b = 2
+70 |     a = 1
+71 |     b = 2
    |
 info: First overload defined here
-  --> src/mdtest_snippet.py:56:9
+  --> src/mdtest_snippet.py:60:9
    |
-54 | class Base:
-55 |     @overload
-56 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+58 | class Base:
+59 |     @overload
+60 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+61 |     @overload
+62 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
    |
 info: Possible overloads for function `__init_subclass__`:
 info:   (cls, mode: Literal["a"], arg: int) -> None
 info:   (cls, mode: Literal["b"], arg: str) -> None
 info: Overload implementation defined here
-  --> src/mdtest_snippet.py:59:9
+  --> src/mdtest_snippet.py:63:9
    |
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-59 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+61 |     @overload
+62 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+63 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-60 |
-61 | class Valid(Base, mode="a", arg=5): ...
+64 |
+65 | class Valid(Base, mode="a", arg=5): ...
    |
 
 ```

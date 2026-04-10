@@ -20,7 +20,7 @@ use crate::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
         StaticClassLiteral, Type,
-        call::{Argument, CallError, CallErrorKind},
+        call::{Argument, CallError},
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
         definition_expression_type,
@@ -745,9 +745,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             if let Some(init_subclass) = init_subclass_type {
                 let call_args = call_args.with_self(Some(Type::from(class)));
-                if let Err(CallError(CallErrorKind::BindingError, bindings)) =
-                    init_subclass.try_call(db, &call_args)
-                {
+                if let Err(CallError(_, bindings)) = init_subclass.try_call(db, &call_args) {
                     bindings.report_diagnostics(context, class_node.into());
                 }
             }
