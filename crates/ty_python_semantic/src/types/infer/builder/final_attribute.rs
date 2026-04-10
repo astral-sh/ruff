@@ -126,10 +126,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
 
         let report_not_in_init = || {
-            let is_dataclass_like = object_ty.nominal_class(db).is_some_and(|cls| {
-                cls.static_class_literal(db)
-                    .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db))
-            });
+            let is_dataclass_like = object_ty
+                .nominal_class(db)
+                .or_else(|| object_ty.to_class_type(db))
+                .and_then(|cls| cls.static_class_literal(db))
+                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())

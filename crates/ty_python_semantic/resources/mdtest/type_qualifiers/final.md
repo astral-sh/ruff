@@ -760,6 +760,21 @@ class NonDataclass:
         self.x: Final[int] = 1
 ```
 
+Assigning to a `Final` attribute via the class literal on a dataclass-like class mentions
+`__post_init__` in the diagnostic:
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class E:
+    x: Final[int] = 1
+
+# error: [invalid-assignment] "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
+E.x = 2
+```
+
 Redeclaring an existing dataclass field as `Final` in `__post_init__` should ideally be an error,
 since the field is not actually `Final`:
 
