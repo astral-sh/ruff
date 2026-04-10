@@ -368,6 +368,7 @@ impl<'db> Type<'db> {
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
+            materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
         let constraints = checker.check_type_pair(db, self, target);
 
