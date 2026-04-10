@@ -307,12 +307,11 @@ impl WorkspaceOptions {
 
 /// Resolve the [`PythonVersion`] from an environment, if it's supported.
 fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<PythonVersion> {
-    let Some(python_version) = u8::try_from(version.major)
+    let python_version = PythonVersion::try_from((version.major, version.minor))
         .ok()
-        .zip(u8::try_from(version.minor).ok())
-        .map(PythonVersion::from)
-        .filter(|version| !PythonVersion::iter().any(|supported| supported > *version))
-    else {
+        .filter(|version| version.is_known());
+
+    if python_version.is_none() {
         tracing::warn!(
             "Unsupported Python version `{}.{}` selected in your editor; ty won't set \
             the Python version to the selected interpreter's version. Expected one of {}.",
@@ -323,10 +322,9 @@ fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<PythonV
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        return None;
-    };
+    }
 
-    Some(python_version)
+    python_version
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]

@@ -258,10 +258,9 @@ impl Options {
             })
             .or_else(|| site_packages_paths.python_version_from_layout())
             .filter(|python_version| {
-                let is_supported =
-                    PythonVersion::iter().any(|supported| supported == python_version.version);
+                let is_supported = python_version.version.is_known();
                 if !is_supported {
-                    tracing::debug!(
+                    tracing::warn!(
                         "Ignoring unsupported inferred Python version: {}",
                         python_version.version
                     );
@@ -562,7 +561,7 @@ where
     let python_version = Option::<RangedValue<PythonVersion>>::deserialize(deserializer)?;
 
     if let Some(python_version) = &python_version
-        && !PythonVersion::iter().any(|supported_version| supported_version == **python_version)
+        && !python_version.is_known()
     {
         return Err(serde::de::Error::custom(format!(
             "unsupported value `{python_version}` for `python-version`; expected one of {}",

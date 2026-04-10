@@ -80,6 +80,11 @@ impl PythonVersion {
         (self.major, self.minor)
     }
 
+    /// Returns `true` if this version is in the set of known Python versions.
+    pub fn is_known(self) -> bool {
+        Self::iter().any(|supported| supported == self)
+    }
+
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
     }
@@ -106,6 +111,18 @@ impl From<(u8, u8)> for PythonVersion {
     fn from(value: (u8, u8)) -> Self {
         let (major, minor) = value;
         Self { major, minor }
+    }
+}
+
+impl TryFrom<(i64, i64)> for PythonVersion {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(value: (i64, i64)) -> Result<Self, Self::Error> {
+        let (major, minor) = value;
+        Ok(Self {
+            major: u8::try_from(major)?,
+            minor: u8::try_from(minor)?,
+        })
     }
 }
 

@@ -1230,6 +1230,7 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
     All checks passed!
 
     ----- stderr -----
+    WARN Ignoring unsupported inferred Python version: 3.16
     ");
 
     Ok(())
