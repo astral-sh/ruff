@@ -4437,3 +4437,231 @@ fn preview_default_rules() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn lint_script() -> Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+[lint]
+select = ["B","Q"]
+"#,
+        ),
+        (
+            "script.py",
+            r#"
+# /// script
+# dependencies = []
+# [tool.ruff.lint]
+# select = ["Q000"]
+# [tool.ruff.lint.flake8-quotes]
+# inline-quotes = "single"
+# ///
+a = "abcba".strip("aba")
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.check_command()
+            .arg("script.py")
+            , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:9:5: Q000 [*] Double quotes found but single quotes preferred
+    script.py:9:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn lint_script_requires_python() -> Result<()> {
+    let pyproject_311_metadata_none = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[project]
+requires-python = ">=3.11"
+"#,
+        ),
+        (
+            "script.py",
+            r#"
+# /// script
+# dependencies = []
+# [tool.ruff.lint]
+# select = ["UP006"]
+# ///
+from typing import List; foo: List[int]
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        pyproject_311_metadata_none.check_command()
+            .arg("script.py")
+            , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:7:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    let pyproject_311_metadata_38 = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[project]
+requires-python = ">=3.11"
+"#,
+        ),
+        (
+            "script.py",
+            r#"
+# /// script
+# dependencies = []
+# requires-python = ">=3.8"
+# [tool.ruff.lint]
+# select = ["UP006"]
+# ///
+from typing import List; foo: List[int]
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        pyproject_311_metadata_38.check_command()
+            .arg("script.py")
+            , @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
+    let pyproject_38_metadata_311 = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[project]
+requires-python = ">=3.8"
+"#,
+        ),
+        (
+            "script.py",
+            r#"
+# /// script
+# dependencies = []
+# requires-python = ">= 3.11"
+# [tool.ruff.lint]
+# select = ["UP006"]
+# ///
+from typing import List; foo: List[int]
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        pyproject_38_metadata_311.check_command()
+            .arg("script.py")
+            , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:8:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+#[test]
+
+fn lint_script_with_extend() -> Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+[lint]
+select = ["B","Q"]
+"#,
+        ),
+        (
+            "script.py",
+            r#"
+# /// script
+# dependencies = []
+# [tool.ruff]
+# extend = "ruff.toml"
+# [tool.ruff.lint.flake8-quotes]
+# inline-quotes = "single"
+# ///
+a = "abcba".strip("aba")
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.check_command()
+            .arg("script.py")
+            , @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn lint_script_cli_overrides() -> Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+# /// script
+# dependencies = []
+# [tool.ruff.lint]
+# select = ["Q000"]
+# [tool.ruff.lint.flake8-quotes]
+# inline-quotes = "single"
+# ///
+a = "abcba".strip("aba")
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.check_command()
+            .args(["--ignore","ALL"])
+            .arg("script.py")
+            , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:9:5: Q000 [*] Double quotes found but single quotes preferred
+    script.py:9:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
