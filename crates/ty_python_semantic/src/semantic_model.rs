@@ -578,7 +578,7 @@ pub trait HasType {
 /// Returns contextual expected type information for expressions.
 ///
 /// Note: This is used for implementing IDE features like string-literal
-/// completion, and is not intended to be a universal expected-type query 
+/// completion, and is not intended to be a universal expected-type query
 /// for every expression in the program.
 pub trait HasExpectedType {
     /// Returns the expected type for `self`, if tracked by inference.
