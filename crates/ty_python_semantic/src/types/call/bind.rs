@@ -17,6 +17,7 @@ use std::fmt;
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
@@ -59,7 +60,7 @@ use crate::types::{
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
+use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
@@ -908,7 +909,8 @@ impl<'db> Bindings<'db> {
     ) {
         // If all elements are not callable, report that the type as a whole is not callable.
         if self.elements.iter().all(|e| !e.is_callable()) {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type().display(context.db())
@@ -3277,7 +3279,8 @@ impl<'db> CallableBinding<'db> {
         compound_diag: Option<&dyn CompoundDiagnostic>,
     ) {
         if !self.is_callable() {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type.display(context.db()),
@@ -3290,7 +3293,8 @@ impl<'db> CallableBinding<'db> {
         }
 
         if self.dunder_call_is_possibly_unbound {
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+            let range = all_arguments_range(node);
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly missing `__call__` method)",
                     self.callable_type.display(context.db()),
@@ -3380,7 +3384,8 @@ impl<'db> CallableBinding<'db> {
                     return;
                 }
 
-                let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) else {
+                let range = all_arguments_range(node);
+                let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, range) else {
                     return;
                 };
                 let callable_description =
@@ -5802,7 +5807,8 @@ impl<'db> BindingError<'db> {
                 parameters,
                 paramspec,
             } => {
-                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
+                let range = all_arguments_range(node);
+                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, range) {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
@@ -6073,10 +6079,15 @@ impl<'db> BindingError<'db> {
     fn get_node(node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> ast::AnyNodeRef<'_> {
         // If we have a Call node and an argument index, report the diagnostic on the correct
         // argument node; otherwise, report it on the entire provided node.
-        match Self::get_argument_node(node, argument_index) {
-            Some(ast::ArgOrKeyword::Arg(expr)) => expr.into(),
-            Some(ast::ArgOrKeyword::Keyword(expr)) => expr.into(),
-            None => node,
+        match (Self::get_argument_node(node, argument_index), node) {
+            (Some(ast::ArgOrKeyword::Arg(expr)), _) => expr.into(),
+            (Some(ast::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
+            (None, ast::AnyNodeRef::StmtClassDef(class_def)) => class_def
+                .arguments
+                .as_deref()
+                .map(ast::AnyNodeRef::Arguments)
+                .unwrap_or(node),
+            (None, _) => node,
         }
     }
 
@@ -6088,10 +6099,26 @@ impl<'db> BindingError<'db> {
             (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node
                     .arguments
-                    .arguments_source_order()
+                    .iter_source_order()
                     .nth(argument_index)
                     .expect("argument index should not be out of range"),
             ),
+            // If we've been passed a `ClassDef` node, it indicates that we're reporting an error
+            // relating to the class's keyword arguments. Keyword arguments are passed to `__init_subclass__`,
+            // or `__new__`/`__prepare__` on the metaclass -- but positional arguments are not, and neither
+            // is the special keyword argument `metaclass`. These need to be excluded from the
+            // argument index when looking up the relevant keyword-argument node.
+            (ast::AnyNodeRef::StmtClassDef(class_def), Some(argument_index)) => {
+                class_def.arguments.as_deref().and_then(|args| {
+                    args.iter_source_order()
+                        .filter_map(ArgOrKeyword::as_keyword)
+                        .filter(|keyword| {
+                            keyword.arg.as_deref().is_none_or(|arg| arg != "metaclass")
+                        })
+                        .nth(argument_index)
+                        .map(ast::ArgOrKeyword::Keyword)
+                })
+            }
             _ => None,
         }
     }
@@ -6368,4 +6395,26 @@ fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<
     }
 
     Some(elements)
+}
+
+/// Return the range for a binding diagnostic that is not related to one specific
+/// argument.
+///
+/// For a normal function call, this is just the range of the entire call.
+/// If we're reporting diagnostics for bad arguments in a class definition,
+/// however,
+/// restrict the range to just the range of the class name + its arguments.
+fn all_arguments_range(node: AnyNodeRef) -> TextRange {
+    node.as_stmt_class_def()
+        .map(|class| {
+            TextRange::new(
+                class.start(),
+                class
+                    .arguments
+                    .as_deref()
+                    .map(Ranged::end)
+                    .unwrap_or(class.name.end()),
+            )
+        })
+        .unwrap_or(node.range())
 }

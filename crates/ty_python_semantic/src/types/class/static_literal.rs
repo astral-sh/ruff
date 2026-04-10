@@ -37,7 +37,7 @@ use crate::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
             FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
             MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
-            typed_dict::{synthesize_typed_dict_method, typed_dict_class_member},
+            typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
         declaration_type, definition_expression_type, determine_upper_bound,
@@ -55,7 +55,7 @@ use crate::{
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{Tuple, TupleSpec, TupleType},
-        typed_dict::{TypedDictField, TypedDictParams, typed_dict_params_from_class_def},
+        typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -1533,9 +1533,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (CodeGeneratorKind::TypedDict, name) => {
                 synthesize_typed_dict_method(db, instance_ty, name, || {
-                    self.fields(db, specialization, field_policy)
-                        .iter()
-                        .map(|(name, field)| (name, TypedDictField::from_field(field)))
+                    TypedDictFields::Static(self.fields(db, specialization, field_policy))
                 })
             }
             _ => None,

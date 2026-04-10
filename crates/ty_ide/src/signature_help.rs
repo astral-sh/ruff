@@ -171,7 +171,7 @@ fn get_call_expr(
 fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
     let mut current_arg = 0;
 
-    for (i, arg) in call_expr.arguments.arguments_source_order().enumerate() {
+    for (i, arg) in call_expr.arguments.iter_source_order().enumerate() {
         if offset <= arg.end() {
             return i;
         }
