@@ -97,7 +97,7 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
                 },
                 mode_arg.range(),
             );
-        } else if known.is_fully_known() && known.ones & dangerous != 0 {
+        } else if known.ones & dangerous != 0 {
             checker.report_diagnostic(
                 BadFilePermissions {
                     reason: Reason::Permissive(known.ones),
@@ -118,9 +118,8 @@ const VALID_BITS: u64 = 0o7777;
 
 /// Known-bits abstract value for a `u64`: `ones` are the bits that are
 /// statically known to be 1, `zeros` are the bits that are statically known
-/// to be 0. An expression whose value is fully known satisfies
-/// `!oversized && ones | zeros == u64::MAX`; an expression whose value is
-/// entirely unknown has `ones == 0 && zeros == 0 && !oversized`.
+/// to be 0. An expression whose value is entirely unknown has
+/// `ones == 0 && zeros == 0 && !oversized`.
 ///
 /// The `oversized` flag indicates that the value is known to exceed `u64::MAX`
 /// (i.e., it has bits set above bit 63). This is tracked separately because we
@@ -147,10 +146,6 @@ impl KnownBits {
             zeros: 0,
             oversized: false,
         }
-    }
-
-    const fn is_fully_known(&self) -> bool {
-        !self.oversized && self.ones | self.zeros == u64::MAX
     }
 
     const fn invalid() -> Self {
