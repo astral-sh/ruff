@@ -510,10 +510,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
-    /// We only consider cycles among inferable typevars. Non-inferable typevars (e.g., from outer
-    /// scopes that appear due to BDD constraint reordering) are skipped during both cycle
-    /// detection and solution extraction.
-    ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's
     /// materialized lower and upper bounds. It returns:
     /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
