@@ -36,6 +36,7 @@ pub use types::ide_support::{
 pub use types::{DisplaySettings, TypeQualifiers};
 
 pub mod ast_node_ref;
+pub mod coverage;
 mod db;
 mod dunder_all;
 pub mod lint;

@@ -33,6 +33,9 @@ pub(crate) enum Command {
     /// Check a project for type errors.
     Check(CheckCommand),
 
+    /// Measure type-inference coverage for a project.
+    Coverage(CoverageCommand),
+
     /// Start the language server
     Server,
 
@@ -269,6 +272,100 @@ impl CheckCommand {
             ..Options::default()
         };
         // Merge with options passed in via --config
+        options.combine(self.config.into_options().unwrap_or_default())
+    }
+}
+
+/// Arguments for `ty coverage`.
+#[derive(Debug, Parser)]
+pub(crate) struct CoverageCommand {
+    /// List of files or directories to measure coverage for.
+    #[clap(
+        help = "List of files or directories to measure [default: the project root]",
+        value_name = "PATH"
+    )]
+    pub paths: Vec<SystemPathBuf>,
+
+    /// Run the command within the given project directory.
+    #[arg(long, value_name = "PROJECT")]
+    pub(crate) project: Option<SystemPathBuf>,
+
+    /// Path to your project's Python environment or interpreter.
+    #[arg(long, value_name = "PATH", alias = "venv")]
+    pub(crate) python: Option<SystemPathBuf>,
+
+    /// Custom directory to use for stdlib typeshed stubs.
+    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
+    pub(crate) typeshed: Option<SystemPathBuf>,
+
+    /// Additional path to use as a module-resolution source (can be passed multiple times).
+    #[arg(long, value_name = "PATH")]
+    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
+
+    /// Python version to assume when resolving types.
+    #[arg(long, value_name = "VERSION", alias = "target-version")]
+    pub(crate) python_version: Option<PythonVersion>,
+
+    /// Target platform to assume when resolving types.
+    #[arg(long, value_name = "PLATFORM", alias = "platform")]
+    pub(crate) python_platform: Option<String>,
+
+    #[clap(flatten)]
+    pub(crate) verbosity: Verbosity,
+
+    #[clap(flatten)]
+    pub(crate) config: ConfigsArg,
+
+    /// The path to a `ty.toml` file to use for configuration.
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
+
+    /// Write a self-contained HTML coverage report to PATH.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) html: Option<SystemPathBuf>,
+
+    /// Include the count of `Todo` types in the output.
+    #[arg(long, hide = true)]
+    pub(crate) todo: bool,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        display_order = 1000
+    )]
+    pub(crate) color: Option<TerminalColor>,
+
+    /// Hide all progress outputs.
+    ///
+    /// For example, spinners or progress bars.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub(crate) no_progress: bool,
+}
+
+impl CoverageCommand {
+    pub(crate) fn into_options(self) -> Options {
+        let options = Options {
+            environment: Some(EnvironmentOptions {
+                python_version: self
+                    .python_version
+                    .map(|version| RangedValue::cli(version.into())),
+                python_platform: self
+                    .python_platform
+                    .map(|platform| RangedValue::cli(platform.into())),
+                python: self.python.map(RelativePathBuf::cli),
+                typeshed: self.typeshed.map(RelativePathBuf::cli),
+                extra_paths: self.extra_search_path.map(|extra_search_paths| {
+                    extra_search_paths
+                        .into_iter()
+                        .map(RelativePathBuf::cli)
+                        .collect()
+                }),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        };
         options.combine(self.config.into_options().unwrap_or_default())
     }
 }

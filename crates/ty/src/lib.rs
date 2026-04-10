@@ -1,4 +1,6 @@
 mod args;
+#[doc(hidden)]
+pub mod coverage;
 mod logging;
 mod printer;
 mod python_version;
@@ -28,10 +30,15 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::coverage::{
+    CoverageStats, FileCoverageDetails, coverage_details as compute_coverage_details,
+};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::args::{
+    CheckCommand, Command, CoverageCommand, ExplainCommand, HelpFormat, TerminalColor,
+};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -48,6 +55,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Coverage(coverage_args) => run_coverage(coverage_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
@@ -86,6 +94,92 @@ pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
     Ok(())
 }
 
+fn load_project(
+    cwd: &SystemPath,
+    paths: &[SystemPathBuf],
+    project: Option<&SystemPathBuf>,
+    config_file: Option<SystemPathBuf>,
+    options: ty_project::metadata::options::Options,
+    system: OsSystem,
+    verbosity: VerbosityLevel,
+) -> anyhow::Result<(ProjectDatabase, ProjectOptionsOverrides, Vec<SystemPathBuf>)> {
+    let project_path = project
+        .map(|p| {
+            if p.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(p, cwd))
+            } else {
+                Err(anyhow!("Provided project path `{p}` is not a directory"))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cwd.to_path_buf());
+
+    let absolute_paths: Vec<_> = paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, cwd))
+        .collect();
+
+    let mut project_metadata = match &config_file {
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
+    project_metadata.apply_overrides(&project_options_overrides);
+
+    let mut db = ProjectDatabase::fallible(project_metadata, system)?;
+    let project = db.project();
+
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+
+    if !absolute_paths.is_empty() {
+        project.set_included_paths(&mut db, absolute_paths.clone());
+    }
+
+    Ok((db, project_options_overrides, absolute_paths))
+}
+
+/// Returns the current working directory as a [`SystemPathBuf`].
+fn current_working_directory() -> anyhow::Result<SystemPathBuf> {
+    let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+    SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+        anyhow!(
+            "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
+            path.display()
+        )
+    })
+}
+
+/// Creates the main loop, installs the Ctrl+C handler, and runs (or watches).
+fn run_main_loop(
+    db: &mut ProjectDatabase,
+    project_options_overrides: ProjectOptionsOverrides,
+    mode: MainLoopMode,
+    printer: Printer,
+    watch: bool,
+) -> anyhow::Result<ExitStatus> {
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(mode, project_options_overrides, printer);
+
+    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
+    ctrlc::set_handler(move || {
+        let mut lock = main_loop_cancellation_token.lock().unwrap();
+        if let Some(token) = lock.take() {
+            token.stop();
+        }
+    })?;
+
+    if watch {
+        main_loop.watch(db)
+    } else {
+        main_loop.run(db)
+    }
+}
+
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
@@ -100,38 +194,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     tracing::debug!("Version: {}", version::version());
 
-    // The base path to which all CLI arguments are relative to.
-    let cwd = {
-        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd)
-            .map_err(|path| {
-                anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                    path.display()
-                )
-            })?
-    };
-
-    let project_path = args
-        .project
-        .as_ref()
-        .map(|project| {
-            if project.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(project, &cwd))
-            } else {
-                Err(anyhow!(
-                    "Provided project path `{project}` is not a directory"
-                ))
-            }
-        })
-        .transpose()?
-        .unwrap_or_else(|| cwd.clone());
-
-    let check_paths: Vec<_> = args
-        .paths
-        .iter()
-        .map(|path| SystemPath::absolute(path, &cwd))
-        .collect();
+    let cwd = current_working_directory()?;
 
     let mode = if args.add_ignore {
         MainLoopMode::AddIgnore
@@ -142,52 +205,29 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let force_exclude = args.force_exclude();
     let config_file = args
         .config_file
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
-    let force_exclude = args.force_exclude();
+    // Extract paths and project before consuming args with into_options().
+    let paths = args.paths.clone();
+    let project = args.project.clone();
+    let options = args.into_options();
 
-    let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
-        }
-        None => ProjectMetadata::discover(&project_path, &system)?,
-    };
+    let (mut db, project_options_overrides, _) = load_project(
+        &cwd,
+        &paths,
+        project.as_ref(),
+        config_file,
+        options,
+        system,
+        verbosity,
+    )?;
 
-    project_metadata.apply_configuration_files(&system)?;
+    db.project().set_force_exclude(&mut db, force_exclude);
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
-    project_metadata.apply_overrides(&project_options_overrides);
-
-    let mut db = ProjectDatabase::fallible(project_metadata, system)?;
-    let project = db.project();
-
-    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
-    project.set_force_exclude(&mut db, force_exclude);
-
-    if !check_paths.is_empty() {
-        project.set_included_paths(&mut db, check_paths);
-    }
-
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
-
-    // Listen to Ctrl+C and abort the watch mode.
-    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
-    ctrlc::set_handler(move || {
-        let mut lock = main_loop_cancellation_token.lock().unwrap();
-
-        if let Some(token) = lock.take() {
-            token.stop();
-        }
-    })?;
-
-    let exit_status = if watch {
-        main_loop.watch(&mut db)?
-    } else {
-        main_loop.run(&mut db)?
-    };
+    let exit_status = run_main_loop(&mut db, project_options_overrides, mode, printer, watch)?;
 
     let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
@@ -209,6 +249,202 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         Ok(exit_status)
     }
+}
+
+fn run_coverage(args: CoverageCommand) -> anyhow::Result<ExitStatus> {
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
+    set_colored_override(args.color);
+
+    let verbosity = args.verbosity.level();
+    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+
+    let cwd = current_working_directory()?;
+
+    let system = OsSystem::new(&cwd);
+    let config_file = args
+        .config_file
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
+    // Extract paths and project before consuming args with into_options().
+    let paths = args.paths.clone();
+    let project = args.project.clone();
+    let no_progress = args.no_progress;
+    let mode = MainLoopMode::Coverage {
+        show_todo: args.todo,
+        html_path: args.html.clone(),
+        cwd: cwd.clone(),
+    };
+    let options = args.into_options();
+
+    let (mut db, project_options_overrides, resolved_paths) = load_project(
+        &cwd,
+        &paths,
+        project.as_ref(),
+        config_file,
+        options,
+        system,
+        verbosity,
+    )?;
+
+    // Verify that each explicitly provided path exists.
+    for path in &resolved_paths {
+        if !path.as_std_path().exists() {
+            return Err(anyhow!("path does not exist: {path}"));
+        }
+    }
+
+    let printer = Printer::new(verbosity, no_progress);
+    let exit_status = run_main_loop(&mut db, project_options_overrides, mode, printer, false)?;
+
+    std::mem::forget(db);
+
+    Ok(exit_status)
+}
+
+fn render_coverage(
+    db: &ProjectDatabase,
+    mut per_file: Vec<(SystemPathBuf, File, FileCoverageDetails)>,
+    cwd: &SystemPath,
+    show_todo: bool,
+    html_path: Option<&SystemPath>,
+) -> anyhow::Result<()> {
+    use std::io::Write as _;
+
+    // Sort by combined line-level imprecision descending, then by path for stable output.
+    // When todo reporting is off, todo lines are folded into dynamic for display, so include
+    // them in the sort key too so the table order matches the displayed percentages.
+    #[expect(clippy::cast_precision_loss)]
+    let sort_key = |s: &CoverageStats| -> f64 {
+        let dynamic = if show_todo {
+            s.dynamic
+        } else {
+            s.dynamic + s.todo
+        };
+        let total = s.total();
+        if total == 0 {
+            0.0
+        } else {
+            (dynamic + s.imprecise) as f64 / total as f64 * 100.0
+        }
+    };
+    per_file.sort_by(|(path_a, _, details_a), (path_b, _, details_b)| {
+        sort_key(&details_b.stats)
+            .partial_cmp(&sort_key(&details_a.stats))
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| path_a.cmp(path_b))
+    });
+
+    let total = per_file
+        .iter()
+        .fold(CoverageStats::default(), |acc, (_, _, d)| {
+            acc.merge(d.stats)
+        });
+
+    // Compute common directory prefix to strip from displayed paths.
+    let prefix = common_path_prefix(per_file.iter().map(|(p, _, _)| p.as_path()));
+
+    let display_path =
+        |p: &SystemPath| -> String { p.strip_prefix(&prefix).unwrap_or(p).as_str().to_owned() };
+
+    let mut stdout = std::io::stdout().lock();
+
+    {
+        use coverage::table::{Align, AsciiTable, Column};
+
+        let mut columns = vec![
+            Column::new("File", Align::Left),
+            Column::new("Lines", Align::Right),
+            Column::new("Precise", Align::Right),
+            Column::new("Imprecise", Align::Right),
+            Column::new("Dynamic", Align::Right),
+        ];
+        if show_todo {
+            columns.push(Column::new("Todo", Align::Right));
+        }
+        columns.push(Column::new("Empty", Align::Right));
+
+        let mut tbl = AsciiTable::new(columns);
+
+        for (path, _, d) in &per_file {
+            let ls = &d.stats;
+            let n = ls.total();
+            let mut row = vec![
+                display_path(path),
+                n.to_string(),
+                fmt_count_pct(ls.precise, n),
+                fmt_count_pct(ls.imprecise, n),
+                fmt_count_pct(ls.dynamic, n),
+            ];
+            if show_todo {
+                row.push(fmt_count_pct(ls.todo, n));
+            }
+            row.push(fmt_count_pct(ls.empty, n));
+            tbl.push_row(row);
+        }
+
+        let tl = &total;
+        let tn = tl.total();
+        let mut footer = vec![
+            "Total".to_owned(),
+            tn.to_string(),
+            fmt_count_pct(tl.precise, tn),
+            fmt_count_pct(tl.imprecise, tn),
+            fmt_count_pct(tl.dynamic, tn),
+        ];
+        if show_todo {
+            footer.push(fmt_count_pct(tl.todo, tn));
+        }
+        footer.push(fmt_count_pct(tl.empty, tn));
+        tbl.set_footer(footer);
+
+        tbl.render(&mut stdout)?;
+    }
+
+    if let Some(html_out) = html_path {
+        let abs = SystemPath::absolute(html_out, cwd);
+        coverage::html::write_html_report(&abs, &per_file, &prefix, db, show_todo)?;
+        writeln!(stdout, "HTML report written to {abs}")?;
+    }
+
+    Ok(())
+}
+
+/// Formats a count with its percentage of a total as `"N (X%)"`.
+#[expect(clippy::cast_precision_loss)]
+fn fmt_count_pct(count: u64, total: u64) -> String {
+    if total == 0 {
+        return format!("{count} (0%)");
+    }
+    let pct = (count as f64 / total as f64 * 100.0).round();
+    format!("{count} ({pct:.0}%)")
+}
+
+/// Returns the longest common directory prefix of the given paths.
+/// If the paths share no common ancestor (or the slice is empty), returns an empty path.
+fn common_path_prefix<'a>(mut paths: impl Iterator<Item = &'a SystemPath>) -> SystemPathBuf {
+    let Some(first) = paths.next() else {
+        return SystemPathBuf::new();
+    };
+
+    // Start from the first path's parent directory.
+    let mut prefix = first
+        .parent()
+        .map(SystemPath::to_path_buf)
+        .unwrap_or_default();
+
+    for path in paths {
+        // Walk up until `path` starts with `prefix`.
+        while !path.starts_with(&prefix) {
+            let Some(parent) = prefix.parent().map(SystemPath::to_path_buf) else {
+                return SystemPathBuf::new();
+            };
+            prefix = parent;
+        }
+    }
+
+    prefix
 }
 
 #[derive(Copy, Clone)]
@@ -314,7 +550,7 @@ impl MainLoop {
     }
 
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        // Schedule the first check.
+        // Schedule the first workspace analysis (check or coverage).
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
@@ -325,29 +561,101 @@ impl MainLoop {
                     let db = db.clone();
                     let sender = self.sender.clone();
 
-                    // Spawn a new task that checks the project. This needs to be done in a separate thread
-                    // to prevent blocking the main loop here.
-                    rayon::spawn(move || {
-                        let mut reporter = IndicatifReporter::from(self.printer);
-                        let bar = reporter.bar.clone();
+                    if matches!(self.mode, MainLoopMode::Coverage { .. }) {
+                        // Coverage mode: compute per-file details in a background thread.
+                        rayon::spawn(move || {
+                            let bar = indicatif::ProgressBar::hidden();
+                            let bar_for_cancel = bar.clone();
 
-                        match salsa::Cancelled::catch(|| {
-                            db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish_and_clear();
-                            reporter.collector.into_sorted(&db)
-                        }) {
-                            Ok(result) => {
-                                // Send the result back to the main loop for printing.
-                                sender
-                                    .send(MainLoopMessage::CheckCompleted { result, revision })
-                                    .unwrap();
-                            }
-                            Err(cancelled) => {
+                            match salsa::Cancelled::catch(|| {
+                                let indexed = db.project().files(&db);
+                                let files: Vec<File> = indexed.iter().copied().collect();
+                                bar.set_length(files.len() as u64);
+                                bar.set_message("Coverage");
+                                bar.set_style(
+                                    indicatif::ProgressStyle::with_template(
+                                        "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                                    )
+                                    .unwrap()
+                                    .progress_chars("--"),
+                                );
+                                bar.set_draw_target(self.printer.progress_target());
+
+                                // Compute coverage in parallel, mirroring how `check` spawns
+                                // one task per file inside a rayon scope. Each task gets its
+                                // own db clone (lightweight: shares the underlying Arc storage).
+                                // The scope closure is `move` so it is `Send`; `collected` and
+                                // `bar` are captured as references since Mutex and ProgressBar
+                                // are Sync.
+                                let collected =
+                                    std::sync::Mutex::new(Vec::with_capacity(files.len()));
+                                {
+                                    let db = db.clone();
+                                    let collected = &collected;
+                                    let bar = &bar;
+                                    rayon::scope(move |scope| {
+                                        for &file in &files {
+                                            let db = db.clone();
+                                            scope.spawn(move |_| {
+                                                if let Some(path) = file
+                                                    .path(&db)
+                                                    .as_system_path()
+                                                    .map(SystemPath::to_path_buf)
+                                                {
+                                                    let details =
+                                                        compute_coverage_details(&db, file);
+                                                    collected
+                                                        .lock()
+                                                        .unwrap()
+                                                        .push((path, file, details));
+                                                }
+                                                bar.inc(1);
+                                            });
+                                        }
+                                    });
+                                }
                                 bar.finish_and_clear();
-                                tracing::debug!("Check has been cancelled: {cancelled:?}");
+                                collected.into_inner().unwrap()
+                            }) {
+                                Ok(per_file) => {
+                                    sender
+                                        .send(MainLoopMessage::CoverageCompleted {
+                                            per_file,
+                                            revision,
+                                        })
+                                        .unwrap();
+                                }
+                                Err(cancelled) => {
+                                    bar_for_cancel.finish_and_clear();
+                                    tracing::debug!(
+                                        "Coverage computation cancelled: {cancelled:?}"
+                                    );
+                                }
                             }
-                        }
-                    });
+                        });
+                    } else {
+                        // Check/AddIgnore mode: run diagnostics in a background thread.
+                        rayon::spawn(move || {
+                            let mut reporter = IndicatifReporter::from(self.printer);
+                            let bar = reporter.bar.clone();
+
+                            match salsa::Cancelled::catch(|| {
+                                db.check_with_reporter(&mut reporter);
+                                reporter.bar.finish_and_clear();
+                                reporter.collector.into_sorted(&db)
+                            }) {
+                                Ok(result) => {
+                                    sender
+                                        .send(MainLoopMessage::CheckCompleted { result, revision })
+                                        .unwrap();
+                                }
+                                Err(cancelled) => {
+                                    bar.finish_and_clear();
+                                    tracing::debug!("Check has been cancelled: {cancelled:?}");
+                                }
+                            }
+                        });
+                    }
                 }
 
                 MainLoopMessage::CheckCompleted {
@@ -365,7 +673,7 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
-                    let result = match self.mode {
+                    let result = match &self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
                             if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
@@ -404,6 +712,8 @@ impl MainLoop {
                                 Err(Canceled)
                             }
                         }
+                        // Coverage mode never sends CheckCompleted; ignore stale messages.
+                        MainLoopMode::Coverage { .. } => continue,
                     };
 
                     let exit_status = match result.as_deref() {
@@ -426,6 +736,33 @@ impl MainLoop {
                     }
 
                     return Ok(exit_status);
+                }
+
+                MainLoopMessage::CoverageCompleted {
+                    per_file,
+                    revision: check_revision,
+                } => {
+                    if check_revision != revision {
+                        tracing::debug!(
+                            "Discarding coverage result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        );
+                        continue;
+                    }
+
+                    if let MainLoopMode::Coverage {
+                        show_todo,
+                        html_path,
+                        cwd,
+                    } = &self.mode
+                    {
+                        render_coverage(db, per_file, cwd, *show_todo, html_path.as_deref())?;
+                    }
+
+                    if self.watcher.is_some() {
+                        continue;
+                    }
+
+                    return Ok(ExitStatus::Success);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -505,10 +842,15 @@ impl MainLoop {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum MainLoopMode {
     Check,
     AddIgnore,
+    Coverage {
+        show_todo: bool,
+        html_path: Option<SystemPathBuf>,
+        cwd: SystemPathBuf,
+    },
 }
 
 fn exit_status_from_diagnostics(
@@ -615,6 +957,10 @@ enum MainLoopMessage {
     CheckCompleted {
         /// The diagnostics that were found during the check.
         result: Vec<Diagnostic>,
+        revision: u64,
+    },
+    CoverageCompleted {
+        per_file: Vec<(SystemPathBuf, File, FileCoverageDetails)>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

@@ -143,7 +143,7 @@ mod typed_dict;
 mod typevar;
 mod unpacker;
 mod variance;
-mod visitor;
+pub(crate) mod visitor;
 
 mod definition;
 #[cfg(test)]
