@@ -37,7 +37,7 @@ mod tests {
     fn test_additional_path_functions_dj100() -> Result<()> {
         let mut settings =
             settings::LinterSettings::for_rule(Rule::DjangoUrlPathWithoutTrailingSlash);
-        settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
+        settings.flake8_django.extend_path_functions = vec!["mytools.path".to_string()];
 
         let diagnostics = test_path(Path::new("flake8_django/DJ100_custom_paths.py"), &settings)?;
         assert_diagnostics!("DJ100_custom_paths.py", diagnostics);
@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn test_additional_path_functions_dj101() -> Result<()> {
         let mut settings = settings::LinterSettings::for_rule(Rule::DjangoUrlPathWithLeadingSlash);
-        settings.flake8_django.additional_path_functions = vec!["mytools.path".to_string()];
+        settings.flake8_django.extend_path_functions = vec!["mytools.path".to_string()];
 
         let diagnostics = test_path(Path::new("flake8_django/DJ101_custom_paths.py"), &settings)?;
         assert_diagnostics!("DJ101_custom_paths.py", diagnostics);

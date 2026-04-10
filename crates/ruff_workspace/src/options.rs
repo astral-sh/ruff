@@ -1514,16 +1514,16 @@ pub struct Flake8DjangoOptions {
         value_type = "list[str]",
         example = r#"
             # Allow checking URL patterns from custom path functions
-            additional-path-functions = ["mytools.path", "myapp.urls.custom_path"]
+            extend-path-functions = ["mytools.path", "myapp.urls.custom_path"]
         "#
     )]
-    pub additional_path_functions: Option<Vec<String>>,
+    pub extend_path_functions: Option<Vec<String>>,
 }
 
 impl Flake8DjangoOptions {
     pub fn into_settings(self) -> flake8_django::settings::Settings {
         flake8_django::settings::Settings {
-            additional_path_functions: self.additional_path_functions.unwrap_or_default(),
+            extend_path_functions: self.extend_path_functions.unwrap_or_default(),
         }
     }
 }

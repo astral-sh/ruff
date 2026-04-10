@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
-    pub additional_path_functions: Vec<String>,
+    pub extend_path_functions: Vec<String>,
 }
 
 impl Display for Settings {
@@ -15,7 +15,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_django",
             fields = [
-                self.additional_path_functions | array
+                self.extend_path_functions | array
             ]
         }
         Ok(())
