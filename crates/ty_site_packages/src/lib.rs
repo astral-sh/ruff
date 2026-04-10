@@ -277,6 +277,14 @@ impl PythonEnvironment {
         }
     }
 
+    /// Returns the `pyvenv.cfg` path for virtual environments.
+    pub fn pyvenv_cfg_path(&self) -> Option<SystemPathBuf> {
+        match self {
+            Self::Virtual(env) => Some(env.root_path.join("pyvenv.cfg")),
+            Self::System(_) => None,
+        }
+    }
+
     /// Returns `true` if this is a virtual environment (has a `pyvenv.cfg` file).
     pub fn is_virtual(&self) -> bool {
         matches!(self, Self::Virtual(_))

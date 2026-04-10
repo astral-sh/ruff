@@ -265,24 +265,27 @@ impl ProjectDatabase {
                         metadata.apply_overrides(overrides);
                     }
 
-                    match metadata.to_program_settings(
+                    let program_settings_diagnostics = match metadata.to_program_settings(
+                        self,
                         self.system(),
                         self.vendored(),
                         &FallibleStrategy,
                     ) {
-                        Ok(program_settings) => {
+                        Ok((program_settings, diagnostics)) => {
                             let program = Program::get(self);
                             program.update_from_settings(self, program_settings);
+                            diagnostics
                         }
                         Err(error) => {
                             tracing::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
+                            Vec::new()
                         }
-                    }
+                    };
 
                     tracing::debug!("Reloading project after structural change");
-                    project.reload(self, metadata);
+                    project.reload(self, metadata, program_settings_diagnostics);
                 }
                 Err(error) => {
                     tracing::error!(
@@ -294,11 +297,12 @@ impl ProjectDatabase {
             return result;
         } else if result.custom_stdlib_changed {
             match project.metadata(self).to_program_settings(
+                self,
                 self.system(),
                 self.vendored(),
                 &FallibleStrategy,
             ) {
-                Ok(program_settings) => {
+                Ok((program_settings, _diagnostics)) => {
                     program.update_from_settings(self, program_settings);
                 }
                 Err(error) => {

@@ -28,6 +28,7 @@ use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
+use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
@@ -156,12 +157,14 @@ impl Options {
 
     pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
+        db: &dyn Db,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+    ) -> Result<(ProgramSettings, Vec<OptionDiagnostic>), Strategy::Error<anyhow::Error>> {
+        let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
         let options_python_version =
@@ -249,6 +252,9 @@ impl Options {
                 tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
             }).ok()
         });
+        let layout_inference_source = python_environment
+            .as_ref()
+            .and_then(ty_python_semantic::PythonEnvironment::pyvenv_cfg_path);
 
         let python_version = options_python_version
             .or_else(|| {
@@ -259,14 +265,23 @@ impl Options {
             })
             .or_else(|| site_packages_paths.python_version_from_layout())
             .filter(|python_version| {
-                let is_supported = SupportedPythonVersion::try_from(python_version.version).is_ok();
-                if !is_supported {
-                    tracing::warn!(
-                        "Ignoring unsupported inferred Python version: {}",
-                        python_version.version
-                    );
+                if SupportedPythonVersion::try_from(python_version.version).is_ok() {
+                    return true;
                 }
-                is_supported
+
+                diagnostics.push(unsupported_inferred_python_version_diagnostic(
+                    db,
+                    python_version,
+                    layout_inference_source.as_deref(),
+                ));
+
+                tracing::warn!(
+                    "Ignoring unsupported inferred Python version `{}`; ty will use Python {} instead.",
+                    python_version.version,
+                    PythonVersion::latest_ty()
+                );
+
+                false
             })
             .unwrap_or_default();
 
@@ -286,11 +301,14 @@ impl Options {
             python_version = python_version.version
         );
 
-        Ok(ProgramSettings {
-            python_version,
-            python_platform,
-            search_paths,
-        })
+        Ok((
+            ProgramSettings {
+                python_version,
+                python_platform,
+                search_paths,
+            },
+            diagnostics,
+        ))
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -551,6 +569,78 @@ impl Options {
 
         Ok(overrides)
     }
+}
+
+fn unsupported_inferred_python_version_diagnostic(
+    db: &dyn Db,
+    python_version: &PythonVersionWithSource,
+    layout_inference_source: Option<&SystemPath>,
+) -> OptionDiagnostic {
+    let expected = SupportedPythonVersion::iter()
+        .map(|version| format!("`{version}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let fallback = PythonVersion::latest_ty();
+
+    let mut diagnostic = OptionDiagnostic::new(
+        DiagnosticId::UnsupportedPythonVersion,
+        format!(
+            "Ignoring unsupported inferred Python version `{}`; ty will use Python {fallback} instead.",
+            python_version.version
+        ),
+        Severity::Warning,
+    )
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format!("Expected one of {expected}."),
+    ))
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Set `python-version` explicitly to override the inferred version.",
+    ));
+
+    diagnostic = match &python_version.source {
+        PythonVersionSource::ConfigFile(source) => diagnostic
+            .with_annotation(source.span(db).map(Annotation::primary))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from a configuration file.",
+            )),
+        PythonVersionSource::PyvenvCfgFile(source) => diagnostic
+            .with_annotation(source.span(db).map(Annotation::primary))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from your virtual environment metadata.",
+            )),
+        PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir,
+        } => diagnostic
+            .with_annotation(
+                layout_inference_source
+                    .and_then(|path| system_path_to_file(db, path).ok())
+                    .map(|file| Annotation::primary(Span::from(file))),
+            )
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!(
+                    "The version was inferred from the `lib/{site_packages_parent_dir}/site-packages` directory layout.",
+                ),
+            )),
+        PythonVersionSource::Cli => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from the command line.",
+        )),
+        PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from your editor.",
+        )),
+        PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "ty fell back to its default Python version.",
+        )),
+    };
+
+    diagnostic
 }
 
 /// Return the site-packages from the environment ty is installed in, as derived from ty's
