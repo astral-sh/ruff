@@ -1,0 +1,75 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Intersections
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from ty_extensions import Intersection
+ 2 | 
+ 3 | class P: ...
+ 4 | class Q: ...
+ 5 | class R: ...
+ 6 | 
+ 7 | def _(source: Intersection[P, Q]):
+ 8 |     target: int = source  # error: [invalid-assignment]
+ 9 | def _(source: P):
+10 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+11 | def _(source: Intersection[P, R]):
+12 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `P & Q` is not assignable to `int`
+  --> src/mdtest_snippet.py:8:13
+   |
+ 7 | def _(source: Intersection[P, Q]):
+ 8 |     target: int = source  # error: [invalid-assignment]
+   |             ---   ^^^^^^ Incompatible value of type `P & Q`
+   |             |
+   |             Declared type
+ 9 | def _(source: P):
+10 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+   |
+
+```
+
+```
+error[invalid-assignment]: Object of type `P` is not assignable to `P & Q`
+  --> src/mdtest_snippet.py:10:13
+   |
+ 8 |     target: int = source  # error: [invalid-assignment]
+ 9 | def _(source: P):
+10 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+   |             ------------------   ^^^^^^ Incompatible value of type `P`
+   |             |
+   |             Declared type
+11 | def _(source: Intersection[P, R]):
+12 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+   |
+
+```
+
+```
+error[invalid-assignment]: Object of type `P & R` is not assignable to `P & Q`
+  --> src/mdtest_snippet.py:12:13
+   |
+10 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+11 | def _(source: Intersection[P, R]):
+12 |     target: Intersection[P, Q] = source  # error: [invalid-assignment]
+   |             ------------------   ^^^^^^ Incompatible value of type `P & R`
+   |             |
+   |             Declared type
+   |
+
+```
