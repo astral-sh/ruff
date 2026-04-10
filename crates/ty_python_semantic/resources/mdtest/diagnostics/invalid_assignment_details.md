@@ -364,6 +364,18 @@ def _(source: list[str]):
     target: Iterable[bytes] = source  # error: [invalid-assignment]
 ```
 
+## Deleting a read-only property
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+c = C()
+del c.attr  # error: [invalid-assignment]
+```
+
 ## Invariant generic classes
 
 We show a special diagnostic hint for invariant generic classes. For example, if you try to assign a

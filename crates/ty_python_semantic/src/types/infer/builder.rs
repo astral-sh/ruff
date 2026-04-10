@@ -2730,10 +2730,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match object_ty {
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
-                    if !self.validate_attribute_deletion(target, *element_ty, attribute, false) {
-                        if emit_diagnostics {
-                            self.validate_attribute_deletion(target, *element_ty, attribute, true);
-                        }
+                    if !self.validate_attribute_deletion(
+                        target,
+                        *element_ty,
+                        attribute,
+                        emit_diagnostics,
+                    ) {
                         return false;
                     }
                 }
@@ -2754,6 +2756,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // Type aliases need their own arm so aliased unions and intersections reuse the
+            // specialized handling above. `NewType` instances don't: dunder lookup and attribute
+            // fallback already delegate through the concrete base type when needed.
             Type::TypeAlias(alias) => self.validate_attribute_deletion(
                 target,
                 alias.value_type(db),
@@ -2792,34 +2797,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
-                match &delattr_dunder_call_result {
-                    Ok(result) if result.return_type(db).is_never() => {
-                        if emit_diagnostics
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot delete attribute `{attribute}` on type `{}` \
-                                 whose `__delattr__` method returns `Never`/`NoReturn`",
-                                object_ty.display(db),
-                            ));
-                        }
-                        return false;
+                let returns_never = match &delattr_dunder_call_result {
+                    Ok(result) => result.return_type(db).is_never(),
+                    Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
+                };
+                if returns_never {
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot delete attribute `{attribute}` on type `{}` \
+                             whose `__delattr__` method returns `Never`/`NoReturn`",
+                            object_ty.display(db),
+                        ));
                     }
-                    Err(err) if err.return_type(db).is_some_and(|ty| ty.is_never()) => {
-                        if emit_diagnostics
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot delete attribute `{attribute}` on type `{}` \
-                                 whose `__delattr__` method returns `Never`/`NoReturn`",
-                                object_ty.display(db),
-                            ));
-                        }
-                        return false;
-                    }
-                    _ => {}
+                    return false;
                 }
 
                 match delattr_dunder_call_result {

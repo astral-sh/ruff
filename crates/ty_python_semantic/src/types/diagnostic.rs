@@ -3799,7 +3799,7 @@ pub(super) fn report_bad_dunder_delattr_call(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method.",
+        "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method",
         object_type.display(db),
     ));
     if binding_error {

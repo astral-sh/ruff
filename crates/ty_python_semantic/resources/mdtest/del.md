@@ -212,6 +212,7 @@ supports_delete = SupportsDelete()
 del supports_delete.x
 
 rejects_descriptor_delete = RejectsDescriptorDelete()
+# TODO: this should be an error once properties with `Never`/`NoReturn` deleters are rejected
 del rejects_descriptor_delete.x
 
 explicit_none_deleter = ExplicitNoneDeleter()
@@ -263,7 +264,7 @@ rejects_delete = RejectsDelete()
 del rejects_delete.x
 
 bad_delattr = BadDelAttr()
-# error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method."
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `BadDelAttr` with custom `__delattr__` method"
 del bad_delattr.x
 
 deletable_namedtuple = DeletableNamedTuple(1)
@@ -290,12 +291,21 @@ del fallback_instance_attribute.x
 ```py
 from typing import NoReturn
 
+class SupportsClassDeleteMeta(type):
+    def __delattr__(self, name: str) -> None:
+        pass
+
+class SupportsClassDelete(metaclass=SupportsClassDeleteMeta):
+    x: int = 1
+
 class RejectsClassDeleteMeta(type):
     def __delattr__(self, name: str) -> NoReturn:
         raise AttributeError(name)
 
 class RejectsClassDelete(metaclass=RejectsClassDeleteMeta):
     x: int = 1
+
+del SupportsClassDelete.x
 
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `<class 'RejectsClassDelete'>` whose `__delattr__` method returns `Never`/`NoReturn`"
 del RejectsClassDelete.x
