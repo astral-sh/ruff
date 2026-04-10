@@ -43,5 +43,8 @@ error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to
    |             |
    |             Declared type
    |
+info: type `IncompatibleFoo` is not compatible with protocol `SupportsFooAndBar`
+info: └── protocol member `foo` is incompatible
+info:     └── parameter `name_` does not match `name` (and can be used as a keyword parameter)
 
 ```

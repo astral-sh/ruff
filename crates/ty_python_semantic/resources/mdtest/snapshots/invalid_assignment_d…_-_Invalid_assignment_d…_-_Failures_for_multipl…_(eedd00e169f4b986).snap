@@ -39,5 +39,10 @@ error[invalid-assignment]: Object of type `HasNeither` is not assignable to `Sup
    |             |
    |             Declared type
    |
+info: type `HasNeither` is not assignable to any element of the union `SupportsFoo | SupportsBar`
+info: ├── type `HasNeither` is not compatible with protocol `SupportsFoo`
+info: │   └── protocol member `foo` is not defined on type `HasNeither`
+info: └── type `HasNeither` is not compatible with protocol `SupportsBar`
+info:     └── protocol member `bar` is not defined on type `HasNeither`
 
 ```
