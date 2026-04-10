@@ -3314,6 +3314,31 @@ def f(c: C[int]) -> None:
     takes_c(c)
 ```
 
+### Recursive generic sub-protocol with `cast()` and unbound super call
+
+This snippet caused a stack overflow via infinite recursion in the type walker.
+The combination of a sub-protocol whose method calls `cast()` on the unbound
+parent protocol method triggers constraint solving, which walks the protocol
+interface. Because the return type wraps `T` in `list[T]`, each recursive step
+produces a distinct specialization (`Proto[list[T]]`, `Proto[list[list[T]]]`,
+etc.), defeating exact-match cycle detection and causing unbounded stack growth.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, cast
+
+class Proto[T](Protocol):
+    def method(self) -> "Proto[list[T]]": ...
+
+class Sub[T](Proto[T], Protocol):
+    def method(self) -> "Sub[list[T]]":
+        return cast(Sub[list[T]], Proto.method(self))  # error: [redundant-cast]
+```
+
 ### Recursive legacy generic protocol
 
 ```py
