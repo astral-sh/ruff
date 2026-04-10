@@ -156,6 +156,24 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Lazy cached property behind `hasattr`
+
+This pattern used to panic with "too many cycle iterations".
+
+```py
+class Cached:
+    def get(self) -> int:
+        return 0
+
+    @property
+    def metadata(self) -> int:
+        if not hasattr(self, "_metadata"):
+            self._metadata = self.get()
+        return self._metadata
+
+reveal_type(Cached().metadata)  # revealed: int
+```
+
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from

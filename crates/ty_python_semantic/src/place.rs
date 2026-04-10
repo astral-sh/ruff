@@ -805,11 +805,27 @@ impl<'db> PlaceAndQualifiers<'db> {
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let qualifiers = if cycle.iteration() <= 1 {
+            self.qualifiers
+        } else {
+            previous_place.qualifiers.union(self.qualifiers)
+        };
         let place = match (previous_place.place, self.place) {
-            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
-            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            // In fixed-point iteration of type inference, the member result must be monotonically
+            // widened and not "oscillate". The type component is widened by unioning the previous
+            // iteration into the current result; after the first couple iterations, the same
+            // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
                 ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                definedness: if cycle.iteration() <= 1
+                    || matches!(
+                        (prev.definedness, current.definedness),
+                        (Definedness::AlwaysDefined, Definedness::AlwaysDefined)
+                    ) {
+                    current.definedness
+                } else {
+                    Definedness::PossiblyUndefined
+                },
                 ..current
             }),
             // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
@@ -821,7 +837,11 @@ impl<'db> PlaceAndQualifiers<'db> {
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
                 ty: current.ty.recursive_type_normalized(db, cycle),
-                definedness: Definedness::PossiblyUndefined,
+                definedness: if cycle.iteration() <= 1 {
+                    current.definedness
+                } else {
+                    Definedness::PossiblyUndefined
+                },
                 ..current
             }),
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
@@ -839,10 +859,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers {
-            place,
-            qualifiers: self.qualifiers,
-        }
+        PlaceAndQualifiers { place, qualifiers }
     }
 }
 
