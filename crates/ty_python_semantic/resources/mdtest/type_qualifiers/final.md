@@ -731,6 +731,33 @@ class C:
         self.x: Final[int] = 1
 ```
 
+### Dataclass `__post_init__`
+
+Dataclass-like `__post_init__` methods run as part of instance initialization, so they may declare
+and assign `Final` instance attributes. A plain method named `__post_init__` does not get this
+special case.
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class C:
+    def __post_init__(self):
+        self.x: Final[int] = 1
+
+    def f(self):
+        # error: [invalid-assignment]
+        self.x = 2
+
+reveal_type(C().x)  # revealed: int
+
+class D:
+    def __post_init__(self):
+        # error: [invalid-assignment]
+        self.x: Final[int] = 1
+```
+
 ### Protocol members
 
 Assignments to `Final` protocol members are also invalid, both through a protocol-typed value and
