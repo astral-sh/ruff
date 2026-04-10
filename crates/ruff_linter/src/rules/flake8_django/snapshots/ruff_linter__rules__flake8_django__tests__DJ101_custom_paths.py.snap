@@ -19,7 +19,7 @@ help: Remove the leading slash
 6 +     mypath("help/", views.help_view),  # DJ101
 7 |     mypath("/about/", views.about_view),  # DJ101
 8 | ]
-9 | 
+9 |
 
 DJ101 [*] URL route `/about/` has an unnecessary leading slash
  --> DJ101_custom_paths.py:7:12
@@ -37,7 +37,7 @@ help: Remove the leading slash
    -     mypath("/about/", views.about_view),  # DJ101
 7  +     mypath("about/", views.about_view),  # DJ101
 8  | ]
-9  | 
+9  |
 10 | # OK - custom path without leading slash
 
 DJ101 [*] URL route `/api/users/` has an unnecessary leading slash

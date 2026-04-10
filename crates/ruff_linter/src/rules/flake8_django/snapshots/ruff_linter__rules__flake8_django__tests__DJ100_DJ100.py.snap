@@ -79,7 +79,7 @@ help: Add a trailing slash
 9  +     path("api/users/", views.users_view),  # DJ100
 10 |     path("blog/posts", views.posts_view),  # DJ100
 11 | ]
-12 | 
+12 |
 
 DJ100 [*] URL route `blog/posts` is missing a trailing slash
   --> DJ100.py:10:10
@@ -97,7 +97,7 @@ help: Add a trailing slash
    -     path("blog/posts", views.posts_view),  # DJ100
 10 +     path("blog/posts/", views.posts_view),  # DJ100
 11 | ]
-12 | 
+12 |
 13 | # OK - has trailing slash
 
 DJ100 [*] URL route `bad` is missing a trailing slash
@@ -136,7 +136,7 @@ help: Add a trailing slash
    -     path("also-bad", views.also_bad_view),  # DJ100
 39 +     path("also-bad/", views.also_bad_view),  # DJ100
 40 | ]
-41 | 
+41 |
 42 | # Error - missing trail slash and argument should stay in message
 
 DJ100 [*] URL route `bad/<slug:slug>` is missing a trailing slash
@@ -157,6 +157,7 @@ help: Add a trailing slash
 44 +     path("bad/<slug:slug>/", views.bad_view),  # DJ100
 45 |     path("<slug:slug>", views.bad_view),  # DJ100
 46 | ]
+47 |
 
 DJ100 [*] URL route `<slug:slug>` is missing a trailing slash
   --> DJ100.py:45:10
@@ -174,3 +175,24 @@ help: Add a trailing slash
    -     path("<slug:slug>", views.bad_view),  # DJ100
 45 +     path("<slug:slug>/", views.bad_view),  # DJ100
 46 | ]
+47 |
+48 | # Edge case - backslash continuation: value is "path" (no trailing slash)
+
+DJ100 [*] URL route `path` is missing a trailing slash
+  --> DJ100.py:51:10
+   |
+49 |   # and the fix inserts "/" before the closing quote.
+50 |   urlpatterns_backslash = [
+51 |       path("path\
+   |  __________^
+52 | | ", views.view),  # DJ100
+   | |_^
+53 |   ]
+   |
+help: Add a trailing slash
+49 | # and the fix inserts "/" before the closing quote.
+50 | urlpatterns_backslash = [
+51 |     path("path\
+   - ", views.view),  # DJ100
+52 + /", views.view),  # DJ100
+53 | ]
