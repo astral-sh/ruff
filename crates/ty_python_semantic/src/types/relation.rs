@@ -19,7 +19,7 @@ use crate::types::{
 use crate::{
     Db,
     types::{
-        Type, TypeRelationErrorContext, TypeRelationHint, constraints::ConstraintSet,
+        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
         generics::InferableTypeVars,
     },
 };
@@ -332,7 +332,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -357,24 +357,24 @@ impl<'db> Type<'db> {
     ///
     /// This is a separate method so that we can skip this expensive check when diagnostics
     /// are suppressed.
-    pub fn assignability_error_context(
+    pub(crate) fn assignability_error_context(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> TypeRelationErrorContext<'db> {
+    ) -> ErrorContextTree<'db> {
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
-            error_context: TypeRelationErrorContext::enabled(),
+            context_tree: ErrorContextTree::enabled(),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
         checker.check_type_pair(db, self, target);
-        checker.error_context
+        checker.context_tree
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set assignability.
@@ -462,7 +462,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -607,7 +607,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
-    error_context: TypeRelationErrorContext<'db>,
+    context_tree: ErrorContextTree<'db>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -633,7 +633,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -651,7 +651,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -674,31 +674,34 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    pub(super) fn provide_hint(&self, get_hint: impl FnOnce() -> TypeRelationHint<'db>) {
-        self.error_context.push(get_hint());
+    /// Provide context about a failing (assignability) relation between two types.
+    pub(super) fn provide_context(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
+        self.context_tree.push(get_context);
     }
 
-    pub(super) fn set_hint(
+    /// Overwrite the error context tree with a new root context and child nodes.
+    pub(super) fn set_context(
         &self,
-        hint: TypeRelationHint<'db>,
-        children: Vec<TypeRelationErrorContext<'db>>,
+        root: ErrorContext<'db>,
+        children: impl IntoIterator<Item = ErrorContextTree<'db>>,
     ) {
-        self.error_context.set_root(hint, children);
+        self.context_tree.set(root, children);
     }
 
+    /// Return true if error context collection is currently enabled.
     pub(super) fn is_context_collection_enabled(&self) -> bool {
-        self.error_context.is_enabled()
+        self.context_tree.is_enabled()
     }
 
     /// Temporarily suppress error context collection for the duration of `f`.
     ///
-    /// TODO: we may eventually not need this when we properly restore error
+    /// Note: we may eventually not need this method once we properly retain error
     /// context everywhere.
-    pub(super) fn without_error_context<R>(&self, f: impl FnOnce() -> R) -> R {
-        let was_enabled = self.error_context.is_enabled();
-        self.error_context.set_enabled(false);
+    pub(super) fn without_context_collection<R>(&self, f: impl FnOnce() -> R) -> R {
+        let was_enabled = self.context_tree.is_enabled();
+        self.context_tree.set_enabled(false);
         let result = f();
-        self.error_context.set_enabled(was_enabled);
+        self.context_tree.set_enabled(was_enabled);
         result
     }
 
@@ -1059,7 +1062,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
                         if constraint_set.is_never_satisfied(db) {
-                            self.provide_hint(|| TypeRelationHint::NotAllUnionElementsAssignable {
+                            self.provide_context(|| ErrorContext::NotAllUnionElementsAssignable {
                                 element: elem_ty,
                                 union: source,
                                 target,
@@ -1107,7 +1110,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_any(db, self.constraints, |&elem_ty| {
                         let result = self.check_type_pair(db, source, elem_ty);
                         if context_collection_enabled {
-                            let ctx = self.error_context.take();
+                            let ctx = self.context_tree.take();
                             if !ctx.is_empty() {
                                 elements_context.push(ctx);
                             }
@@ -1123,14 +1126,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     let elements_without_context = elements.len() - elements_context.len();
                     if elements_without_context > 0 && elements_without_context < elements.len() {
                         elements_context.push(
-                            TypeRelationHint::NotAssignableToNOtherUnionElements {
+                            ErrorContext::NotAssignableToNOtherUnionElements {
                                 n: elements_without_context,
                             }
                             .into(),
                         );
                     }
-                    self.set_hint(
-                        TypeRelationHint::NotAssignableToAnyUnionElement {
+                    self.set_context(
+                        ErrorContext::NotAssignableToAnyUnionElement {
                             source,
                             union: target,
                         },
@@ -1198,7 +1201,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
 
-                self.without_error_context(|| {
+                self.without_context_collection(|| {
                     intersection
                         .positive_elements_or_object(db)
                         .when_any(db, self.constraints, |elem_ty| {
@@ -1381,7 +1384,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     if let Type::NominalInstance(instance) = target
                         && instance.class(db).is_known(db, KnownClass::Dict)
                     {
-                        self.provide_hint(|| TypeRelationHint::TypedDictNotAssignableToDict);
+                        self.provide_context(|| ErrorContext::TypedDictNotAssignableToDict);
                     }
                 }
                 result
@@ -1765,7 +1768,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -1846,7 +1849,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
-            error_context: TypeRelationErrorContext::disabled(),
+            context_tree: ErrorContextTree::disabled(),
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,

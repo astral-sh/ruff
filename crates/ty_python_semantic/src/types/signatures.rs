@@ -28,10 +28,10 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
-    TypeContext, TypeMapping, TypeRelationHint, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    TypeContext, TypeMapping, UnionBuilder, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1018,7 +1018,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let return_types_match = || {
                         // TODO: Similar to how we do this for unions, we should collect error
                         // context for all elements and report it if *all* checks fail.
-                        self.without_error_context(|| {
+                        self.without_context_collection(|| {
                             target_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
@@ -1054,7 +1054,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let return_types_match = || {
                         // TODO: Similar to how we do this for unions, we should collect error
                         // context for all elements and report it if *all* checks fail.
-                        self.without_error_context(|| {
+                        self.without_context_collection(|| {
                             source_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
@@ -1101,7 +1101,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
-                self.without_error_context(|| {
+                self.without_context_collection(|| {
                     source_overloads
                         .iter()
                         .when_any(db, self.constraints, |self_signature| {
@@ -1256,7 +1256,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db);
         if !return_type_checks {
-            self.provide_hint(|| TypeRelationHint::IncompatibleReturnTypes {
+            self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
                 source: source.return_ty,
                 target: target.return_ty,
             });
@@ -1287,7 +1287,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db) {
-                self.provide_hint(|| TypeRelationHint::IncompatibleParameterTypes {
+                self.provide_context(|| ErrorContext::IncompatibleParameterTypes {
                     source: source_ty,
                     target: target_ty,
                 });
@@ -1447,7 +1447,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 },
                             ) => {
                                 if self_name != other_name {
-                                    self.provide_hint(|| TypeRelationHint::ParameterNameMismatch {
+                                    self.provide_context(|| ErrorContext::ParameterNameMismatch {
                                         source_name: self_name.clone(),
                                         target_name: other_name.clone(),
                                     });
@@ -2136,7 +2136,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
-                                self.provide_hint(|| TypeRelationHint::ParameterNameMismatch {
+                                self.provide_context(|| ErrorContext::ParameterNameMismatch {
                                     source_name: source_name.clone(),
                                     target_name: target_name.clone(),
                                 });
@@ -2224,8 +2224,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 name: target_name, ..
                             },
                         ) => {
-                            self.provide_hint(|| {
-                                TypeRelationHint::ParameterMustAcceptKeywordArguments {
+                            self.provide_context(|| {
+                                ErrorContext::ParameterMustAcceptKeywordArguments {
                                     source_name: name.clone(),
                                     target_name: target_name.clone(),
                                 }
@@ -2238,8 +2238,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            self.provide_hint(|| {
-                                TypeRelationHint::ParameterMustAcceptPositionalArguments {
+                            self.provide_context(|| {
+                                ErrorContext::ParameterMustAcceptPositionalArguments {
                                     name: name.clone(),
                                 }
                             });

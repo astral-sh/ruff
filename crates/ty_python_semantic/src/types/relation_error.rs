@@ -1,3 +1,5 @@
+/// This module defines a tree structure for collecting contextual information about type relation errors
+/// ("why is this complex type not assignable to that other complex type?").
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -8,8 +10,9 @@ use crate::types::Type;
 use crate::types::tuple::TupleLength;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum TypeRelationHint<'db> {
-    Root,
+pub(crate) enum ErrorContext<'db> {
+    /// No additional context is available.
+    Empty,
     NotAllUnionElementsAssignable {
         element: Type<'db>,
         union: Type<'db>,
@@ -65,10 +68,10 @@ pub(crate) enum TypeRelationHint<'db> {
     },
 }
 
-impl<'db> TypeRelationHint<'db> {
+impl<'db> ErrorContext<'db> {
     fn render(&self, db: &'db dyn Db) -> Option<String> {
         Some(match self {
-            Self::Root => {
+            Self::Empty => {
                 return None;
             }
             Self::NotAllUnionElementsAssignable {
@@ -169,14 +172,14 @@ impl<'db> TypeRelationHint<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ErrorContextNode<'db> {
-    hint: TypeRelationHint<'db>,
+    context: ErrorContext<'db>,
     children: Vec<ErrorContextNode<'db>>,
 }
 
 impl Default for ErrorContextNode<'_> {
     fn default() -> Self {
         Self {
-            hint: TypeRelationHint::Root,
+            context: ErrorContext::Empty,
             children: Vec::new(),
         }
     }
@@ -185,7 +188,7 @@ impl Default for ErrorContextNode<'_> {
 impl<'db> ErrorContextNode<'db> {
     /// Returns `true` if this node has no renderable content.
     fn is_empty(&self) -> bool {
-        matches!(self.hint, TypeRelationHint::Root) && self.children.is_empty()
+        matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
     fn render_messages(
@@ -195,7 +198,7 @@ impl<'db> ErrorContextNode<'db> {
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(message) = self.hint.render(db) {
+        if let Some(message) = self.context.render(db) {
             messages.push(format!("{prefix}{message}"));
         }
 
@@ -213,28 +216,33 @@ impl<'db> ErrorContextNode<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub struct TypeRelationErrorContext<'db> {
+pub(crate) struct ErrorContextTree<'db> {
     root: Rc<RefCell<ErrorContextNode<'db>>>,
     enabled: Cell<bool>,
 }
 
-impl PartialEq for TypeRelationErrorContext<'_> {
+impl PartialEq for ErrorContextTree<'_> {
     fn eq(&self, other: &Self) -> bool {
         *self.root.borrow() == *other.root.borrow()
     }
 }
 
-impl Eq for TypeRelationErrorContext<'_> {}
+impl Eq for ErrorContextTree<'_> {}
 
-impl<'db> From<TypeRelationHint<'db>> for TypeRelationErrorContext<'db> {
-    fn from(hint: TypeRelationHint<'db>) -> Self {
-        let context = TypeRelationErrorContext::enabled();
-        context.push(hint);
-        context
+impl<'db> From<ErrorContext<'db>> for ErrorContextTree<'db> {
+    fn from(context: ErrorContext<'db>) -> Self {
+        Self {
+            root: Rc::new(RefCell::new(ErrorContextNode {
+                context,
+                children: Vec::new(),
+            })),
+            enabled: Cell::new(true),
+        }
     }
 }
 
-impl<'db> TypeRelationErrorContext<'db> {
+impl<'db> ErrorContextTree<'db> {
+    /// Create a new, empty error context tree with collection disabled.
     pub(crate) fn disabled() -> Self {
         Self {
             root: Rc::default(),
@@ -242,6 +250,7 @@ impl<'db> TypeRelationErrorContext<'db> {
         }
     }
 
+    /// Create a new, empty error context tree with collection enabled.
     pub(crate) fn enabled() -> Self {
         Self {
             root: Rc::default(),
@@ -257,29 +266,33 @@ impl<'db> TypeRelationErrorContext<'db> {
         self.enabled.set(enabled);
     }
 
+    /// Returns `true` if the tree has no renderable content.
     pub(crate) fn is_empty(&self) -> bool {
         self.root.borrow().is_empty()
     }
 
-    pub(crate) fn push(&self, hint: TypeRelationHint<'db>) {
+    /// Push a new error context node, making the existing tree a child of the new context.
+    pub(crate) fn push(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
         if !self.is_enabled() {
             return;
         }
+        let context = get_context();
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
-        *self.root.borrow_mut() = ErrorContextNode { hint, children };
+        *self.root.borrow_mut() = ErrorContextNode { context, children };
     }
 
-    pub(crate) fn set_root(
+    /// Overwrite the error context tree with a new root context and child nodes.
+    pub(crate) fn set(
         &self,
-        hint: TypeRelationHint<'db>,
-        children: Vec<TypeRelationErrorContext<'db>>,
+        context: ErrorContext<'db>,
+        children: impl IntoIterator<Item = ErrorContextTree<'db>>,
     ) {
         if !self.is_enabled() {
             return;
         }
         *self.root.borrow_mut() = ErrorContextNode {
-            hint,
+            context,
             children: children
                 .into_iter()
                 .map(|child_context| child_context.root.take())
@@ -288,18 +301,20 @@ impl<'db> TypeRelationErrorContext<'db> {
         };
     }
 
+    /// Return the full tree, replacing it with an empty tree.
     pub(crate) fn take(&self) -> Self {
-        TypeRelationErrorContext {
+        ErrorContextTree {
             root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
             enabled: Cell::new(self.enabled.get()),
         }
     }
 
-    pub fn info_messages(&self, db: &'db dyn Db) -> Vec<String> {
+    /// Render the tree as a list of messages, with child nodes rendered as indented sub-messages.
+    pub(crate) fn info_messages(&self, db: &'db dyn Db) -> impl Iterator<Item = String> {
         let mut messages = Vec::new();
         self.root
             .borrow()
             .render_messages(db, &mut messages, "", "");
-        messages
+        messages.into_iter()
     }
 }

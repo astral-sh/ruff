@@ -29,8 +29,8 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    Type, TypeMapping, TypeRelationHint, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, Type, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -293,7 +293,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
                 if !equal_length && self.relation.is_assignability() {
-                    self.provide_hint(|| TypeRelationHint::TupleLengthMismatch {
+                    self.provide_context(|| ErrorContext::TupleLengthMismatch {
                         source_len: source_tuple.0.len(),
                         target_len: target_tuple.len(),
                     });
@@ -310,8 +310,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if constraint_set.is_never_satisfied(db) {
-                                    self.provide_hint(|| {
-                                        TypeRelationHint::TupleElementNotCompatible {
+                                    self.provide_context(|| {
+                                        ErrorContext::TupleElementNotCompatible {
                                             source,
                                             target,
                                             element_index: n,

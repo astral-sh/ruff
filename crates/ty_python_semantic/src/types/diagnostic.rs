@@ -27,9 +27,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext,
-    TypeRelationErrorContext, TypeVarVariance, binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
+    binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -5379,7 +5379,7 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
-    error_context: impl FnOnce() -> TypeRelationErrorContext<'db>,
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
 

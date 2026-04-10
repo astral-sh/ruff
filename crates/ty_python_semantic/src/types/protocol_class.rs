@@ -18,10 +18,9 @@ use crate::{
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
-        FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeRelationHint, TypeVarVariance,
-        VarianceInferable,
+        ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
+        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -698,7 +697,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                         .place
                     else {
-                        self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                        self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                             member_name: member.name.into(),
                             ty,
                         });
@@ -739,7 +738,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 );
                 if !is_defined {
-                    self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                         member_name: member.name.into(),
                         ty,
                     });
@@ -754,7 +753,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ..
                 }) = ty.member(db, member.name).place
                 else {
-                    self.provide_hint(|| TypeRelationHint::ProtocolMemberNotDefined {
+                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                         member_name: member.name.into(),
                         ty,
                     });
@@ -768,7 +767,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         };
         if result.is_never_satisfied(db) {
-            self.provide_hint(|| TypeRelationHint::ProtocolMemberIncompatible {
+            self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
             });
         }
