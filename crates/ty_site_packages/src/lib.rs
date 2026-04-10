@@ -74,7 +74,10 @@ impl SitePackagesPaths {
     }
 
     /// Tries to detect the version from the layout of the `site-packages` directory.
-    pub fn python_version_from_layout(&self) -> Option<PythonVersionWithSource> {
+    pub fn python_version_from_layout(
+        &self,
+        system: &dyn System,
+    ) -> Option<PythonVersionWithSource> {
         if cfg!(windows) {
             // The path to `site-packages` on Unix is
             // `<sys.prefix>/lib/pythonX.Y/site-packages`,
@@ -112,6 +115,8 @@ impl SitePackagesPaths {
         let version = PythonVersion::from_str(version).ok()?;
         let source = PythonVersionSource::InstallationDirectoryLayout {
             site_packages_parent_dir: Box::from(parent_component),
+            source: settings_diagnostic_path_from_site_packages_path(primary_site_packages, system)
+                .map(|path| PythonVersionFileSource::new(Arc::new(path), None)),
         };
 
         Some(PythonVersionWithSource { version, source })
@@ -126,6 +131,57 @@ impl fmt::Display for SitePackagesPaths {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.0.iter()).finish()
     }
+}
+
+fn settings_diagnostic_path_from_site_packages_path(
+    site_packages_path: &SystemPath,
+    system: &dyn System,
+) -> Option<SystemPathBuf> {
+    let sys_prefix = site_packages_path.ancestors().nth(3)?;
+    settings_diagnostic_path_from_sys_prefix(sys_prefix, system)
+}
+
+fn settings_diagnostic_path_from_sys_prefix(
+    sys_prefix: &SystemPath,
+    system: &dyn System,
+) -> Option<SystemPathBuf> {
+    let pyvenv_cfg = sys_prefix.join("pyvenv.cfg");
+    if system.is_file(&pyvenv_cfg) {
+        return Some(pyvenv_cfg);
+    }
+
+    let bin_dir = if cfg!(windows) {
+        sys_prefix.to_path_buf()
+    } else {
+        sys_prefix.join("bin")
+    };
+
+    for candidate in [
+        bin_dir.join("python3"),
+        bin_dir.join("python"),
+        bin_dir.join("pypy3"),
+        bin_dir.join("pypy"),
+    ] {
+        if system.is_file(&candidate) {
+            return Some(candidate);
+        }
+    }
+
+    let entries = system.read_directory(&bin_dir).ok()?;
+    for entry in entries.flatten() {
+        if entry.file_type().is_directory() {
+            continue;
+        }
+
+        let path = entry.into_path();
+        if let Some(file_name) = path.file_name()
+            && (file_name.starts_with("python") || file_name.starts_with("pypy"))
+        {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
@@ -2659,6 +2715,46 @@ mod tests {
         paths.insert(SystemPathBuf::from("/path/to/site/packages"));
 
         assert_eq!(paths.to_string(), r#"["/path/to/site/packages"]"#);
+    }
+
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn layout_inference_uses_the_primary_site_packages_source() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let self_site_packages = SystemPathBuf::from("/self/.venv/lib/python3.16/site-packages");
+        let project_site_packages =
+            SystemPathBuf::from("/project/.venv/lib/python3.12/site-packages");
+        let self_pyvenv_cfg = SystemPathBuf::from("/self/.venv/pyvenv.cfg");
+        let project_pyvenv_cfg = SystemPathBuf::from("/project/.venv/pyvenv.cfg");
+
+        memory_fs.create_directory_all(&self_site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&project_site_packages)
+            .unwrap();
+        memory_fs
+            .write_file_all(&self_pyvenv_cfg, "home = /python/bin")
+            .unwrap();
+        memory_fs
+            .write_file_all(&project_pyvenv_cfg, "home = /python/bin")
+            .unwrap();
+
+        let paths = SitePackagesPaths::from([self_site_packages, project_site_packages]);
+        let PythonVersionWithSource { version, source } =
+            paths.python_version_from_layout(&system).unwrap();
+
+        assert_eq!(version, PythonVersion::from((3, 16)));
+        assert_eq!(
+            source,
+            PythonVersionSource::InstallationDirectoryLayout {
+                site_packages_parent_dir: Box::from("python3.16"),
+                source: Some(PythonVersionFileSource::new(
+                    Arc::new(self_pyvenv_cfg),
+                    None
+                )),
+            }
+        );
     }
 
     /// Test that dist-packages directories (Debian/Ubuntu) are discovered alongside site-packages

@@ -85,6 +85,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
         }
         crate::PythonVersionSource::InstallationDirectoryLayout {
             site_packages_parent_dir,
+            source: _,
         } => {
             // TODO: it would also be nice to tell them how we resolved this Python installation...
             diagnostic.info(format_args!(

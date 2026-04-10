@@ -246,6 +246,7 @@ reveal_type(sys.version_info[:2])
     Ok(())
 }
 
+#[cfg_attr(windows, ignore = "site-packages layout inference is Unix-only")]
 #[test]
 fn unsupported_inferred_python_version_setting_diagnostic() -> Result<()> {
     let workspace_root = SystemPath::new("project");
@@ -286,6 +287,65 @@ fn unsupported_inferred_python_version_setting_diagnostic() -> Result<()> {
     let diagnostics = server.collect_publish_diagnostic_notifications(1);
 
     assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[cfg_attr(windows, ignore = "site-packages layout inference is Unix-only")]
+#[test]
+fn unsupported_inferred_python_version_setting_diagnostic_for_system_interpreter() -> Result<()> {
+    let workspace_root = SystemPath::new("project");
+    let main = SystemPath::new("project/main.py");
+    let python = "python/bin/python3.16";
+    let site_packages = "python/lib/python3.16/site-packages/foo.py";
+
+    let builder = TestServerBuilder::new()?;
+    let sys_prefix = builder.file_path("python");
+    let python_uri = builder.file_uri(python);
+
+    let workspace_options: ClientOptions = serde_json::from_value(json!({
+        "pythonExtension": {
+            "activeEnvironment": {
+                "executable": {
+                    "uri": python_uri,
+                    "sysPrefix": sys_prefix,
+                }
+            }
+        }
+    }))?;
+
+    let mut server = builder
+        .with_workspace(workspace_root, Some(workspace_options))?
+        .with_file(main, "x = 1\n")?
+        .with_file(python, "")?
+        .with_file(site_packages, "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "file://<temp_dir>/python/bin/python3.16": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 0
+            }
+          },
+          "severity": 2,
+          "code": "unsupported-python-version",
+          "source": "ty",
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
+        }
+      ]
+    }
+    "#);
 
     Ok(())
 }
