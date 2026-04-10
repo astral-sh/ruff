@@ -1119,7 +1119,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .or(db, self.constraints, is_new_type_of_union);
 
                 if context_collection_enabled
-                    && elements_context.len() > 0
+                    && !elements_context.is_empty()
                     && result.is_never_satisfied(db)
                 {
                     let elements_without_context = elements.len() - elements_context.len();
