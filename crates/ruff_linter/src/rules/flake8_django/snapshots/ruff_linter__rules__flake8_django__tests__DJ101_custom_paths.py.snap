@@ -11,8 +11,8 @@ DJ101 [*] URL route `/help/` has an unnecessary leading slash
 7 |     mypath("/about/", views.about_view),  # DJ101
 8 | ]
   |
-help: Remove leading slash
-3 | 
+help: Remove the leading slash
+3 |
 4 | # Test that custom path functions are also checked for leading slashes
 5 | urlpatterns_custom = [
   -     mypath("/help/", views.help_view),  # DJ101
@@ -30,7 +30,7 @@ DJ101 [*] URL route `/about/` has an unnecessary leading slash
   |            ^^^^^^^^^
 8 | ]
   |
-help: Remove leading slash
+help: Remove the leading slash
 4  | # Test that custom path functions are also checked for leading slashes
 5  | urlpatterns_custom = [
 6  |     mypath("/help/", views.help_view),  # DJ101
@@ -50,8 +50,8 @@ DJ101 [*] URL route `/api/users/` has an unnecessary leading slash
 19 |     mypath("/api/posts/", views.posts_view),  # DJ101
 20 |     mypath("api/comments/", views.comments_view),  # OK
    |
-help: Remove leading slash
-15 | 
+help: Remove the leading slash
+15 |
 16 | # Test multiple violations in same list
 17 | urlpatterns_multiple = [
    -     mypath("/api/users/", views.users_view),  # DJ101
@@ -70,7 +70,7 @@ DJ101 [*] URL route `/api/posts/` has an unnecessary leading slash
 20 |     mypath("api/comments/", views.comments_view),  # OK
 21 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 16 | # Test multiple violations in same list
 17 | urlpatterns_multiple = [
 18 |     mypath("/api/users/", views.users_view),  # DJ101

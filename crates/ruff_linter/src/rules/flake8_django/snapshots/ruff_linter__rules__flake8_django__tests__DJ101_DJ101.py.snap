@@ -11,8 +11,8 @@ DJ101 [*] URL route `/help/` has an unnecessary leading slash
 7 |     path("/about/", views.about_view),  # DJ101
 8 |     path("/contact/", views.contact_view),  # DJ101
   |
-help: Remove leading slash
-3 | 
+help: Remove the leading slash
+3 |
 4 | # Errors - leading slash
 5 | urlpatterns = [
   -     path("/help/", views.help_view),  # DJ101
@@ -31,7 +31,7 @@ DJ101 [*] URL route `/about/` has an unnecessary leading slash
 8 |     path("/contact/", views.contact_view),  # DJ101
 9 |     path("/api/users/", views.users_view),  # DJ101
   |
-help: Remove leading slash
+help: Remove the leading slash
 4  | # Errors - leading slash
 5  | urlpatterns = [
 6  |     path("/help/", views.help_view),  # DJ101
@@ -51,7 +51,7 @@ DJ101 [*] URL route `/contact/` has an unnecessary leading slash
  9 |     path("/api/users/", views.users_view),  # DJ101
 10 |     path("/blog/posts/", views.posts_view),  # DJ101
    |
-help: Remove leading slash
+help: Remove the leading slash
 5  | urlpatterns = [
 6  |     path("/help/", views.help_view),  # DJ101
 7  |     path("/about/", views.about_view),  # DJ101
@@ -71,7 +71,7 @@ DJ101 [*] URL route `/api/users/` has an unnecessary leading slash
 10 |     path("/blog/posts/", views.posts_view),  # DJ101
 11 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 6  |     path("/help/", views.help_view),  # DJ101
 7  |     path("/about/", views.about_view),  # DJ101
 8  |     path("/contact/", views.contact_view),  # DJ101
@@ -90,7 +90,7 @@ DJ101 [*] URL route `/blog/posts/` has an unnecessary leading slash
    |          ^^^^^^^^^^^^^^
 11 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 7  |     path("/about/", views.about_view),  # DJ101
 8  |     path("/contact/", views.contact_view),  # DJ101
 9  |     path("/api/users/", views.users_view),  # DJ101
@@ -110,7 +110,7 @@ DJ101 [*] URL route `/bad/` has an unnecessary leading slash
 38 |     path("also-good/", views.also_good_view),
 39 |     path("/also-bad/", views.also_bad_view),  # DJ101
    |
-help: Remove leading slash
+help: Remove the leading slash
 34 | # Mixed cases
 35 | urlpatterns_mixed = [
 36 |     path("good/", views.good_view),
@@ -129,7 +129,7 @@ DJ101 [*] URL route `/also-bad/` has an unnecessary leading slash
    |          ^^^^^^^^^^^^
 40 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 36 |     path("good/", views.good_view),
 37 |     path("/bad/", views.bad_view),  # DJ101
 38 |     path("also-good/", views.also_good_view),
@@ -149,8 +149,8 @@ DJ101 [*] URL route `/single-quote/` has an unnecessary leading slash
 45 |     path("/double-quote/", views.double_quote_view),  # DJ101
 46 |     path('''/triple-single/''', views.triple_single_view),  # DJ101
    |
-help: Remove leading slash
-41 | 
+help: Remove the leading slash
+41 |
 42 | # Edge cases with different quote styles
 43 | urlpatterns_quotes = [
    -     path('/single-quote/', views.single_quote_view),  # DJ101
@@ -169,7 +169,7 @@ DJ101 [*] URL route `/double-quote/` has an unnecessary leading slash
 46 |     path('''/triple-single/''', views.triple_single_view),  # DJ101
 47 |     path("""/triple-double/""", views.triple_double_view),  # DJ101
    |
-help: Remove leading slash
+help: Remove the leading slash
 42 | # Edge cases with different quote styles
 43 | urlpatterns_quotes = [
 44 |     path('/single-quote/', views.single_quote_view),  # DJ101
@@ -189,7 +189,7 @@ DJ101 [*] URL route `/triple-single/` has an unnecessary leading slash
 47 |     path("""/triple-double/""", views.triple_double_view),  # DJ101
 48 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 43 | urlpatterns_quotes = [
 44 |     path('/single-quote/', views.single_quote_view),  # DJ101
 45 |     path("/double-quote/", views.double_quote_view),  # DJ101
@@ -208,7 +208,7 @@ DJ101 [*] URL route `/triple-double/` has an unnecessary leading slash
    |          ^^^^^^^^^^^^^^^^^^^^^
 48 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 44 |     path('/single-quote/', views.single_quote_view),  # DJ101
 45 |     path("/double-quote/", views.double_quote_view),  # DJ101
 46 |     path('''/triple-single/''', views.triple_single_view),  # DJ101
@@ -228,8 +228,8 @@ DJ101 [*] URL route `/bad/<slug:slug>/` has an unnecessary leading slash
 53 |     path("/<slug:slug>", views.bad_view),  # DJ101
 54 | ]
    |
-help: Remove leading slash
-49 | 
+help: Remove the leading slash
+49 |
 50 | # Error - leading trail slash and argument should stay in message
 51 | urlpatterns_params_bad = [
    -     path("/bad/<slug:slug>/", views.bad_view),  # DJ101
@@ -246,7 +246,7 @@ DJ101 [*] URL route `/<slug:slug>` has an unnecessary leading slash
    |          ^^^^^^^^^^^^^^
 54 | ]
    |
-help: Remove leading slash
+help: Remove the leading slash
 50 | # Error - leading trail slash and argument should stay in message
 51 | urlpatterns_params_bad = [
 52 |     path("/bad/<slug:slug>/", views.bad_view),  # DJ101
