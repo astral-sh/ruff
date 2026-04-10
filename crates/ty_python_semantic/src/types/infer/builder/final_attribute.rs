@@ -13,17 +13,6 @@ use crate::{
 };
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// Returns `true` if `object_ty` belongs to a dataclass-like class whose `__post_init__`
-    /// method should be treated as part of instance initialization for `Final` attributes.
-    fn final_attribute_allows_post_init(&self, object_ty: Type<'db>) -> bool {
-        let db = self.db();
-
-        object_ty.nominal_class(db).is_some_and(|cls| {
-            cls.static_class_literal(db)
-                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db))
-        })
-    }
-
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
     fn annotate_final_declaration(
         &self,
@@ -132,16 +121,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Use the full assignment statement range for these diagnostics instead of
         // just the attribute target range.
 
-        let is_in_allowed_initializer = self.current_function_definition().is_some_and(|func| {
-            if func.name.id == "__init__" {
-                true
-            } else {
-                func.name.id == "__post_init__" && self.final_attribute_allows_post_init(object_ty)
-            }
-        });
+        let is_in_allowed_initializer = self
+            .current_function_definition()
+            .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
 
         let report_not_in_init = || {
-            let allows_post_init = self.final_attribute_allows_post_init(object_ty);
+            let is_dataclass_like = object_ty.nominal_class(db).is_some_and(|cls| {
+                cls.static_class_literal(db)
+                    .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db))
+            });
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
@@ -152,7 +140,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
                 object_ty.display(db)
             ));
-            diagnostic.set_primary_message(if allows_post_init {
+            diagnostic.set_primary_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"

@@ -731,11 +731,10 @@ class C:
         self.x: Final[int] = 1
 ```
 
-### Dataclass `__post_init__`
+### `__post_init__`
 
-Dataclass-like `__post_init__` methods run as part of instance initialization, so they may declare
-and assign `Final` instance attributes. A plain method named `__post_init__` does not get this
-special case.
+`__post_init__` is a dunder that runs as part of instance initialization, so `Final` instance
+attributes may be declared and assigned in it, regardless of whether the class is a dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -753,6 +752,14 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
+```py
+from typing import Final
+
+class NonDataclass:
+    def __post_init__(self):
+        self.x: Final[int] = 1
+```
+
 Redeclaring an existing dataclass field as `Final` in `__post_init__` should ideally be an error,
 since the field is not actually `Final`:
 
@@ -767,17 +774,6 @@ class D:
     def __post_init__(self):
         # TODO: this should be an error (conflicting declaration)
         self.x: Final[str] = "bar"
-```
-
-`__post_init__` methods in non-dataclasses are not affected:
-
-```py
-from typing import Final
-
-class NonDataclass:
-    def __post_init__(self):
-        # error: [invalid-assignment]
-        self.x: Final[int] = 1
 ```
 
 ### Protocol members
