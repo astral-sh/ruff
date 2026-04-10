@@ -260,7 +260,7 @@ class HasName:
 type StringOrName = str | SupportsName
 
 def _(source: HasName):
-    target: SupportsName = source  # error: [invalid-assignment]
+    target: StringOrName = source  # error: [invalid-assignment]
 ```
 
 ## Deeply nested incompatibilities
