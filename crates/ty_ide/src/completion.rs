@@ -3947,10 +3947,10 @@ quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
-        bar :: Unknown | Literal[2]
-        baz :: Unknown | Literal[3]
-        foo :: Unknown | Literal[1]
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+        bar :: int
+        baz :: int
+        foo :: int
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
@@ -3974,7 +3974,7 @@ quux.<CURSOR>
         __sizeof__ :: bound method Quux.__sizeof__() -> int
         __str__ :: bound method Quux.__str__() -> str
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
-        ");
+        "###);
     }
 
     #[test]
@@ -3993,13 +3993,13 @@ quux.b<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
-        bar :: Unknown | Literal[2]
-        baz :: Unknown | Literal[3]
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+        bar :: int
+        baz :: int
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
-        ");
+        "###);
     }
 
     #[test]
