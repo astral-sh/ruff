@@ -4464,7 +4464,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let iter = itertools::izip!(
             arguments.iter_mut(),
             argument_forms.iter().copied(),
-            ast_arguments.arguments_source_order()
+            ast_arguments.iter_source_order()
         );
 
         for ((_, argument_types), argument_form, ast_argument) in iter {
@@ -8958,7 +8958,7 @@ enum ArgumentsIter<'a> {
 
 impl<'a> ArgumentsIter<'a> {
     fn from_ast(arguments: &'a ast::Arguments) -> Self {
-        Self::FromAst(arguments.arguments_source_order())
+        Self::FromAst(arguments.iter_source_order())
     }
 
     fn synthesized(arguments: &'a [ArgOrKeyword<'a>]) -> Self {
