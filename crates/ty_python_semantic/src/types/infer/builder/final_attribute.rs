@@ -204,6 +204,41 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         false
     }
+
+    fn invalid_deletion_of_final_attribute(
+        &self,
+        object_ty: Type<'db>,
+        target: &ast::ExprAttribute,
+        attribute: &str,
+        qualifiers: TypeQualifiers,
+        emit_diagnostics: bool,
+    ) -> bool {
+        if !qualifiers.contains(TypeQualifiers::FINAL) {
+            return false;
+        }
+
+        if emit_diagnostics {
+            let db = self.db();
+            let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
+
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ASSIGNMENT, target.range())
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Cannot delete final attribute `{attribute}` on type `{}`",
+                    object_ty.display(db)
+                ));
+                diagnostic.set_primary_message("`Final` attributes cannot be deleted");
+                if let Some(final_declaration) = final_declaration {
+                    self.annotate_final_declaration(&mut diagnostic, final_declaration);
+                }
+            }
+        }
+
+        true
+    }
+
     pub(super) fn validate_final_attribute_assignment(
         &mut self,
         target: &ast::ExprAttribute,
@@ -230,5 +265,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 fallback_attr.qualifiers,
             );
         }
+    }
+
+    pub(super) fn validate_final_attribute_deletion(
+        &self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let Some((meta_attr, fallback_attr)) =
+            self.assignment_attribute_members(object_ty, attribute)
+        else {
+            return false;
+        };
+
+        self.invalid_deletion_of_final_attribute(
+            object_ty,
+            target,
+            attribute,
+            meta_attr.qualifiers,
+            emit_diagnostics,
+        ) || fallback_attr.is_some_and(|fallback_attr| {
+            self.invalid_deletion_of_final_attribute(
+                object_ty,
+                target,
+                attribute,
+                fallback_attr.qualifiers,
+                emit_diagnostics,
+            )
+        })
     }
 }
