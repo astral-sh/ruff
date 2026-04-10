@@ -1,9 +1,7 @@
 use crate::semantic_index::definition::Definition;
-use crate::types::class::{
-    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
-};
+use crate::types::class::{ClassLiteral, DynamicClassAnchor, DynamicClassLiteral};
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
+    INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_dynamic_metaclass_error,
     report_instance_layout_conflict,
 };
 use crate::types::infer::builder::{
@@ -258,6 +256,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             members,
             has_dynamic_namespace,
             None,
+            None,
         );
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
@@ -285,22 +284,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            // Check for metaclass conflicts.
-            if let Err(DynamicMetaclassConflict {
-                metaclass1,
-                base1,
-                metaclass2,
-                base2,
-            }) = dynamic_class.try_metaclass(db)
-            {
-                report_conflicting_metaclass_from_bases(
+            // Check for metaclass errors.
+            if let Err(error) = dynamic_class.try_metaclass(db) {
+                report_dynamic_metaclass_error(
                     &self.context,
                     call_expr.into(),
                     dynamic_class.name(db),
-                    metaclass1,
-                    base1.display(db),
-                    metaclass2,
-                    base2.display(db),
+                    &error,
                 );
             }
         }

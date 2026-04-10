@@ -1,10 +1,9 @@
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{
-    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
-    dynamic_class_bases_argument,
+    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, dynamic_class_bases_argument,
 };
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
+    INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_dynamic_metaclass_error,
     report_instance_layout_conflict,
 };
 use crate::types::infer::builder::{
@@ -38,10 +37,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // We need at least the `name` argument.
         let no_positional_args = args.is_empty();
         if no_positional_args {
-            // Check if `name` is provided as a keyword argument.
-            let name_keyword = keywords.iter().find(|kw| kw.arg.as_deref() == Some("name"));
-
-            if name_keyword.is_none() {
+            if call_expr.arguments.find_keyword("name").is_none() {
                 // Infer all keyword values for side effects.
                 for keyword in keywords {
                     self.infer_expression(&keyword.value, TypeContext::default());
@@ -55,12 +51,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Find the arguments we treat specially while preserving normal call-binding diagnostics.
         let name_node = args.first().or_else(|| {
-            keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("name"))
-                .map(|kw| &kw.value)
+            call_expr
+                .arguments
+                .find_keyword("name")
+                .map(|keyword| &keyword.value)
         });
         let bases_arg = dynamic_class_bases_argument(&call_expr.arguments);
+        let kwds_arg = args.get(2).or_else(|| {
+            call_expr
+                .arguments
+                .find_keyword("kwds")
+                .map(|keyword| &keyword.value)
+        });
 
         self.validate_new_class_call_arguments(call_expr, name_node, bases_arg, definition);
 
@@ -132,20 +134,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `new_class()` doesn't accept a namespace dict, so members are always empty.
         // If `exec_body` is provided (and is not `None`), it can populate the namespace
         // dynamically, so we mark it as dynamic. Without `exec_body`, no members can be added.
-        //
-        // TODO: Model `kwds`, especially `{"metaclass": Meta}`. `types.new_class()` uses the
-        // third argument for explicit metaclass overrides, but we currently only account for
-        // metaclass behavior that follows from the resolved bases.
         let exec_body_arg = args.get(3).or_else(|| {
-            keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("exec_body"))
-                .map(|kw| &kw.value)
+            call_expr
+                .arguments
+                .find_keyword("exec_body")
+                .map(|keyword| &keyword.value)
         });
-        let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
+        let has_exec_body = exec_body_arg.is_some_and(|arg| !self.expression_type(arg).is_none(db));
+        let explicit_metaclass =
+            kwds_arg.and_then(|kwds_arg| self.extract_new_class_explicit_metaclass(kwds_arg));
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
-        let dynamic_class =
-            DynamicClassLiteral::new(db, name.clone(), anchor, members, has_exec_body, None);
+        let dynamic_class = DynamicClassLiteral::new(
+            db,
+            name.clone(),
+            anchor,
+            members,
+            has_exec_body,
+            explicit_metaclass,
+            None,
+        );
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
@@ -171,25 +178,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     );
                 }
             }
+        }
 
-            // Check for metaclass conflicts.
-            if let Err(DynamicMetaclassConflict {
-                metaclass1,
-                base1,
-                metaclass2,
-                base2,
-            }) = dynamic_class.try_metaclass(db)
-            {
-                report_conflicting_metaclass_from_bases(
-                    &self.context,
-                    call_expr.into(),
-                    dynamic_class.name(db),
-                    metaclass1,
-                    base1.display(db),
-                    metaclass2,
-                    base2.display(db),
-                );
-            }
+        // For dangling calls, check metaclass errors eagerly even when the bases can't be
+        // enumerated statically. Assigned calls are validated during deferred inference.
+        if definition.is_none()
+            && let Err(error) = dynamic_class.try_metaclass(db)
+        {
+            report_dynamic_metaclass_error(
+                &self.context,
+                call_expr.into(),
+                dynamic_class.name(db),
+                &error,
+            );
         }
 
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
@@ -282,5 +283,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if bindings_result.is_err() {
             bindings.report_diagnostics(&self.context, call_expr.into());
         }
+    }
+
+    fn extract_new_class_explicit_metaclass(&self, kwds_arg: &ast::Expr) -> Option<Type<'db>> {
+        let ast::Expr::Dict(dict) = kwds_arg else {
+            return None;
+        };
+
+        let db = self.db();
+
+        for item in dict.items.iter().rev() {
+            let key_expr = item.key.as_ref()?;
+            let key = self.expression_type(key_expr).as_string_literal()?;
+
+            if key.value(db) == "metaclass" {
+                return Some(self.expression_type(&item.value));
+            }
+        }
+
+        None
     }
 }

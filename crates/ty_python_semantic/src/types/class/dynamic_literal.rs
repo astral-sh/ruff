@@ -7,8 +7,9 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     semantic_index::{definition::Definition, scope::ScopeId},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass,
+        MemberLookupPolicy, SubclassOfType, Type,
+        call::{CallError, CallErrorKind},
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
@@ -72,6 +73,9 @@ pub struct DynamicClassLiteral<'db> {
     /// non-string-literal keys). When true, attribute lookups on this class
     /// and its instances return `Unknown` instead of failing.
     pub has_dynamic_namespace: bool,
+
+    /// The explicit metaclass override from `types.new_class(..., kwds=...)`, if known.
+    pub explicit_metaclass: Option<Type<'db>>,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
@@ -243,22 +247,51 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Try to get the metaclass of this dynamic class.
     ///
-    /// Returns `Err(DynamicMetaclassConflict)` if there's a metaclass conflict
-    /// (i.e., two base classes have metaclasses that are not in a subclass relationship).
+    /// Returns `Err(DynamicMetaclassError)` if a metaclass conflict occurs or an explicit
+    /// metaclass override is invalid.
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     pub(crate) fn try_metaclass(
         self,
         db: &'db dyn Db,
-    ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
+    ) -> Result<Type<'db>, DynamicMetaclassError<'db>> {
         let original_bases = self.explicit_bases(db);
+        let explicit_metaclass = self.explicit_metaclass(db);
 
-        // If no bases, metaclass is `type`.
-        // To dynamically create a class with no bases that has a custom metaclass,
-        // you have to invoke that metaclass rather than `type()`.
-        if original_bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+        if let Some(Type::GenericAlias(alias)) = explicit_metaclass
+            && alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.has_typevar_or_typevar_instance(db))
+        {
+            return Err(DynamicMetaclassError::GenericMetaclass);
         }
+
+        let resolve_explicit_metaclass = |metaclass: Type<'db>| {
+            if metaclass.to_class_type(db).is_some() {
+                return Ok(metaclass);
+            }
+
+            let name = Type::string_literal(db, self.name(db));
+            let bases = Type::heterogeneous_tuple(db, original_bases);
+            let namespace = KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
+
+            let return_ty = match metaclass.try_call(db, &arguments) {
+                Ok(bindings) => bindings.return_type(db),
+                Err(CallError(CallErrorKind::BindingError, bindings)) => bindings.return_type(db),
+                Err(CallError(CallErrorKind::NotCallable, bindings)) => {
+                    return Err(DynamicMetaclassError::NotCallable(bindings.callable_type()));
+                }
+                Err(CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                    return Err(DynamicMetaclassError::PartlyNotCallable(metaclass));
+                }
+            };
+
+            Ok(return_ty.to_meta_type(db))
+        };
 
         // If there's an MRO error, return unknown to avoid cascading errors.
         if self.try_mro(db).is_err() {
@@ -275,14 +308,36 @@ impl<'db> DynamicClassLiteral<'db> {
 
         // If all bases failed to convert, return type as the metaclass.
         if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return if let Some(metaclass) = explicit_metaclass {
+                resolve_explicit_metaclass(metaclass)
+            } else {
+                Ok(KnownClass::Type.to_class_literal(db))
+            };
         }
 
-        // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db);
-
-        // Track which base the candidate metaclass came from.
-        let (mut candidate_base, rest) = bases.split_first().unwrap();
+        // Track whether the class constructor had an explicit metaclass override.
+        // This is distinct from the current winning candidate's origin: a base metaclass can
+        // later replace the explicit metaclass as the running candidate, but we still want to
+        // report the conflict as involving the class's explicit metaclass override.
+        let (mut candidate, mut candidate_base, had_explicit_metaclass, rest) =
+            if let Some(metaclass) = explicit_metaclass {
+                (
+                    resolve_explicit_metaclass(metaclass)?,
+                    None,
+                    true,
+                    bases.as_slice(),
+                )
+            } else {
+                let (candidate_base, rest) = bases
+                    .split_first()
+                    .expect("non-empty bases should have a first base");
+                (
+                    candidate_base.metaclass(db),
+                    Some(*candidate_base),
+                    false,
+                    rest,
+                )
+            };
 
         // Reconcile with other bases' metaclasses.
         for base in rest {
@@ -300,7 +355,7 @@ impl<'db> DynamicClassLiteral<'db> {
             // If base's metaclass is more derived, use it.
             if base_metaclass_class.is_subclass_of(db, candidate_class) {
                 candidate = base_metaclass;
-                candidate_base = base;
+                candidate_base = Some(*base);
                 continue;
             }
 
@@ -311,12 +366,13 @@ impl<'db> DynamicClassLiteral<'db> {
 
             // Conflict: neither metaclass is a subclass of the other.
             // Python raises `TypeError: metaclass conflict` at runtime.
-            return Err(DynamicMetaclassConflict {
+            return Err(DynamicMetaclassError::Conflict(DynamicMetaclassConflict {
                 metaclass1: candidate_class,
-                base1: *candidate_base,
+                base1: candidate_base,
                 metaclass2: base_metaclass_class,
                 base2: *base,
-            });
+                had_explicit_metaclass,
+            }));
         }
 
         Ok(candidate)
@@ -483,6 +539,7 @@ impl<'db> DynamicClassLiteral<'db> {
             self.anchor(db).clone(),
             self.members(db),
             self.has_dynamic_namespace(db),
+            self.explicit_metaclass(db),
             dataclass_params,
         )
     }
@@ -495,10 +552,19 @@ impl<'db> DynamicClassLiteral<'db> {
 pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The first conflicting metaclass and its originating base class.
     pub(crate) metaclass1: ClassType<'db>,
-    pub(crate) base1: ClassBase<'db>,
+    pub(crate) base1: Option<ClassBase<'db>>,
     /// The second conflicting metaclass and its originating base class.
     pub(crate) metaclass2: ClassType<'db>,
     pub(crate) base2: ClassBase<'db>,
+    pub(crate) had_explicit_metaclass: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DynamicMetaclassError<'db> {
+    Conflict(DynamicMetaclassConflict<'db>),
+    GenericMetaclass,
+    NotCallable(Type<'db>),
+    PartlyNotCallable(Type<'db>),
 }
 
 #[expect(clippy::unnecessary_wraps)]
