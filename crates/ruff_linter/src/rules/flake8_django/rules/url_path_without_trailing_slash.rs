@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for DjangoURLPathWithoutTrailingSlash {
     }
 
     fn fix_title(&self) -> String {
-        "Add trailing slash".to_string()
+        "Add a trailing slash".to_string()
     }
 }
 

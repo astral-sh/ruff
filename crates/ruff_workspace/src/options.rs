@@ -1503,7 +1503,7 @@ impl Flake8CopyrightOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8DjangoOptions {
     /// Additional qualified paths to Django URL path functions beyond
-    /// the default `django.urls.path`. This allows the rule to check
+    /// the default `django.urls.path`. This allows the rules to check
     /// URL patterns defined using custom path functions or re-exported
     /// path functions from other modules.
     ///
