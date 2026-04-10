@@ -1,0 +1,67 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__new__` keyword arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Any
+2 | 
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+5 |         return super().__new__(mcs, name, bases, namespace)
+6 | 
+7 | class Valid(metaclass=Meta, required_arg=5): ...
+8 | class MissingArg(metaclass=Meta): ...  # error: [missing-argument]
+9 | class InvalidType(metaclass=Meta, required_arg="foo"): ...  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `required_arg` of function `__new__`
+ --> src/mdtest_snippet.py:8:1
+  |
+7 | class Valid(metaclass=Meta, required_arg=5): ...
+8 | class MissingArg(metaclass=Meta): ...  # error: [missing-argument]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+9 | class InvalidType(metaclass=Meta, required_arg="foo"): ...  # error: [invalid-argument-type]
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^^^^^
+5 |         return super().__new__(mcs, name, bases, namespace)
+  |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__new__` is incorrect
+ --> src/mdtest_snippet.py:9:35
+  |
+7 | class Valid(metaclass=Meta, required_arg=5): ...
+8 | class MissingArg(metaclass=Meta): ...  # error: [missing-argument]
+9 | class InvalidType(metaclass=Meta, required_arg="foo"): ...  # error: [invalid-argument-type]
+  |                                   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+  |         ^^^^^^^                                                                        ----------------- Parameter declared here
+5 |         return super().__new__(mcs, name, bases, namespace)
+  |
+
+```

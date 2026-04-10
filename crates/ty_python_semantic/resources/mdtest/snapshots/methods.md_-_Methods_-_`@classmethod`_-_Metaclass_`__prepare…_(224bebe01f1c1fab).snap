@@ -1,0 +1,50 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__prepare__` keyword arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class Meta(type):
+ 4 |     @classmethod
+ 5 |     def __prepare__(mcs, name: str, bases: tuple[type, ...], *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
+ 6 |         return {}
+ 7 | 
+ 8 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any):
+ 9 |         return super().__new__(mcs, name, bases, namespace)
+10 | 
+11 | class Valid(metaclass=Meta, prep_arg=5): ...
+12 | class InvalidType(metaclass=Meta, prep_arg="foo"): ...  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `__prepare__` is incorrect
+  --> src/mdtest_snippet.py:12:35
+   |
+11 | class Valid(metaclass=Meta, prep_arg=5): ...
+12 | class InvalidType(metaclass=Meta, prep_arg="foo"): ...  # error: [invalid-argument-type]
+   |                                   ^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+3 | class Meta(type):
+4 |     @classmethod
+5 |     def __prepare__(mcs, name: str, bases: tuple[type, ...], *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
+  |         ^^^^^^^^^^^                                             ----------------- Parameter declared here
+6 |         return {}
+  |
+
+```

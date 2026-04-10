@@ -6359,7 +6359,27 @@ pub(super) fn report_invalid_concatenate_last_arg<'db>(
     }
 }
 
-pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
+fn find_definition_in_mro<'db>(
+    db: &'db dyn Db,
+    member: &str,
+    mro: impl IntoIterator<Item = ClassBase<'db>>,
+) -> Option<(StaticClassLiteral<'db>, Definition<'db>)> {
+    mro.into_iter().find_map(|base| {
+        let class = base.into_class()?.class_literal(db).as_static()?;
+        let scope = class.body_scope(db);
+        let place_table = place_table(db, scope);
+        let symbol = place_table.symbol_id(member)?;
+        let use_def = use_def_map(db, scope);
+        let bindings = use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
+        let place_with_def = place_from_bindings(db, bindings);
+        if place_with_def.place.is_undefined() {
+            return None;
+        }
+        Some((class, place_with_def.first_definition?))
+    })
+}
+
+pub(super) fn report_invalid_init_subclass_call<'db>(
     context: &InferContext<'db, '_>,
     call_error: CallError<'db>,
     class: StaticClassLiteral<'db>,
@@ -6379,21 +6399,8 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
             let mut diagnostic =
                 builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
 
-            let class_and_def = class
-                .iter_mro(db, None)
-                .filter_map(|base| base.into_class()?.class_literal(db).as_static())
-                .find_map(|class| {
-                    let scope = class.body_scope(db);
-                    let place_table = place_table(db, scope);
-                    let symbol = place_table.symbol_id("__init_subclass__")?;
-                    let use_def = use_def_map(db, scope);
-                    let bindings = use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
-                    let place_with_def = place_from_bindings(db, bindings);
-                    if place_with_def.place.is_undefined() {
-                        return None;
-                    }
-                    Some((class, place_with_def.first_definition?))
-                });
+            let class_and_def =
+                find_definition_in_mro(db, "__init_subclass__", class.iter_mro(db, None).skip(1));
 
             if let Some((superclass, definition)) = class_and_def {
                 let superclass_name = superclass.name(db);
@@ -6454,6 +6461,111 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                 "See https://docs.python.org/3/reference/datamodel.html\
                 #customizing-class-creation",
             );
+        }
+        CallErrorKind::BindingError => {
+            bindings.report_diagnostics(context, class_node.into());
+        }
+    }
+}
+
+pub(super) fn report_invalid_dunder_prepare_call<'db>(
+    context: &InferContext<'db, '_>,
+    call_error: &CallError<'db>,
+    class: StaticClassLiteral<'db>,
+    metaclass: Type<'db>,
+    class_node: &ast::StmtClassDef,
+) {
+    let db = context.db();
+    let CallError(err_kind, bindings) = call_error;
+
+    match err_kind {
+        CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable => {
+            let range = class_node
+                .arguments
+                .as_deref()
+                .and_then(|args| args.find_keyword("metaclass"))
+                .map(Ranged::range)
+                .unwrap_or_else(|| class.header_range(db));
+
+            let Some(builder) = context.report_lint(&INVALID_METACLASS, range) else {
+                return;
+            };
+            let class_name = class.name(db);
+            let mut diagnostic =
+                builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
+
+            let class_and_def = metaclass.as_class_literal().and_then(|metaclass| {
+                find_definition_in_mro(db, "__prepare__", metaclass.iter_mro(db))
+            });
+
+            diagnostic
+                .set_primary_message("Class creation will fail at runtime due to its metaclass");
+            diagnostic.annotate(
+                Annotation::primary(Span::from(context.file()).with_range(range)).message(
+                    format_args!(
+                        "Metaclass `{}` has an invalid `__prepare__` definition",
+                        metaclass.display(db)
+                    ),
+                ),
+            );
+            diagnostic.set_concise_message(format_args!(
+                "Creation of class `{class_name}` will fail due \
+                to a metaclass with an invalid `__prepare__` definition"
+            ));
+
+            if let Some((_, definition)) = class_and_def {
+                let definition_module = parsed_module(db, definition.file(db));
+                let annotation = Annotation::secondary(Span::from(
+                    definition.focus_range(db, &definition_module.load(db)),
+                ))
+                .message("Metaclass `__prepare__` defined here");
+                diagnostic.annotate(annotation);
+            }
+
+            diagnostic.info(
+                "`__prepare__` on a class's metaclass is implicitly called \
+                during creation of the class object",
+            );
+            diagnostic.info(
+                "See https://docs.python.org/3/reference/datamodel.html\
+                #preparing-the-class-namespace",
+            );
+        }
+        CallErrorKind::BindingError => {
+            bindings.report_diagnostics(context, class_node.into());
+        }
+    }
+}
+
+pub(super) fn report_invalid_metaclass<'db>(
+    context: &InferContext<'db, '_>,
+    call_error: &CallError<'db>,
+    class: StaticClassLiteral<'db>,
+    metaclass: Type<'db>,
+    class_node: &ast::StmtClassDef,
+) {
+    let db = context.db();
+    let CallError(err_kind, bindings) = call_error;
+
+    match err_kind {
+        CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable => {
+            let range = class_node
+                .arguments
+                .as_deref()
+                .and_then(|args| args.find_keyword("metaclass"))
+                .map(Ranged::range)
+                .unwrap_or_else(|| class.header_range(db));
+
+            let Some(builder) = context.report_lint(&INVALID_METACLASS, range) else {
+                return;
+            };
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Metaclass of type `{}` is not callable",
+                metaclass.display(db)
+            ));
+            diagnostic
+                .info("A `class` statement leads to an implicit call to the class's metaclass");
+            diagnostic.info("See https://docs.python.org/3/reference/datamodel.html#metaclasses");
         }
         CallErrorKind::BindingError => {
             bindings.report_diagnostics(context, class_node.into());

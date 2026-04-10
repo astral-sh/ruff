@@ -1,0 +1,86 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass with a custom metaclass
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class MetaMeta(type):
+ 2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+ 3 |         return "foo"
+ 4 | 
+ 5 | class Meta(type, metaclass=MetaMeta): ...
+ 6 | 
+ 7 | # error: [missing-argument] "No argument provided for required parameter `meta_meta_arg` of bound method `__call__`"
+ 8 | class Bad(metaclass=Meta): ...
+ 9 | 
+10 | # TODO: should be `str` because of the return type of `MetaMeta.__call__`
+11 | reveal_type(Bad)  # revealed: <class 'Bad'>
+12 | 
+13 | class Good(metaclass=Meta, meta_meta_arg=42): ...
+14 | class InitSubclassBase(metaclass=Meta, meta_meta_arg=42):
+15 |     def __init_subclass__(cls, required_arg: int): ...
+16 | 
+17 | class InitSubclassNotCheckedHere(InitSubclassBase, metaclass=Meta, meta_meta_arg=42): ...
+18 | class LessFancyMetaMeta(type): ...
+19 | class LessFancyMeta(type, metaclass=LessFancyMetaMeta): ...
+20 | 
+21 | class WithInitSubclass(metaclass=LessFancyMeta):
+22 |     def __init_subclass__(cls, arg: int): ...
+23 | 
+24 | # error: [missing-argument] "No argument provided for required parameter `arg` of function `__init_subclass__`"
+25 | class Bad(WithInitSubclass): ...
+26 | class Good(WithInitSubclass, arg=42): ...
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `meta_meta_arg` of bound method `__call__`
+  --> src/mdtest_snippet.py:8:1
+   |
+ 7 | # error: [missing-argument] "No argument provided for required parameter `meta_meta_arg` of bound method `__call__`"
+ 8 | class Bad(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | # TODO: should be `str` because of the return type of `MetaMeta.__call__`
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:34
+  |
+1 | class MetaMeta(type):
+2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+  |                                  ^^^^^^^^^^^^^^^^^^
+3 |         return "foo"
+  |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
+  --> src/mdtest_snippet.py:25:1
+   |
+24 | # error: [missing-argument] "No argument provided for required parameter `arg` of function `__init_subclass__`"
+25 | class Bad(WithInitSubclass): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 | class Good(WithInitSubclass, arg=42): ...
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:22:32
+   |
+21 | class WithInitSubclass(metaclass=LessFancyMeta):
+22 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+23 |
+24 | # error: [missing-argument] "No argument provided for required parameter `arg` of function `__init_subclass__`"
+   |
+
+```

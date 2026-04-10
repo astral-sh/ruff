@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/metaclass.md
 # Diagnostics
 
 ```
-error[invalid-metaclass]: Metaclass type `int` is not callable
+error[invalid-metaclass]: Metaclass of type `int` is not callable
  --> src/mdtest_snippet.py:3:13
   |
 1 | def _(n: int):
@@ -33,5 +33,7 @@ error[invalid-metaclass]: Metaclass type `int` is not callable
 4 |         x = 1
 5 |         y = 2
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```

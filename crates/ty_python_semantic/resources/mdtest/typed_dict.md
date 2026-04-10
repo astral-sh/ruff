@@ -3354,6 +3354,7 @@ class TypedDict:
     def __init__(self):
         pass
 
+# error: [unknown-argument] "Argument `total` does not match any known parameter of function `__init_subclass__`"
 class NotActualTypedDict(TypedDict, total=True):
     name: str
 

@@ -1,0 +1,53 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__new__` with incompatible namespace type from `__prepare__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class MyNamespace(dict[str, Any]):
+ 4 |     pass
+ 5 | 
+ 6 | class Meta(type):
+ 7 |     @classmethod
+ 8 |     def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> dict[str, Any]:
+ 9 |         return {}
+10 | 
+11 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
+12 |         return super().__new__(mcs, name, bases, namespace)
+13 | 
+14 | class Foo(metaclass=Meta): ...  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `__new__` is incorrect
+  --> src/mdtest_snippet.py:14:10
+   |
+12 |         return super().__new__(mcs, name, bases, namespace)
+13 |
+14 | class Foo(metaclass=Meta): ...  # error: [invalid-argument-type]
+   |          ^^^^^^^^^^^^^^^^ Expected `MyNamespace`, found `dict[str, Any]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:11:9
+   |
+ 9 |         return {}
+10 |
+11 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
+   |         ^^^^^^^                                          ---------------------- Parameter declared here
+12 |         return super().__new__(mcs, name, bases, namespace)
+   |
+
+```

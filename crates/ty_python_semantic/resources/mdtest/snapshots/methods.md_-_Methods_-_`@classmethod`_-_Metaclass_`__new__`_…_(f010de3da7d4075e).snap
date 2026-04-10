@@ -1,0 +1,98 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__new__` takes priority over `__init_subclass__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class Meta(type):
+ 4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+ 5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
+ 6 | 
+ 7 | class Base:
+ 8 |     def __init_subclass__(cls, sub_arg: str): ...
+ 9 | 
+10 | # `meta_arg` is checked against `Meta.__new__`, not `Base.__init_subclass__`
+11 | class Valid(Base, meta_arg=5, metaclass=Meta): ...
+12 | class MissingArg(Base, metaclass=Meta): ...  # error: [missing-argument]
+13 | class InvalidType(Base, meta_arg="foo", metaclass=Meta): ...  # error: [invalid-argument-type]
+14 | 
+15 | # error: [missing-argument]
+16 | class Invalid2(metaclass=Meta):
+17 |     def __init_subclass__(cls, sub_arg: str): ...
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `meta_arg` of function `__new__`
+  --> src/mdtest_snippet.py:12:1
+   |
+10 | # `meta_arg` is checked against `Meta.__new__`, not `Base.__init_subclass__`
+11 | class Valid(Base, meta_arg=5, metaclass=Meta): ...
+12 | class MissingArg(Base, metaclass=Meta): ...  # error: [missing-argument]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 | class InvalidType(Base, meta_arg="foo", metaclass=Meta): ...  # error: [invalid-argument-type]
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^
+5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
+  |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__new__` is incorrect
+  --> src/mdtest_snippet.py:13:25
+   |
+11 | class Valid(Base, meta_arg=5, metaclass=Meta): ...
+12 | class MissingArg(Base, metaclass=Meta): ...  # error: [missing-argument]
+13 | class InvalidType(Base, meta_arg="foo", metaclass=Meta): ...  # error: [invalid-argument-type]
+   |                         ^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+14 |
+15 | # error: [missing-argument]
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |         ^^^^^^^                                                                        ------------- Parameter declared here
+5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
+  |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `meta_arg` of function `__new__`
+  --> src/mdtest_snippet.py:16:1
+   |
+15 | # error: [missing-argument]
+16 | class Invalid2(metaclass=Meta):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |     def __init_subclass__(cls, sub_arg: str): ...
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+3 | class Meta(type):
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^
+5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
+  |
+
+```

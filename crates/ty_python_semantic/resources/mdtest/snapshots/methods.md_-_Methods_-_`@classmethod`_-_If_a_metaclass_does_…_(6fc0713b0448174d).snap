@@ -1,0 +1,186 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - If a metaclass does not override `__new__`, we still check `__init_subclass__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Meta(type):
+ 2 |     pass
+ 3 | 
+ 4 | class Base(metaclass=Meta):
+ 5 |     def __init_subclass__(cls, arg: int): ...
+ 6 | 
+ 7 | class Valid(Base, arg=5): ...
+ 8 | class MissingArg(Base): ...  # error: [missing-argument]
+ 9 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+10 | class Meta2(type):
+11 |     def __init__(cls, *args, **kwargs): ...
+12 | 
+13 | class Base(metaclass=Meta2):
+14 |     def __init_subclass__(cls, arg: int): ...
+15 | 
+16 | class Valid(Base, arg=5): ...
+17 | class MissingArg(Base): ...  # error: [missing-argument]
+18 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+19 | 
+20 | class MetaclassWithFancyInit(type):
+21 |     def __init__(cls, *args, metaclass_arg: int, **kwargs): ...
+22 | 
+23 | # `object.__init_subclass__` is called before `MetaclassWithFancyInit.__init__` here, so this is an...
+24 | #
+25 | # error: [unknown-argument] "Argument `metaclass_arg` does not match any known parameter of function `__init_subclass__`"
+26 | class Base2(metaclass=MetaclassWithFancyInit, metaclass_arg=42):
+27 |     def __init_subclass__(cls, init_subclass_arg: int): ...
+28 | 
+29 | class Base3:
+30 |     def __init_subclass__(cls, *args, **kwargs): ...
+31 | 
+32 | # In this situation, the permissive signature of `Base3.__init_subclass__` allows
+33 | # the `metaclass_arg` argument to be passed unhindered to the metaclass `__init__` method
+34 | class Fine(Base3, metaclass=MetaclassWithFancyInit, metaclass_arg=42): ...
+35 | 
+36 | # error: [missing-argument] "No argument provided for required parameter `metaclass_arg` of bound method `__init__`"
+37 | class NotGood(Base3, metaclass=MetaclassWithFancyInit): ...
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
+  --> src/mdtest_snippet.py:8:1
+   |
+ 7 | class Valid(Base, arg=5): ...
+ 8 | class MissingArg(Base): ...  # error: [missing-argument]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+ 9 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+10 | class Meta2(type):
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:32
+  |
+4 | class Base(metaclass=Meta):
+5 |     def __init_subclass__(cls, arg: int): ...
+  |                                ^^^^^^^^
+6 |
+7 | class Valid(Base, arg=5): ...
+  |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:9:25
+   |
+ 7 | class Valid(Base, arg=5): ...
+ 8 | class MissingArg(Base): ...  # error: [missing-argument]
+ 9 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+   |                         ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+10 | class Meta2(type):
+11 |     def __init__(cls, *args, **kwargs): ...
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+4 | class Base(metaclass=Meta):
+5 |     def __init_subclass__(cls, arg: int): ...
+  |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+6 |
+7 | class Valid(Base, arg=5): ...
+  |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
+  --> src/mdtest_snippet.py:17:1
+   |
+16 | class Valid(Base, arg=5): ...
+17 | class MissingArg(Base): ...  # error: [missing-argument]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+18 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:14:32
+   |
+13 | class Base(metaclass=Meta2):
+14 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+15 |
+16 | class Valid(Base, arg=5): ...
+   |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:18:25
+   |
+16 | class Valid(Base, arg=5): ...
+17 | class MissingArg(Base): ...  # error: [missing-argument]
+18 | class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+   |                         ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+19 |
+20 | class MetaclassWithFancyInit(type):
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:14:9
+   |
+13 | class Base(metaclass=Meta2):
+14 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+15 |
+16 | class Valid(Base, arg=5): ...
+   |
+
+```
+
+```
+error[unknown-argument]: Argument `metaclass_arg` does not match any known parameter of function `__init_subclass__`
+  --> src/mdtest_snippet.py:26:47
+   |
+24 | #
+25 | # error: [unknown-argument] "Argument `metaclass_arg` does not match any known parameter of function `__init_subclass__`"
+26 | class Base2(metaclass=MetaclassWithFancyInit, metaclass_arg=42):
+   |                                               ^^^^^^^^^^^^^^^^
+27 |     def __init_subclass__(cls, init_subclass_arg: int): ...
+   |
+info: Function signature here
+   --> stdlib/builtins.pyi:158:9
+    |
+157 |     def __dir__(self) -> Iterable[str]: ...
+158 |     def __init_subclass__(cls) -> None: ...
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+159 |     @classmethod
+160 |     def __subclasshook__(cls, subclass: type, /) -> bool: ...
+    |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `metaclass_arg` of bound method `__init__`
+  --> src/mdtest_snippet.py:37:1
+   |
+36 | # error: [missing-argument] "No argument provided for required parameter `metaclass_arg` of bound method `__init__`"
+37 | class NotGood(Base3, metaclass=MetaclassWithFancyInit): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:21:30
+   |
+20 | class MetaclassWithFancyInit(type):
+21 |     def __init__(cls, *args, metaclass_arg: int, **kwargs): ...
+   |                              ^^^^^^^^^^^^^^^^^^
+22 |
+23 | # `object.__init_subclass__` is called before `MetaclassWithFancyInit.__init__` here, so this is an...
+   |
+
+```

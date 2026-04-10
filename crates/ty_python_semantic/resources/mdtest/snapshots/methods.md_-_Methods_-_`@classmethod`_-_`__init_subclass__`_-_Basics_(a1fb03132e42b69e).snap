@@ -62,27 +62,34 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
 47 | 
 48 | class Valid(Base, arg=5, metaclass=object): ...
 49 | 
-50 | # error: [invalid-argument-type]
-51 | class Invalid(Base, metaclass=type, arg="foo"): ...
-52 | from typing import Literal, overload
-53 | 
-54 | class Base:
-55 |     @overload
-56 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-59 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+50 | # Despite the explicit `metaclass=object` call,
+51 | # the metaclass of this class is `type`, because that is
+52 | # the metaclass of its superclass `object`, and `type`
+53 | # (metaclass of superclass) is a subclass of `object`
+54 | # (explicit `metaclass=` argument in this class statement).
+55 | reveal_type(Valid.__class__)  # revealed: <class 'type'>
+56 | 
+57 | # error: [invalid-argument-type]
+58 | class Invalid(Base, metaclass=type, arg="foo"): ...
+59 | from typing import Literal, overload
 60 | 
-61 | class Valid(Base, mode="a", arg=5): ...
-62 | class Valid(Base, mode="b", arg="foo"): ...
-63 | 
-64 | # error: [no-matching-overload]
-65 | class InvalidType(Base, mode="b", arg=5):
-66 |     a = 1
-67 |     b = 2
-68 |     c = 3
-69 |     d = 4
-70 |     e = 5
+61 | class Base:
+62 |     @overload
+63 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+64 |     @overload
+65 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+66 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+67 | 
+68 | class Valid(Base, mode="a", arg=5): ...
+69 | class Valid(Base, mode="b", arg="foo"): ...
+70 | 
+71 | # error: [no-matching-overload]
+72 | class InvalidType(Base, mode="b", arg=5):
+73 |     a = 1
+74 |     b = 2
+75 |     c = 3
+76 |     d = 4
+77 |     e = 5
 ```
 
 # Diagnostics
@@ -198,12 +205,12 @@ info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-c
 
 ```
 error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
-  --> src/mdtest_snippet.py:51:37
+  --> src/mdtest_snippet.py:58:37
    |
-50 | # error: [invalid-argument-type]
-51 | class Invalid(Base, metaclass=type, arg="foo"): ...
+57 | # error: [invalid-argument-type]
+58 | class Invalid(Base, metaclass=type, arg="foo"): ...
    |                                     ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-52 | from typing import Literal, overload
+59 | from typing import Literal, overload
    |
 info: Function defined here
   --> src/mdtest_snippet.py:46:9
@@ -220,36 +227,36 @@ info: Function defined here
 
 ```
 error[no-matching-overload]: No overload of function `__init_subclass__` matches arguments
-  --> src/mdtest_snippet.py:65:1
+  --> src/mdtest_snippet.py:72:1
    |
-64 | # error: [no-matching-overload]
-65 | class InvalidType(Base, mode="b", arg=5):
+71 | # error: [no-matching-overload]
+72 | class InvalidType(Base, mode="b", arg=5):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 |     a = 1
-67 |     b = 2
+73 |     a = 1
+74 |     b = 2
    |
 info: First overload defined here
-  --> src/mdtest_snippet.py:56:9
+  --> src/mdtest_snippet.py:63:9
    |
-54 | class Base:
-55 |     @overload
-56 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+61 | class Base:
+62 |     @overload
+63 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+64 |     @overload
+65 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
    |
 info: Possible overloads for function `__init_subclass__`:
 info:   (cls, mode: Literal["a"], arg: int) -> None
 info:   (cls, mode: Literal["b"], arg: str) -> None
 info: Overload implementation defined here
-  --> src/mdtest_snippet.py:59:9
+  --> src/mdtest_snippet.py:66:9
    |
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-59 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+64 |     @overload
+65 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+66 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-60 |
-61 | class Valid(Base, mode="a", arg=5): ...
+67 |
+68 | class Valid(Base, mode="a", arg=5): ...
    |
 
 ```

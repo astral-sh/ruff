@@ -2597,10 +2597,6 @@ pub(super) enum MetaclassErrorKind<'db> {
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
-    /// The metaclass is not callable
-    NotCallable(Type<'db>),
-    /// The metaclass is of a union type whose some members are not callable
-    PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
 }

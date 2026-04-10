@@ -557,9 +557,10 @@ arguments as `type.__new__`) isn't a valid metaclass.
 
 ```py
 class M: ...
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 4"
 class A(metaclass=M): ...
 
-# TODO: emit a diagnostic for the invalid metaclass
 reveal_type(A.__class__)  # revealed: <class 'M'>
 ```
 
@@ -715,14 +716,14 @@ class A(metaclass=f): ...
 
 # TODO: Should be `int`
 reveal_type(A)  # revealed: <class 'A'>
-reveal_type(A.__class__)  # revealed: type[int]
+reveal_type(A.__class__)  # revealed: Unknown
 
 def _(n: int):
     # error: [invalid-metaclass]
     class B(metaclass=n): ...
     # TODO: Should be `Unknown`
     reveal_type(B)  # revealed: <class 'B'>
-    reveal_type(B.__class__)  # revealed: type[Unknown]
+    reveal_type(B.__class__)  # revealed: Unknown
 
 def _(flag: bool):
     m = f if flag else 42
@@ -731,17 +732,23 @@ def _(flag: bool):
     class C(metaclass=m): ...
     # TODO: Should be `int | Unknown`
     reveal_type(C)  # revealed: <class 'C'>
-    reveal_type(C.__class__)  # revealed: type[Unknown]
+    reveal_type(C.__class__)  # revealed: Unknown
 
 class SignatureMismatch: ...
 
-# TODO: Emit a diagnostic
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 4"
 class D(metaclass=SignatureMismatch): ...
 
 # TODO: Should be `Unknown`
 reveal_type(D)  # revealed: <class 'D'>
 # TODO: Should be `type[Unknown]`
 reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
+
+# This is fine
+class E(metaclass=print): ...
+
+# TODO: should be `None`
+reveal_type(E)  # revealed: <class 'E'>
 ```
 
 ## Diagnostic range

@@ -175,7 +175,8 @@ Any()  # error: [call-non-callable] "Object of type `<special-form 'typing.Any'>
 `Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):
 
 ```py
-class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `<special-form 'typing.Any'>` is not callable"
+# TODO: ideally, we would emit an error here
+class F(metaclass=Any): ...
 ```
 
 And `Any` cannot be used in `isinstance()` checks:

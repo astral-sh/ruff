@@ -1,0 +1,84 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__new__` expects a fixed-length tuple of bases
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class Meta(type):
+ 4 |     def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+ 5 | 
+ 6 | class A: ...
+ 7 | class B: ...
+ 8 | 
+ 9 | # This errors because a `bases` tuple of length 0 was passed to metaclass `__new__`
+10 | #
+11 | # error: [invalid-argument-type]
+12 | class Bad1(metaclass=Meta): ...
+13 | 
+14 | # This errors because a `bases` tuple of length 1 was passed to metaclass `__new__`
+15 | #
+16 | # error: [invalid-argument-type]
+17 | class Bad2(A, metaclass=Meta): ...
+18 | 
+19 | # This succeeds
+20 | class Good(A, B, metaclass=Meta): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `__new__` is incorrect
+  --> src/mdtest_snippet.py:12:11
+   |
+10 | #
+11 | # error: [invalid-argument-type]
+12 | class Bad1(metaclass=Meta): ...
+   |           ^^^^^^^^^^^^^^^^ Expected `tuple[type, type]`, found `tuple[()]`
+13 |
+14 | # This errors because a `bases` tuple of length 1 was passed to metaclass `__new__`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Meta(type):
+4 |     def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+  |         ^^^^^^^                     ------------------------ Parameter declared here
+5 |
+6 | class A: ...
+  |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `__new__` is incorrect
+  --> src/mdtest_snippet.py:17:11
+   |
+15 | #
+16 | # error: [invalid-argument-type]
+17 | class Bad2(A, metaclass=Meta): ...
+   |           ^^^^^^^^^^^^^^^^^^^ Expected `tuple[type, type]`, found `tuple[type]`
+18 |
+19 | # This succeeds
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Meta(type):
+4 |     def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+  |         ^^^^^^^                     ------------------------ Parameter declared here
+5 |
+6 | class A: ...
+  |
+
+```

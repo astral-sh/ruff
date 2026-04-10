@@ -1,0 +1,114 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass with a custom `__new__` method and a custom meta-metaclass
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class MetaMeta(type):
+ 2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+ 3 |         return "foo"
+ 4 | 
+ 5 | class Meta(type, metaclass=MetaMeta):
+ 6 |     def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+ 7 | 
+ 8 | # error: [missing-argument] "No argument provided for required parameter `meta_meta_arg` of bound method `__call__`"
+ 9 | class Bad(metaclass=Meta): ...
+10 | 
+11 | # `Meta.__new__` is not checked because `MetaMeta.__call__` returns `str`,
+12 | # so no diagnostic is emitted here
+13 | class Fine(metaclass=Meta, meta_meta_arg=42): ...
+14 | 
+15 | class MetaMeta2(type):
+16 |     def __call__(metacls, *args, **kwargs) -> "Meta2":
+17 |         return type.__call__(metacls, *args, **kwargs)
+18 | 
+19 | class Meta2(type, metaclass=MetaMeta2):
+20 |     def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+21 | 
+22 | # error: [missing-argument] "No argument provided for required parameter `meta_arg` of function `__new__`"
+23 | class AlsoBad(metaclass=Meta2): ...
+24 | 
+25 | class MetaMeta3(type):
+26 |     def __call__(metacls, *args, **kwargs) -> "Meta3":
+27 |         return type.__call__(metacls, *args, **kwargs)
+28 | 
+29 | class Meta3(type, metaclass=MetaMeta3):
+30 |     def __init__(cls, *args, init_arg: int, **kwargs): ...
+31 | 
+32 | # error: [missing-argument] "No argument provided for required parameter `init_arg` of bound method `__init__`"
+33 | class AlsoFine(metaclass=Meta3): ...
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `meta_meta_arg` of bound method `__call__`
+  --> src/mdtest_snippet.py:9:1
+   |
+ 8 | # error: [missing-argument] "No argument provided for required parameter `meta_meta_arg` of bound method `__call__`"
+ 9 | class Bad(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | # `Meta.__new__` is not checked because `MetaMeta.__call__` returns `str`,
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:34
+  |
+1 | class MetaMeta(type):
+2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+  |                                  ^^^^^^^^^^^^^^^^^^
+3 |         return "foo"
+  |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `meta_arg` of function `__new__`
+  --> src/mdtest_snippet.py:23:1
+   |
+22 | # error: [missing-argument] "No argument provided for required parameter `meta_arg` of function `__new__`"
+23 | class AlsoBad(metaclass=Meta2): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 |
+25 | class MetaMeta3(type):
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:20:33
+   |
+19 | class Meta2(type, metaclass=MetaMeta2):
+20 |     def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+   |                                 ^^^^^^^^^^^^^
+21 |
+22 | # error: [missing-argument] "No argument provided for required parameter `meta_arg` of function `__new__`"
+   |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `init_arg` of bound method `__init__`
+  --> src/mdtest_snippet.py:33:1
+   |
+32 | # error: [missing-argument] "No argument provided for required parameter `init_arg` of bound method `__init__`"
+33 | class AlsoFine(metaclass=Meta3): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:30:30
+   |
+29 | class Meta3(type, metaclass=MetaMeta3):
+30 |     def __init__(cls, *args, init_arg: int, **kwargs): ...
+   |                              ^^^^^^^^^^^^^
+31 |
+32 | # error: [missing-argument] "No argument provided for required parameter `init_arg` of bound method `__init__`"
+   |
+
+```

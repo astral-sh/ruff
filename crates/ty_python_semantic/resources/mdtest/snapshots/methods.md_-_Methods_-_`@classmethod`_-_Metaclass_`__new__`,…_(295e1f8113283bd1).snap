@@ -1,0 +1,108 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - Metaclass `__new__`, `__init__` and `__prepare__` all defined
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class Meta(type):
+ 4 |     @classmethod
+ 5 |     def __prepare__(  # error: [invalid-method-override]
+ 6 |         mcs, name: str, bases: tuple[type, ...], prepare_arg: int, **kwargs: Any
+ 7 |     ) -> dict[str, Any]:
+ 8 |         return {}
+ 9 | 
+10 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], dunder_new_arg: int, **kwargs: Any):
+11 |         return super().__new__(mcs, name, bases, namespace)
+12 | 
+13 |     # TODO: we could complain here that `__init__` has an incompatible signature with `__new__`
+14 |     def __init__(cls, *args, init_arg: int): ...
+15 | 
+16 | # Implicit calls to metaclass constructors work the same way as explicit "regular" constructor calls.
+17 | # We do not complain about the missing argument to the metaclass `__init__` method here:
+18 | # it'll never get called because of the missing argument to the metaclass `__new__` method
+19 | #
+20 | # error: [missing-argument] "No argument provided for required parameter `prepare_arg` of bound method `__prepare__`"
+21 | # error: [missing-argument] "No argument provided for required parameter `dunder_new_arg` of function `__new__`"
+22 | class Foo(metaclass=Meta): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `__prepare__`
+   --> src/mdtest_snippet.py:5:9
+    |
+  3 |   class Meta(type):
+  4 |       @classmethod
+  5 |       def __prepare__(  # error: [invalid-method-override]
+    |  _________^
+  6 | |         mcs, name: str, bases: tuple[type, ...], prepare_arg: int, **kwargs: Any
+  7 | |     ) -> dict[str, Any]:
+    | |_______________________^ Definition is incompatible with `type.__prepare__`
+  8 |           return {}
+    |
+   ::: stdlib/builtins.pyi:303:9
+    |
+302 |       @classmethod
+303 |       def __prepare__(metacls, name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]:
+    |           ------------------------------------------------------------------------------------------------------- `type.__prepare__` defined here
+304 |           """Create the namespace for the class statement"""
+305 |       if sys.version_info >= (3, 10):
+    |
+info: This violates the Liskov Substitution Principle
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `prepare_arg` of bound method `__prepare__`
+  --> src/mdtest_snippet.py:22:1
+   |
+20 | # error: [missing-argument] "No argument provided for required parameter `prepare_arg` of bound method `__prepare__`"
+21 | # error: [missing-argument] "No argument provided for required parameter `dunder_new_arg` of function `__new__`"
+22 | class Foo(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:6:50
+  |
+4 |     @classmethod
+5 |     def __prepare__(  # error: [invalid-method-override]
+6 |         mcs, name: str, bases: tuple[type, ...], prepare_arg: int, **kwargs: Any
+  |                                                  ^^^^^^^^^^^^^^^^
+7 |     ) -> dict[str, Any]:
+8 |         return {}
+  |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `dunder_new_arg` of function `__new__`
+  --> src/mdtest_snippet.py:22:1
+   |
+20 | # error: [missing-argument] "No argument provided for required parameter `prepare_arg` of bound method `__prepare__`"
+21 | # error: [missing-argument] "No argument provided for required parameter `dunder_new_arg` of function `__new__`"
+22 | class Foo(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:10:85
+   |
+ 8 |         return {}
+ 9 |
+10 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], dunder_new_arg: int, **kwargs: Any):
+   |                                                                                     ^^^^^^^^^^^^^^^^^^^
+11 |         return super().__new__(mcs, name, bases, namespace)
+   |
+
+```

@@ -1008,7 +1008,7 @@ object first, i.e. on the metaclass:
 ```py
 from typing import Literal
 
-class Meta1:
+class Meta1(type):
     attr: Literal["metaclass value"] = "metaclass value"
 
 class C1(metaclass=Meta1): ...
@@ -1021,7 +1021,7 @@ descriptor. If it is a non-data descriptor or a normal attribute, the class-leve
 instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
 
 ```py
-class Meta2:
+class Meta2(type):
     attr: str = "metaclass value"
 
 class C2(metaclass=Meta2):
@@ -1035,7 +1035,7 @@ class-level attribute:
 
 ```py
 def _(flag: bool):
-    class Meta3:
+    class Meta3(type):
         attr1 = "metaclass value"
         attr2: Literal["metaclass value"] = "metaclass value"
 
@@ -1054,7 +1054,7 @@ diagnostic:
 
 ```py
 def _(flag: bool):
-    class Meta4:
+    class Meta4(type):
         if flag:
             attr1: str = "metaclass value"
 
@@ -1068,7 +1068,7 @@ we union them and emit a `possibly-missing-attribute` diagnostic:
 
 ```py
 def _(flag1: bool, flag2: bool):
-    class Meta5:
+    class Meta5(type):
         if flag1:
             attr1 = "metaclass value"
 
@@ -1269,6 +1269,7 @@ def _(flag: bool):
             y: int | str = "f"
 
     class C3(metaclass=Meta3): ...
+    reveal_type(C3.__class__)  # revealed: <class 'Meta3'> | <class 'Meta3'>
     reveal_type(C3.x)  # revealed: int | str
     reveal_type(C3.y)  # revealed: int | str
 

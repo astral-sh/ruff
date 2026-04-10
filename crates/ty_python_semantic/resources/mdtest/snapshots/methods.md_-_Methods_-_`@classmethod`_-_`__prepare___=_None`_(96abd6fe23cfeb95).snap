@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: methods.md - Methods - `@classmethod` - `__prepare__ = None`
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Meta(type):
+2 |     __prepare__ = None
+3 | 
+4 | # error: [invalid-metaclass] "Creation of class `Foo` will fail due to a metaclass with an invalid `__prepare__` definition"
+5 | class Foo(metaclass=Meta): ...
+6 | class MetaSub(Meta): ...
+7 | 
+8 | # error: [invalid-metaclass]
+9 | class Bar(Foo, metaclass=MetaSub): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-metaclass]: Invalid definition of class `Foo`
+ --> src/mdtest_snippet.py:2:5
+  |
+1 | class Meta(type):
+2 |     __prepare__ = None
+  |     ----------- Metaclass `__prepare__` defined here
+3 |
+4 | # error: [invalid-metaclass] "Creation of class `Foo` will fail due to a metaclass with an invalid `__prepare__` definition"
+5 | class Foo(metaclass=Meta): ...
+  |           ^^^^^^^^^^^^^^
+  |           |
+  |           Class creation will fail at runtime due to its metaclass
+  |           Metaclass `<class 'Meta'>` has an invalid `__prepare__` definition
+6 | class MetaSub(Meta): ...
+  |
+info: `__prepare__` on a class's metaclass is implicitly called during creation of the class object
+info: See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
+
+```
+
+```
+error[invalid-metaclass]: Invalid definition of class `Bar`
+ --> src/mdtest_snippet.py:9:16
+  |
+8 | # error: [invalid-metaclass]
+9 | class Bar(Foo, metaclass=MetaSub): ...
+  |                ^^^^^^^^^^^^^^^^^
+  |                |
+  |                Class creation will fail at runtime due to its metaclass
+  |                Metaclass `<class 'MetaSub'>` has an invalid `__prepare__` definition
+  |
+ ::: src/mdtest_snippet.py:2:5
+  |
+1 | class Meta(type):
+2 |     __prepare__ = None
+  |     ----------- Metaclass `__prepare__` defined here
+3 |
+4 | # error: [invalid-metaclass] "Creation of class `Foo` will fail due to a metaclass with an invalid `__prepare__` definition"
+  |
+info: `__prepare__` on a class's metaclass is implicitly called during creation of the class object
+info: See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
+
+```
