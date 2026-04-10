@@ -29,8 +29,11 @@ use crate::{Locator, Violation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
+    /// # ruff:disable[...] start of a block suppression
     Disable,
+    /// # ruff:enable[...] end of a block suppression
     Enable,
+    /// # ruff:ignore[...] ignore a single line or multi-line statement
     Ignore,
 }
 
@@ -102,23 +105,23 @@ impl Suppression {
 
 #[derive(Debug)]
 pub(crate) enum SuppressionComments {
-    /// A standalone comment
+    /// A #ruff:ignore comment, or #ruff:disable without a matching #ruff:enable
     Single(SuppressionComment),
-    /// A matching pair of comments.
-    Pair(SuppressionComment, SuppressionComment),
+    /// A matching pair of #ruff:disable and #ruff:enable comments.
+    DisableEnable(SuppressionComment, SuppressionComment),
 }
 
 impl SuppressionComments {
     pub(crate) fn first(&self) -> &SuppressionComment {
         match self {
             SuppressionComments::Single(comment) => comment,
-            SuppressionComments::Pair(comment, _) => comment,
+            SuppressionComments::DisableEnable(comment, _) => comment,
         }
     }
     pub(crate) fn second(&self) -> Option<&SuppressionComment> {
         match self {
             SuppressionComments::Single(_) => None,
-            SuppressionComments::Pair(_, comment) => Some(comment),
+            SuppressionComments::DisableEnable(_, comment) => Some(comment),
         }
     }
 }
@@ -298,7 +301,8 @@ impl Suppressions {
         let mut unmatched_ranges = FxHashSet::default();
 
         for suppression in &self.valid {
-            let key = suppression.comments.first().range;
+            let first_comment = suppression.comments.first();
+            let key = first_comment.range;
 
             if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
             {
@@ -324,9 +328,7 @@ impl Suppressions {
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
 
                 if context.is_rule_enabled(rule) {
-                    if suppression
-                        .comments
-                        .first()
+                    if first_comment
                         .codes_as_str(locator.contents())
                         .filter(|code| *code == code_str)
                         .count()
@@ -339,7 +341,13 @@ impl Suppressions {
                 } else {
                     group.disabled_codes.push(code_str);
                 }
-            } else if let SuppressionComments::Single(comment) = &suppression.comments {
+            } else if let SuppressionComments::Single(
+                comment @ SuppressionComment {
+                    action: SuppressionAction::Disable,
+                    ..
+                },
+            ) = &suppression.comments
+            {
                 // UnmatchedSuppressionComment
                 if unmatched_ranges.insert(comment.range) {
                     context.report_diagnostic_if_enabled(
@@ -670,7 +678,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: combined_range,
-                        comments: SuppressionComments::Pair(
+                        comments: SuppressionComments::DisableEnable(
                             comment.comment.clone(),
                             other.comment.clone(),
                         ),
