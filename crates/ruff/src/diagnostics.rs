@@ -1,5 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use ruff_python_ast::script::ScriptTag;
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::pyproject::parse_script_metadata;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io;
@@ -245,6 +248,20 @@ pub(crate) fn lint_path(
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
         }
+    };
+
+    let settings = match source_kind {
+        SourceKind::Python { ref code, is_stub } if !is_stub => {
+            if let Some(script_tag) = ScriptTag::parse(code.as_bytes()) {
+                let options = parse_script_metadata(&script_tag.metadata)?;
+                let configuration =
+                    Configuration::from_options(options, Some(path), &settings.project_root)?;
+                &configuration.into_settings(&settings.project_root)?.linter
+            } else {
+                settings
+            }
+        }
+        _ => settings,
     };
 
     // Lint the file.

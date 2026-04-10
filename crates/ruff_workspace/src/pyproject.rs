@@ -30,6 +30,13 @@ pub struct Pyproject {
     project: Option<Project>,
 }
 
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ScriptMetadata {
+    tool: Option<Tools>,
+    #[serde(alias = "requires-python", alias = "requires_python")]
+    requires_python: Option<VersionSpecifiers>,
+}
+
 impl Pyproject {
     pub const fn new(options: Options) -> Self {
         Self {
@@ -73,6 +80,34 @@ fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     parse_toml(path, &["tool", "ruff"])
+}
+
+/// Parse PEP 723 script metadata
+pub fn parse_script_metadata(contents: &str) -> Result<Options> {
+    // Parse the TOML document once into a spanned representation so we can:
+    // - Inspect `required-version` without triggering strict deserialization errors.
+    // - Deserialize with precise spans (line/column and excerpt) on errors.
+    let root =
+        toml::de::DeTable::parse(contents).with_context(|| "Failed to parse inline metadata")?;
+
+    check_required_version(root.get_ref(), &["tool", "ruff"])?;
+
+    let deserializer = toml::de::Deserializer::from(root);
+    let metadata = ScriptMetadata::deserialize(deserializer)
+        .map_err(|mut err| {
+            // `Deserializer::from` doesn't have access to the original input, but we do.
+            // Attach it so TOML errors include line/column and a source excerpt.
+            err.set_input(Some(contents));
+            err
+        })
+        .with_context(|| "Failed to parse inline metadata")?;
+    let mut ruff = metadata.tool.and_then(|tool| tool.ruff).unwrap_or_default();
+    if ruff.target_version.is_none() {
+        if let Some(requires_python) = metadata.requires_python {
+            ruff.target_version = get_minimum_supported_version(&requires_python);
+        }
+    }
+    Ok(ruff)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
