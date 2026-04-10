@@ -1773,10 +1773,11 @@ impl<'db> ClassType<'db> {
             let is_enum_class = KnownClass::Enum
                 .to_class_literal(db)
                 .to_class_type(db)
-                .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
+                .is_some_and(|enum_class| {
+                    self.is_subclass_of(db, enum_class) && self != enum_class
+                });
 
-            // For enum classes, skip the metaclass `__call__`.
-            // TODO: This is wrong for the functional API e.g. `Enum('Status', ...)`
+            // For enum subclasses, skip the metaclass `__call__`.
             if !is_enum_class {
                 // TODO: this intentionally diverges from step 1 in
                 // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
