@@ -18,11 +18,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn final_attribute_allows_post_init(&self, object_ty: Type<'db>) -> bool {
         let db = self.db();
 
-        object_ty
-            .nominal_class(db)
-            .or_else(|| object_ty.to_class_type(db))
-            .and_then(|class_ty| class_ty.static_class_literal(db))
-            .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db))
+        object_ty.nominal_class(db).is_some_and(|cls| {
+            cls.static_class_literal(db)
+                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db))
+        })
     }
 
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
@@ -57,9 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let class_ty = object_ty
-            .nominal_class(db)
-            .or_else(|| object_ty.to_class_type(db))?;
+        let class_ty = object_ty.nominal_class(db)?;
 
         for base in class_ty.iter_mro(db) {
             let Some(class) = base.into_class() else {
