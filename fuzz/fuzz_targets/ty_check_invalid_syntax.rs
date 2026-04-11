@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use libfuzzer_sys::{Corpus, fuzz_target};
 
 use ruff_db::Db as SourceDb;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
     DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
@@ -101,6 +102,14 @@ impl ty_python_core::Db for TestDb {
 
 #[salsa::db]
 impl SemanticDb for TestDb {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if self.should_check_file(file) {
+            ty_python_semantic::check_file_unwrap(self, file)
+        } else {
+            Vec::new()
+        }
+    }
+
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }

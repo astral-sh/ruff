@@ -1,5 +1,6 @@
 use crate::glob::IncludeExcludeFilter;
-use crate::{Db, GlobFilterCheckMode, IOErrorDiagnostic, IOErrorKind, IncludeResult, Project};
+use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -174,7 +175,7 @@ impl<'a> ProjectFilesWalker<'a> {
 
     /// Walks the project paths and collects the paths of all files that
     /// are included in the project.
-    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
+    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<Diagnostic>) {
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
@@ -280,18 +281,12 @@ impl<'a> ProjectFilesWalker<'a> {
                                 }
                             };
 
-                            diagnostics.push(IOErrorDiagnostic {
-                                file: None,
-                                error: IOErrorKind::Walk(error),
-                            });
+                            diagnostics.push(error.to_diagnostic());
                         }
                         ErrorKind::NonUtf8Path { path } => {
-                            diagnostics.lock().unwrap().push(IOErrorDiagnostic {
-                                file: None,
-                                error: IOErrorKind::Walk(WalkError::NonUtf8Path {
-                                    path: path.clone(),
-                                }),
-                            });
+                            diagnostics.lock().unwrap().push(WalkError::NonUtf8Path {
+                                path: path.clone(),
+                            }.to_diagnostic());
                         }
                     },
                 }
@@ -306,14 +301,14 @@ impl<'a> ProjectFilesWalker<'a> {
         )
     }
 
-    pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<IOErrorDiagnostic>) {
+    pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<Diagnostic>) {
         let (files, diagnostics) = self.collect_vec(db);
         (files.into_iter().collect(), diagnostics)
     }
 }
 
 #[derive(Error, Debug, Clone, get_size2::GetSize)]
-pub(crate) enum WalkError {
+enum WalkError {
     #[error("`{path}`: {error}")]
     IOPathError { path: SystemPathBuf, error: String },
 
@@ -322,4 +317,9 @@ pub(crate) enum WalkError {
 
     #[error("`{path}` is not a valid UTF-8 path")]
     NonUtf8Path { path: PathBuf },
+}
+impl WalkError {
+    fn to_diagnostic(&self) -> Diagnostic {
+        Diagnostic::new(DiagnosticId::Io, Severity::Error, self)
+    }
 }

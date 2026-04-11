@@ -10,7 +10,6 @@ use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
@@ -23,7 +22,7 @@ use ty_module_resolver::{
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
+use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
@@ -479,23 +478,8 @@ fn run_test(
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file).load(db);
-
-            let mut diagnostics: Vec<Diagnostic> = parsed
-                .errors()
-                .iter()
-                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
-                .collect();
-
-            diagnostics.extend(
-                parsed
-                    .unsupported_syntax_errors()
-                    .iter()
-                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
-            );
-
-            let mdtest_result = attempt_test(db, check_types, test_file);
-            let type_diagnostics = match mdtest_result {
+            let mdtest_result = attempt_test(db, ty_python_semantic::Db::check_file, test_file);
+            let diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
                     if test.should_expect_panic().is_ok() {
@@ -506,12 +490,6 @@ fn run_test(
                     return Some(failures.into_file_failures(db, "run mdtest", None));
                 }
             };
-
-            diagnostics.extend(type_diagnostics);
-            diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(db)
-                    .cmp(&right.rendering_sort_key(db))
-            });
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
                 Ok(()) => None,
