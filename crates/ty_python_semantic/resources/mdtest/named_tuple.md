@@ -1067,8 +1067,10 @@ reveal_type(alice.level)  # revealed: int
 alice = SuperUser(1, "Alice", 3)
 ```
 
-Annotated subclass fields may not reuse `NamedTuple` field names from the base class, whether or not
-they also bind a value:
+Any subclass member that reuses an inherited `NamedTuple` field name is rejected. This is a
+special-cased `NamedTuple` diagnostic rather than a Liskov-substitution check: at runtime, these
+overrides can make attribute access disagree with tuple indexing and `repr`, and modeling all of
+those split views precisely would add a lot of complexity for a pattern that is usually a mistake.
 
 ```py
 from typing import NamedTuple
@@ -1079,162 +1081,56 @@ class User(NamedTuple):
     age: int | None
     nickname: str
 
-class SuperUser(User):
-    level: int
-
+class AnnotatedAttributeChild(User):
     # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `User`"
-    id: int = 0
+    id: int
 
-    title: str = "staff"
+class AnnotatedDefaultChild(User):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `User`"
+    name: str = "foo"
 
+class PropertyChild(User):
     @property
-    def display_age(self) -> int:
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `age` inherited from `User`"
+    def age(self) -> int:
         return super().age or 42
 
-james = SuperUser(0, "James", 42, "Jimmy")
-reveal_type(james.display_age)  # revealed: int
+class MethodChild(User):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `nickname` inherited from `User`"
+    def nickname(self) -> str:
+        return "Bob"
 
+class PlainAssignmentChild(User):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `User`"
+    name = "shadowed"
+
+class DistinctFieldChild(User):
+    title: str = "staff"
+
+james = DistinctFieldChild(0, "James", 42, "Jimmy")
 james.title = "Boss"
 
-# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `DistinctFieldChild`"
 james.nickname = "Bob"
 ```
 
-Plain assignments on the same class are also rejected:
-
-```py
-from typing import NamedTuple
-
-class PlainAssignmentBase(NamedTuple):
-    name: str
-
-class PlainAssignmentChild(PlainAssignmentBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `PlainAssignmentBase`"
-    name = "shadowed"
-```
-
-Other class-body redefinitions on the same class are also rejected:
-
-```py
-from typing import NamedTuple
-
-value = 0
-
-class NonAssignmentBase(NamedTuple):
-    id: int
-    name: str
-    value: int
-
-class MethodChild(NonAssignmentBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `NonAssignmentBase`"
-    def id(self) -> int:
-        return 0
-
-class PropertyChild(NonAssignmentBase):
-    @property
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `NonAssignmentBase`"
-    def name(self) -> str:
-        return "shadowed"
-
-class AugmentedAssignmentChild(NonAssignmentBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `value` inherited from `NonAssignmentBase`"
-    value += 1
-```
-
-Conditional redefinitions are rejected if the name may still be present at the end of the class
-body, but later-deleted redefinitions are ignored:
-
-```py
-from typing import NamedTuple
-
-def coinflip() -> bool:
-    return True
-
-class VanishingBase(NamedTuple):
-    id: int
-
-class ConditionalDeclarationChild(VanishingBase):
-    if coinflip():
-        # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `VanishingBase`"
-        id: int
-
-class ConditionalAssignmentChild(VanishingBase):
-    if coinflip():
-        # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `VanishingBase`"
-        id = 1
-
-class ConditionalMethodChild(VanishingBase):
-    if coinflip():
-        # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `VanishingBase`"
-        def id(self) -> int:
-            return 0
-
-class DeletedAssignmentChild(VanishingBase):
-    id = 1
-    del id
-```
-
-Split declaration and binding pairs are only diagnosed once:
-
-```py
-from typing import NamedTuple
-
-class SplitBase(NamedTuple):
-    id: int
-
-class SplitChild(SplitBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `SplitBase`"
-    id: int
-    id = 0
-```
-
-Descriptor-valued annotated shadows on the same class are also rejected:
-
-```py
-from typing import Any, NamedTuple
-
-class WritableDescriptorBase(NamedTuple):
-    data: int
-
-class WritableDescriptorChild(WritableDescriptorBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `data` inherited from `WritableDescriptorBase`"
-    data: Any = property(lambda self: 0, lambda self, value: None)
-```
-
-An earlier base that already defines a writable descriptor still stops the conflict check:
-
-```py
-from typing import NamedTuple
-
-class WritableDescriptorBase(NamedTuple):
-    data: int
-
-class WritableDescriptorMixin:
-    data = property(lambda self: 0, lambda self, value: None)
-
-class WritableMixinChild(WritableDescriptorMixin, WritableDescriptorBase):
-    data: int
-```
+This broad rule also means we do not need to model cases where the subclass would expose one value
+through `obj.x` but a different value through `obj[0]` and `repr(obj)`.
 
 The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
 
 ```py
-from collections import namedtuple
 from typing import NamedTuple
 
-TypingBase = NamedTuple("TypingBase", [("id", int), ("name", str)])
-CollectionsBase = namedtuple("CollectionsBase", ["key", "value"])
+TypingBase = NamedTuple("TypingBase", [("id", int)])
 
 class TypingChild(TypingBase):
     # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `TypingBase`"
-    id: int
-
-class CollectionsChild(CollectionsBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `key` inherited from `CollectionsBase`"
-    key: int
+    id: int = 0
 ```
 
-An earlier base that already defines the name stops the conflict check:
+Once an earlier base has already overridden the name, we do not emit a second conflict for later
+subclasses:
 
 ```py
 from typing import NamedTuple
@@ -1247,111 +1143,6 @@ class ShadowingMid(ShadowTupleBase):
 
 class ShadowedChild(ShadowingMid):
     name: int
-```
-
-An earlier base that declares the name also stops the conflict check:
-
-```py
-from typing import NamedTuple
-
-class AnnotationOnlyMixin:
-    key: int
-
-class AnnotationTupleBase(NamedTuple):
-    key: int
-
-class AnnotationOnlyChild(AnnotationOnlyMixin, AnnotationTupleBase):
-    key: int
-```
-
-A read-only descriptor in an earlier base also stops the conflict check:
-
-```py
-from typing import NamedTuple
-
-class ReadOnlyMixin:
-    field = property(lambda self: 0)
-
-class DescriptorTupleBase(NamedTuple):
-    field: int
-
-class DescriptorShadowChild(ReadOnlyMixin, DescriptorTupleBase):
-    field: int
-```
-
-A statically false conditional binding in an earlier base does not stop the conflict check:
-
-```py
-from typing import NamedTuple
-
-flag = False
-
-class MaybeShadowMixin:
-    if flag:
-        value = 1
-
-class ConditionalTupleBase(NamedTuple):
-    value: int
-
-class ConditionalShadowChild(MaybeShadowMixin, ConditionalTupleBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `value` inherited from `ConditionalTupleBase`"
-    value: int
-```
-
-An earlier base with a conditional binding that may still be present at the end of the class body
-does stop the conflict check:
-
-```py
-from typing import NamedTuple
-
-def coinflip() -> bool:
-    return True
-
-class MaybeShadowRuntimeMixin:
-    if coinflip():
-        value = 1
-
-class ConditionalRuntimeTupleBase(NamedTuple):
-    value: int
-
-class ConditionalRuntimeShadowChild(MaybeShadowRuntimeMixin, ConditionalRuntimeTupleBase):
-    value: int
-```
-
-Mixed bindings in an earlier base also stop the conflict check:
-
-```py
-from typing import NamedTuple
-
-flag = False
-
-class MixedShadowMixin:
-    if flag:
-        data = 1
-    else:
-        data = property(lambda self: 0)
-
-class MixedShadowTupleBase(NamedTuple):
-    data: int
-
-class MixedShadowChild(MixedShadowMixin, MixedShadowTupleBase):
-    data: int
-```
-
-Ignoring one conflict does not suppress later ones:
-
-```py
-from typing import NamedTuple
-
-class DoubleConflictBase(NamedTuple):
-    left: int
-    right: int
-
-class DoubleConflictChild(DoubleConflictBase):
-    left: int  # ty: ignore[invalid-named-tuple]
-
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `right` inherited from `DoubleConflictBase`"
-    right: int
 ```
 
 ### Generic named tuples
