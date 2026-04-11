@@ -8,6 +8,7 @@ use lsp_types::{
     NumberOrString, PublishDiagnosticsParams, Url,
 };
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use ty_python_semantic::types::ide_support::{unreachable_ranges, unused_bindings};
@@ -29,7 +30,22 @@ use crate::{PositionEncoding, Session};
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(super) struct UnnecessaryHint {
     range: TextRange,
-    message: String,
+    kind: UnnecessaryHintKind,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+enum UnnecessaryHintKind {
+    UnusedBinding(Name),
+    UnreachableCode,
+}
+
+impl UnnecessaryHintKind {
+    fn message(&self) -> String {
+        match self {
+            Self::UnusedBinding(name) => format!("`{name}` is unused"),
+            Self::UnreachableCode => "Code is unreachable".to_owned(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -370,7 +386,7 @@ pub(super) fn collect_unnecessary_hints(db: &ProjectDatabase, file: File) -> Vec
         .iter()
         .map(|binding| UnnecessaryHint {
             range: binding.range,
-            message: format!("`{}` is unused", binding.name),
+            kind: UnnecessaryHintKind::UnusedBinding(binding.name.clone()),
         })
         .collect::<Vec<_>>();
 
@@ -379,15 +395,15 @@ pub(super) fn collect_unnecessary_hints(db: &ProjectDatabase, file: File) -> Vec
             .iter()
             .map(|range| UnnecessaryHint {
                 range: *range,
-                message: "Code is unreachable".to_owned(),
+                kind: UnnecessaryHintKind::UnreachableCode,
             }),
     );
 
     hints.sort_unstable_by(|left, right| {
-        (left.range.start(), left.range.end(), left.message.as_str()).cmp(&(
+        (left.range.start(), left.range.end(), &left.kind).cmp(&(
             right.range.start(),
             right.range.end(),
-            right.message.as_str(),
+            &right.kind,
         ))
     });
     hints
@@ -423,7 +439,7 @@ fn unnecessary_hint_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: hint.message.clone(),
+            message: hint.kind.message(),
             related_information: None,
             tags: Some(vec![DiagnosticTag::UNNECESSARY]),
             data: None,
