@@ -656,11 +656,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|tv| tv.typevar(db).name(db))
                         .format("`, `"),
-                    if let Some(CallableDescription { kind, name }) = description {
-                        format!(" of {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    description
+                        .map(|description| format!(" of {description}"))
+                        .unwrap_or_default()
                 ));
             }
             error = Some(ExplicitSpecializationError::MissingTypeVars);
@@ -704,11 +702,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let description = CallableDescription::new(db, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",
-                        if let Some(CallableDescription { kind, name }) = description {
-                            format!(" to {kind} `{name}`")
-                        } else {
-                            String::new()
-                        },
+                        description
+                            .map(|description| format!(" to {description}"))
+                            .unwrap_or_default(),
                         if typevar_with_defaults == 0 {
                             format!("{typevars_len}")
                         } else {

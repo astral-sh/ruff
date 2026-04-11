@@ -443,7 +443,7 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `A.__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to constructor `A.__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
 A(f([]))
 ```
 

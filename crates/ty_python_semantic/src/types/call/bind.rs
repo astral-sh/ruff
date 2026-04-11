@@ -3447,11 +3447,9 @@ impl<'db> CallableBinding<'db> {
                     CallableDescription::new(context.db(), self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" of {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" of {description}"))
+                        .unwrap_or_default()
                 ));
 
                 if let Some(index) =
@@ -5363,7 +5361,7 @@ impl CallableBindingSnapshotter {
 #[derive(Debug)]
 pub(crate) struct CallableDescription<'a> {
     pub(crate) name: Cow<'a, str>,
-    pub(crate) kind: &'static str,
+    pub(crate) kind: Option<&'static str>,
 }
 
 impl<'db> CallableDescription<'db> {
@@ -5390,37 +5388,49 @@ impl<'db> CallableDescription<'db> {
 
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
-                kind: "function",
+                kind: Some(if function.name(db) == "__new__" {
+                    "constructor"
+                } else {
+                    "function"
+                }),
                 name: qualified_function_name(db, function),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
-                kind: "class",
+                kind: Some("class"),
                 name: Cow::Borrowed(class_type.name(db)),
             }),
-            Type::BoundMethod(bound_method) => Some(CallableDescription {
-                kind: "bound method",
-                name: qualified_function_name(db, bound_method.function(db)),
+            Type::BoundMethod(bound_method) => Some({
+                let function = bound_method.function(db);
+                let kind = if function.name(db) == "__init__" {
+                    None
+                } else {
+                    Some("bound method")
+                };
+                CallableDescription {
+                    kind,
+                    name: qualified_function_name(db, function),
+                }
             }),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper `__get__` of function",
+                    kind: Some("method wrapper `__get__` of function"),
                     name: Cow::Borrowed(function.name(db)),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper",
+                    kind: Some("method wrapper"),
                     name: Cow::Borrowed("`__get__` of property"),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper",
+                    kind: Some("method wrapper"),
                     name: Cow::Borrowed("`__delete__` of property"),
                 })
             }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
-                kind: "wrapper descriptor",
+                kind: Some("wrapper descriptor"),
                 name: Cow::Borrowed(match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
@@ -5429,6 +5439,16 @@ impl<'db> CallableDescription<'db> {
                 }),
             }),
             _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for CallableDescription<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(kind) = self.kind {
+            write!(f, "{kind} `{}`", self.name)
+        } else {
+            write!(f, "`{}`", self.name)
         }
     }
 }
@@ -5726,11 +5746,9 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" to {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" to {description}"))
+                        .unwrap_or_default()
                 ));
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
@@ -5872,11 +5890,9 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" to {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" to {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5900,11 +5916,9 @@ impl<'db> BindingError<'db> {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5943,11 +5957,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5972,11 +5984,9 @@ impl<'db> BindingError<'db> {
                 {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Positional-only parameter {parameter} passed as keyword argument{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5999,11 +6009,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -6025,11 +6033,9 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" to {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" to {description}"))
+                        .unwrap_or_default()
                 ));
 
                 match error {
@@ -6115,11 +6121,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
