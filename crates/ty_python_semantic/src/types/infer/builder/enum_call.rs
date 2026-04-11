@@ -81,11 +81,6 @@ fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersi
     ) || (name == "boundary" && python_version >= PythonVersion::PY311)
 }
 
-fn has_duplicate_enum_member_names(members: &[(Name, Type<'_>)]) -> bool {
-    let mut seen = FxHashSet::default();
-    members.iter().any(|(name, _)| !seen.insert(name.clone()))
-}
-
 /// Returns the effective `_EnumNames` type accepted by the functional enum APIs.
 ///
 /// This includes the string form, iterables of strings, iterables of
@@ -404,7 +399,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             match self.parse_enum_members_arg(names_arg, start, base_class) {
                 EnumMembersArgParseResult::Known(members) => {
-                    if has_duplicate_enum_member_names(&members) {
+                    let mut seen = FxHashSet::default();
+                    if members.iter().any(|(name, _)| !seen.insert(name.clone())) {
                         // Duplicate member names raise at runtime, so degrade to an unknown
                         // member set and let normal call binding surface the rest.
                         (vec![], false)
@@ -466,7 +462,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let ty = self.expression_type(names_arg);
-
         if let Some(string_lit) = ty.as_string_literal() {
             let s = string_lit.value(db);
             let names: Vec<Name> = s
@@ -513,7 +508,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         for elt in elts {
             if matches!(elt, ast::Expr::Starred(_)) {
-                return EnumMembersArgParseResult::Unknown;
+                return EnumMembersArgParseResult::Invalid;
             }
             match self.classify_sequence_enum_member(elt) {
                 SequenceEnumMember::NameKnown(name) => {
@@ -593,7 +588,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_keys = false;
         for item in &dict.items {
             let Some(key) = &item.key else {
-                return EnumMembersArgParseResult::Unknown;
+                return EnumMembersArgParseResult::Invalid;
             };
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {

@@ -548,7 +548,8 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.is_final(db),
             Self::DynamicEnum(enum_lit) => {
-                crate::types::enums::enum_metadata(db, Self::DynamicEnum(enum_lit)).is_some()
+                crate::types::enums::enum_metadata(db, Self::DynamicEnum(enum_lit))
+                    .is_some_and(|metadata| !metadata.members.is_empty())
             }
             // Dynamic classes created via `type()`, `collections.namedtuple()`, etc. cannot be
             // marked as final.

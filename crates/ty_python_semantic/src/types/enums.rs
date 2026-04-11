@@ -214,9 +214,6 @@ pub(crate) fn enum_metadata<'db>(
                 }
                 members.insert(name.clone(), *ty);
             }
-            if members.is_empty() {
-                return None;
-            }
             return Some(EnumMetadata {
                 members,
                 aliases,

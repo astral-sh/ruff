@@ -1545,15 +1545,37 @@ enum base class should still resolve through the MRO.
 
 ```py
 from enum import Enum
+from ty_extensions import enum_members
 
-names: list[str] = ["A", "B"]
-E = Enum("E", names)
+def f(
+    names: list[str],
+    labels: str,
+    pairs: tuple[tuple[str, int], ...],
+    mapping: dict[str, int],
+    name: str,
+    key: str,
+) -> None:
+    E1 = Enum("E1", names)
+    E2 = Enum("E2", labels)
+    E3 = Enum("E3", pairs)
+    E4 = Enum("E4", mapping)
+    E5 = Enum("E5", ["A", name])
+    E6 = Enum("E6", [(name, 1)])
+    E7 = Enum("E7", {key: 1})
 
-# Inherited class attributes resolve from Enum base.
-reveal_type(E.__members__)  # revealed: MappingProxyType[str, E]
+    reveal_type(enum_members(E1))  # revealed: Unknown
+    reveal_type(enum_members(E2))  # revealed: Unknown
+    reveal_type(enum_members(E3))  # revealed: Unknown
+    reveal_type(enum_members(E4))  # revealed: Unknown
+    reveal_type(enum_members(E5))  # revealed: Unknown
+    reveal_type(enum_members(E6))  # revealed: Unknown
+    reveal_type(enum_members(E7))  # revealed: Unknown
 
-# But own member access is unknown.
-reveal_type(E.FOO)  # revealed: Unknown
+    # Inherited class attributes resolve from Enum base.
+    reveal_type(E1.__members__)  # revealed: MappingProxyType[str, E1]
+
+    # But own member access is unknown.
+    reveal_type(E1.FOO)  # revealed: Unknown
 ```
 
 ### Too many positional args
@@ -1603,8 +1625,8 @@ Non-literal names should still be recognized as creating an enum class.
 ```py
 from enum import Enum
 
-def make_enum(name: str, labels: tuple[str, ...]) -> type[Enum]:
-    result = Enum(name.title(), labels, module=__name__)
+def make_enum(name: str) -> type[Enum]:
+    result = Enum(name.title(), "RED BLUE", module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result
 
@@ -1636,7 +1658,7 @@ Color = Enum("Color", "RED GREEN BLUE", bad_kwarg=True)
 
 ### Definitely invalid `names` arguments
 
-Functional enums should still reject `names` values that are definitely not `_EnumNames`:
+Functional enums should still reject obviously invalid `names` values:
 
 ```py
 from enum import Enum
@@ -1652,30 +1674,44 @@ Empty functional enums are valid, even though they have no members:
 
 ```py
 from enum import Enum
+from ty_extensions import enum_members
 
 EmptyFromString = Enum("EmptyFromString", "")
 EmptyFromList = Enum("EmptyFromList", [])
 EmptyFromDict = Enum("EmptyFromDict", {})
+
+reveal_type(enum_members(EmptyFromString))  # revealed: tuple[()]
+reveal_type(enum_members(EmptyFromList))  # revealed: tuple[()]
+reveal_type(enum_members(EmptyFromDict))  # revealed: tuple[()]
+
+class ExtendedEmpty(EmptyFromString):
+    A = 1
+
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(ExtendedEmpty))
 ```
 
-Literal list/tuple/dict inputs that use unpacking should degrade to unknown members rather than
-being rejected outright:
+Literal list/tuple/dict inputs that use unpacking are rejected:
 
 ```py
 from enum import Enum
-from ty_extensions import enum_members
 
 names: list[str] = ["B"]
 pairs: list[tuple[str, int]] = [("B", 2)]
 more: dict[str, int] = {"B": 2}
+bad_keys: dict[int, int] = {1: 2}
 
-FromNames = Enum("FromNames", ["A", *names])
-FromPairs = Enum("FromPairs", [("A", 1), *pairs])
-FromMapping = Enum("FromMapping", {"A": 1, **more})
+# error: [invalid-argument-type]
+Enum("FromNames", ["A", *names])
 
-reveal_type(enum_members(FromNames))  # revealed: Unknown
-reveal_type(enum_members(FromPairs))  # revealed: Unknown
-reveal_type(enum_members(FromMapping))  # revealed: Unknown
+# error: [invalid-argument-type]
+Enum("FromPairs", [("A", 1), *pairs])
+
+# error: [invalid-argument-type]
+Enum("FromMapping", {"A": 1, **more})
+
+# error: [invalid-argument-type]
+Enum("BadDoubleStar", {**bad_keys})
 ```
 
 ### Keyword argument type validation
