@@ -3485,12 +3485,9 @@ impl<'db> Type<'db> {
                 Place::bound(Type::Callable(callable)).into()
             }
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
-                let return_ty = callable.signatures(db).overload_return_type_or_unknown(db);
-                KnownClass::FunctoolsPartial
-                    .to_specialized_instance(db, &[return_ty])
-                    .member_lookup_with_policy(db, name, policy)
-            }
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => callable
+                .into_functools_partial_instance(db)
+                .member_lookup_with_policy(db, name, policy),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)

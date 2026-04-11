@@ -881,9 +881,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .class(db)
                 .is_known(db, KnownClass::FunctoolsPartial) =>
             {
-                let return_ty = callable.signatures(db).overload_return_type_or_unknown(db);
-                let specialized =
-                    KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty]);
+                let specialized = callable.into_functools_partial_instance(db);
                 self.check_type_pair(db, specialized, target)
             }
 

@@ -9,8 +9,7 @@ mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
-    ArgumentInferenceRefinement, ArgumentInferenceRefinementBindings, Binding, Bindings,
-    CallableBinding, MatchedArgument,
+    ArgumentInferenceRefinementBindings, Binding, Bindings, CallableBinding, MatchedArgument,
 };
 
 impl<'db> Type<'db> {

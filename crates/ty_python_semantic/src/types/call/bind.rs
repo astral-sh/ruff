@@ -321,27 +321,6 @@ impl<'db> BindingsElement<'db> {
     }
 }
 
-/// A request to re-infer call arguments using refinement bindings discovered after an initial
-/// binding pass.
-#[derive(Clone, Debug)]
-pub(crate) enum ArgumentInferenceRefinement<'db> {
-    Bindings(ArgumentInferenceRefinementBindings<'db>),
-}
-
-impl<'db> ArgumentInferenceRefinement<'db> {
-    fn bindings(
-        bindings: Bindings<'db>,
-        argument_start_index: usize,
-        argument_index_offset: usize,
-    ) -> Self {
-        Self::Bindings(ArgumentInferenceRefinementBindings {
-            bindings,
-            argument_start_index,
-            argument_index_offset,
-        })
-    }
-}
-
 /// Refinement bindings to use for a suffix of the call arguments during a refinement pass.
 #[derive(Clone, Debug)]
 pub(crate) struct ArgumentInferenceRefinementBindings<'db> {
@@ -351,6 +330,18 @@ pub(crate) struct ArgumentInferenceRefinementBindings<'db> {
 }
 
 impl<'db> ArgumentInferenceRefinementBindings<'db> {
+    fn new(
+        bindings: Bindings<'db>,
+        argument_start_index: usize,
+        argument_index_offset: usize,
+    ) -> Self {
+        Self {
+            bindings,
+            argument_start_index,
+            argument_index_offset,
+        }
+    }
+
     pub(crate) fn bindings(&self) -> &Bindings<'db> {
         &self.bindings
     }
@@ -740,7 +731,7 @@ impl<'db> Bindings<'db> {
         &self,
         db: &'db dyn Db,
         call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<ArgumentInferenceRefinement<'db>> {
+    ) -> Option<ArgumentInferenceRefinementBindings<'db>> {
         if !self.may_request_argument_inference_refinement(db) {
             return None;
         }
@@ -765,7 +756,7 @@ impl<'db> Bindings<'db> {
         let (_, refinement_bindings) =
             Self::functools_partial_matched_bindings(db, wrapped_callable_ty, call_arguments)?;
 
-        Some(ArgumentInferenceRefinement::bindings(
+        Some(ArgumentInferenceRefinementBindings::new(
             refinement_bindings,
             1,
             1,
