@@ -55,8 +55,7 @@ use crate::semantic_index::{
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{
-    ArgumentInferenceRefinement, ArgumentInferenceRefinementBindings, Binding, Bindings,
-    CallArguments, CallError, CallErrorKind,
+    ArgumentInferenceRefinementBindings, Binding, Bindings, CallArguments, CallError, CallErrorKind,
 };
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -4847,9 +4846,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         constraints: &ConstraintSetBuilder<'db>,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
-        let may_request_refinement = bindings.may_request_argument_inference_refinement(db);
-        let original_argument_types = may_request_refinement.then(|| argument_types.clone());
-        let original_bindings = may_request_refinement.then(|| bindings.clone());
+        if !bindings.may_request_argument_inference_refinement(db) {
+            self.infer_all_argument_types(
+                ast_arguments,
+                argument_types,
+                infer_argument_ty,
+                bindings,
+                call_expression_tcx,
+                None,
+            );
+
+            return bindings.check_types_impl(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+            );
+        }
+
+        let original_argument_types = argument_types.clone();
+        let original_bindings = bindings.clone();
 
         self.infer_all_argument_types(
             ast_arguments.clone(),
@@ -4868,34 +4885,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &self.dataclass_field_specifiers,
         );
 
-        let refinement_request = bindings.argument_inference_refinement_request(db, argument_types);
-        if let (Some(original_bindings), Some(original_argument_types), Some(refinement_request)) = (
-            original_bindings,
-            original_argument_types,
-            refinement_request,
-        ) {
-            *bindings = original_bindings;
-            *argument_types = original_argument_types;
-            let mut refinement_builder = self.speculate();
-            refinement_builder.infer_all_argument_types(
-                ast_arguments,
-                argument_types,
-                infer_argument_ty,
-                bindings,
-                call_expression_tcx,
-                Some(&refinement_request),
-            );
+        let Some(refinement_bindings) =
+            bindings.argument_inference_refinement_request(db, argument_types)
+        else {
+            return result;
+        };
 
-            result = bindings.check_types_impl(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                &self.dataclass_field_specifiers,
-            );
+        *bindings = original_bindings;
+        *argument_types = original_argument_types;
+        let mut refinement_builder = self.speculate();
+        refinement_builder.infer_all_argument_types(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+            Some(&refinement_bindings),
+        );
 
-            self.extend(refinement_builder);
-        }
+        result = bindings.check_types_impl(
+            db,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            &self.dataclass_field_specifiers,
+        );
+
+        self.extend(refinement_builder);
 
         result
     }
@@ -4973,17 +4989,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
-        argument_inference_refinement: Option<&ArgumentInferenceRefinement<'db>>,
+        refinement_bindings: Option<&ArgumentInferenceRefinementBindings<'db>>,
     ) {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
         let root_overloads_with_binding = Self::argument_inference_overloads(bindings);
-        let refinement_bindings =
-            argument_inference_refinement.map(|refinement| match refinement {
-                ArgumentInferenceRefinement::Bindings(bindings) => bindings,
-            });
         let refinement_overloads_with_binding = refinement_bindings
             .map(ArgumentInferenceRefinementBindings::bindings)
             .map(Self::argument_inference_overloads);
