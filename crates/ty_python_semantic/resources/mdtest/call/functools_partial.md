@@ -671,10 +671,7 @@ p()
 p("extra")  # error: [too-many-positional-arguments]
 ```
 
-## TODO: Class constructor where `__new__` and `__init__` disagree after partial binding
-
-This currently demonstrates that constructor partials can still over-prefer the `__new__` path when
-`__new__` and `__init__` disagree after binding.
+## Class constructor preserves downstream params after partial binding
 
 ```py
 from functools import partial
@@ -685,11 +682,51 @@ class MyClass:
     def __init__(self, x: int, y: str) -> None: ...
 
 p = partial(MyClass, 1)
-# TODO: should be `partial[(y: str) -> MyClass]`
-reveal_type(p)  # revealed: partial[() -> MyClass]
-# TODO: should be error: [missing-argument]
-p()
-p("extra")  # error: [too-many-positional-arguments]
+reveal_type(p)  # revealed: partial[(y: Never) -> MyClass]
+p()  # error: [missing-argument]
+p("extra")  # error: [invalid-argument-type]
+```
+
+## Class constructor partial preserves both `__new__` and `__init__`
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int | str) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, x: int) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[(x: int) -> MyClass]
+p(1)
+p("s")  # error: [invalid-argument-type]
+```
+
+## Class constructor partial keeps non-instance `__new__` overloads
+
+```py
+from __future__ import annotations
+
+from functools import partial
+from typing import overload
+
+class MyClass:
+    @overload
+    def __new__(cls, x: int) -> "MyClass": ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> "MyClass" | str:
+        if isinstance(x, str):
+            return x
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[Overload[(x: str) -> str, (x: int) -> MyClass]]
+reveal_type(p(1))  # revealed: MyClass
+reveal_type(p("s"))  # revealed: str
 ```
 
 ## Binding a default parameter
@@ -1129,9 +1166,26 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, 1)
-reveal_type(p.func)  # revealed: (...) -> bool
+reveal_type(p.func)  # revealed: def f(a: int, b: str) -> bool
+reveal_type(p.func(2, "hello"))  # revealed: bool
 reveal_type(p.args)  # revealed: tuple[Any, ...]
 reveal_type(p.keywords)  # revealed: dict[str, Any]
+```
+
+## `partial.func` keeps the original callable type
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def combine(a: T, b: U) -> tuple[T, U]:
+    return (a, b)
+
+p = partial(combine, 1)
+reveal_type(p.func(2, "x"))  # revealed: tuple[Literal[2], Literal["x"]]
 ```
 
 ## Attribute assignment on partial results

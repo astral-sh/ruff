@@ -53,10 +53,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members,
+    InternedType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -83,6 +83,17 @@ enum CallErrorPriority {
 enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
+}
+
+fn functools_partial_instance<'db>(
+    db: &'db dyn Db,
+    wrapped: Type<'db>,
+    partial: CallableType<'db>,
+) -> Type<'db> {
+    Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+        wrapped: InternedType::new(db, wrapped),
+        partial,
+    })
 }
 
 impl<'db> CallableItem<'db> {
@@ -187,6 +198,26 @@ impl<'db> CallableItem<'db> {
 
     fn callable_type(&self) -> Type<'db> {
         self.callable().callable_type
+    }
+
+    fn functools_partial_type<'a>(
+        &self,
+        db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            CallableItem::Regular(binding) => binding
+                .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                .map(|callable| functools_partial_instance(db, wrapped_callable_ty, callable)),
+            CallableItem::Constructor(binding) => binding.functools_partial_type(
+                db,
+                wrapped_callable_ty,
+                partial_overload,
+                bound_call_arguments,
+            ),
+        }
     }
 
     fn map<F>(self, f: &F) -> CallableItem<'db>
@@ -738,7 +769,7 @@ impl<'db> Bindings<'db> {
 
         let should_refine = !matches!(
             self.return_type(db),
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { .. })
         ) || self
             .iter_flat()
             .flat_map(CallableBinding::overloads)
@@ -784,6 +815,33 @@ impl<'db> Bindings<'db> {
 
             if !binding_types.is_empty() {
                 element_types.push(IntersectionType::from_elements(db, binding_types));
+            }
+        }
+
+        UnionType::from_elements(db, element_types)
+    }
+
+    /// Maps each `CallableItem` to a type and combines results while preserving
+    /// the union-of-intersections structure:
+    ///
+    /// - callable items inside an element are intersected
+    /// - elements are unioned
+    fn map_item_types(
+        &self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableItem<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        let mut element_types = Vec::with_capacity(self.elements.len());
+        for element in &self.elements {
+            let mut item_types = Vec::new();
+            for item in element.items() {
+                if let Some(ty) = map(item) {
+                    item_types.push(ty);
+                }
+            }
+
+            if !item_types.is_empty() {
+                element_types.push(IntersectionType::from_elements(db, item_types));
             }
         }
 
@@ -2510,55 +2568,71 @@ impl<'db> Bindings<'db> {
                             };
                             let new_return_type = if func_ty.is_union() || func_ty.is_intersection()
                             {
-                                partial_bindings.map_types(db, |partial_binding| {
-                                    partial_binding
-                                        .functools_partial_callable(
-                                            db,
-                                            overload,
-                                            &bound_call_arguments,
-                                        )
-                                        .map(|callable| {
-                                            Type::KnownInstance(
-                                                KnownInstanceType::FunctoolsPartial(callable),
-                                            )
-                                        })
+                                partial_bindings.map_item_types(db, |partial_item| {
+                                    partial_item.functools_partial_type(
+                                        db,
+                                        func_ty,
+                                        overload,
+                                        &bound_call_arguments,
+                                    )
                                 })
                             } else {
+                                let mut partial_types = Vec::new();
                                 let mut new_overloads = Vec::new();
                                 let mut seen_overloads = FxHashSet::default();
-                                for partial_binding in partial_bindings.iter_flat() {
-                                    let Some(callable) = partial_binding
-                                        .functools_partial_callable(
-                                            db,
-                                            overload,
-                                            &bound_call_arguments,
-                                        )
-                                    else {
+                                for partial_item in partial_bindings.iter_callable_items() {
+                                    let Some(partial_type) = partial_item.functools_partial_type(
+                                        db,
+                                        func_ty,
+                                        overload,
+                                        &bound_call_arguments,
+                                    ) else {
                                         continue;
                                     };
 
-                                    for signature in callable.signatures(db) {
-                                        let signature = signature.clone();
-                                        let dedup_key = signature.clone().with_definition(None);
-                                        if seen_overloads.insert(dedup_key) {
-                                            new_overloads.push(signature);
+                                    if let Type::KnownInstance(
+                                        KnownInstanceType::FunctoolsPartial { partial, .. },
+                                    ) = partial_type
+                                    {
+                                        for signature in partial.signatures(db) {
+                                            let signature = signature.clone();
+                                            let dedup_key = signature.clone().with_definition(None);
+                                            if seen_overloads.insert(dedup_key) {
+                                                new_overloads.push(signature);
+                                            }
                                         }
+                                    } else {
+                                        partial_types.push(partial_type);
                                     }
                                 }
 
-                                if new_overloads.is_empty() {
-                                    Type::Never
+                                if partial_types.is_empty() {
+                                    if new_overloads.is_empty() {
+                                        Type::Never
+                                    } else {
+                                        let new_callable_sig =
+                                            CallableSignature::from_overloads(new_overloads);
+                                        let callable = CallableType::new(
+                                            db,
+                                            new_callable_sig,
+                                            CallableTypeKind::Regular,
+                                        );
+                                        functools_partial_instance(db, func_ty, callable)
+                                    }
                                 } else {
-                                    let new_callable_sig =
-                                        CallableSignature::from_overloads(new_overloads);
-                                    let callable = CallableType::new(
-                                        db,
-                                        new_callable_sig,
-                                        CallableTypeKind::Regular,
-                                    );
-                                    Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-                                        callable,
-                                    ))
+                                    if !new_overloads.is_empty() {
+                                        let new_callable_sig =
+                                            CallableSignature::from_overloads(new_overloads);
+                                        let callable = CallableType::new(
+                                            db,
+                                            new_callable_sig,
+                                            CallableTypeKind::Regular,
+                                        );
+                                        partial_types.push(functools_partial_instance(
+                                            db, func_ty, callable,
+                                        ));
+                                    }
+                                    IntersectionType::from_elements(db, partial_types)
                                 }
                             };
                             if new_return_type.is_never() {

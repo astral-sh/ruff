@@ -866,8 +866,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_callable)),
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(target_callable)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+                    partial: source_callable,
+                    ..
+                }),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+                    partial: target_callable,
+                    ..
+                }),
             ) => self.with_recursion_guard(source, target, || {
                 self.check_callable_pair(db, source_callable, target_callable)
             }),
@@ -875,7 +881,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
             // the nominal instance with the partial's return type so the check is precise.
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+                    partial: callable, ..
+                }),
                 Type::NominalInstance(target_instance),
             ) if target_instance
                 .class(db)
@@ -1249,7 +1257,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_function_pair(db, source_function, target_function)
             }
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_callable)),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+                    partial: source_callable,
+                    ..
+                }),
                 Type::FunctionLiteral(target_function),
             ) if matches!(
                 self.relation,

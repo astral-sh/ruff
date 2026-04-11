@@ -213,8 +213,8 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
-                Some(CallableTypes::one(callable))
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { partial, .. }) => {
+                Some(CallableTypes::one(partial))
             }
 
             // TODO
