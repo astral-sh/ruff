@@ -9,9 +9,9 @@ use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
-/// A `QuickFix` Code Action
+/// A Code Action
 #[derive(Debug, Clone)]
-pub struct QuickFix {
+pub struct CodeAction {
     pub title: String,
     pub edits: Vec<Edit>,
     pub preferred: bool,
@@ -22,7 +22,7 @@ pub fn code_actions(
     file: File,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
-) -> Vec<QuickFix> {
+) -> Vec<CodeAction> {
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -40,7 +40,7 @@ pub fn code_actions(
     }
 
     // Suggest just suppressing the lint (always a valid option, but never ideal)
-    actions.push(QuickFix {
+    actions.push(CodeAction {
         title: format!("Ignore '{}' for this line", lint_id.name()),
         edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
@@ -53,7 +53,7 @@ fn unresolved_fixes(
     db: &dyn Db,
     file: File,
     diagnostic_range: TextRange,
-) -> Option<impl Iterator<Item = QuickFix>> {
+) -> Option<impl Iterator<Item = CodeAction>> {
     let parsed = parsed_module(db, file).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
@@ -61,7 +61,7 @@ fn unresolved_fixes(
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()
-            .map(|import| QuickFix {
+            .map(|import| CodeAction {
                 title: import.label,
                 edits: vec![import.edit],
                 preferred: true,
