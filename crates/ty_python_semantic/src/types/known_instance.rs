@@ -324,6 +324,11 @@ impl<'db> KnownInstanceType<'db> {
                     callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::FunctoolsPartial(callable_type) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                    callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
@@ -343,8 +348,7 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
-            | KnownInstanceType::NewType(_)
-            | KnownInstanceType::FunctoolsPartial(_) => {
+            | KnownInstanceType::NewType(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)
             }
