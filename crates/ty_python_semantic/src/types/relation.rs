@@ -11,10 +11,10 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints,
-    UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -650,6 +650,78 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
+    /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
+    ///
+    /// This does not include all types that are subtypes of `builtins.type`! The semantic
+    /// distinction that matters here is not whether `target` is a subtype of `type`, but whether
+    /// it constrains the class or the metaclass of its inhabitants.
+    ///
+    /// The type `type[C]` and the type `ABCMeta` are both subtypes of `builtins.type`, but they
+    /// constrain their inhabitants in different domains. `type[C]` constrains in the regular-class
+    /// domain (it describes a regular class object and all its subclasses). A metaclass instance
+    /// like `ABCMeta` constrains in the metaclass domain: its inhabitants can be class objects
+    /// that are unrelated to each other in the regular-class domain (they do not inherit each
+    /// other or any other common base), but they are all constrained to have a metaclass that
+    /// inherits from `ABCMeta`.
+    fn is_metaclass_instance(db: &'db dyn Db, target: Type<'db>) -> bool {
+        target.as_nominal_instance().is_some_and(|instance| {
+            KnownClass::Type
+                .try_to_class_literal(db)
+                .is_some_and(|type_class| {
+                    instance
+                        .class(db)
+                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
+                })
+        })
+    }
+
+    /// Can we check `target`s relation to a `type[T]` in either the metaclass-instance domain (it
+    /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
+    /// `.to_instance()`)?
+    fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
+        Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some()
+    }
+
+    /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
+    /// projected into the ordinary instance/object domain via `.to_instance()`, or is a plain
+    /// metaclass object type.
+    ///
+    /// In the former case, we unwrap the source from `type[T]` to `T`, push the target down
+    /// through `A.to_instance()`, and compare those types. This is the right interpretation for
+    /// targets like `type[S]`: they constrain class objects via the instances they create, not via
+    /// their metaclasses.
+    ///
+    /// For a metaclass instance type (see `is_metaclass_instance` for definition),
+    /// `A.to_instance()` is too lossy: it collapses to `object`, because we have no precise
+    /// instance-space representation for "all class objects whose metaclass inhabits `A`". For
+    /// these types which constrain in the metaclass space, we instead need to resolve `type[T]` to
+    /// the metaclass of the upper bound of `T`, and compare in the metaclass-instance domain
+    /// directly.
+    ///
+    /// If `A` has no `.to_instance()` projection and is not a metaclass instance type, it won't
+    /// pass the `can_check_typevar_subclass_relation_to_target` guard, and this helper does not
+    /// decide the relation; it will fall through to other type-pair branches.
+    fn check_typevar_subclass_relation_to_target(
+        &self,
+        db: &'db dyn Db,
+        source_subclass: SubclassOfType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source_subclass
+            .into_type_var()
+            .when_some_and(db, self.constraints, |source_i| {
+                if Self::is_metaclass_instance(db, target) {
+                    self.check_type_pair(db, source_subclass.to_metaclass_instance(db), target)
+                } else {
+                    target
+                        .to_instance(db)
+                        .when_some_and(db, self.constraints, |target_i| {
+                            self.check_type_pair(db, Type::TypeVar(source_i), target_i)
+                        })
+                }
+            })
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -868,36 +940,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
-            // of `A`, and vice versa.
+            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype
+            // of an instance of `A`. If `A` is a metaclass instance (instance of a specific
+            // subclass of `type`), we instead compare in the metaclass-instance domain, since
+            // collapsing `A` through `to_instance()` would erase it to `object` (we have no
+            // precise representation for "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
-                if !subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
-                    .is_never_satisfied(db) =>
+                if subclass_of.is_type_var()
+                    && Self::can_check_typevar_subclass_relation_to_target(db, target) =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
-                subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
+                self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }
 
+            // And vice versa. (No special metaclass handling is needed in this direction, since
+            // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
-                if !subclass_of
-                    .into_type_var()
-                    .zip(source.to_instance(db))
-                    .when_some_and(db, self.constraints, |(target_i, source_i)| {
-                        self.check_type_pair(db, source_i, Type::TypeVar(target_i))
-                    })
-                    .is_never_satisfied(db) =>
+                if subclass_of.is_type_var() && source.to_instance(db).is_some() =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
                     .into_type_var()
                     .zip(source.to_instance(db))
@@ -1838,15 +1897,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if !subclass_of
-                    .into_type_var()
-                    .zip(other.to_instance(db))
-                    .when_none_or(db, self.constraints, |(this_instance, other_instance)| {
-                        self.check_type_pair(db, Type::TypeVar(this_instance), other_instance)
-                    })
-                    .is_always_satisfied(db) =>
+                if subclass_of.is_type_var() && other.to_instance(db).is_some() =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
                     .into_type_var()
                     .zip(other.to_instance(db))

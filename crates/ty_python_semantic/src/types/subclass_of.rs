@@ -237,6 +237,18 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Return a type representing "the set of all instances of the metaclass of this type".
+    pub(crate) fn to_metaclass_instance(self, db: &'db dyn Db) -> Type<'db> {
+        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
+        // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
+        // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
+        // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
+        // `to_instance` then resolves to `M`.
+        self.to_meta_type(db)
+            .to_instance(db)
+            .expect("the meta-type of a SubclassOf type should always be instantiable")
+    }
+
     /// Compute the metatype of this `type[T]`.
     ///
     /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
