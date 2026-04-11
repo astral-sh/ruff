@@ -5,7 +5,7 @@ use lsp_types::{self as types, NumberOrString, TextEdit, Url, request as req};
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
-use ty_ide::code_actions;
+use ty_ide::{code_actions, refactor_code_actions};
 use ty_project::ProjectDatabase;
 use types::{CodeActionKind, CodeActionOrCommand};
 
@@ -41,6 +41,8 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
+        let url = snapshot.url();
+        let encoding = snapshot.encoding();
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
@@ -78,8 +80,6 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // This is only for actions that are messy to compute at the time of the diagnostic.
             // For instance, suggesting imports requires finding symbols for the entire project,
             // which is dubious when you're in the middle of resolving symbols.
-            let url = snapshot.url();
-            let encoding = snapshot.encoding();
             if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
                 && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
             {
@@ -99,6 +99,25 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                         data: None,
                     }));
                 }
+            }
+        }
+
+        if let Some(range) = params.range.to_text_range(db, file, url, encoding) {
+            for action in refactor_code_actions(db, file, range) {
+                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                    title: action.title,
+                    kind: Some(CodeActionKind::REFACTOR),
+                    diagnostics: None,
+                    edit: Some(lsp_types::WorkspaceEdit {
+                        changes: to_lsp_edits(db, file, encoding, action.edits),
+                        document_changes: None,
+                        change_annotations: None,
+                    }),
+                    is_preferred: Some(action.preferred),
+                    command: None,
+                    disabled: None,
+                    data: None,
+                }));
             }
         }
 

@@ -49,6 +49,12 @@ pub fn code_actions(
     actions
 }
 
+pub fn refactor_code_actions(db: &dyn Db, file: File, range: TextRange) -> Vec<CodeAction> {
+    let mut actions = Vec::new();
+
+    actions
+}
+
 fn unresolved_fixes(
     db: &dyn Db,
     file: File,
@@ -72,7 +78,7 @@ fn unresolved_fixes(
 #[cfg(test)]
 mod tests {
 
-    use crate::code_actions;
+    use crate::{code_actions, refactor_code_actions};
 
     use insta::assert_snapshot;
     use ruff_db::{
@@ -789,7 +795,7 @@ mod tests {
     pub(super) struct CodeActionTest {
         pub(super) db: ty_project::TestDb,
         pub(super) file: File,
-        pub(super) diagnostic_range: TextRange,
+        pub(super) range: TextRange,
     }
 
     impl CodeActionTest {
@@ -824,7 +830,7 @@ mod tests {
             Self {
                 db,
                 file,
-                diagnostic_range: TextRange::new(
+                range: TextRange::new(
                     TextSize::try_from(start).unwrap(),
                     TextSize::try_from(end).unwrap(),
                 ),
@@ -841,7 +847,7 @@ mod tests {
                 .show_fix_diff(true)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+            for mut action in code_actions(&self.db, self.file, self.range, &lint.name) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,
@@ -849,7 +855,44 @@ mod tests {
                 );
 
                 diagnostic.annotate(Annotation::primary(
-                    Span::from(self.file).with_range(self.diagnostic_range),
+                    Span::from(self.file).with_range(self.range),
+                ));
+
+                if action.preferred {
+                    diagnostic.sub(SubDiagnostic::new(
+                        ruff_db::diagnostic::SubDiagnosticSeverity::Help,
+                        "This is a preferred code action",
+                    ));
+                }
+
+                let first_edit = action.edits.remove(0);
+                diagnostic.set_fix(Fix::safe_edits(first_edit, action.edits));
+
+                write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
+            }
+
+            buf
+        }
+
+        pub(super) fn refactor_code_actions(&self) -> String {
+            use std::fmt::Write;
+
+            let mut buf = String::new();
+
+            let config = DisplayDiagnosticConfig::new("ty")
+                .color(false)
+                .show_fix_diff(true)
+                .format(DiagnosticFormat::Full);
+
+            for mut action in refactor_code_actions(&self.db, self.file, self.range) {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Lint(LintName::of("code-action(refactor)")),
+                    ruff_db::diagnostic::Severity::Info,
+                    action.title,
+                );
+
+                diagnostic.annotate(Annotation::primary(
+                    Span::from(self.file).with_range(self.range),
                 ));
 
                 if action.preferred {
