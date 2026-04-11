@@ -5559,12 +5559,15 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
 ) {
-    let db = context.db();
+    let signature_span = |function: FunctionType<'db>| {
+        function
+            .literal(context.db())
+            .last_definition
+            .spans(context.db())
+            .signature
+    };
 
-    let signature_span =
-        |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
-
-    let subclass_definition_kind = subclass_definition.kind(db);
+    let subclass_definition_kind = subclass_definition.kind(context.db());
     let subclass_definition_signature_span = signature_span(subclass_function);
 
     // If the function was originally defined elsewhere and simply assigned
@@ -5574,12 +5577,63 @@ pub(super) fn report_invalid_method_override<'db>(
             .range()
             .unwrap_or_else(|| {
                 subclass_function
-                    .node(db, context.file(), context.module())
+                    .node(context.db(), context.file(), context.module())
                     .range
             })
     } else {
-        subclass_definition.full_range(db, context.module()).range()
+        subclass_definition
+            .full_range(context.db(), context.module())
+            .range()
     };
+
+    report_invalid_method_override_impl(
+        context,
+        member,
+        subclass,
+        diagnostic_range,
+        (!subclass_definition_kind.is_function_def()).then_some(subclass_definition_signature_span),
+        superclass,
+        superclass_type,
+        superclass_method_kind,
+    );
+}
+
+pub(super) fn report_invalid_method_override_at_range<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass: ClassType<'db>,
+    range: TextRange,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
+    superclass_method_kind: MethodKind,
+) {
+    report_invalid_method_override_impl(
+        context,
+        member,
+        subclass,
+        range,
+        None,
+        superclass,
+        superclass_type,
+        superclass_method_kind,
+    );
+}
+
+#[expect(clippy::too_many_arguments)]
+pub(super) fn report_invalid_method_override_impl<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass: ClassType<'db>,
+    diagnostic_range: TextRange,
+    subclass_signature_span: Option<Span>,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
+    superclass_method_kind: MethodKind,
+) {
+    let db = context.db();
+
+    let signature_span =
+        |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
 
     let class_name = subclass.name(db);
     let superclass_name = superclass.name(db);
@@ -5630,9 +5684,9 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    if !subclass_definition_kind.is_function_def() {
+    if let Some(subclass_signature_span) = subclass_signature_span {
         diagnostic.annotate(
-            Annotation::secondary(subclass_definition_signature_span)
+            Annotation::secondary(subclass_signature_span)
                 .message(format_args!("Signature of `{class_name}.{member}`")),
         );
     }
@@ -5734,6 +5788,25 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
+pub(super) fn report_overridden_final_method_at_range<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    range: TextRange,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_method_defs: &[FunctionType<'db>],
+) {
+    report_overridden_final_method_impl(
+        context,
+        member,
+        range,
+        None,
+        superclass,
+        subclass,
+        superclass_method_defs,
+    );
+}
+
 pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
@@ -5762,11 +5835,33 @@ pub(super) fn report_overridden_final_method<'db>(
     };
 
     let subclass_definition = property_getter_definition.unwrap_or(subclass_definition);
+    let range = subclass_definition
+        .focus_range(db, context.module())
+        .range();
 
-    let Some(builder) = context.report_lint(
-        &OVERRIDE_OF_FINAL_METHOD,
-        subclass_definition.focus_range(db, context.module()),
-    ) else {
+    report_overridden_final_method_impl(
+        context,
+        member,
+        range,
+        Some((subclass_definition, subclass_type)),
+        superclass,
+        subclass,
+        superclass_method_defs,
+    );
+}
+
+pub(super) fn report_overridden_final_method_impl<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    range: TextRange,
+    subclass_details: Option<(Definition<'db>, Type<'db>)>,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_method_defs: &[FunctionType<'db>],
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&OVERRIDE_OF_FINAL_METHOD, range) else {
         return;
     };
 
@@ -5822,6 +5917,11 @@ pub(super) fn report_overridden_final_method<'db>(
     }
 
     diagnostic.sub(sub);
+
+    let Some((subclass_definition, subclass_type)) = subclass_details else {
+        diagnostic.help(format_args!("Remove the override of `{member}`"));
+        return;
+    };
 
     // It's tempting to autofix properties as well,
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
@@ -5919,12 +6019,47 @@ pub(super) fn report_overridden_final_variable<'db>(
     subclass: ClassType<'db>,
     superclass_definition: Option<Definition<'db>>,
 ) {
+    report_overridden_final_variable_impl(
+        context,
+        member,
+        subclass_definition
+            .focus_range(context.db(), context.module())
+            .range(),
+        superclass,
+        subclass,
+        superclass_definition,
+    );
+}
+
+pub(super) fn report_overridden_final_variable_at_range<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    range: TextRange,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_definition: Option<Definition<'db>>,
+) {
+    report_overridden_final_variable_impl(
+        context,
+        member,
+        range,
+        superclass,
+        subclass,
+        superclass_definition,
+    );
+}
+
+pub(super) fn report_overridden_final_variable_impl<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    range: TextRange,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_definition: Option<Definition<'db>>,
+) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(
-        &OVERRIDE_OF_FINAL_VARIABLE,
-        subclass_definition.focus_range(db, context.module()),
-    ) else {
+    let Some(builder) = context.report_lint(&OVERRIDE_OF_FINAL_VARIABLE, range) else {
         return;
     };
 
