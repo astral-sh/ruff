@@ -1568,6 +1568,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn as_int_like_literal(self) -> Option<i64> {
+        match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => Some(value.as_i64()),
+            Some(LiteralValueTypeKind::Bool(value)) => Some(i64::from(value)),
+            _ => None,
+        }
+    }
+
     pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::LiteralValue(literal) => literal.as_enum(),

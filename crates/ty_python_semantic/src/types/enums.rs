@@ -185,31 +185,6 @@ pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
-    if let ClassLiteral::DynamicEnum(enum_lit) = class {
-        let spec = enum_lit.spec(db);
-        if !spec.has_known_members(db) {
-            return None;
-        }
-        let mut members = FxIndexMap::default();
-        let mut aliases = FxHashMap::default();
-        let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
-        for (name, ty) in spec.members(db) {
-            if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
-                continue;
-            }
-            members.insert(name.clone(), *ty);
-        }
-        if members.is_empty() {
-            return None;
-        }
-        return Some(EnumMetadata {
-            members,
-            aliases,
-            auto_members: FxHashSet::default(),
-            value_annotation: None,
-            init_function: None,
-        });
-    }
     let class = match class {
         ClassLiteral::Static(class) => class,
         ClassLiteral::Dynamic(..) => {
@@ -225,7 +200,31 @@ pub(crate) fn enum_metadata<'db>(
             return None;
         }
         ClassLiteral::DynamicNamedTuple(..) | ClassLiteral::DynamicTypedDict(..) => return None,
-        ClassLiteral::DynamicEnum(..) => unreachable!("handled above"),
+        ClassLiteral::DynamicEnum(enum_lit) => {
+            let spec = enum_lit.spec(db);
+            if !spec.has_known_members(db) {
+                return None;
+            }
+            let mut members = FxIndexMap::default();
+            let mut aliases = FxHashMap::default();
+            let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            for (name, ty) in spec.members(db) {
+                if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
+                    continue;
+                }
+                members.insert(name.clone(), *ty);
+            }
+            if members.is_empty() {
+                return None;
+            }
+            return Some(EnumMetadata {
+                members,
+                aliases,
+                auto_members: FxHashSet::default(),
+                value_annotation: None,
+                init_function: None,
+            });
+        }
     };
 
     // This is a fast path to avoid traversing the MRO of known classes
@@ -248,6 +247,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
     let mut prev_value_was_non_literal_int = false;
+    let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
@@ -338,6 +338,10 @@ pub(crate) fn enum_metadata<'db>(
                                         ) {
                                             if prev_value_was_non_literal_int {
                                                 KnownClass::Int.to_instance(db)
+                                            } else if let Some(prev_bool_literal) =
+                                                prev_bool_literal
+                                            {
+                                                Type::int_literal(i64::from(prev_bool_literal) + 1)
                                             } else {
                                                 Type::int_literal(auto_counter)
                                             }
@@ -405,8 +409,15 @@ pub(crate) fn enum_metadata<'db>(
 
             // track whether this member's value is a non-literal int, so a
             // following `auto()` knows to widen its result to `int`
-            prev_value_was_non_literal_int = value_ty.as_int_literal().is_none()
+            prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
                 && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
+            prev_bool_literal =
+                value_ty
+                    .as_literal_value_kind()
+                    .and_then(|literal| match literal {
+                        LiteralValueTypeKind::Bool(value) => Some(value),
+                        _ => None,
+                    });
 
             Some((name.clone(), value_ty))
         })

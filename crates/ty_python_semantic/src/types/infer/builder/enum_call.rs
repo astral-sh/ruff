@@ -6,7 +6,7 @@ use crate::{
     Db, Program,
     semantic_index::definition::Definition,
     types::{
-        ClassLiteral, KnownClass, Type, TypeContext,
+        ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
@@ -22,6 +22,39 @@ use crate::{
 enum EnumStart {
     Literal(i64),
     DynamicInt,
+}
+
+/// Result of parsing the `names` argument of a functional enum call.
+enum EnumMembersArgParseResult<'db> {
+    /// The argument was parsed into a fully known member list.
+    Known(Vec<(Name, Type<'db>)>),
+    /// The argument is valid, but some members are not known precisely.
+    Unknown,
+    /// The argument is definitely invalid for functional enum creation.
+    Invalid,
+}
+
+/// Classification of one element in a sequence-form `names` argument.
+enum SequenceEnumMember<'db> {
+    /// A known string member name like `"RED"`.
+    NameKnown(Name),
+    /// A name entry whose type is compatible with `str`, but not precise.
+    NameOpaque,
+    /// A known `(name, value)` pair like `("RED", 1)`.
+    PairKnown(Name, Type<'db>),
+    /// A potential `(name, value)` pair whose name position is not precise.
+    PairOpaque,
+    /// An element that cannot participate in functional enum member parsing.
+    Invalid,
+}
+
+/// Distinguishes whether a sequence-form `names` argument uses bare names or explicit pairs.
+#[derive(Copy, Clone)]
+enum SequenceEnumMemberForm {
+    /// The sequence is a list of member names.
+    Names,
+    /// The sequence is a list of explicit `(name, value)` pairs.
+    Pairs,
 }
 
 /// Find enum base class of the given type.
@@ -48,9 +81,32 @@ fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersi
     ) || (name == "boundary" && python_version >= PythonVersion::PY311)
 }
 
-fn has_duplicate_enum_member_names<'db>(members: &[(Name, Type<'db>)]) -> bool {
+fn has_duplicate_enum_member_names(members: &[(Name, Type<'_>)]) -> bool {
     let mut seen = FxHashSet::default();
     members.iter().any(|(name, _)| !seen.insert(name.clone()))
+}
+
+/// Returns the effective `_EnumNames` type accepted by the functional enum APIs.
+///
+/// This includes the string form, iterables of strings, iterables of
+/// iterable-like `(name, value)` pairs, and mappings from `str` to values.
+fn enum_names_type(db: &dyn Db) -> Type<'_> {
+    let str_type = KnownClass::Str.to_instance(db);
+    let iterable_str = KnownClass::Iterable.to_specialized_instance(db, &[str_type]);
+    let iterable_object = KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
+    let iterable_iterable_object =
+        KnownClass::Iterable.to_specialized_instance(db, &[iterable_object]);
+    let mapping_str_object = KnownClass::Mapping
+        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()]);
+    UnionType::from_elements(
+        db,
+        [
+            str_type,
+            iterable_str,
+            iterable_iterable_object,
+            mapping_str_object,
+        ],
+    )
 }
 
 /// Compute the first auto-assigned value for functional enum forms that only specify names.
@@ -114,12 +170,12 @@ fn next_auto_value<'db>(
     }
 }
 
-fn enum_members_from_names<'db>(
-    db: &'db dyn Db,
+fn enum_members_from_names(
+    db: &dyn Db,
     names: Vec<Name>,
     start: EnumStart,
     base_class: KnownClass,
-) -> Vec<(Name, Type<'db>)> {
+) -> Vec<(Name, Type<'_>)> {
     let mut members = Vec::with_capacity(names.len());
     let mut last_int_value = None;
 
@@ -208,12 +264,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(&kw.value, TypeContext::default());
         }
 
-        // Non-literal names use the ordinary `type[EnumSubclass]` overload result
-        // instead of synthesizing a `DynamicEnumLiteral`.
-        let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
-            return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
-        };
-
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
         });
@@ -241,6 +291,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             base_class,
             has_too_many_positional || has_positional_keyword_conflict,
         );
+
+        // Non-literal names use the ordinary `type[EnumSubclass]` overload result
+        // instead of synthesizing a `DynamicEnumLiteral`.
+        let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
+            return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
+        };
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
@@ -346,14 +402,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let (members, has_known_members) = if has_invalid_arguments {
             (vec![], false)
         } else {
-            let (members, has_known_members) =
-                self.parse_enum_members_arg(names_arg, start, base_class);
-            if has_known_members && has_duplicate_enum_member_names(&members) {
-                // Duplicate member names raise at runtime, so degrade to an unknown
-                // member set and let normal call binding surface the rest.
-                (vec![], false)
-            } else {
-                (members, has_known_members)
+            match self.parse_enum_members_arg(names_arg, start, base_class) {
+                EnumMembersArgParseResult::Known(members) => {
+                    if has_duplicate_enum_member_names(&members) {
+                        // Duplicate member names raise at runtime, so degrade to an unknown
+                        // member set and let normal call binding surface the rest.
+                        (vec![], false)
+                    } else {
+                        (members, true)
+                    }
+                }
+                EnumMembersArgParseResult::Unknown => (vec![], false),
+                EnumMembersArgParseResult::Invalid => {
+                    self.report_invalid_enum_names_argument(names_arg, base_class);
+                    (vec![], false)
+                }
             }
         };
 
@@ -400,7 +463,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         names_arg: &ast::Expr,
         start: EnumStart,
         base_class: KnownClass,
-    ) -> (Vec<(Name, Type<'db>)>, bool) {
+    ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let ty = self.expression_type(names_arg);
 
@@ -413,10 +476,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .map(Name::new)
                 .collect();
             if names.is_empty() {
-                return (vec![], false);
+                return EnumMembersArgParseResult::Invalid;
             }
             let members = enum_members_from_names(db, names, start, base_class);
-            return (members, true);
+            return EnumMembersArgParseResult::Known(members);
         }
 
         let elts = match names_arg {
@@ -432,7 +495,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return self.parse_enum_members_from_dict(dict, base_class);
         }
 
-        (vec![], false)
+        if ty.is_dynamic() || ty.is_assignable_to(db, enum_names_type(db)) {
+            EnumMembersArgParseResult::Unknown
+        } else {
+            EnumMembersArgParseResult::Invalid
+        }
     }
 
     fn parse_enum_members_from_sequence(
@@ -440,38 +507,74 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         elts: &[ast::Expr],
         start: EnumStart,
         base_class: KnownClass,
-    ) -> (Vec<(Name, Type<'db>)>, bool) {
+    ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
-        let all_names = elts
-            .iter()
-            .map(|elt| {
-                self.expression_type(elt)
-                    .as_string_literal()
-                    .map(|literal| Name::new(literal.value(db)))
-            })
-            .collect::<Option<Vec<_>>>();
+        let mut names = Vec::with_capacity(elts.len());
+        let mut explicit_members = Vec::with_capacity(elts.len());
+        let mut form = None;
+        let mut has_opaque_members = false;
 
-        if let Some(names) = all_names {
-            return (enum_members_from_names(db, names, start, base_class), true);
+        for elt in elts {
+            match self.classify_sequence_enum_member(elt) {
+                SequenceEnumMember::NameKnown(name) => {
+                    if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
+                        return EnumMembersArgParseResult::Invalid;
+                    }
+                    form = Some(SequenceEnumMemberForm::Names);
+                    names.push(name);
+                }
+                SequenceEnumMember::NameOpaque => {
+                    if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
+                        return EnumMembersArgParseResult::Invalid;
+                    }
+                    form = Some(SequenceEnumMemberForm::Names);
+                    has_opaque_members = true;
+                }
+                SequenceEnumMember::PairKnown(name, value) => {
+                    if matches!(form, Some(SequenceEnumMemberForm::Names)) {
+                        return EnumMembersArgParseResult::Invalid;
+                    }
+                    form = Some(SequenceEnumMemberForm::Pairs);
+                    explicit_members.push((name, value));
+                }
+                SequenceEnumMember::PairOpaque => {
+                    if matches!(form, Some(SequenceEnumMemberForm::Names)) {
+                        return EnumMembersArgParseResult::Invalid;
+                    }
+                    form = Some(SequenceEnumMemberForm::Pairs);
+                    has_opaque_members = true;
+                }
+                SequenceEnumMember::Invalid => return EnumMembersArgParseResult::Invalid,
+            }
+        }
+
+        if has_opaque_members {
+            return EnumMembersArgParseResult::Unknown;
+        }
+
+        if matches!(form, Some(SequenceEnumMemberForm::Names)) {
+            return EnumMembersArgParseResult::Known(enum_members_from_names(
+                db, names, start, base_class,
+            ));
+        }
+        if form.is_none() {
+            return EnumMembersArgParseResult::Invalid;
         }
 
         let mut members = Vec::with_capacity(elts.len());
         // Explicit-value forms match static enums: `start` is ignored and a leading `auto()`
         // still begins from the default seed of `1`.
         let mut last_int_value = Some(0);
-        for elt in elts {
-            let Some((name, value)) = self.parse_explicit_enum_member(elt) else {
-                return (vec![], false);
-            };
+        for (name, value) in explicit_members {
             let value = if value.is_instance_of(db, KnownClass::Auto) {
                 next_auto_value(db, base_class, name.as_str(), last_int_value)
             } else {
                 value
             };
-            last_int_value = value.as_int_literal();
+            last_int_value = value.as_int_like_literal();
             members.push((name, value));
         }
-        (members, true)
+        EnumMembersArgParseResult::Known(members)
     }
 
     /// Parse enum members from a dict literal like `{"RED": 1, "GREEN": 2}`.
@@ -483,17 +586,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         dict: &ast::ExprDict,
         base_class: KnownClass,
-    ) -> (Vec<(Name, Type<'db>)>, bool) {
+    ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
         let mut last_int_value = Some(0);
+        let mut has_opaque_keys = false;
         for item in &dict.items {
             let Some(key) = &item.key else {
-                return (vec![], false);
+                return EnumMembersArgParseResult::Invalid;
             };
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
-                return (vec![], false);
+                if key_ty.is_dynamic()
+                    || key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                {
+                    has_opaque_keys = true;
+                    continue;
+                }
+                return EnumMembersArgParseResult::Invalid;
             };
             let name = Name::new(string_lit.value(db));
             let raw_value = self.expression_type(&item.value);
@@ -502,13 +612,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else {
                 raw_value
             };
-            last_int_value = value.as_int_literal();
+            last_int_value = value.as_int_like_literal();
             members.push((name, value));
         }
-        if members.is_empty() {
-            (vec![], false)
+        if has_opaque_keys {
+            EnumMembersArgParseResult::Unknown
+        } else if members.is_empty() {
+            EnumMembersArgParseResult::Invalid
         } else {
-            (members, true)
+            EnumMembersArgParseResult::Known(members)
         }
     }
 
@@ -527,5 +639,65 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = Name::new(name_ty.as_string_literal()?.value(db));
         let value = self.expression_type(value_expr);
         Some((name, value))
+    }
+
+    /// Returns `true` if `elt` could be an explicit `(name, value)` member pair.
+    ///
+    /// This is used when the name position is not a known string literal, but
+    /// is still compatible with `str`.
+    fn is_potential_explicit_enum_member(&mut self, elt: &ast::Expr) -> bool {
+        let pair = match elt {
+            ast::Expr::Tuple(tup) => &tup.elts,
+            ast::Expr::List(list) => &list.elts,
+            _ => return false,
+        };
+        let [name_expr, _value_expr] = &**pair else {
+            return false;
+        };
+        let db = self.db();
+        let name_ty = self.expression_type(name_expr);
+        name_ty.is_dynamic() || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+    }
+
+    /// Classifies one element from a sequence-form `names` argument.
+    ///
+    /// This distinguishes between known names, opaque names, known explicit
+    /// pairs, opaque explicit pairs, and definitely invalid elements.
+    fn classify_sequence_enum_member(&mut self, elt: &ast::Expr) -> SequenceEnumMember<'db> {
+        let db = self.db();
+        let ty = self.expression_type(elt);
+        if let Some(string_lit) = ty.as_string_literal() {
+            return SequenceEnumMember::NameKnown(Name::new(string_lit.value(db)));
+        }
+        if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
+            return SequenceEnumMember::PairKnown(name, value);
+        }
+        if ty.is_dynamic() || ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+            return SequenceEnumMember::NameOpaque;
+        }
+        if self.is_potential_explicit_enum_member(elt) {
+            return SequenceEnumMember::PairOpaque;
+        }
+        SequenceEnumMember::Invalid
+    }
+
+    fn report_invalid_enum_names_argument(
+        &mut self,
+        names_arg: &ast::Expr,
+        base_class: KnownClass,
+    ) {
+        let db = self.db();
+        let base_name = base_class.name(db);
+        let names_ty = self.expression_type(names_arg);
+        if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, names_arg) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `names` of `{base_name}()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `{}`, found `{}`",
+                enum_names_type(db).display(db),
+                names_ty.display(db),
+            ));
+        }
     }
 }

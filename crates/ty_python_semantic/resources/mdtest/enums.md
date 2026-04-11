@@ -725,6 +725,22 @@ def f(n: int):
     reveal_type(Dynamic.B.value)  # revealed: int
 ```
 
+Bool literals are still concrete predecessors for `auto()`:
+
+```py
+class AfterFalse(Enum):
+    A = False
+    B = auto()
+
+reveal_type(AfterFalse.B.value)  # revealed: Literal[1]
+
+class AfterTrue(Enum):
+    A = True
+    B = auto()
+
+reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
+```
+
 When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
 
 ```py
@@ -1452,6 +1468,18 @@ reveal_type(Mixed.B.value)  # revealed: Literal[11]
 reveal_type(Mixed.C.value)  # revealed: Literal[12]
 ```
 
+This also applies when the previous value is a bool literal:
+
+```py
+from enum import Enum, auto
+
+AfterFalse = Enum("AfterFalse", {"A": False, "B": auto()})
+reveal_type(AfterFalse.B.value)  # revealed: Literal[1]
+
+AfterTrue = Enum("AfterTrue", {"A": True, "B": auto()})
+reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
+```
+
 ### `auto()` in tuple/list entries
 
 `auto()` should also expand in tuple/list entry forms of the functional syntax:
@@ -1579,6 +1607,13 @@ def make_enum(name: str, labels: tuple[str, ...]) -> type[Enum]:
     result = Enum(name.title(), labels, module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result
+
+def validate_other_args(name: str) -> None:
+    # error: [invalid-argument-type]
+    Enum(name, "RED", start="0")
+
+    # error: [invalid-argument-type]
+    Enum(name, "RED", type=1)
 ```
 
 ### Non-string name
@@ -1597,6 +1632,20 @@ from enum import Enum
 
 # error: [unknown-argument]
 Color = Enum("Color", "RED GREEN BLUE", bad_kwarg=True)
+```
+
+### Definitely invalid `names` arguments
+
+Functional enums should still reject `names` values that are definitely not `_EnumNames`:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# error: [invalid-argument-type]
+Color = Enum("Color", 123)
+
+reveal_type(enum_members(Color))  # revealed: Unknown
 ```
 
 ### Keyword argument type validation
