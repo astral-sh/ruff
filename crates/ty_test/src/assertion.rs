@@ -217,6 +217,9 @@ impl<'a> Deref for LineAssertions<'a> {
 /// in the event of an invalid assertion
 #[derive(Debug)]
 pub(crate) enum UnparsedAssertion<'a> {
+    /// A `# snapshot` assertion.
+    Snapshot,
+
     /// A `# revealed:` assertion.
     Revealed(&'a str),
 
@@ -229,6 +232,10 @@ impl<'a> UnparsedAssertion<'a> {
     /// indicating that it is an assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         let comment = comment.trim().strip_prefix('#')?.trim();
+        if comment == "snapshot" {
+            return Some(Self::Snapshot);
+        }
+
         let (keyword, body) = comment.split_once(':')?;
         let keyword = keyword.trim();
 
@@ -252,6 +259,7 @@ impl<'a> UnparsedAssertion<'a> {
     /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
     pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
         match self {
+            Self::Snapshot => Err(PragmaParseError::UnexpectedSnapshotAssertion),
             Self::Revealed(revealed) => {
                 if revealed.is_empty() {
                     Err(PragmaParseError::EmptyRevealTypeAssertion)
@@ -264,11 +272,16 @@ impl<'a> UnparsedAssertion<'a> {
                 .map_err(PragmaParseError::ErrorAssertionParseError),
         }
     }
+
+    pub(crate) const fn is_snapshot(&self) -> bool {
+        matches!(self, Self::Snapshot)
+    }
 }
 
 impl std::fmt::Display for UnparsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Snapshot => f.write_str("snapshot"),
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => write!(f, "error: {assertion}"),
         }
@@ -447,6 +460,8 @@ impl<'a> ErrorAssertionParser<'a> {
 /// The assertion comment could be either a "revealed" assertion or an "error" assertion.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum PragmaParseError<'a> {
+    #[error("`# snapshot` cannot be used as an inline assertion")]
+    UnexpectedSnapshotAssertion,
     #[error("Must specify which type should be revealed")]
     EmptyRevealTypeAssertion,
     #[error("{0}")]

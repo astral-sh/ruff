@@ -4762,6 +4762,7 @@ dependencies = [
  "rustc-stable-hash",
  "salsa",
  "serde",
+ "similar",
  "smallvec",
  "tempfile",
  "thiserror 2.0.18",
@@ -4770,7 +4771,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_python_core",
  "ty_python_semantic",
- "ty_static",
  "ty_vendored",
 ]
 

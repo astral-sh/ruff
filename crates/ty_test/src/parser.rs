@@ -218,6 +218,12 @@ struct EmbeddedFileId;
 #[derive(Debug, Clone)]
 pub(crate) struct BacktickOffsets(TextSize, TextSize);
 
+#[derive(Debug, Clone)]
+pub(crate) struct InlineSnapshotBlock<'s> {
+    pub(crate) expected: &'s str,
+    pub(crate) content_range: TextRange,
+}
+
 /// Holds information about the position and length of all code blocks that are part of
 /// a single embedded file in a Markdown file. This is used to reconstruct absolute line
 /// numbers (in the Markdown file) from relative line numbers (in the embedded file).
@@ -353,17 +359,26 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) lang: &'s str,
     pub(crate) code: Cow<'s, str>,
     pub(crate) backtick_offsets: Vec<BacktickOffsets>,
+    pub(crate) inline_snapshot_block: Option<InlineSnapshotBlock<'s>>,
+    insertion_offset: TextSize,
 }
 
 impl EmbeddedFile<'_> {
-    fn append_code(&mut self, backtick_offsets: BacktickOffsets, new_code: &str) {
+    fn append_code(
+        &mut self,
+        backtick_offsets: BacktickOffsets,
+        new_code: &str,
+        insertion_offset: TextSize,
+    ) {
         // Treat empty code blocks as non-existent, instead of creating
         // an additional empty line:
         if new_code.is_empty() {
+            self.insertion_offset = insertion_offset;
             return;
         }
 
         self.backtick_offsets.push(backtick_offsets);
+        self.insertion_offset = insertion_offset;
 
         let existing_code = self.code.to_mut();
         existing_code.push('\n');
@@ -384,6 +399,14 @@ impl EmbeddedFile<'_> {
         } else {
             project_root.join(relative_path)
         }
+    }
+
+    pub(crate) fn is_checkable(&self) -> bool {
+        matches!(self.lang, "py" | "python" | "pyi")
+    }
+
+    pub(crate) fn insertion_offset(&self) -> TextSize {
+        self.insertion_offset
     }
 }
 
@@ -446,6 +469,9 @@ struct Parser<'s> {
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
 
+    /// The most recent checkable embedded file in the current section.
+    current_section_last_checkable_file: Option<EmbeddedFileId>,
+
     /// Whether or not any section in the file has external dependencies.
     /// Only one section per file is allowed to have dependencies (for lockfile support).
     file_has_dependencies: bool,
@@ -471,6 +497,7 @@ impl<'s> Parser<'s> {
             stack: SectionStack::new(root_section_id),
             current_section_files: FxHashMap::default(),
             current_section_has_config: false,
+            current_section_last_checkable_file: None,
             file_has_dependencies: false,
         }
     }
@@ -624,6 +651,8 @@ impl<'s> Parser<'s> {
                             );
                         }
 
+                        let code_start = self.cursor.offset();
+
                         if let Some(position) =
                             memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
                         {
@@ -635,11 +664,24 @@ impl<'s> Parser<'s> {
                             }
 
                             let backtick_offset_end = self.cursor.offset() - "```".text_len();
+                            let content_range = TextRange::new(
+                                code_start,
+                                code_start
+                                    + TextSize::try_from(code.len())
+                                        .expect("content length fits in TextSize"),
+                            );
+                            let insertion_offset = if self.cursor.first() == '\n' {
+                                self.cursor.offset() + '\n'.text_len()
+                            } else {
+                                self.cursor.offset()
+                            };
 
                             self.process_code_block(
                                 lang,
                                 code,
                                 BacktickOffsets(backtick_offset_start, backtick_offset_end),
+                                content_range,
+                                insertion_offset,
                             )?;
                         } else {
                             let code_block_start = self.cursor.token_len();
@@ -718,6 +760,7 @@ impl<'s> Parser<'s> {
 
         self.current_section_files.clear();
         self.current_section_has_config = false;
+        self.current_section_last_checkable_file = None;
 
         Ok(())
     }
@@ -727,10 +770,16 @@ impl<'s> Parser<'s> {
         lang: &'s str,
         code: &'s str,
         backtick_offsets: BacktickOffsets,
+        content_range: TextRange,
+        insertion_offset: TextSize,
     ) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
         let test_name = self.sections[section].title;
+
+        if lang == "diagnostics" {
+            return self.process_inline_snapshot_block(code, content_range, test_name);
+        }
 
         if lang == "toml" {
             return self.process_config_block(code);
@@ -799,7 +848,12 @@ impl<'s> Parser<'s> {
                     lang,
                     code: Cow::Borrowed(code),
                     backtick_offsets: vec![backtick_offsets],
+                    inline_snapshot_block: None,
+                    insertion_offset,
                 });
+                if self.files[index].is_checkable() {
+                    self.current_section_last_checkable_file = Some(index);
+                }
                 entry.insert(index);
             }
             Entry::Occupied(entry) => {
@@ -817,9 +871,43 @@ impl<'s> Parser<'s> {
                 }
 
                 let index = *entry.get();
-                self.files[index].append_code(backtick_offsets, code);
+                self.files[index].append_code(backtick_offsets, code, insertion_offset);
+                if self.files[index].is_checkable() {
+                    self.current_section_last_checkable_file = Some(index);
+                }
             }
         }
+
+        Ok(())
+    }
+
+    fn process_inline_snapshot_block(
+        &mut self,
+        code: &'s str,
+        content_range: TextRange,
+        test_name: &str,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.explicit_path.is_none(),
+            "Inline diagnostics blocks in test `{test_name}` must not have explicit file paths.",
+        );
+
+        let Some(file_id) = self.current_section_last_checkable_file else {
+            bail!(
+                "Inline diagnostics block in test `{test_name}` must follow a checkable Python file block in the same section.",
+            );
+        };
+
+        let file = &mut self.files[file_id];
+        anyhow::ensure!(
+            file.inline_snapshot_block.is_none(),
+            "File `{}` in test `{test_name}` has more than one inline diagnostics block.",
+            file.relative_path(),
+        );
+        file.inline_snapshot_block = Some(InlineSnapshotBlock {
+            expected: code,
+            content_range,
+        });
 
         Ok(())
     }
@@ -897,6 +985,7 @@ impl<'s> Parser<'s> {
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
             self.current_section_files.clear();
+            self.current_section_last_checkable_file = None;
         }
     }
 

@@ -1,6 +1,6 @@
 use crate::config::Log;
 use crate::db::Db;
-use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap, InlineSnapshotBlock};
 use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
@@ -14,6 +14,8 @@ use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::TextRange;
+use similar::{ChangeTag, TextDiff};
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
 use ty_module_resolver::{
@@ -35,7 +37,10 @@ mod external_dependencies;
 mod matcher;
 mod parser;
 
-use ty_static::EnvVars;
+use crate::assertion::InlineFileAssertions;
+
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -53,8 +58,10 @@ pub fn run(
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
+    let update_mode = SnapshotUpdateMode::from_env();
+    let mut markdown_edits = vec![];
 
-    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     let mut assertion = String::new();
     for test in suite.tests() {
@@ -76,8 +83,16 @@ pub fn run(
             relative_fixture_path,
             snapshot_path,
             &test,
+            update_mode,
+            output_format,
         );
-        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+        if let Ok((_, edits)) = &result {
+            markdown_edits.extend(edits.iter().cloned());
+        }
+        let inconsistencies = if result
+            .as_ref()
+            .is_ok_and(|(outcome, _)| outcome.has_been_skipped())
+        {
             Ok(())
         } else {
             run_module_resolution_consistency_test(&db)
@@ -90,7 +105,7 @@ pub fn run(
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = result {
+        if let Err(failures) = result.map(|(outcome, _)| outcome) {
             let md_index = LineIndex::from_source_text(source);
 
             for test_failures in failures {
@@ -144,18 +159,20 @@ pub fn run(
             let _ = writeln!(
                 assertion,
                 "\nTo rerun this specific test, \
-                set the environment variable: {}='{escaped_test_name}'",
-                EnvVars::MDTEST_TEST_FILTER,
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             let _ = writeln!(
                 assertion,
-                "{}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic \
                 --test mdtest -- {test_name}",
-                EnvVars::MDTEST_TEST_FILTER,
             );
 
             let _ = writeln!(assertion, "\n{}", "-".repeat(50));
         }
+    }
+
+    if !markdown_edits.is_empty() {
+        apply_markdown_edits(absolute_fixture_path, source, markdown_edits)?;
     }
 
     assert!(!any_failures, "{}", &assertion);
@@ -244,13 +261,41 @@ impl TestOutcome {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SnapshotUpdateMode {
+    Disabled,
+    Enabled,
+}
+
+impl SnapshotUpdateMode {
+    fn from_env() -> Self {
+        if std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some() {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
+
+    const fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MarkdownEdit {
+    range: TextRange,
+    replacement: String,
+}
+
 fn run_test(
     db: &mut db::Db,
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
-) -> Result<TestOutcome, Failures> {
+    update_mode: SnapshotUpdateMode,
+    output_format: OutputFormat,
+) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -285,7 +330,7 @@ fn run_test(
     let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
     if let Some(dependencies) = test.configuration().dependencies() {
         if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
-            return Ok(TestOutcome::Skipped);
+            return Ok((TestOutcome::Skipped, vec![]));
         }
 
         let python_platform = test.configuration().python_platform().expect(
@@ -308,7 +353,7 @@ fn run_test(
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
-    let test_files: Vec<_> = test
+    let test_files: Vec<TestFile<'_>> = test
         .files()
         .filter_map(|embedded| {
             if embedded.lang == "ignore" {
@@ -379,6 +424,9 @@ fn run_test(
             Some(TestFile {
                 file,
                 backtick_offsets: embedded.backtick_offsets.clone(),
+                relative_path: embedded.relative_path(),
+                inline_snapshot_block: embedded.inline_snapshot_block.clone(),
+                insertion_offset: embedded.insertion_offset(),
             })
         })
         .collect();
@@ -471,6 +519,7 @@ fn run_test(
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
     let mut snapshot_diagnostics = vec![];
+    let mut markdown_edits = vec![];
 
     let mut any_pull_types_failures = false;
     let mut panic_info = None;
@@ -499,13 +548,34 @@ fn run_test(
                 }),
             };
 
+            let inline_snapshot_failure = match validate_inline_snapshot(
+                db,
+                test,
+                test_file,
+                &diagnostics,
+                update_mode,
+                output_format,
+                &mut markdown_edits,
+            ) {
+                Ok(()) => None,
+                Err(by_line) => Some(FileFailures {
+                    backtick_offsets: test_file.backtick_offsets.clone(),
+                    by_line,
+                }),
+            };
+
             // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
             // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
-                    diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                }));
+                snapshot_diagnostics.extend(
+                    diagnostics
+                        .iter()
+                        .filter(|diagnostic| {
+                            diagnostic.id() != DiagnosticId::RevealedType
+                                && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                        })
+                        .cloned(),
+                );
             }
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
@@ -526,7 +596,16 @@ fn run_test(
                 }
             }
 
-            failure
+            match (failure, inline_snapshot_failure) {
+                (Some(mut existing), Some(inline_failures)) => {
+                    for (line_number, messages) in inline_failures.by_line.iter() {
+                        existing.by_line.push(line_number, messages.to_vec());
+                    }
+                    Some(existing)
+                }
+                (Some(failure), None) | (None, Some(failure)) => Some(failure),
+                (None, None) => None,
+            }
         })
         .collect();
 
@@ -601,7 +680,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(TestOutcome::Success)
+        Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
     }
@@ -698,6 +777,7 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
 type Failures = Vec<FileFailures>;
 
 /// The failures for a single file in a test by line number.
+#[derive(Debug)]
 struct FileFailures {
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
     backtick_offsets: Vec<BacktickOffsets>,
@@ -707,11 +787,287 @@ struct FileFailures {
 }
 
 /// File in a test.
-struct TestFile {
+struct TestFile<'a> {
     file: File,
 
     /// Positional information about the code block(s) to reconstruct absolute line numbers.
     backtick_offsets: Vec<BacktickOffsets>,
+
+    relative_path: &'a str,
+    inline_snapshot_block: Option<InlineSnapshotBlock<'a>>,
+    insertion_offset: ruff_text_size::TextSize,
+}
+
+struct InlineSnapshotSelection {
+    ordered_lines: Vec<OneIndexed>,
+    selected_lines: rustc_hash::FxHashSet<OneIndexed>,
+}
+
+fn collect_inline_snapshot_selection(
+    db: &Db,
+    file: File,
+) -> Result<InlineSnapshotSelection, matcher::FailuresByLine> {
+    let assertions = InlineFileAssertions::from_file(db, file);
+    let mut failures = matcher::FailuresByLine::default();
+    let mut ordered_lines = vec![];
+    let mut selected_lines = rustc_hash::FxHashSet::default();
+
+    for line_assertions in &assertions {
+        let snapshot_count = line_assertions
+            .assertions
+            .iter()
+            .filter(|assertion| assertion.is_snapshot())
+            .count();
+        if snapshot_count > 1 {
+            failures.push(
+                line_assertions.line_number,
+                vec!["invalid assertion: multiple `# snapshot` comments for one line".to_string()],
+            );
+        } else if snapshot_count == 1 {
+            ordered_lines.push(line_assertions.line_number);
+            selected_lines.insert(line_assertions.line_number);
+        }
+    }
+
+    if failures.iter().next().is_none() {
+        Ok(InlineSnapshotSelection {
+            ordered_lines,
+            selected_lines,
+        })
+    } else {
+        Err(failures)
+    }
+}
+
+fn diagnostic_display_config() -> DisplayDiagnosticConfig {
+    DisplayDiagnosticConfig::new("ty")
+        .color(false)
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly)
+}
+
+fn render_diagnostic(db: &mut db::Db, diagnostic: &Diagnostic) -> String {
+    diagnostic
+        .display(db, &diagnostic_display_config())
+        .to_string()
+}
+
+fn render_diagnostics(
+    db: &mut db::Db,
+    diagnostics: impl IntoIterator<Item = Diagnostic>,
+) -> String {
+    let mut rendered = String::new();
+    for (index, diag) in diagnostics.into_iter().enumerate() {
+        if index > 0 {
+            writeln!(rendered).unwrap();
+        }
+        write!(rendered, "{}", render_diagnostic(db, &diag)).unwrap();
+    }
+    rendered.trim_end_matches('\n').to_string()
+}
+
+fn validate_inline_snapshot(
+    db: &mut db::Db,
+    test: &parser::MarkdownTest,
+    test_file: &TestFile<'_>,
+    diagnostics: &[Diagnostic],
+    update_mode: SnapshotUpdateMode,
+    output_format: OutputFormat,
+    markdown_edits: &mut Vec<MarkdownEdit>,
+) -> Result<(), matcher::FailuresByLine> {
+    let snapshot_selection = collect_inline_snapshot_selection(db, test_file.file)?;
+    let has_snapshot_markers = !snapshot_selection.ordered_lines.is_empty();
+    let has_snapshot_block = test_file.inline_snapshot_block.is_some();
+
+    let mut failures = matcher::FailuresByLine::default();
+
+    if has_snapshot_markers && test.should_snapshot_diagnostics() {
+        failures.push(
+            OneIndexed::from_zero_indexed(0),
+            vec![
+                "inline `# snapshot` markers cannot be combined with `<!-- snapshot-diagnostics -->`"
+                    .to_string(),
+            ],
+        );
+    }
+
+    if has_snapshot_block && !has_snapshot_markers {
+        failures.push(
+            OneIndexed::from_zero_indexed(0),
+            vec![format!(
+                "file `{}` has an inline diagnostics block but no `# snapshot` markers",
+                test_file.relative_path
+            )],
+        );
+    }
+
+    if failures.iter().next().is_some() {
+        return Err(failures);
+    }
+
+    if !has_snapshot_markers {
+        return Ok(());
+    }
+
+    let line_index = ruff_db::source::line_index(db, test_file.file);
+    let mut selected_diagnostics = vec![];
+    let mut matched_lines = rustc_hash::FxHashSet::default();
+
+    for diagnostic in diagnostics {
+        let Some(range) = diagnostic.primary_span().and_then(|span| span.range()) else {
+            continue;
+        };
+        let line_number = line_index.line_index(range.start());
+        if snapshot_selection.selected_lines.contains(&line_number) {
+            matched_lines.insert(line_number);
+            selected_diagnostics.push(diagnostic.clone());
+        }
+    }
+
+    for line_number in &snapshot_selection.ordered_lines {
+        if !matched_lines.contains(line_number) {
+            failures.push(
+                *line_number,
+                vec!["`# snapshot` did not match any diagnostics on this line".to_string()],
+            );
+        }
+    }
+
+    if failures.iter().next().is_some() {
+        return Err(failures);
+    }
+
+    let rendered = render_diagnostics(db, selected_diagnostics);
+
+    match &test_file.inline_snapshot_block {
+        Some(snapshot_block) => {
+            if snapshot_block.expected == rendered {
+                return Ok(());
+            }
+
+            if update_mode.is_enabled() {
+                tracing::info!(
+                    "Updated inline diagnostics snapshot for mdtest `{}` file `{}`",
+                    test.name(),
+                    test_file.relative_path
+                );
+                markdown_edits.push(MarkdownEdit {
+                    range: snapshot_block.content_range,
+                    replacement: rendered,
+                });
+                return Ok(());
+            }
+
+            let diff =
+                render_snapshot_diff(snapshot_block.expected, &rendered, output_format.is_cli());
+            failures.push(
+                OneIndexed::from_zero_indexed(0),
+                vec![format!(
+                    "inline diagnostics snapshot for file `{}` is out of date; set `{}` to rewrite the `diagnostics` block\n{diff}",
+                    test_file.relative_path,
+                    MDTEST_UPDATE_SNAPSHOTS,
+                )],
+            );
+            Err(failures)
+        }
+        None => {
+            if update_mode.is_enabled() {
+                tracing::info!(
+                    "Inserted inline diagnostics snapshot for mdtest `{}` file `{}`",
+                    test.name(),
+                    test_file.relative_path
+                );
+                markdown_edits.push(MarkdownEdit {
+                    range: TextRange::empty(test_file.insertion_offset),
+                    replacement: format!("\n\n```diagnostics\n{rendered}\n```"),
+                });
+                Ok(())
+            } else {
+                failures.push(
+                    OneIndexed::from_zero_indexed(0),
+                    vec![format!(
+                        "file `{}` has `# snapshot` markers but no inline diagnostics block; set `{}` to insert one",
+                        test_file.relative_path,
+                        MDTEST_UPDATE_SNAPSHOTS,
+                    )],
+                );
+                Err(failures)
+            }
+        }
+    }
+}
+
+fn render_snapshot_diff(expected: &str, actual: &str, use_color: bool) -> String {
+    let diff = TextDiff::from_lines(expected, actual);
+    let mut rendered = String::new();
+
+    if use_color {
+        colored::control::set_override(true);
+    }
+
+    let result = {
+        if use_color {
+            writeln!(rendered, "{}", "--- expected".red()).unwrap();
+            writeln!(rendered, "{}", "+++ actual".green()).unwrap();
+        } else {
+            writeln!(rendered, "--- expected").unwrap();
+            writeln!(rendered, "+++ actual").unwrap();
+        }
+
+        let mut unified = diff.unified_diff();
+        let unified = unified.header("expected", "actual");
+        for hunk in unified.iter_hunks() {
+            writeln!(rendered, "{}", hunk.header()).unwrap();
+            for change in hunk.iter_changes() {
+                let value = change.value();
+                match (change.tag(), use_color) {
+                    (ChangeTag::Equal, _) => write!(rendered, " {value}").unwrap(),
+                    (ChangeTag::Delete, true) => {
+                        write!(rendered, "{}{}", "-".red(), value.red()).unwrap();
+                    }
+                    (ChangeTag::Insert, true) => {
+                        write!(rendered, "{}{}", "+".green(), value.green()).unwrap();
+                    }
+                    (ChangeTag::Delete, false) => write!(rendered, "-{value}").unwrap(),
+                    (ChangeTag::Insert, false) => write!(rendered, "+{value}").unwrap(),
+                }
+
+                if !diff.newline_terminated() || change.missing_newline() {
+                    writeln!(rendered).unwrap();
+                }
+            }
+        }
+        rendered.trim_end().to_string()
+    };
+
+    if use_color {
+        colored::control::unset_override();
+    }
+
+    result
+}
+
+fn apply_markdown_edits(
+    absolute_fixture_path: &Utf8Path,
+    source: &str,
+    edits: Vec<MarkdownEdit>,
+) -> anyhow::Result<()> {
+    let updated = apply_markdown_edits_to_source(source, edits);
+    std::fs::write(absolute_fixture_path, updated)?;
+    Ok(())
+}
+
+fn apply_markdown_edits_to_source(source: &str, mut edits: Vec<MarkdownEdit>) -> String {
+    edits.sort_by_key(|edit| edit.range.start());
+
+    let mut updated = source.to_string();
+    for edit in edits.into_iter().rev() {
+        updated.replace_range(
+            edit.range.start().to_usize()..edit.range.end().to_usize(),
+            &edit.replacement,
+        );
+    }
+    updated
 }
 
 fn create_diagnostic_snapshot(
@@ -720,11 +1076,6 @@ fn create_diagnostic_snapshot(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::new("ty")
-        .color(false)
-        .show_fix_diff(true)
-        .with_fix_applicability(Applicability::DisplayOnly);
-
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
@@ -756,12 +1107,12 @@ fn create_diagnostic_snapshot(
 
     writeln!(snapshot, "# Diagnostics").unwrap();
     writeln!(snapshot).unwrap();
-    for (i, diag) in diagnostics.into_iter().enumerate() {
-        if i > 0 {
+    for (index, diagnostic) in diagnostics.into_iter().enumerate() {
+        if index > 0 {
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
+        write!(snapshot, "{}", render_diagnostic(db, &diagnostic)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
@@ -776,7 +1127,7 @@ fn create_diagnostic_snapshot(
 fn attempt_test<'db, 'a, T, F>(
     db: &'db Db,
     test_fn: F,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 ) -> Result<T, AttemptTestError<'a>>
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
@@ -787,7 +1138,7 @@ where
 
 struct AttemptTestError<'a> {
     info: PanicError,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 }
 
 impl AttemptTestError<'_> {
@@ -847,5 +1198,181 @@ impl AttemptTestError<'_> {
             backtick_offsets: self.test_file.backtick_offsets.clone(),
             by_line,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use camino::Utf8PathBuf;
+    use ruff_python_trivia::textwrap::dedent;
+
+    fn run_inline_snapshot_test(
+        source: &str,
+        update_mode: SnapshotUpdateMode,
+    ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
+        let suite = test_parser::parse("fixture.md", source).unwrap();
+        let test = suite.tests().next().expect("expected one test");
+        let mut db = db::Db::setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let absolute_fixture_path =
+            Utf8PathBuf::from_path_buf(temp_dir.path().join("fixture.md")).unwrap();
+        let snapshot_path = Utf8PathBuf::from_path_buf(temp_dir.path().join("snapshots")).unwrap();
+        std::fs::create_dir_all(&snapshot_path).unwrap();
+
+        run_test(
+            &mut db,
+            &absolute_fixture_path,
+            Utf8Path::new("fixture.md"),
+            &snapshot_path,
+            &test,
+            update_mode,
+            OutputFormat::Cli,
+        )
+    }
+
+    fn flatten_failures(failures: &[FileFailures]) -> Vec<String> {
+        failures
+            .iter()
+            .flat_map(|file_failures| file_failures.by_line.iter())
+            .flat_map(|(_, messages)| messages.iter().cloned())
+            .collect()
+    }
+
+    #[test]
+    fn inline_snapshot_requires_block_without_update_mode() {
+        let source = dedent(
+            r#"
+            ```py
+            # snapshot
+            x: int = "a"  # error: [invalid-assignment]
+            ```
+            "#,
+        );
+
+        let failures = run_inline_snapshot_test(&source, SnapshotUpdateMode::Disabled)
+            .expect_err("missing inline block should fail");
+        let messages = flatten_failures(&failures);
+
+        assert!(messages.iter().any(|message| {
+            message.contains("has `# snapshot` markers but no inline diagnostics block")
+        }));
+    }
+
+    #[test]
+    fn inline_snapshot_generates_insert_edit_in_update_mode() {
+        let source = dedent(
+            r#"
+            ```py
+            # snapshot
+            x: int = "a"  # error: [invalid-assignment]
+            ```
+            "#,
+        );
+
+        let (_, edits) = run_inline_snapshot_test(&source, SnapshotUpdateMode::Enabled).unwrap();
+
+        assert_eq!(edits.len(), 1);
+        assert!(edits[0].replacement.contains("```diagnostics"));
+        assert!(edits[0].replacement.contains("error[invalid-assignment]"));
+    }
+
+    #[test]
+    fn inline_snapshot_rewrites_existing_block_in_update_mode() {
+        let source = dedent(
+            r#"
+            ```py
+            # snapshot
+            x: int = "a"  # error: [invalid-assignment]
+            ```
+
+            ```diagnostics
+            stale
+            ```
+            "#,
+        );
+
+        let (_, edits) = run_inline_snapshot_test(&source, SnapshotUpdateMode::Enabled).unwrap();
+
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].replacement, edits[0].replacement.trim_end());
+        assert!(edits[0].replacement.contains("error[invalid-assignment]"));
+        assert!(!edits[0].replacement.contains("stale"));
+    }
+
+    #[test]
+    fn inline_snapshot_mismatch_error_mentions_update_command() {
+        let source = dedent(
+            r#"
+            ```py
+            # snapshot
+            x: int = "a"  # error: [invalid-assignment]
+            ```
+
+            ```diagnostics
+            stale
+            ```
+            "#,
+        );
+
+        let failures = run_inline_snapshot_test(&source, SnapshotUpdateMode::Disabled)
+            .expect_err("stale inline snapshot should fail");
+        let messages = flatten_failures(&failures);
+
+        assert!(messages.iter().any(|message| {
+            message.contains("is out of date")
+                && message.contains("MDTEST_UPDATE_SNAPSHOTS")
+                && message.contains("diagnostics` block")
+        }));
+    }
+
+    #[test]
+    fn inline_snapshot_block_without_markers_fails() {
+        let source = dedent(
+            r#"
+            ```py
+            x: int = "a"  # error: [invalid-assignment]
+            ```
+
+            ```diagnostics
+            error[invalid-assignment]
+            ```
+            "#,
+        );
+
+        let failures = run_inline_snapshot_test(&source, SnapshotUpdateMode::Disabled)
+            .expect_err("orphaned diagnostics block should fail");
+        let messages = flatten_failures(&failures);
+
+        assert!(messages.iter().any(|message| {
+            message.contains("has an inline diagnostics block but no `# snapshot` markers")
+        }));
+    }
+
+    #[test]
+    fn multiple_markdown_edits_apply_against_original_offsets() {
+        let source = "aaa\nbbb\nccc\n";
+        let updated = apply_markdown_edits_to_source(
+            source,
+            vec![
+                MarkdownEdit {
+                    range: TextRange::new(0.into(), 3.into()),
+                    replacement: "first-longer".to_string(),
+                },
+                MarkdownEdit {
+                    range: TextRange::new(8.into(), 11.into()),
+                    replacement: "second".to_string(),
+                },
+            ],
+        );
+
+        assert_eq!(updated, "first-longer\nbbb\nsecond\n");
+    }
+
+    #[test]
+    fn snapshot_diff_is_colored_for_cli_output() {
+        let diff = render_snapshot_diff("old\n", "new\n", true);
+
+        assert!(diff.contains("\u{1b}["));
     }
 }

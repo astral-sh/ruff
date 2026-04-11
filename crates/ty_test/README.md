@@ -141,31 +141,54 @@ f(2)  # error: [invalid-argument-type]
 
 ## Diagnostic Snapshotting
 
-In addition to inline assertions, one can also snapshot the full diagnostic
-output of a test. This is done by adding a `<!-- snapshot-diagnostics -->` directive
-in the corresponding section. For example:
+Inline snapshots store rendered diagnostics directly in the Markdown fixture.
+
+Add `# snapshot` to the lines you want to snapshot, then add a fenced
+`diagnostics` block after the corresponding `py` / `pyi` file block:
 
 ````markdown
-## Unresolvable module import
-
-<!-- snapshot-diagnostics -->
-
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+# snapshot
+x: int = "a"  # error: [invalid-assignment]
+
+# snapshot
+reveal_type(x)  # revealed: int
+```
+
+Some explanatory prose can go here.
+
+```diagnostics
+error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | x: int = "a"  # error: [invalid-assignment]
+  |          ^^^
+
+info: Revealed type is `int`
+ --> src/mdtest_snippet.py:5:13
+  |
+5 | reveal_type(x)  # revealed: int
+  |             ^
 ```
 ````
 
-The `snapshot-diagnostics` directive must appear before anything else in
-the section.
+`# snapshot` follows the same placement rules as other inline assertions.
 
-This will use `insta` to manage an external file snapshot of all diagnostic
-output generated.
+To insert or rewrite inline snapshots automatically, run mdtest with
+`MDTEST_UPDATE_SNAPSHOTS` set. For example:
 
-Inline assertions, as described above, may be used in conjunction with diagnostic
-snapshotting.
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diagnostics/missing_argument.md
+```
 
-At present, there is no way to do inline snapshotting or to request more granular
-snapshotting of specific diagnostics.
+Or with a test-name filter:
+
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 MDTEST_TEST_FILTER="Missing argument diagnostics" cargo test -p ty_python_semantic --test mdtest -- --nocapture
+```
+
+External `<!-- snapshot-diagnostics -->` snapshots are still supported, but
+inline snapshots are generally preferred for new tests.
 
 ## Expected panics
 

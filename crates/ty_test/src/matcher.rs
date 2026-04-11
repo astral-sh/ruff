@@ -69,7 +69,18 @@ pub(super) fn match_file(
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
 
     // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
-    let mut line_assertions = assertions.iter();
+    let mut line_assertions = assertions.iter().filter_map(|line_assertions| {
+        let assertions = line_assertions
+            .assertions
+            .into_iter()
+            .filter(|assertion| !assertion.is_snapshot())
+            .collect::<smallvec::SmallVec<[UnparsedAssertion<'_>; 1]>>();
+
+        (!assertions.is_empty()).then_some(crate::assertion::LineAssertions {
+            line_number: line_assertions.line_number,
+            assertions,
+        })
+    });
     let mut line_diagnostics = diagnostics.iter_lines();
 
     let mut current_assertions = line_assertions.next();
