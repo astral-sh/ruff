@@ -44,6 +44,7 @@ pub(crate) mod place;
 mod program;
 mod python_platform;
 mod rank;
+mod reachability_constraints;
 pub mod semantic_index;
 mod semantic_model;
 mod subscript;

@@ -254,7 +254,7 @@ use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
 };
-use crate::semantic_index::reachability_constraints::{
+use crate::semantic_index::reachability_constraints_datastructures::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};

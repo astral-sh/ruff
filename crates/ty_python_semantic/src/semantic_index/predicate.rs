@@ -4,7 +4,7 @@
 //!
 //! - [_Narrowing constraints_][crate::semantic_index::narrowing_constraints] constrain the type of
 //!   a binding that is visible at a particular use.
-//! - [_Reachability constraints_][crate::semantic_index::reachability_constraints] determine the
+//! - [_Reachability constraints_][crate::reachability_constraints] determine the
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;

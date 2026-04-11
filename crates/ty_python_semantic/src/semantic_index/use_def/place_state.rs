@@ -47,7 +47,7 @@ use ruff_index::newtype_index;
 use smallvec::{SmallVec, smallvec};
 
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
-use crate::semantic_index::reachability_constraints::{
+use crate::semantic_index::reachability_constraints_datastructures::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 
