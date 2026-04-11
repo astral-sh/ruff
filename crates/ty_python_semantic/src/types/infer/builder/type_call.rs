@@ -1,5 +1,6 @@
 use crate::types::class::{
-    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
+    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicClassMember,
+    DynamicMetaclassConflict,
 };
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
@@ -9,12 +10,235 @@ use crate::types::infer::builder::{
     TypeInferenceBuilder,
     dynamic_class::{DynamicClassKind, report_dynamic_mro_errors},
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type, overrides,
+    typed_dict::extract_unpacked_typed_dict_keys_from_value_type,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
+use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 
+/// Tracks namespace members that are guaranteed to survive until class creation.
+///
+/// The order matches the dictionary's insertion order, but later writes to the same string key
+/// replace earlier writes. That matches Python's dictionary semantics:
+///
+/// ```python
+/// C = type("C", (), {"method": first, "method": second})
+/// ```
+///
+/// In this example, override diagnostics must consider only `second`.
+#[derive(Default)]
+struct GuaranteedDynamicClassMembers<'db> {
+    members: Vec<DynamicClassMember<'db>>,
+    member_indices: FxHashMap<Name, usize>,
+}
+
+impl<'db> GuaranteedDynamicClassMembers<'db> {
+    /// Inserts a guaranteed member, replacing an earlier member with the same name.
+    fn insert(&mut self, member: DynamicClassMember<'db>) {
+        if let Some(index) = self.member_indices.get(&member.name) {
+            self.members[*index] = member;
+        } else {
+            self.member_indices
+                .insert(member.name.clone(), self.members.len());
+            self.members.push(member);
+        }
+    }
+
+    /// Removes all currently guaranteed members after an uncertain namespace write.
+    ///
+    /// For example, a dynamic key could overwrite any previous string-named member:
+    ///
+    /// ```python
+    /// C = type("C", (), {"method": good, maybe_name: bad})
+    /// ```
+    fn clear(&mut self) {
+        self.members.clear();
+        self.member_indices.clear();
+    }
+
+    /// Returns the surviving members in dictionary insertion order.
+    fn into_vec(self) -> Vec<DynamicClassMember<'db>> {
+        self.members
+    }
+}
+
+/// Members extracted from a dynamic class namespace, plus uncertainty metadata.
+///
+/// `has_dynamic_namespace` controls normal attribute lookup for unknown members, while
+/// `has_uncertain_writes` controls whether earlier guaranteed override members must be discarded.
+struct ExtractedDynamicNamespace<'db> {
+    members: Vec<DynamicClassMember<'db>>,
+    has_dynamic_namespace: bool,
+    has_uncertain_writes: bool,
+}
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Extracts namespace members that are safe to use for dynamic override diagnostics.
+    ///
+    /// This is more conservative than normal dynamic member extraction: only entries that are
+    /// guaranteed to be present at class creation are returned.
+    ///
+    /// ```python
+    /// class Base:
+    ///     def method(self, x: int) -> None: ...
+    ///
+    /// def bad(self, x: str) -> None: ...
+    ///
+    /// C = type("C", (Base,), {"method": bad})
+    /// ```
+    ///
+    /// The `method` entry is guaranteed, so it can produce an `invalid-method-override`
+    /// diagnostic.
+    fn extract_dynamic_override_members(
+        &self,
+        namespace_arg: &ast::Expr,
+        namespace_type: Type<'db>,
+    ) -> (Box<[DynamicClassMember<'db>]>, bool) {
+        if let ast::Expr::Dict(dict) = namespace_arg {
+            let extracted = self.extract_dynamic_override_members_from_dict(dict);
+            return (
+                extracted.members.into_boxed_slice(),
+                extracted.has_dynamic_namespace,
+            );
+        }
+
+        if let Type::TypedDict(typed_dict) = namespace_type {
+            // `namespace` is a TypedDict instance. Only required keys are guaranteed to be
+            // present at runtime; optional keys may be omitted.
+            let members: Box<[DynamicClassMember<'db>]> = typed_dict
+                .items(self.db())
+                .iter()
+                .filter_map(|(name, field)| {
+                    field.is_required().then_some(DynamicClassMember {
+                        name: name.clone(),
+                        ty: field.declared_ty,
+                        range: namespace_arg.range(),
+                    })
+                })
+                .collect();
+
+            // TypedDicts are "open" (can have additional string keys), so this is still a
+            // dynamic namespace for unknown attributes.
+            return (members, true);
+        }
+
+        // `namespace` is not a dict literal, so it's dynamic.
+        (Box::new([]), true)
+    }
+
+    /// Extracts guaranteed override members from a literal dictionary namespace.
+    ///
+    /// Spread entries and non-literal keys are treated conservatively because they can overwrite
+    /// earlier values:
+    ///
+    /// ```python
+    /// C = type("C", (), {"method": first, **namespace, "other": value})
+    /// ```
+    ///
+    /// After `**namespace`, only later entries with known string keys are guaranteed.
+    fn extract_dynamic_override_members_from_dict(
+        &self,
+        dict: &ast::ExprDict,
+    ) -> ExtractedDynamicNamespace<'db> {
+        let mut guaranteed_members = GuaranteedDynamicClassMembers::default();
+        let mut has_dynamic_namespace = false;
+        let mut has_uncertain_writes = false;
+
+        for item in &dict.items {
+            if let Some(key_expr) = item.key.as_ref() {
+                let key_ty = self.expression_type(key_expr);
+                let Some(key_name) = key_ty.as_string_literal() else {
+                    has_dynamic_namespace = true;
+
+                    // Keys that cannot be strings still make the namespace dynamic, but they
+                    // cannot shadow string-named members and therefore should not erase
+                    // guaranteed override diagnostics for earlier entries.
+                    if !key_ty.is_disjoint_from(self.db(), KnownClass::Str.to_instance(self.db())) {
+                        guaranteed_members.clear();
+                        has_uncertain_writes = true;
+                    }
+                    continue;
+                };
+
+                guaranteed_members.insert(DynamicClassMember {
+                    name: ast::name::Name::new(key_name.value(self.db())),
+                    ty: self.expression_type(&item.value),
+                    range: item.value.range(),
+                });
+                continue;
+            }
+
+            let unpacked = self.extract_unpacked_dynamic_override_members(&item.value);
+            if unpacked.has_uncertain_writes {
+                guaranteed_members.clear();
+            }
+            for member in unpacked.members {
+                guaranteed_members.insert(member);
+            }
+            has_dynamic_namespace |= unpacked.has_dynamic_namespace;
+            has_uncertain_writes |= unpacked.has_uncertain_writes;
+        }
+
+        ExtractedDynamicNamespace {
+            members: guaranteed_members.into_vec(),
+            has_dynamic_namespace,
+            has_uncertain_writes,
+        }
+    }
+
+    /// Extracts guaranteed override members from a dictionary unpack in a namespace literal.
+    ///
+    /// Literal unpacked dictionaries preserve their own guaranteed keys, while a typed-dict unpack
+    /// only guarantees required keys:
+    ///
+    /// ```python
+    /// namespace = {"method": bad}
+    /// C = type("C", (Base,), {**namespace})
+    /// ```
+    ///
+    /// If the unpacked value is not statically understood, the namespace is treated as dynamic and
+    /// as an uncertain write.
+    fn extract_unpacked_dynamic_override_members(
+        &self,
+        unpacked: &ast::Expr,
+    ) -> ExtractedDynamicNamespace<'db> {
+        if let ast::Expr::Dict(dict) = unpacked {
+            return self.extract_dynamic_override_members_from_dict(dict);
+        }
+
+        let unpacked_type = self.expression_type(unpacked);
+        if let Some(unpacked_keys) =
+            extract_unpacked_typed_dict_keys_from_value_type(self.db(), unpacked_type)
+        {
+            let members = unpacked_keys
+                .into_iter()
+                .filter_map(|(name, unpacked_key)| {
+                    unpacked_key.is_required.then_some(DynamicClassMember {
+                        name,
+                        ty: unpacked_key.value_ty,
+                        range: unpacked.range(),
+                    })
+                })
+                .collect();
+
+            return ExtractedDynamicNamespace {
+                members,
+                has_dynamic_namespace: true,
+                has_uncertain_writes: true,
+            };
+        }
+
+        ExtractedDynamicNamespace {
+            members: Vec::new(),
+            has_dynamic_namespace: true,
+            has_uncertain_writes: true,
+        }
+    }
+
     /// Infer a call to `builtins.type()`.
     ///
     /// `builtins.type` has two overloads: a single-argument overload (e.g. `type("foo")`,
@@ -133,7 +357,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Extract members from the namespace dict (third argument).
-        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
+        let (members, has_dynamic_namespace): (Box<[DynamicClassMember<'db>]>, bool) =
             if let ast::Expr::Dict(dict) = namespace_arg {
                 // Check if all keys are string literal types. If any key is not a string literal
                 // type or is missing (spread), the namespace is considered dynamic.
@@ -152,7 +376,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let key_name = ast::name::Name::new(key_name.value(db));
                         // Get the already-inferred type from when we inferred the dict above.
                         let value_ty = self.expression_type(&item.value);
-                        Some((key_name, value_ty))
+                        Some(DynamicClassMember {
+                            name: key_name,
+                            ty: value_ty,
+                            range: item.value.range(),
+                        })
                     })
                     .collect();
                 (members, !all_keys_are_string_literals)
@@ -160,16 +388,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `namespace` is a TypedDict instance. Extract known keys as members.
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
-                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                let members: Box<[DynamicClassMember<'db>]> = typed_dict
                     .items(db)
                     .iter()
-                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .map(|(name, field)| DynamicClassMember {
+                        name: name.clone(),
+                        ty: field.declared_ty,
+                        range: namespace_arg.range(),
+                    })
                     .collect();
                 (members, true)
             } else {
                 // `namespace` is not a dict literal, so it's dynamic.
                 (Box::new([]), true)
             };
+
+        let (override_members, _has_dynamic_override_namespace) =
+            self.extract_dynamic_override_members(namespace_arg, namespace_type);
 
         if !matches!(namespace_type, Type::TypedDict(_))
             && !namespace_type.is_assignable_to(
@@ -256,6 +491,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             name.clone(),
             anchor,
             members,
+            override_members,
             has_dynamic_namespace,
             None,
         );
@@ -303,6 +539,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     base2.display(db),
                 );
             }
+
+            overrides::check_dynamic_class(&self.context, dynamic_class);
         }
 
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))

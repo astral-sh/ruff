@@ -7,7 +7,8 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use rustc_hash::FxHashSet;
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Db,
@@ -17,14 +18,15 @@ use crate::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
         Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
-        class::{CodeGeneratorKind, FieldKind},
+        class::{CodeGeneratorKind, DynamicClassLiteral, FieldKind},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_invalid_method_override, report_overridden_final_method,
+            report_invalid_method_override, report_invalid_method_override_at_range,
+            report_overridden_final_method, report_overridden_final_method_at_range,
             report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
@@ -58,9 +60,6 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "_source",
 ];
 
-// TODO: Support dynamic class literals. If we allow dynamic classes to define attributes in their
-// namespace dictionary, we should also check whether those attributes are valid overrides of
-// attributes in their superclasses.
 pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticClassLiteral<'db>) {
     let db = context.db();
     let configuration = OverrideRulesConfig::from(context);
@@ -85,13 +84,101 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 }
 
+/// Checks override rules for guaranteed members of a dynamic class.
+///
+/// Dynamic classes do not have a class body, so diagnostics use the source ranges recovered from
+/// the namespace argument:
+///
+/// ```python
+/// from typing import Final, final
+///
+/// class Base:
+///     value: Final[int] = 1
+///
+///     @final
+///     def final_method(self) -> None: ...
+///
+///     def method(self, x: int) -> None: ...
+///
+/// def bad(self, x: str) -> None: ...
+/// def replacement(self) -> None: ...
+///
+/// C = type("C", (Base,), {
+///     "method": bad,
+///     "final_method": replacement,
+///     "value": 2,
+/// })
+/// ```
+///
+/// Classes with invalid MROs are skipped to avoid cascading override diagnostics for classes that
+/// cannot be created at runtime.
+pub(super) fn check_dynamic_class<'db>(
+    context: &InferContext<'db, '_>,
+    class: DynamicClassLiteral<'db>,
+) {
+    let db = context.db();
+    let configuration = OverrideRulesConfig::from(context);
+    if configuration.no_rules_enabled() {
+        return;
+    }
+
+    if class.try_mro(db).is_err() {
+        return;
+    }
+
+    let class_specialized = ClassLiteral::Dynamic(class).identity_specialization(db);
+    let class_kind = CodeGeneratorKind::from_class(db, class.into(), None);
+    let mut final_members_by_name = FxHashMap::default();
+    let mut seen_names = FxHashSet::default();
+
+    for dynamic_member in class.override_members(db) {
+        final_members_by_name.insert(dynamic_member.name.clone(), dynamic_member);
+    }
+
+    for dynamic_member in class.override_members(db) {
+        // Dict literals keep the original insertion order for duplicate keys, but the last
+        // assignment provides the surviving value.
+        if !seen_names.insert(dynamic_member.name.clone()) {
+            continue;
+        }
+
+        let Some(dynamic_member) = final_members_by_name.get(&dynamic_member.name).copied() else {
+            continue;
+        };
+
+        let member = Member {
+            name: dynamic_member.name.clone(),
+            ty: dynamic_member.ty,
+        };
+        check_named_tuple_field_override(
+            context,
+            configuration,
+            class_specialized,
+            &member.name,
+            MemberOrigin::Dynamic {
+                range: dynamic_member.range,
+            },
+        );
+        check_member_override_rules(
+            context,
+            configuration,
+            class_kind,
+            class_specialized,
+            &member,
+            MemberOrigin::Dynamic {
+                range: dynamic_member.range,
+            },
+        );
+    }
+}
+
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
 fn conflicting_named_tuple_field_in_mro<'db>(
     db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
+    class: ClassType<'db>,
     field_name: &Name,
 ) -> Option<(ClassType<'db>, Option<Definition<'db>>)> {
-    for class_base in class.iter_mro(db, None).skip(1) {
+    for class_base in class.iter_mro(db).skip(1) {
         let Some(superclass) = class_base.into_class() else {
             continue;
         };
@@ -125,6 +212,73 @@ fn conflicting_named_tuple_field_in_mro<'db>(
     None
 }
 
+/// Reports an invalid override of an inherited `NamedTuple` field.
+///
+/// This helper is shared by static and dynamic classes so both of these forms are handled:
+///
+/// ```python
+/// from typing import NamedTuple
+///
+/// class Base(NamedTuple):
+///     field: int
+///
+/// class StaticChild(Base):
+///     field = 1
+///
+/// DynamicChild = type("DynamicChild", (Base,), {"field": 1})
+/// ```
+fn check_named_tuple_field_override<'db>(
+    context: &InferContext<'db, '_>,
+    configuration: OverrideRulesConfig,
+    class: ClassType<'db>,
+    member_name: &Name,
+    origin: MemberOrigin<'db>,
+) {
+    if !configuration.check_invalid_named_tuple_field_overrides() {
+        return;
+    }
+
+    let db = context.db();
+
+    let Some((superclass, overridden_field_declaration)) =
+        conflicting_named_tuple_field_in_mro(db, class, member_name)
+    else {
+        return;
+    };
+
+    let primary_range = match origin {
+        MemberOrigin::Static {
+            first_reachable_definition,
+        } => first_reachable_definition
+            .focus_range(db, context.module())
+            .range(),
+        MemberOrigin::Dynamic { range } => range,
+    };
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE_OVERRIDE, primary_range) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot override NamedTuple field `{}` inherited from `{}`",
+        member_name,
+        superclass.name(db)
+    ));
+    diagnostic.info("Subclass members are not allowed to reuse inherited NamedTuple field names");
+    if let Some(first_declaration) = overridden_field_declaration
+        && first_declaration.file(db) == context.file()
+    {
+        diagnostic.annotate(
+            Annotation::secondary(
+                context.span(first_declaration.kind(db).full_range(context.module())),
+            )
+            .message(format_args!(
+                "Inherited NamedTuple field `{member_name}` declared here"
+            )),
+        );
+    }
+}
+
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
@@ -141,15 +295,6 @@ fn check_class_declaration<'db>(
     } = member;
 
     let instance_of_class = Type::instance(db, class);
-
-    let subclass_instance_member = instance_of_class.member(db, &member.name);
-    let Place::Defined(DefinedPlace {
-        ty: type_on_subclass_instance,
-        ..
-    }) = subclass_instance_member.place
-    else {
-        return;
-    };
 
     let Some((literal, specialization)) = class.static_class_literal(db) else {
         return;
@@ -193,35 +338,15 @@ fn check_class_declaration<'db>(
         Some(CodeGeneratorKind::TypedDict) | None => {}
     }
 
-    if configuration.check_invalid_named_tuple_field_overrides()
-        && let Some((superclass, overridden_field_declaration)) =
-            conflicting_named_tuple_field_in_mro(db, literal, &member.name)
-        && let Some(builder) = context.report_lint(
-            &INVALID_NAMED_TUPLE_OVERRIDE,
-            first_reachable_definition.focus_range(db, context.module()),
-        )
-    {
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot override NamedTuple field `{}` inherited from `{}`",
-            member.name,
-            superclass.name(db)
-        ));
-        diagnostic
-            .info("Subclass members are not allowed to reuse inherited NamedTuple field names");
-        if let Some(first_declaration) = overridden_field_declaration
-            && first_declaration.file(db) == context.file()
-        {
-            diagnostic.annotate(
-                Annotation::secondary(
-                    context.span(first_declaration.kind(db).full_range(context.module())),
-                )
-                .message(format_args!(
-                    "Inherited NamedTuple field `{}` declared here",
-                    member.name
-                )),
-            );
-        }
-    }
+    check_named_tuple_field_override(
+        context,
+        configuration,
+        class,
+        &member.name,
+        MemberOrigin::Static {
+            first_reachable_definition: *first_reachable_definition,
+        },
+    );
 
     // Check for invalid Enum member values.
     if let Some(enum_info) = enum_info {
@@ -283,6 +408,138 @@ fn check_class_declaration<'db>(
             }
         }
     }
+
+    check_member_override_rules(
+        context,
+        configuration,
+        class_kind,
+        class,
+        member,
+        MemberOrigin::Static {
+            first_reachable_definition: *first_reachable_definition,
+        },
+    );
+}
+
+/// The syntactic origin for a subclass member considered by override checks.
+#[derive(Clone, Copy)]
+enum MemberOrigin<'db> {
+    /// A member declared in a normal class body.
+    Static {
+        first_reachable_definition: Definition<'db>,
+    },
+    /// A member recovered from a dynamic class namespace value.
+    Dynamic { range: TextRange },
+}
+
+impl MemberOrigin<'_> {
+    /// Returns whether this origin is a function definition in the current semantic model.
+    fn is_function_definition(self, db: &dyn Db) -> bool {
+        match self {
+            Self::Static {
+                first_reachable_definition,
+            } => first_reachable_definition.kind(db).is_function_def(),
+            Self::Dynamic { .. } => false,
+        }
+    }
+}
+
+/// Checks all override rules that apply to a single subclass member.
+///
+/// The member can come from either a static class body or from a guaranteed dynamic namespace
+/// entry:
+///
+/// ```python
+/// class Base:
+///     def method(self, x: int) -> None: ...
+///
+/// class StaticChild(Base):
+///     def method(self, x: str) -> None: ...
+///
+/// def bad(self, x: str) -> None: ...
+/// DynamicChild = type("DynamicChild", (Base,), {"method": bad})
+/// ```
+///
+/// For dynamic namespace values, descriptor binding is applied before Liskov checks so
+/// `staticmethod(...)` and `classmethod(...)` values are compared like their static-class
+/// equivalents.
+fn check_member_override_rules<'db>(
+    context: &InferContext<'db, '_>,
+    configuration: OverrideRulesConfig,
+    class_kind: Option<CodeGeneratorKind<'db>>,
+    class: ClassType<'db>,
+    member: &Member<'db>,
+    origin: MemberOrigin<'db>,
+) {
+    /// Salsa-tracked query to check whether any of the definitions of a symbol
+    /// in a superclass scope are function definitions.
+    ///
+    /// We need to know this for compatibility with pyright and mypy, neither of which emit an error
+    /// on `C.f` here:
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def f(self) -> None: ...
+    ///
+    /// class B:
+    ///     f = A.f
+    ///
+    /// class C(B):
+    ///     def f(self) -> None: ...  # no error here
+    /// ```
+    ///
+    /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
+    /// which might be in a different Python module. If this weren't a tracked query, we could
+    /// introduce cross-module dependencies and over-invalidation.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn is_function_definition<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol: ScopedSymbolId,
+    ) -> bool {
+        use_def_map(db, scope)
+            .end_of_scope_symbol_bindings(symbol)
+            .filter_map(|binding| binding.binding.definition())
+            .any(|definition| definition.kind(db).is_function_def())
+    }
+
+    let db = context.db();
+
+    let instance_of_class = Type::instance(db, class);
+    let subclass_instance_member = instance_of_class.member(db, &member.name);
+    let (type_on_subclass_instance, dynamic_descriptor_member) = match class.class_literal(db) {
+        ClassLiteral::Dynamic(_) => {
+            if let Some((ty, _)) =
+                member
+                    .ty
+                    .try_call_dunder_get(db, Some(instance_of_class), Type::from(class))
+            {
+                (ty, true)
+            } else {
+                let Place::Defined(DefinedPlace {
+                    ty: type_on_subclass_instance,
+                    ..
+                }) = subclass_instance_member.place
+                else {
+                    return;
+                };
+                (type_on_subclass_instance, false)
+            }
+        }
+        _ => {
+            let Place::Defined(DefinedPlace {
+                ty: type_on_subclass_instance,
+                ..
+            }) = subclass_instance_member.place
+            else {
+                return;
+            };
+            (type_on_subclass_instance, false)
+        }
+    };
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
@@ -436,7 +693,11 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if configuration.check_attribute_liskov_violations() {
+            if configuration.check_attribute_liskov_violations()
+                && let MemberOrigin::Static {
+                    first_reachable_definition,
+                } = origin
+            {
                 if let Some(superclass_variable_kind) =
                     effective_superclass_variable_kind(db, superclass, member.name.clone())
                 {
@@ -485,7 +746,7 @@ fn check_class_declaration<'db>(
                         report_invalid_attribute_override(
                             context,
                             &member.name,
-                            *first_reachable_definition,
+                            first_reachable_definition,
                             superclass,
                             superclass_definition,
                             subclass_kind,
@@ -501,9 +762,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Type::FunctionLiteral(subclass_function) = member.ty else {
-                continue;
+            let subclass_function = match member.ty {
+                Type::FunctionLiteral(function) => Some(function),
+                _ => None,
             };
+            if subclass_function.is_none() && !dynamic_descriptor_member {
+                continue;
+            }
 
             // Constructor methods are not checked for Liskov compliance
             if matches!(
@@ -536,33 +801,50 @@ fn check_class_declaration<'db>(
             // If so, don't report the same violation for the child class -- it would be a false positive
             // since the child cannot fix the violation without contradicting its immediate parent's contract.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-                if immediate_parent != superclass {
-                    // The immediate parent already defines this method and is different from the
-                    // current ancestor we're checking. Check if the immediate parent's method
-                    // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
-                        // The immediate parent already has an LSP violation with this ancestor.
-                        // Don't report the same violation for the child.
-                        continue;
-                    }
-                }
+            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method
+                && immediate_parent != superclass
+                && !immediate_parent_type.is_assignable_to(db, superclass_type_as_type)
+            {
+                // The immediate parent already has an LSP violation with this ancestor.
+                // Don't report the same violation for the child.
+                continue;
             }
 
-            report_invalid_method_override(
-                context,
-                &member.name,
-                class,
-                *first_reachable_definition,
-                subclass_function,
-                superclass,
-                superclass_type,
-                method_kind,
-                || {
-                    type_on_subclass_instance
-                        .assignability_error_context(db, superclass_type_as_type)
-                },
-            );
+            match (origin, subclass_function) {
+                (
+                    MemberOrigin::Static {
+                        first_reachable_definition,
+                    },
+                    Some(subclass_function),
+                ) => report_invalid_method_override(
+                    context,
+                    &member.name,
+                    class,
+                    first_reachable_definition,
+                    subclass_function,
+                    superclass,
+                    superclass_type,
+                    method_kind,
+                    || {
+                        type_on_subclass_instance
+                            .assignability_error_context(db, superclass_type_as_type)
+                    },
+                ),
+                (MemberOrigin::Static { .. }, None) => continue,
+                (MemberOrigin::Dynamic { range }, _) => report_invalid_method_override_at_range(
+                    context,
+                    &member.name,
+                    class,
+                    range,
+                    superclass,
+                    superclass_type,
+                    method_kind,
+                    || {
+                        type_on_subclass_instance
+                            .assignability_error_context(db, superclass_type_as_type)
+                    },
+                ),
+            }
 
             liskov_diagnostic_emitted = true;
         }
@@ -592,30 +874,49 @@ fn check_class_declaration<'db>(
 
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
-        // accessing `.kind()` here is fine as `definition`
-        // will always be a definition in the file currently being checked
-        && first_reachable_definition.kind(db).is_function_def()
+        && origin.is_function_definition(db)
     {
         check_explicit_overrides(context, member, class);
     }
 
     if let Some((superclass, superclass_method)) = overridden_final_method {
-        report_overridden_final_method(
-            context,
-            &member.name,
-            *first_reachable_definition,
-            member.ty,
-            superclass,
-            class,
-            &superclass_method,
-        );
+        match origin {
+            MemberOrigin::Static {
+                first_reachable_definition,
+            } => report_overridden_final_method(
+                context,
+                &member.name,
+                first_reachable_definition,
+                member.ty,
+                superclass,
+                class,
+                &superclass_method,
+            ),
+            MemberOrigin::Dynamic { range } => report_overridden_final_method_at_range(
+                context,
+                &member.name,
+                range,
+                superclass,
+                class,
+                &superclass_method,
+            ),
+        }
     }
 
     if let Some((superclass, superclass_definition)) = overridden_final_variable {
+        let range = match origin {
+            MemberOrigin::Static {
+                first_reachable_definition,
+            } => first_reachable_definition
+                .focus_range(context.db(), context.module())
+                .range(),
+            MemberOrigin::Dynamic { range } => range,
+        };
+
         report_overridden_final_variable(
             context,
             &member.name,
-            *first_reachable_definition,
+            range,
             superclass,
             class,
             superclass_definition,

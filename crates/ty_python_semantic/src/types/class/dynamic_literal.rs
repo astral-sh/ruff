@@ -64,9 +64,15 @@ pub struct DynamicClassLiteral<'db> {
     pub anchor: DynamicClassAnchor<'db>,
 
     /// The class members extracted from the namespace argument.
-    /// Each entry is a (name, type) pair extracted from the dict literal.
+    /// Each entry records the member name, inferred type, and source range
+    /// for the namespace entry that defined it.
     #[returns(deref)]
-    pub members: Box<[(Name, Type<'db>)]>,
+    pub members: Box<[DynamicClassMember<'db>]>,
+
+    /// Dynamic namespace members that are guaranteed to survive as final assignments and are
+    /// therefore safe to use for override diagnostics.
+    #[returns(deref)]
+    pub override_members: Box<[DynamicClassMember<'db>]>,
 
     /// Whether the namespace is dynamic (not a literal dict, or contains
     /// non-string-literal keys). When true, attribute lookups on this class
@@ -106,6 +112,20 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
+
+/// A member recovered from the namespace passed to a dynamic class constructor.
+///
+/// For example, the namespace in `type("C", (), {"x": 1})` contributes a member named `x`
+/// with the inferred type of `1` and the source range of the value expression.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct DynamicClassMember<'db> {
+    /// The string key used for the namespace entry.
+    pub name: Name,
+    /// The inferred type of the namespace value.
+    pub ty: Type<'db>,
+    /// The range to use when reporting diagnostics for this namespace entry.
+    pub range: TextRange,
+}
 
 /// Returns the `bases` argument for a dynamic class constructor call.
 ///
@@ -404,7 +424,7 @@ impl<'db> DynamicClassLiteral<'db> {
         // return Unknown since we can't know what attributes might be defined.
         self.members(db)
             .iter()
-            .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
+            .find_map(|member| (name == member.name).then_some(member.ty))
             .or_else(|| self.has_dynamic_namespace(db).then(Type::unknown))
             .map(Member::definitely_declared)
             .unwrap_or_default()
@@ -436,10 +456,10 @@ impl<'db> DynamicClassLiteral<'db> {
     /// ```
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         // Check if __slots__ is in the members
-        for (name, ty) in self.members(db) {
-            if name.as_str() == "__slots__" {
+        for member in self.members(db) {
+            if member.name.as_str() == "__slots__" {
                 // Check if the slots are non-empty
-                let is_non_empty = match ty {
+                let is_non_empty = match member.ty {
                     // __slots__ = ("a", "b")
                     Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
@@ -482,6 +502,7 @@ impl<'db> DynamicClassLiteral<'db> {
             self.name(db).clone(),
             self.anchor(db).clone(),
             self.members(db),
+            self.override_members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
         )
