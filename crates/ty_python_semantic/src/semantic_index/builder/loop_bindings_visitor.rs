@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 
 use crate::semantic_index::place::PlaceExpr;
@@ -25,13 +26,26 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.bound_places
 }
 
-pub(super) fn target_binds_name(target: &ast::Expr, name: &str) -> bool {
+/// Returns the names bound by `target`, including through nested unpacking.
+pub(super) fn target_symbol_names(target: &ast::Expr) -> Vec<Name> {
     let mut collector = LoopBindingsVisitor::default();
     collector.add_place_from_target(target);
-    collector.bound_places.into_iter().any(|place| match place {
-        PlaceExpr::Symbol(symbol) => symbol.name().as_str() == name,
-        PlaceExpr::Member(_) => false,
-    })
+    collector
+        .bound_places
+        .into_iter()
+        .filter_map(|place| match place {
+            PlaceExpr::Symbol(symbol) => Some(symbol.name().clone()),
+            PlaceExpr::Member(_) => None,
+        })
+        .collect()
+}
+
+/// Returns `true` if `target` binds `name`, including through nested unpacking.
+#[cfg(test)]
+pub(super) fn target_binds_name(target: &ast::Expr, name: &str) -> bool {
+    target_symbol_names(target)
+        .into_iter()
+        .any(|bound_name| bound_name.as_str() == name)
 }
 
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.

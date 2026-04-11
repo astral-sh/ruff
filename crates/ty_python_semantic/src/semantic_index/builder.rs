@@ -87,6 +87,7 @@ struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
+    comprehension_target_names: Vec<Name>,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -220,6 +221,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
+    /// Returns `true` if the current comprehension scope is nested in a class body.
     fn in_class_body_comprehension(&self) -> bool {
         if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
             return false;
@@ -237,34 +239,50 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .unwrap_or(false)
     }
 
+    /// Returns `true` if the current expression is evaluated as a comprehension iterable.
     fn in_comprehension_iterable(&self) -> bool {
         self.comprehension_iterable_nesting > 0
     }
 
+    /// Runs `visit` while treating the current expression as a comprehension iterable.
     fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
         self.comprehension_iterable_nesting += 1;
         visit(self);
         self.comprehension_iterable_nesting -= 1;
     }
 
+    /// Returns `true` if `named` rebinds a name bound by an enclosing comprehension target.
     fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
         let Some(target) = named.target.as_name_expr() else {
             return false;
         };
 
-        self.scope_stack.iter().rev().any(|scope_info| {
-            let generators = match self.scopes[scope_info.file_scope_id].node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::GeneratorExpression(node) => &node.node(self.module).generators,
-                _ => return false,
-            };
+        for scope_info in self.scope_stack.iter().rev() {
+            match self.scopes[scope_info.file_scope_id].node() {
+                NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_) => {
+                    if scope_info
+                        .comprehension_target_names
+                        .iter()
+                        .any(|name| name == &target.id)
+                    {
+                        return true;
+                    }
+                }
+                NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::Function(_)
+                | NodeWithScopeKind::Class(_)
+                | NodeWithScopeKind::Module
+                | NodeWithScopeKind::TypeAlias(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_) => break,
+            }
+        }
 
-            generators.iter().any(|comprehension| {
-                loop_bindings_visitor::target_binds_name(&comprehension.target, target.id.as_str())
-            })
-        })
+        false
     }
 
     /// Returns the scope ID of the current scope if the current scope
@@ -377,6 +395,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
+            comprehension_target_names: Vec::new(),
         });
     }
 
@@ -1614,8 +1633,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // `arr[::[x for *b in y for (b: _` is parsed as `StmtAnnAssign`), the outer
         // assignment context must not leak into the inner scope.
         let saved_assignments = std::mem::take(&mut self.current_assignments);
+        let comprehension_target_names = generators
+            .iter()
+            .flat_map(|generator| loop_bindings_visitor::target_symbol_names(&generator.target))
+            .collect::<Vec<_>>();
 
         self.push_scope(scope);
+        self.current_scope_info_mut().comprehension_target_names = comprehension_target_names;
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -3172,24 +3196,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 let target_is_name = node.target.is_name_expr();
 
-                if self.python_version >= PythonVersion::PY38 && target_is_name {
-                    if self.in_comprehension_iterable() {
-                        self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
-                            range: node.range,
-                            python_version: self.python_version,
-                        });
-                    } else if self.in_class_body_comprehension()
-                        && !self.rebinds_comprehension_variable(node)
-                    {
-                        self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
-                            range: node.range,
-                            python_version: self.python_version,
-                        });
-                    }
-                }
-
                 if target_is_name {
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
@@ -3533,6 +3539,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         false
     }
 
+    fn in_comprehension_iterable(&self) -> bool {
+        SemanticIndexBuilder::in_comprehension_iterable(self)
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        SemanticIndexBuilder::in_class_body_comprehension(self)
+    }
+
     fn in_module_scope(&self) -> bool {
         self.scope_stack.len() == 1
     }
@@ -3582,6 +3596,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             .node()
             .as_function()
             .is_some_and(|func| func.node(self.module).parameters.includes(name))
+    }
+
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
+        SemanticIndexBuilder::rebinds_comprehension_variable(self, named)
     }
 }
 

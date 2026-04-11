@@ -193,6 +193,29 @@ impl ExpectedDocstringKind {
     }
 }
 
+/// Returns `true` if `target` binds `name`, including through nested unpacking.
+fn target_binds_name(target: &Expr, name: &str) -> bool {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == name,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().any(|elt| target_binds_name(elt, name))
+        }
+        Expr::Starred(ast::ExprStarred { value, .. }) => target_binds_name(value, name),
+        _ => false,
+    }
+}
+
+/// Returns the generators for `expr` if it is a comprehension expression.
+fn comprehension_generators(expr: &Expr) -> Option<&[Comprehension]> {
+    match expr {
+        Expr::ListComp(ast::ExprListComp { generators, .. })
+        | Expr::SetComp(ast::ExprSetComp { generators, .. })
+        | Expr::Generator(ast::ExprGenerator { generators, .. }) => Some(generators),
+        Expr::DictComp(ast::ExprDictComp { generators, .. }) => Some(generators),
+        _ => None,
+    }
+}
+
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
@@ -247,6 +270,8 @@ pub(crate) struct Checker<'a> {
     /// Helper visitor for detecting semantic syntax errors.
     #[expect(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
+    /// Tracks whether the current expression is being evaluated as a comprehension iterable.
+    comprehension_iterable_nesting: u32,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
     context: &'a LintContext<'a>,
@@ -298,6 +323,7 @@ impl<'a> Checker<'a> {
             docstring_state: DocstringState::default(),
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
+            comprehension_iterable_nesting: 0,
             semantic_errors: RefCell::default(),
             context,
         }
@@ -353,6 +379,78 @@ impl<'a> Checker<'a> {
         }
 
         None
+    }
+
+    /// Returns `true` if the current expression is evaluated as a comprehension iterable.
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
+    }
+
+    /// Returns `true` if the current generator scope belongs to a comprehension in a class body.
+    fn in_class_body_comprehension(&self) -> bool {
+        match self.semantic.current_scope().kind {
+            ScopeKind::Generator { .. } => {}
+            ScopeKind::Class(_)
+            | ScopeKind::DunderClassCell
+            | ScopeKind::Function(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Module
+            | ScopeKind::Type => return false,
+        }
+
+        self.semantic
+            .current_scopes()
+            .skip(1)
+            .find_map(|scope| match scope.kind {
+                ScopeKind::Generator { .. } => None,
+                ScopeKind::Class(_) => Some(true),
+                ScopeKind::DunderClassCell
+                | ScopeKind::Function(_)
+                | ScopeKind::Lambda(_)
+                | ScopeKind::Module
+                | ScopeKind::Type => Some(false),
+            })
+            .unwrap_or(false)
+    }
+
+    /// Runs `visit` while treating the current expression as a comprehension iterable.
+    fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
+        self.comprehension_iterable_nesting += 1;
+        visit(self);
+        self.comprehension_iterable_nesting -= 1;
+    }
+
+    /// Returns `true` if `named` rebinds a name bound by an enclosing comprehension target.
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
+        let Some(target) = named.target.as_name_expr() else {
+            return false;
+        };
+
+        for expr in self.semantic.current_expressions() {
+            match expr {
+                Expr::Lambda(lambda)
+                    if self.semantic.current_scopes().any(|scope| {
+                        matches!(
+                            scope.kind,
+                            ScopeKind::Lambda(enclosing) if enclosing.node_index == lambda.node_index
+                        )
+                    }) =>
+                {
+                    break;
+                }
+                _ => {
+                    if comprehension_generators(expr).is_some_and(|generators| {
+                        generators.iter().any(|comprehension| {
+                            target_binds_name(&comprehension.target, target.id.as_str())
+                        })
+                    }) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
@@ -880,6 +978,14 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
+    fn in_comprehension_iterable(&self) -> bool {
+        Checker::in_comprehension_iterable(self)
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        Checker::in_class_body_comprehension(self)
+    }
+
     fn in_module_scope(&self) -> bool {
         self.semantic.current_scope().kind.is_module()
     }
@@ -941,6 +1047,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             | ScopeKind::Type
             | ScopeKind::DunderClassCell => false,
         }
+    }
+
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
+        Checker::rebinds_comprehension_variable(self, named)
     }
 }
 
@@ -1799,7 +1909,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.visit.lambdas.push(self.semantic.snapshot());
+                self.visit.lambdas.push(deferred::DeferredLambda {
+                    snapshot: self.semantic.snapshot(),
+                    in_comprehension_iterable: self.in_comprehension_iterable(),
+                });
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
             Expr::If(ast::ExprIf {
@@ -2508,7 +2621,7 @@ impl<'a> Checker<'a> {
         // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
-        self.visit_expr(&generator.iter);
+        self.with_comprehension_iterable_context(|checker| checker.visit_expr(&generator.iter));
         self.semantic.push_scope(ScopeKind::Generator {
             kind,
             is_async: generators
@@ -2524,7 +2637,7 @@ impl<'a> Checker<'a> {
         }
 
         for generator in iterator {
-            self.visit_expr(&generator.iter);
+            self.with_comprehension_iterable_context(|checker| checker.visit_expr(&generator.iter));
 
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
@@ -3156,10 +3269,12 @@ impl<'a> Checker<'a> {
     /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
+        let comprehension_iterable_nesting = self.comprehension_iterable_nesting;
         while !self.visit.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.visit.lambdas);
-            for snapshot in lambdas {
-                self.semantic.restore(snapshot);
+            for deferred in lambdas {
+                self.semantic.restore(deferred.snapshot);
+                self.comprehension_iterable_nesting = u32::from(deferred.in_comprehension_iterable);
 
                 let Some(Expr::Lambda(ast::ExprLambda {
                     parameters,
@@ -3205,6 +3320,7 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.comprehension_iterable_nesting = comprehension_iterable_nesting;
         self.semantic.restore(snapshot);
     }
 

@@ -202,8 +202,18 @@ pairs = [(1, 2)]
 class E:
     # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
     [(x := y) for (x, y) in pairs]
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(lambda x=(x := y): x) for (x, y) in pairs]
 
 [(lambda: (x := y))() for (x, y) in pairs]  # ok
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(lambda x=(x := y): x) for (x, y) in pairs]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[b for b in range(1) if (a := 0) for a in range(1)]
+
+[(a := 1) for x in range(3) if (a := 2)]  # ok
 
 def returns_list() -> list[int]:
     return [1, 2, 3]
@@ -211,6 +221,16 @@ def returns_list() -> list[int]:
 # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
 [x for x in (y := returns_list())]
 reveal_type(y)  # revealed: list[int]
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in [(y := 1) for y in range(1)]]
+
+class F:
+    # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+    [x for x in [(y := 1) for y in range(1)]]
+
+class G:
+    [(lambda: (x := y))() for y in range(3)]  # ok
 ```
 
 ## Walrus syntax before Python 3.8
