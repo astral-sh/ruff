@@ -20,8 +20,8 @@ use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
 use crate::rules::flake8_pytest_style::helpers::{
-    Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,
-    keyword_is_literal,
+    Parentheses, get_mark_decorators, is_pytest_asyncio_fixture, is_pytest_fixture,
+    is_pytest_yield_fixture, keyword_is_literal,
 };
 
 /// ## What it does
@@ -697,7 +697,9 @@ fn fixture_decorator<'a>(
     semantic: &SemanticModel,
 ) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
+        is_pytest_fixture(decorator, semantic)
+            || is_pytest_yield_fixture(decorator, semantic)
+            || is_pytest_asyncio_fixture(decorator, semantic)
     })
 }
 

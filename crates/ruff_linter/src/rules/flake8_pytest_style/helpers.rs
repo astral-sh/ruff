@@ -34,6 +34,12 @@ pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fixture"]))
 }
 
+pub(super) fn is_pytest_asyncio_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(map_callable(&decorator.expression))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest_asyncio", "fixture"]))
+}
+
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_callable(&decorator.expression))
