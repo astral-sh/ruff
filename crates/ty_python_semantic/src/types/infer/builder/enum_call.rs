@@ -81,11 +81,6 @@ fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersi
     ) || (name == "boundary" && python_version >= PythonVersion::PY311)
 }
 
-fn has_duplicate_enum_member_names(members: &[(Name, Type<'_>)]) -> bool {
-    let mut seen = FxHashSet::default();
-    members.iter().any(|(name, _)| !seen.insert(name.clone()))
-}
-
 /// Returns the effective `_EnumNames` type accepted by the functional enum APIs.
 ///
 /// This includes the string form, iterables of strings, iterables of
@@ -404,7 +399,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             match self.parse_enum_members_arg(names_arg, start, base_class) {
                 EnumMembersArgParseResult::Known(members) => {
-                    if has_duplicate_enum_member_names(&members) {
+                    let mut seen = FxHashSet::default();
+                    if members.iter().any(|(name, _)| !seen.insert(name.clone())) {
                         // Duplicate member names raise at runtime, so degrade to an unknown
                         // member set and let normal call binding surface the rest.
                         (vec![], false)
@@ -466,7 +462,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let ty = self.expression_type(names_arg);
-
         if let Some(string_lit) = ty.as_string_literal() {
             let s = string_lit.value(db);
             let names: Vec<Name> = s
@@ -475,9 +470,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .filter(|s| !s.is_empty())
                 .map(Name::new)
                 .collect();
-            if names.is_empty() {
-                return EnumMembersArgParseResult::Invalid;
-            }
             let members = enum_members_from_names(db, names, start, base_class);
             return EnumMembersArgParseResult::Known(members);
         }
@@ -515,6 +507,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_members = false;
 
         for elt in elts {
+            if matches!(elt, ast::Expr::Starred(_)) {
+                return EnumMembersArgParseResult::Invalid;
+            }
             match self.classify_sequence_enum_member(elt) {
                 SequenceEnumMember::NameKnown(name) => {
                     if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
@@ -558,7 +553,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
         if form.is_none() {
-            return EnumMembersArgParseResult::Invalid;
+            return EnumMembersArgParseResult::Known(vec![]);
         }
 
         let mut members = Vec::with_capacity(elts.len());
@@ -617,8 +612,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
-        } else if members.is_empty() {
-            EnumMembersArgParseResult::Invalid
         } else {
             EnumMembersArgParseResult::Known(members)
         }
