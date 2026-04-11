@@ -412,3 +412,21 @@ help: Replace with `f.writelines`
     -         for line in ((1,) if True else (2,)):
     -             f.write(f"{line}")
 215 +         f.writelines(f"{line}" for line in ((1,) if True else (2,)))
+
+FURB122 [*] Use of `f.write` in a for loop
+  --> FURB122.py:235:9
+   |
+235 | def _():
+236 |     with open("file", "w") as f:
+237 | /         for x in items:  # type: ignore
+238 | |             f.write(y := process(x))  # OK: walrus target `y` is NOT a loop variable, should still trigger FURB122
+   | |______________________________^
+   |
+help: Replace with `f.writelines`
+232 |
+233 |
+234 | def _():
+235 |     with open("file", "w") as f:
+   -         for x in items:  # type: ignore
+   -             f.write(y := process(x))  # OK: walrus target `y` is NOT a loop variable, should still trigger FURB122
+236 +         f.writelines(y := process(x) for x in items)  # type: ignore

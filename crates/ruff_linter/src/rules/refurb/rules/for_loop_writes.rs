@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
+use ruff_python_ast::{Expr, ExprList, ExprName, ExprNamed, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -185,6 +185,15 @@ fn for_loop_writes(
         return;
     }
 
+    // Suppress the fix if the write argument contains a walrus operator (`:=`)
+    // that binds one of the for-loop targets. For example:
+    //     for f in files: f.write(data := get_data(f))
+    // The generated comprehension `f.writelines(data for f in files)` would
+    // reference `data` which is only bound inside the comprehension itself.
+    if write_arg_contains_walrus_binding(write_arg, binding_names) {
+        return;
+    }
+
     let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
@@ -269,4 +278,43 @@ fn loop_variables_are_used_outside_loop(
     binding_names
         .iter()
         .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
+}
+
+/// Check if `expr` contains a named expression (walrus operator `:=`) whose
+/// target is one of the given `binding_names` from the for-loop.
+fn write_arg_contains_walrus_binding(expr: &Expr, binding_names: &[&ExprName]) -> bool {
+    use ruff_python_ast::visitor::Visitor;
+
+    struct WalrusChecker<'a> {
+        loop_name_ids: Vec<&'a str>,
+        found: bool,
+    }
+
+    impl<'a> Visitor<'a> for WalrusChecker<'a> {
+        fn visit_expr(&mut self, expr: &'a Expr) {
+            if self.found {
+                return;
+            }
+            if let Expr::Named(ExprNamed { target, .. }) = expr {
+                if let Expr::Name(name) = target.as_ref() {
+                    if self
+                        .loop_name_ids
+                        .iter()
+                        .any(|id| *id == name.id.as_str())
+                    {
+                        self.found = true;
+                        return;
+                    }
+                }
+            }
+            ruff_python_ast::visitor::walk_expr(self, expr);
+        }
+    }
+
+    let mut checker = WalrusChecker {
+        loop_name_ids: binding_names.iter().map(|n| n.id.as_str()).collect(),
+        found: false,
+    };
+    checker.visit_expr(expr);
+    checker.found
 }
