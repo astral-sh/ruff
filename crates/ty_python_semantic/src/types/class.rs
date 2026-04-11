@@ -1773,9 +1773,7 @@ impl<'db> ClassType<'db> {
             let is_enum_class = KnownClass::Enum
                 .to_class_literal(db)
                 .to_class_type(db)
-                .is_some_and(|enum_class| {
-                    self.is_subclass_of(db, enum_class) && self != enum_class
-                });
+                .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
 
             // For enum subclasses, skip the metaclass `__call__`.
             // TODO This won't return correct constructor for `Enum`, `IntEnum`, etc.

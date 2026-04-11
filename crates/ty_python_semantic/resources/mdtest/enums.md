@@ -2395,7 +2395,8 @@ Or calling the `Enum` class directly
 from enum import Enum, IntEnum, StrEnum
 from ty_extensions import into_regular_callable
 
-# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+# TODO: the following signatures should show the EnumMeta `__call__` signature
+# revealed: (value: object) -> Enum
 reveal_type(into_regular_callable(Enum))
 
 # revealed: (value: int) -> IntEnum
