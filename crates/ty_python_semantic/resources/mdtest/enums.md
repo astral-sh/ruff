@@ -1648,6 +1648,36 @@ Color = Enum("Color", 123)
 reveal_type(enum_members(Color))  # revealed: Unknown
 ```
 
+Empty functional enums are valid, even though they have no members:
+
+```py
+from enum import Enum
+
+EmptyFromString = Enum("EmptyFromString", "")
+EmptyFromList = Enum("EmptyFromList", [])
+EmptyFromDict = Enum("EmptyFromDict", {})
+```
+
+Literal list/tuple/dict inputs that use unpacking should degrade to unknown members rather than
+being rejected outright:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+names: list[str] = ["B"]
+pairs: list[tuple[str, int]] = [("B", 2)]
+more: dict[str, int] = {"B": 2}
+
+FromNames = Enum("FromNames", ["A", *names])
+FromPairs = Enum("FromPairs", [("A", 1), *pairs])
+FromMapping = Enum("FromMapping", {"A": 1, **more})
+
+reveal_type(enum_members(FromNames))  # revealed: Unknown
+reveal_type(enum_members(FromPairs))  # revealed: Unknown
+reveal_type(enum_members(FromMapping))  # revealed: Unknown
+```
+
 ### Keyword argument type validation
 
 Functional enum construction should still preserve overload-based argument validation:

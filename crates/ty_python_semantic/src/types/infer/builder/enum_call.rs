@@ -475,9 +475,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .filter(|s| !s.is_empty())
                 .map(Name::new)
                 .collect();
-            if names.is_empty() {
-                return EnumMembersArgParseResult::Invalid;
-            }
             let members = enum_members_from_names(db, names, start, base_class);
             return EnumMembersArgParseResult::Known(members);
         }
@@ -515,6 +512,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_members = false;
 
         for elt in elts {
+            if matches!(elt, ast::Expr::Starred(_)) {
+                return EnumMembersArgParseResult::Unknown;
+            }
             match self.classify_sequence_enum_member(elt) {
                 SequenceEnumMember::NameKnown(name) => {
                     if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
@@ -558,7 +558,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
         if form.is_none() {
-            return EnumMembersArgParseResult::Invalid;
+            return EnumMembersArgParseResult::Known(vec![]);
         }
 
         let mut members = Vec::with_capacity(elts.len());
@@ -593,7 +593,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_keys = false;
         for item in &dict.items {
             let Some(key) = &item.key else {
-                return EnumMembersArgParseResult::Invalid;
+                return EnumMembersArgParseResult::Unknown;
             };
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
@@ -617,8 +617,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
-        } else if members.is_empty() {
-            EnumMembersArgParseResult::Invalid
         } else {
             EnumMembersArgParseResult::Known(members)
         }
