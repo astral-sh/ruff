@@ -203,12 +203,37 @@ class E:
     # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
     [(x := y) for (x, y) in pairs]
 
+[(lambda: (x := y))() for (x, y) in pairs]  # ok
+
 def returns_list() -> list[int]:
     return [1, 2, 3]
 
 # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
 [x for x in (y := returns_list())]
 reveal_type(y)  # revealed: list[int]
+```
+
+## Walrus syntax before Python 3.8
+
+On Python 3.7, walrus syntax is itself unsupported, so we should not emit follow-on
+comprehension-context diagnostics for the same expression.
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+def f():
+    return [1, 2, 3]
+
+result = [
+    x
+    for x in (
+        y  # error: [invalid-syntax] "Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)"
+        := f()
+    )
+]
 ```
 
 ## Multiple case assignments

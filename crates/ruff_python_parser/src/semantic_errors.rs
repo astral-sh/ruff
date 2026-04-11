@@ -1123,6 +1123,7 @@ impl SemanticSyntaxChecker {
 
             // test_ok non_rebound_comprehension_variable
             // [a := 0 for x in range(0)]
+            // [(lambda: (x := y))() for (x, y) in pairs]
             Self::add_error(
                 ctx,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable,
@@ -1920,18 +1921,23 @@ fn target_binds_name(target: &Expr, name: &str) -> bool {
 
 impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
-            if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
-                if self
-                    .comprehensions
-                    .iter()
-                    .any(|comp| target_binds_name(&comp.target, id.as_str()))
+        match expr {
+            Expr::Lambda(_) => {}
+            Expr::Named(ast::ExprNamed { target, .. }) => {
+                if let Expr::Name(ast::ExprName { id, range, .. }) = &**target
+                    && self
+                        .comprehensions
+                        .iter()
+                        .any(|comp| target_binds_name(&comp.target, id.as_str()))
                 {
                     self.rebound_variables.push(*range);
                 }
+                walk_expr(self, expr);
+            }
+            _ => {
+                walk_expr(self, expr);
             }
         }
-        walk_expr(self, expr);
     }
 }
 

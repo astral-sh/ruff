@@ -3170,7 +3170,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-                if node.target.is_name_expr() {
+                let target_is_name = node.target.is_name_expr();
+
+                if self.python_version >= PythonVersion::PY38 && target_is_name {
                     if self.in_comprehension_iterable() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
@@ -3186,7 +3188,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             python_version: self.python_version,
                         });
                     }
+                }
 
+                if target_is_name {
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();

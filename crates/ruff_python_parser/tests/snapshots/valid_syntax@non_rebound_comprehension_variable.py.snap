@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/non_rebound_comprehens
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..27,
+        range: 0..70,
         body: [
             Expr(
                 StmtExpr {
@@ -81,6 +81,101 @@ Module(
                                                 ],
                                                 keywords: [],
                                             },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 27..69,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 27..69,
+                            elt: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 28..48,
+                                    func: Lambda(
+                                        ExprLambda {
+                                            node_index: NodeIndex(None),
+                                            range: 29..45,
+                                            parameters: None,
+                                            body: Named(
+                                                ExprNamed {
+                                                    node_index: NodeIndex(None),
+                                                    range: 38..44,
+                                                    target: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 38..39,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 43..44,
+                                                            id: Name("y"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 46..48,
+                                        node_index: NodeIndex(None),
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 49..68,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 53..59,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 54..55,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 57..58,
+                                                        id: Name("y"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: true,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 63..68,
+                                            id: Name("pairs"),
+                                            ctx: Load,
                                         },
                                     ),
                                     ifs: [],
