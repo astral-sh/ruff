@@ -170,7 +170,7 @@ from typing import Self
 class B:
     def __init__(self, x: int) -> None: ...
     def clone(self: Self) -> Self:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["x"]`"
+        # error: [invalid-argument-type] "Argument to bound method `B.__init__` is incorrect: Expected `int`, found `Literal["x"]`"
         self.__class__("x")
         return self.__class__(1)
 ```

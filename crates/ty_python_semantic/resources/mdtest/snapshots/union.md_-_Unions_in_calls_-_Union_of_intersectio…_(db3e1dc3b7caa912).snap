@@ -39,7 +39,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/union.md
 # Diagnostics
 
 ```
-error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
   --> src/mdtest_snippet.py:21:7
    |
 19 |     # error: [invalid-argument-type]
@@ -62,7 +62,7 @@ info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is incorrect
   --> src/mdtest_snippet.py:21:7
    |
 19 |     # error: [invalid-argument-type]
@@ -85,7 +85,7 @@ info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
   --> src/mdtest_snippet.py:21:7
    |
 19 |     # error: [invalid-argument-type]

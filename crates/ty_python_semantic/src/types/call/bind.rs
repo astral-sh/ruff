@@ -26,6 +26,8 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
+use crate::semantic_index::scope::NodeWithScopeKind;
+use crate::semantic_index::semantic_index;
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
@@ -5360,8 +5362,8 @@ impl CallableBindingSnapshotter {
 /// Describes a callable for the purposes of diagnostics.
 #[derive(Debug)]
 pub(crate) struct CallableDescription<'a> {
-    pub(crate) name: &'a str,
-    pub(crate) kind: &'a str,
+    pub(crate) name: Cow<'a, str>,
+    pub(crate) kind: &'static str,
 }
 
 impl<'db> CallableDescription<'db> {
@@ -5369,45 +5371,62 @@ impl<'db> CallableDescription<'db> {
         db: &'db dyn Db,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
+        fn qualified_function_name<'db>(
+            db: &'db dyn Db,
+            function: FunctionType<'db>,
+        ) -> Cow<'db, str> {
+            let file = function.file(db);
+            let semantic_index = semantic_index(db, file);
+            let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
+            match enclosing_scope.node() {
+                NodeWithScopeKind::Class(class) => Cow::Owned(format!(
+                    "{}.{}",
+                    class.node(&parsed_module(db, file).load(db)).name,
+                    function.name(db)
+                )),
+                _ => Cow::Borrowed(function.name(db)),
+            }
+        }
+
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: "function",
-                name: function.name(db),
+                name: qualified_function_name(db, function),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: "class",
-                name: class_type.name(db),
+                name: Cow::Borrowed(class_type.name(db)),
             }),
             Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",
-                name: bound_method.function(db).name(db),
+                name: qualified_function_name(db, bound_method.function(db)),
             }),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
+                    name: Cow::Borrowed(function.name(db)),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
                     kind: "method wrapper",
-                    name: "`__get__` of property",
+                    name: Cow::Borrowed("`__get__` of property"),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
                 Some(CallableDescription {
                     kind: "method wrapper",
-                    name: "`__delete__` of property",
+                    name: Cow::Borrowed("`__delete__` of property"),
                 })
             }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
                 kind: "wrapper descriptor",
-                name: match kind {
+                name: Cow::Borrowed(match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
                     WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
-                },
+                }),
             }),
             _ => None,
         }

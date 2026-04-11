@@ -95,7 +95,7 @@ info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -
 ```
 
 ```
-error[missing-argument]: No argument provided for required parameter `a` of bound method `method`
+error[missing-argument]: No argument provided for required parameter `a` of bound method `Foo.method`
   --> src/main.py:14:1
    |
 12 | h(b=56)

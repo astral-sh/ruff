@@ -563,7 +563,7 @@ class Contravariant[T]:
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never]
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Contravariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```
 
@@ -598,7 +598,7 @@ def _(x: object):
     if isinstance(x, Invariant):
         reveal_type(x)  # revealed: Top[Invariant[Unknown]]
         reveal_type(x.get())  # revealed: object
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```
 
@@ -631,7 +631,7 @@ class ContravariantWithAny[T]:
 def _(x: object):
     if isinstance(x, ContravariantWithAny):
         reveal_type(x)  # revealed: ContravariantWithAny[Never]
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `ContravariantWithAny.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42, "hello")
 ```
 
