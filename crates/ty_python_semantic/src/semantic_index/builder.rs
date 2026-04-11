@@ -247,6 +247,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.comprehension_iterable_nesting -= 1;
     }
 
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
+        let Some(target) = named.target.as_name_expr() else {
+            return false;
+        };
+
+        self.scope_stack.iter().rev().any(|scope_info| {
+            let generators = match self.scopes[scope_info.file_scope_id].node() {
+                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::GeneratorExpression(node) => &node.node(self.module).generators,
+                _ => return false,
+            };
+
+            generators.iter().any(|comprehension| {
+                loop_bindings_visitor::target_binds_name(&comprehension.target, target.id.as_str())
+            })
+        })
+    }
+
     /// Returns the scope ID of the current scope if the current scope
     /// is a method inside a class body or an eagerly executed scope inside a method.
     /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
@@ -3157,7 +3177,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             range: node.range,
                             python_version: self.python_version,
                         });
-                    } else if self.in_class_body_comprehension() {
+                    } else if self.in_class_body_comprehension()
+                        && !self.rebinds_comprehension_variable(node)
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
                             range: node.range,

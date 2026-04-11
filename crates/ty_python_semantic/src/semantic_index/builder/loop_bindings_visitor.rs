@@ -25,6 +25,15 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.bound_places
 }
 
+pub(super) fn target_binds_name(target: &ast::Expr, name: &str) -> bool {
+    let mut collector = LoopBindingsVisitor::default();
+    collector.add_place_from_target(target);
+    collector.bound_places.into_iter().any(|place| match place {
+        PlaceExpr::Symbol(symbol) => symbol.name().as_str() == name,
+        PlaceExpr::Member(_) => false,
+    })
+}
+
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
 ///
 /// This visitor doesn't walk nested function/class definitions since those are different scopes.
@@ -279,6 +288,20 @@ mod tests {
                 PlaceExpr::Member(member) => member.to_string(),
             })
             .collect()
+    }
+
+    #[test]
+    fn test_target_binds_name_with_nested_unpacking() {
+        let parsed = parse_module("for (x, (y, *z)) in items:\n    pass\n").expect("valid Python");
+        let stmt = &parsed.suite()[0];
+        let ast::Stmt::For(for_stmt) = stmt else {
+            panic!("Expected a for statement");
+        };
+
+        assert!(target_binds_name(&for_stmt.target, "x"));
+        assert!(target_binds_name(&for_stmt.target, "y"));
+        assert!(target_binds_name(&for_stmt.target, "z"));
+        assert!(!target_binds_name(&for_stmt.target, "items"));
     }
 
     #[test]

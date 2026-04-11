@@ -789,7 +789,9 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(ReturnInGenerator, error.range);
                 }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+            | SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
+            | SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::LazyImportNotAllowed { .. }
             | SemanticSyntaxErrorKind::LazyImportStar
             | SemanticSyntaxErrorKind::LazyFutureImport

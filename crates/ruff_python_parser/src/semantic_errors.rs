@@ -1116,6 +1116,7 @@ impl SemanticSyntaxChecker {
             // {key: (a := 0) for a in range(0)}
             // ((a := 0) for a in range(0))
             // [[(a := 0)] for a in range(0)]
+            // [(a := b) for (a, b) in pairs]
             // [(a := 0) for b in range (0) for a in range(0)]
             // [(a := 0) for a in range (0) for b in range(0)]
             // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
@@ -1906,15 +1907,26 @@ struct ReboundComprehensionVisitor<'a> {
     rebound_variables: Vec<TextRange>,
 }
 
+fn target_binds_name(target: &Expr, name: &str) -> bool {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == name,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().any(|elt| target_binds_name(elt, name))
+        }
+        Expr::Starred(ast::ExprStarred { value, .. }) => target_binds_name(value, name),
+        _ => false,
+    }
+}
+
 impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
-                if self.comprehensions.iter().any(|comp| {
-                    comp.target
-                        .as_name_expr()
-                        .is_some_and(|name| name.id == *id)
-                }) {
+                if self
+                    .comprehensions
+                    .iter()
+                    .any(|comp| target_binds_name(&comp.target, id.as_str()))
+                {
                     self.rebound_variables.push(*range);
                 }
             }
