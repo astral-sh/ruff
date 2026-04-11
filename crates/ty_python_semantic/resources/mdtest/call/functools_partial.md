@@ -259,8 +259,29 @@ def pair(a: T, b: T) -> tuple[T, T]:
     return (a, b)
 
 p = partial(pair, 1)
-reveal_type(p)  # revealed: partial[(b: int) -> tuple[Literal[1], Literal[1]]]
-reveal_type(p(2))  # revealed: tuple[Literal[1], Literal[1]]
+reveal_type(p)  # revealed: partial[(b: int) -> tuple[int, int]]
+reveal_type(p(2))  # revealed: tuple[int, int]
+reveal_type(p(2)[1])  # revealed: int
+```
+
+## Generic functions preserve defaults for no-longer-inferable type params
+
+```py
+from functools import partial
+from typing import cast
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+
+def with_default(x: T) -> tuple[T, U]:
+    return (x, cast(U, x))
+
+reveal_type(with_default(1))  # revealed: tuple[Literal[1], Literal[1]]
+
+p = partial(with_default, 1)
+reveal_type(p)  # revealed: partial[() -> tuple[Literal[1], Literal[1]]]
+reveal_type(p())  # revealed: tuple[Literal[1], Literal[1]]
 ```
 
 ## Generic constructors
@@ -492,6 +513,25 @@ reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist",
 reveal_type(p())  # revealed: None
 ```
 
+## Keyword argument with empty literal sequence annotation
+
+`partial(...)` should still re-run argument refinement even when the initial constructor binding
+already succeeds, so empty literals keep the parameter's contextual element type:
+
+```py
+from functools import partial
+from typing import Literal, Sequence
+
+Distribution = Literal["sdist", "wheel", "editable"]
+
+def build(distributions: Sequence[Distribution]) -> None:
+    pass
+
+p = partial(build, distributions=[])
+reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
+reveal_type(p())  # revealed: None
+```
+
 ## Overloaded functions with remaining params
 
 ```py
@@ -671,6 +711,38 @@ p()
 p("extra")  # error: [too-many-positional-arguments]
 ```
 
+## Class constructor partial preserves one-sided bound `__new__` positional params
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self) -> None: ...
+
+p = partial(MyClass, 1)
+reveal_type(p)  # revealed: partial[(x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(1)  # error: [invalid-argument-type]
+```
+
+## Class constructor partial preserves one-sided bound `__new__` keyword params
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self) -> None: ...
+
+p = partial(MyClass, x=1)
+reveal_type(p)  # revealed: partial[(*, x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(x=1)  # error: [invalid-argument-type]
+```
+
 ## Class constructor preserves downstream params after partial binding
 
 ```py
@@ -687,6 +759,90 @@ p()  # error: [missing-argument]
 p("extra")  # error: [invalid-argument-type]
 ```
 
+## Class constructor partial preserves one-sided `__init__` params
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, x: int) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[(x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(1)  # error: [invalid-argument-type]
+```
+
+## Class constructor partial preserves downstream keyword-only params
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, *, y: str) -> None: ...
+
+p = partial(MyClass, 1)
+reveal_type(p)  # revealed: partial[(x: Never, *, y: Never) -> MyClass]
+p()  # error: [missing-argument]
+# error: [missing-argument]
+# error: [invalid-argument-type]
+p(y="extra")
+```
+
+## Class constructor partial keeps the narrower subtype-compatible signature
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, x: object) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[(x: int) -> MyClass]
+reveal_type(p(1))  # revealed: MyClass
+p("s")  # error: [invalid-argument-type]
+```
+
+## Class constructor partial matches reordered params by name
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int, *, y: str) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, *, y: str, x: int) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[(*, x: int, y: str) -> MyClass]
+reveal_type(p(x=1, y="s"))  # revealed: MyClass
+p(y="s")  # error: [missing-argument]
+```
+
+## Class constructor partial keeps reordered positional params keyword-only
+
+```py
+from functools import partial
+
+class MyClass:
+    def __new__(cls, x: int, y: str) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, y: str, x: int) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[(*, x: int, y: str) -> MyClass]
+reveal_type(p(x=1, y="s"))  # revealed: MyClass
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+p(1, "s")
+```
+
 ## Class constructor partial preserves both `__new__` and `__init__`
 
 ```py
@@ -701,6 +857,25 @@ p = partial(MyClass)
 reveal_type(p)  # revealed: partial[(x: int) -> MyClass]
 p(1)
 p("s")  # error: [invalid-argument-type]
+```
+
+## Class constructor partial preserves per-overload correlations
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class MyClass:
+    def __new__(cls, x: T, y: T) -> "MyClass":
+        return super().__new__(cls)
+    def __init__(self, x: int, y: str) -> None: ...
+
+p = partial(MyClass)
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+p(1, "s")
 ```
 
 ## Class constructor partial keeps non-instance `__new__` overloads
@@ -966,6 +1141,23 @@ def make_partial(x):
     return p
 
 p = make_partial(1)
+```
+
+## Invalid overloaded binding falls back to default partial type
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(a: int) -> int: ...
+@overload
+def f(a: str) -> str: ...
+def f(a):
+    return a
+
+p = partial(f, 1.0)  # error: [invalid-argument-type]
+reveal_type(p)  # revealed: partial[Unknown]
 ```
 
 ## Partial of bound classmethod is assignable to zero-arg callable

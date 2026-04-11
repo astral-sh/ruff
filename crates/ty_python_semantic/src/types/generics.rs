@@ -1721,28 +1721,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context.specialize_recursive(self.db, types)
     }
 
-    /// Build a specialization that preserves uninferred type variables as themselves.
+    /// Build a specialization that preserves selected uninferred type variables as themselves.
     ///
     /// This is useful for constructing reusable callables like `functools.partial(...)`, where
-    /// unresolved type variables should remain generic over future calls instead of defaulting to
-    /// `Unknown`.
+    /// type variables that can still be inferred by future calls should remain generic, while
+    /// uninferred type variables that can no longer be inferred should still resolve via defaults.
     pub(crate) fn build_preserving_unmapped_with(
         &mut self,
         generic_context: GenericContext<'db>,
+        mut preserve_unmapped: impl FnMut(BoundTypeVarInstance<'db>) -> bool,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
-        let types: Box<[_]> = generic_context
+        let types = generic_context
             .variables_inner(self.db)
             .iter()
             .map(
                 |(identity, variable)| match self.types.get(identity).copied() {
-                    Some(mapped_ty) => choose(*variable, mapped_ty, mapped_ty).unwrap_or(mapped_ty),
-                    None => Type::TypeVar(*variable),
+                    Some(mapped_ty) => {
+                        Some(choose(*variable, mapped_ty, mapped_ty).unwrap_or(mapped_ty))
+                    }
+                    None if preserve_unmapped(*variable) => Some(Type::TypeVar(*variable)),
+                    None => None,
                 },
-            )
-            .collect();
+            );
 
-        generic_context.specialize_from_types_recursive(self.db, types)
+        generic_context.specialize_recursive(self.db, types)
     }
 
     /// Insert a type mapping for a bound typevar.

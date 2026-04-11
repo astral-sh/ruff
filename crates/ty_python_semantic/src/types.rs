@@ -2290,7 +2290,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             // Each `partial()` call creates a distinct object at runtime.
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { .. }) => false,
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
 
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(_)
@@ -3479,15 +3479,16 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { partial, .. })
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))
                 if name_str == "__call__" =>
             {
-                Place::bound(Type::Callable(partial)).into()
+                Place::bound(Type::Callable(partial.partial(db))).into()
             }
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { wrapped, partial }) => {
-                let wrapped = wrapped.inner(db);
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                let wrapped = partial.wrapped(db).inner(db);
                 let nominal_lookup = partial
+                    .partial(db)
                     .into_functools_partial_instance(db)
                     .member_lookup_with_policy(db, name.clone(), policy);
                 if name_str == "func" {
@@ -4180,8 +4181,8 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { partial, .. }) => {
-                Type::Callable(partial).bindings(db)
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                Type::Callable(partial.partial(db)).bindings(db)
             }
 
             Type::KnownInstance(known_instance) => {
@@ -5426,7 +5427,7 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
-                KnownInstanceType::FunctoolsPartial { .. } => Err(InvalidTypeExpressionError {
+                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
                     )],
@@ -6142,7 +6143,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
-                | KnownInstanceType::FunctoolsPartial { .. } => {
+                | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
