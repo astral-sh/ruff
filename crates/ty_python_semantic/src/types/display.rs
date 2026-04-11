@@ -3105,9 +3105,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_str("'>")
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
-            KnownInstanceType::FunctoolsPartial(callable) => {
+            KnownInstanceType::FunctoolsPartial { partial, .. } => {
                 f.write_str("partial[")?;
-                Type::Callable(callable)
+                Type::Callable(partial)
                     .display_with(self.db, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")

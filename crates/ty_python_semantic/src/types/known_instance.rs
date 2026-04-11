@@ -107,7 +107,10 @@ pub enum KnownInstanceType<'db> {
 
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
-    FunctoolsPartial(CallableType<'db>),
+    FunctoolsPartial {
+        wrapped: InternedType<'db>,
+        partial: CallableType<'db>,
+    },
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -163,8 +166,8 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
             }
         }
-        KnownInstanceType::FunctoolsPartial(callable) => {
-            visitor.visit_callable_type(db, callable);
+        KnownInstanceType::FunctoolsPartial { partial, .. } => {
+            visitor.visit_callable_type(db, partial);
         }
     }
 }
@@ -228,9 +231,15 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
-            Self::FunctoolsPartial(callable) => callable
-                .recursive_type_normalized_impl(db, div, nested)
-                .map(Self::FunctoolsPartial),
+            Self::FunctoolsPartial { wrapped, partial } => Some(Self::FunctoolsPartial {
+                wrapped: InternedType::new(
+                    db,
+                    wrapped
+                        .inner(db)
+                        .recursive_type_normalized_impl(db, div, nested)?,
+                ),
+                partial: partial.recursive_type_normalized_impl(db, div, nested)?,
+            }),
         }
     }
 
@@ -258,7 +267,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
-            Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
+            Self::FunctoolsPartial { .. } => KnownClass::FunctoolsPartial,
         }
     }
 
@@ -324,10 +333,16 @@ impl<'db> KnownInstanceType<'db> {
                     callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
-            KnownInstanceType::FunctoolsPartial(callable_type) => {
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-                    callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
+            KnownInstanceType::FunctoolsPartial { wrapped, partial } => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+                    wrapped: InternedType::new(
+                        db,
+                        wrapped
+                            .inner(db)
+                            .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ),
+                    partial: partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                })
             }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(

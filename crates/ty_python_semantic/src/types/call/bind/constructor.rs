@@ -1,10 +1,20 @@
-use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
+use super::{
+    ArgumentForms, Binding, Bindings, CallableBinding, CallableItem, functools_partial_instance,
+};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::Specialization;
-use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::generics::{GenericContext, Specialization};
+use crate::types::known_instance::KnownInstanceType;
+use crate::types::signatures::{
+    CallableSignature, Parameter, ParameterKind, Parameters, Signature,
+};
+use crate::types::{
+    BoundTypeVarInstance, CallableType, ClassLiteral, DynamicType, IntersectionType, Type,
+    TypeContext,
+};
+use rustc_hash::FxHashSet;
 
 /// Bindings for a constructor call.
 ///
@@ -167,6 +177,83 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
         self.downstream_constructor.as_deref_mut()
+    }
+
+    pub(super) fn functools_partial_type<'a>(
+        &self,
+        db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Type<'db>> {
+        let entry_callable =
+            self.entry
+                .functools_partial_callable(db, partial_overload, bound_call_arguments)?;
+        let entry_partial = functools_partial_instance(db, wrapped_callable_ty, entry_callable);
+        let Some(downstream) = self.downstream_constructor() else {
+            return Some(entry_partial);
+        };
+
+        let Some(downstream_item) = downstream.single_item() else {
+            return Some(entry_partial);
+        };
+        let Some(Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+            partial: downstream_callable,
+            ..
+        })) = downstream_item.functools_partial_type(
+            db,
+            wrapped_callable_ty,
+            partial_overload,
+            bound_call_arguments,
+        )
+        else {
+            return Some(entry_partial);
+        };
+
+        let Some(constructor_class_literal) = self.constructed_class_literal(db) else {
+            return Some(functools_partial_instance(
+                db,
+                wrapped_callable_ty,
+                merge_constructor_partial_callables(db, entry_callable, downstream_callable),
+            ));
+        };
+
+        let (instance_signatures, non_instance_signatures): (Vec<_>, Vec<_>) = entry_callable
+            .signatures(db)
+            .iter()
+            .cloned()
+            .partition(|signature| {
+                constructor_returns_instance(db, constructor_class_literal, signature.return_ty)
+            });
+
+        let mut overloads = non_instance_signatures;
+        if !instance_signatures.is_empty() {
+            let instance_entry_callable = CallableType::new(
+                db,
+                CallableSignature::from_overloads(instance_signatures),
+                CallableTypeKind::Regular,
+            );
+            overloads.extend(
+                merge_constructor_partial_callables(
+                    db,
+                    instance_entry_callable,
+                    downstream_callable,
+                )
+                .signatures(db)
+                .iter()
+                .cloned(),
+            );
+        }
+
+        Some(functools_partial_instance(
+            db,
+            wrapped_callable_ty,
+            CallableType::new(
+                db,
+                CallableSignature::from_overloads(overloads),
+                CallableTypeKind::Regular,
+            ),
+        ))
     }
 
     pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
@@ -509,6 +596,164 @@ impl<'db> ConstructorBinding<'db> {
     fn constructor_kind(&self) -> ConstructorCallableKind {
         self.constructor_context.kind()
     }
+}
+
+fn merge_constructor_partial_callables<'db>(
+    db: &'db dyn Db,
+    entry: CallableType<'db>,
+    downstream: CallableType<'db>,
+) -> CallableType<'db> {
+    let mut satisfiable = Vec::new();
+    let mut fallback = Vec::new();
+    let mut seen_overloads = FxHashSet::default();
+
+    for entry_signature in entry.signatures(db) {
+        for downstream_signature in downstream.signatures(db) {
+            let merged =
+                merge_constructor_partial_signature(db, entry_signature, downstream_signature);
+            let dedup_key = merged.clone().with_definition(None);
+            if !seen_overloads.insert(dedup_key) {
+                continue;
+            }
+
+            if constructor_partial_signature_has_possible_call(&merged) {
+                satisfiable.push(merged);
+            } else {
+                fallback.push(merged);
+            }
+        }
+    }
+
+    let overloads = if satisfiable.is_empty() {
+        fallback
+    } else {
+        satisfiable
+    };
+
+    CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::Regular,
+    )
+}
+
+fn merge_constructor_partial_signature<'db>(
+    db: &'db dyn Db,
+    entry: &Signature<'db>,
+    downstream: &Signature<'db>,
+) -> Signature<'db> {
+    let entry_callable = Type::single_callable(db, entry.clone());
+    let downstream_callable = Type::single_callable(db, downstream.clone());
+    if entry_callable.is_subtype_of(db, downstream_callable) {
+        return downstream.clone();
+    }
+    if downstream_callable.is_subtype_of(db, entry_callable) {
+        return entry.clone();
+    }
+
+    Signature::new_generic(
+        GenericContext::merge_optional(db, entry.generic_context, downstream.generic_context),
+        merge_constructor_partial_parameters(db, entry.parameters(), downstream.parameters()),
+        combine_constructor_partial_return_types(db, entry.return_ty, downstream.return_ty),
+    )
+}
+
+fn merge_constructor_partial_parameters<'db>(
+    db: &'db dyn Db,
+    entry: &Parameters<'db>,
+    downstream: &Parameters<'db>,
+) -> Parameters<'db> {
+    let len = entry.len().max(downstream.len());
+    Parameters::new(
+        db,
+        (0..len).map(|index| match (entry.get(index), downstream.get(index)) {
+            (Some(entry_parameter), Some(downstream_parameter)) => {
+                merge_constructor_partial_parameter(db, entry_parameter, downstream_parameter)
+            }
+            (Some(entry_parameter), None) | (None, Some(entry_parameter)) => {
+                entry_parameter.clone().with_annotated_type(Type::Never)
+            }
+            (None, None) => unreachable!(),
+        }),
+    )
+}
+
+fn merge_constructor_partial_parameter<'db>(
+    db: &'db dyn Db,
+    entry: &Parameter<'db>,
+    downstream: &Parameter<'db>,
+) -> Parameter<'db> {
+    let annotated_type = combine_constructor_partial_return_types(
+        db,
+        entry.annotated_type(),
+        downstream.annotated_type(),
+    );
+    let default_type = match (entry.default_type(), downstream.default_type()) {
+        (Some(entry_default), Some(downstream_default)) => Some(
+            combine_constructor_partial_return_types(db, entry_default, downstream_default),
+        ),
+        _ => None,
+    };
+
+    match (entry.kind(), downstream.kind()) {
+        (
+            ParameterKind::PositionalOnly { name, .. },
+            ParameterKind::PositionalOnly { .. },
+        ) => Parameter::positional_only(name.clone()),
+        (
+            ParameterKind::PositionalOnly { name, .. },
+            ParameterKind::PositionalOrKeyword { .. },
+        )
+        | (
+            ParameterKind::PositionalOrKeyword { .. },
+            ParameterKind::PositionalOnly { name, .. },
+        ) => Parameter::positional_only(name.clone()),
+        (
+            ParameterKind::PositionalOrKeyword { name, .. },
+            ParameterKind::PositionalOrKeyword { .. },
+        ) => Parameter::positional_or_keyword(name.clone()),
+        (ParameterKind::Variadic { name }, ParameterKind::Variadic { .. }) => {
+            Parameter::variadic(name.clone())
+        }
+        (
+            ParameterKind::KeywordOnly { name, .. },
+            ParameterKind::KeywordOnly { .. },
+        ) => Parameter::keyword_only(name.clone()),
+        (
+            ParameterKind::KeywordVariadic { name },
+            ParameterKind::KeywordVariadic { .. },
+        ) => Parameter::keyword_variadic(name.clone()),
+        _ => entry.clone(),
+    }
+    .with_annotated_type(annotated_type)
+    .with_optional_default_type(default_type)
+}
+
+fn combine_constructor_partial_return_types<'db>(
+    db: &'db dyn Db,
+    entry: Type<'db>,
+    downstream: Type<'db>,
+) -> Type<'db> {
+    if entry.is_subtype_of(db, downstream) {
+        entry
+    } else if downstream.is_subtype_of(db, entry) {
+        downstream
+    } else {
+        IntersectionType::from_two_elements(db, entry, downstream)
+    }
+}
+
+fn constructor_partial_signature_has_possible_call(signature: &Signature<'_>) -> bool {
+    signature.parameters().iter().all(|parameter| {
+        !(parameter.annotated_type().is_never()
+            && parameter.default_type().is_none()
+            && matches!(
+                parameter.kind(),
+                ParameterKind::PositionalOnly { .. }
+                    | ParameterKind::PositionalOrKeyword { .. }
+                    | ParameterKind::KeywordOnly { .. }
+            ))
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
