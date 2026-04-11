@@ -3,7 +3,8 @@ use crate::completion;
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
-use ruff_text_size::TextRange;
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_project::Db;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
@@ -73,6 +74,47 @@ fn unresolved_fixes(
                 preferred: true,
             }),
     )
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct IndentSpan(TextRange);
+
+impl std::ops::Deref for IndentSpan {
+    type Target = TextRange;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IndentSpan {
+    fn of(tokens: &Tokens, range: impl Ranged) -> Self {
+        let (before, _) = tokens.split_at(range.start());
+        IndentSpan::indent_spans(before).next().unwrap_or_default()
+    }
+
+    fn indent_spans(tokens: &[Token]) -> impl Iterator<Item = Self> {
+        let mut next_token = None;
+        tokens.iter().rev().filter_map(move |token| {
+            if !token.kind().is_any_newline() {
+                next_token = Some(token);
+                return None;
+            }
+            match next_token.take()? {
+                next_token if next_token.kind() == TokenKind::Indent => {
+                    Some(IndentSpan(next_token.range()))
+                }
+                next_token => Some(IndentSpan(TextRange::new(token.end(), next_token.start()))),
+            }
+        })
+    }
+
+    fn dedent(self, len: TextSize) -> Option<Edit> {
+        self.len()
+            .checked_sub(len)
+            .map(|_| Edit::range_deletion(TextRange::at(self.start(), len)))
+            .or_else(|| (!self.is_empty()).then(|| Edit::range_deletion(self.range())))
+    }
 }
 
 #[cfg(test)]
