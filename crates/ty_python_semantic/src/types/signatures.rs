@@ -445,18 +445,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        let signature_type = todo_type!(reason);
-        Signature {
-            generic_context: None,
-            definition: None,
-            parameters: Parameters::todo(),
-            return_ty: signature_type,
-        }
-    }
-
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,

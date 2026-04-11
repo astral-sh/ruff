@@ -152,6 +152,33 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     }
 }
 
+/// If `value_ty` is a hashable literal and already exists in `enum_values`,
+/// record it as an alias and return `true`. Otherwise track it as canonical.
+fn try_register_alias<'db>(
+    value_ty: Type<'db>,
+    name: &Name,
+    enum_values: &mut FxHashMap<Type<'db>, Name>,
+    aliases: &mut FxHashMap<Name, Name>,
+) -> bool {
+    if !matches!(
+        value_ty.as_literal_value_kind(),
+        Some(
+            LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+    ) {
+        return false;
+    }
+    if let Some(canonical) = enum_values.get(&value_ty) {
+        aliases.insert(name.clone(), canonical.clone());
+        return true;
+    }
+    enum_values.insert(value_ty, name.clone());
+    false
+}
+
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -163,17 +190,21 @@ pub(crate) fn enum_metadata<'db>(
         if !spec.has_known_members(db) {
             return None;
         }
-        let members: FxIndexMap<Name, Type<'db>> = spec
-            .members(db)
-            .iter()
-            .map(|(name, ty)| (name.clone(), *ty))
-            .collect();
+        let mut members = FxIndexMap::default();
+        let mut aliases = FxHashMap::default();
+        let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+        for (name, ty) in spec.members(db) {
+            if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
+                continue;
+            }
+            members.insert(name.clone(), *ty);
+        }
         if members.is_empty() {
             return None;
         }
         return Some(EnumMetadata {
             members,
-            aliases: FxHashMap::default(),
+            aliases,
             auto_members: FxHashSet::default(),
             value_annotation: None,
             init_function: None,
@@ -216,6 +247,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
+    let mut prev_value_was_non_literal_int = false;
     let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
@@ -304,7 +336,11 @@ pub(crate) fn enum_metadata<'db>(
                                             custom_mixins.as_slice(),
                                             [] | [Some(KnownClass::Int)]
                                         ) {
-                                            Type::int_literal(auto_counter)
+                                            if prev_value_was_non_literal_int {
+                                                KnownClass::Int.to_instance(db)
+                                            } else {
+                                                Type::int_literal(auto_counter)
+                                            }
                                         } else {
                                             Type::any()
                                         }
@@ -345,26 +381,8 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
-            // Duplicate values are aliases that are not considered separate members. This check is only
-            // performed if we can infer a precise literal type for the enum member. If we only get `int`,
-            // we don't know if it's a duplicate or not.
-            if matches!(
-                value_ty.as_literal_value_kind(),
-                Some(
-                    LiteralValueTypeKind::Bool(_)
-                        | LiteralValueTypeKind::Int(_)
-                        | LiteralValueTypeKind::String(_)
-                        | LiteralValueTypeKind::Bytes(_)
-                )
-            ) {
-                if let Some(canonical) = enum_values.get(&value_ty) {
-                    // This is a duplicate value, create an alias to the canonical (first) member
-                    aliases.insert(name.clone(), canonical.clone());
-                    return None;
-                }
-
-                // This is the first occurrence of this value, track it as the canonical member
-                enum_values.insert(value_ty, name.clone());
+            if try_register_alias(value_ty, name, &mut enum_values, &mut aliases) {
+                return None;
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
@@ -384,6 +402,11 @@ pub(crate) fn enum_metadata<'db>(
             {
                 return None;
             }
+
+            // track whether this member's value is a non-literal int, so a
+            // following `auto()` knows to widen its result to `int`
+            prev_value_was_non_literal_int = value_ty.as_int_literal().is_none()
+                && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
 
             Some((name.clone(), value_ty))
         })

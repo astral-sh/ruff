@@ -4196,10 +4196,6 @@ impl<'db> Type<'db> {
                 )
             }
 
-            KnownClass::Enum => {
-                Some(Binding::single(self, Signature::todo("functional `Enum` syntax")).into())
-            }
-
             KnownClass::Super => {
                 // ```py
                 // class super:

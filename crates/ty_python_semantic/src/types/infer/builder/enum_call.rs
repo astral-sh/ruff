@@ -7,7 +7,9 @@ use crate::{
     types::{
         ClassLiteral, KnownClass, Type, TypeContext,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
-        diagnostic::{INVALID_ARGUMENT_TYPE, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT},
+        diagnostic::{
+            INVALID_ARGUMENT_TYPE, INVALID_BASE, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+        },
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
@@ -66,37 +68,44 @@ fn enum_auto_value<'db>(
     }
 }
 
-/// Compute the next auto-assigned value for a dict-form enum member,
-/// based on the previous member's value rather than positional index.
+/// Compute the next auto-assigned value based on the previous member's value.
 ///
-/// This matches CPython's `_generate_next_value_` behavior for dict form:
+/// Used for dict-form and tuple/list-form functional enums where `auto()` values
+/// are derived from the predecessor rather than positional index.
 /// - `StrEnum`: lowercased member name
 /// - `Flag`/`IntFlag`: next highest power of two
 /// - Others: `last_value + 1`
-fn dict_auto_value<'db>(
+fn next_auto_value<'db>(
     db: &'db dyn Db,
     base_class: KnownClass,
     name: &str,
-    last_int_value: i64,
+    last_int_value: Option<i64>,
 ) -> Type<'db> {
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
-        KnownClass::Flag | KnownClass::IntFlag => {
-            // next power of two after highest bit in the last value
-            if last_int_value <= 0 {
-                Type::int_literal(1)
-            } else {
-                let shift = i64::BITS - last_int_value.leading_zeros();
-                1_i64
-                    .checked_shl(shift)
+        _ => {
+            let Some(last) = last_int_value else {
+                return KnownClass::Int.to_instance(db);
+            };
+            match base_class {
+                KnownClass::Flag | KnownClass::IntFlag => {
+                    // next power of two after highest bit in the last value
+                    if last <= 0 {
+                        Type::int_literal(1)
+                    } else {
+                        let shift = i64::BITS - last.leading_zeros();
+                        1_i64
+                            .checked_shl(shift)
+                            .map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db))
+                    }
+                }
+                _ => last
+                    .checked_add(1)
                     .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(db))
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
             }
         }
-        _ => last_int_value
-            .checked_add(1)
-            .map(Type::int_literal)
-            .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
     }
 }
 
@@ -178,10 +187,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let start = start_kw
-            .and_then(|kw| self.expression_type(&kw.value).as_int_literal())
+            .and_then(|kw| {
+                let ty = self.expression_type(&kw.value);
+                if let Some(lit) = ty.as_int_literal() {
+                    return Some(lit);
+                }
+                if !ty.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Expected `int` for `start` argument, got `{}`",
+                            ty.display(db),
+                        ));
+                    }
+                }
+                None
+            })
             .unwrap_or(1);
 
-        let mixin_type = type_kw.map(|kw| self.expression_type(&kw.value));
+        let mixin_type = type_kw.map(|kw| {
+            let ty = self.expression_type(&kw.value);
+            if let Some(class_lit) = ty.as_class_literal() {
+                if class_lit.is_typed_dict(db) {
+                    if let Some(builder) = self.context.report_lint(&INVALID_BASE, &kw.value) {
+                        builder.into_diagnostic(format_args!(
+                            "TypedDict class `{}` cannot be used as an enum mixin",
+                            ty.display(db),
+                        ));
+                    }
+                }
+            } else if !ty.is_dynamic() {
+                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value) {
+                    builder.into_diagnostic(format_args!(
+                        "Expected a class for `type` argument, got `{}`",
+                        ty.display(db),
+                    ));
+                }
+            }
+            ty
+        });
 
         let name_type = self.expression_type(name_arg);
         let name = Name::new(
@@ -327,13 +372,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> (Vec<(Name, Type<'db>)>, bool) {
         let db = self.db();
         let mut members = Vec::with_capacity(elts.len());
+        let mut last_int_value: Option<i64> = start.checked_sub(1);
         for (i, elt) in elts.iter().enumerate() {
             let ty = self.expression_type(elt);
             if let Some(string_lit) = ty.as_string_literal() {
                 let member_name = Name::new(string_lit.value(db));
                 let v = enum_auto_value(db, base_class, member_name.as_str(), start, i);
+                last_int_value = v.as_int_literal();
                 members.push((member_name, v));
             } else if let Some((name, value)) = self.extract_enum_tuple_entry(elt) {
+                let value = if value.is_instance_of(db, KnownClass::Auto) {
+                    next_auto_value(db, base_class, name.as_str(), last_int_value)
+                } else {
+                    value
+                };
+                last_int_value = value.as_int_literal();
                 members.push((name, value));
             } else {
                 return (vec![], false);
@@ -355,7 +408,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> (Vec<(Name, Type<'db>)>, bool) {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
-        let mut last_int_value = start - 1;
+        let mut last_int_value: Option<i64> = start.checked_sub(1);
         for item in &dict.items {
             let Some(key) = &item.key else {
                 return (vec![], false);
@@ -367,13 +420,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let name = Name::new(string_lit.value(db));
             let raw_value = self.expression_type(&item.value);
             let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
-                dict_auto_value(db, base_class, name.as_str(), last_int_value)
+                next_auto_value(db, base_class, name.as_str(), last_int_value)
             } else {
                 raw_value
             };
-            if let Some(int_val) = value.as_int_literal() {
-                last_int_value = int_val;
-            }
+            last_int_value = value.as_int_literal();
             members.push((name, value));
         }
         if members.is_empty() {
