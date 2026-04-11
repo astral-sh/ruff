@@ -263,13 +263,37 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
+            //
+            // With the inner group (default), compact multi-line is possible:
+            // ```python
+            // def foo(
+            //     first_param, second_param, third_param, fourth_param
+            // ):
+            // ```
+            //
+            // Without the inner group (Normalize), one-per-line with trailing comma:
+            // ```python
+            // def foo(
+            //     first_param,
+            //     second_param,
+            //     third_param,
+            //     fourth_param,
+            // ):
+            // ```
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+            let inner = format_with(|f: &mut PyFormatter| {
+                if f.options().magic_trailing_comma().is_normalize() {
+                    format_inner.fmt(f)
+                } else {
+                    group(&format_inner).fmt(f)
+                }
+            });
             write!(
                 f,
                 [
                     token("("),
                     dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&group(&format_inner)),
+                    soft_block_indent(&inner),
                     token(")")
                 ]
             )

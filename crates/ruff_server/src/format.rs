@@ -276,10 +276,11 @@ impl UvFormatCommand {
 
         command.arg("--config");
         command.arg(format!(
-            "format.skip-magic-trailing-comma = {}",
+            "format.magic-trailing-comma = \"{}\"",
             match self.options.magic_trailing_comma() {
-                ruff_python_formatter::MagicTrailingComma::Respect => "false",
-                ruff_python_formatter::MagicTrailingComma::Ignore => "true",
+                ruff_python_formatter::MagicTrailingComma::Respect => "respect",
+                ruff_python_formatter::MagicTrailingComma::Ignore => "ignore",
+                ruff_python_formatter::MagicTrailingComma::Normalize => "normalize",
             }
         ));
 

@@ -133,12 +133,23 @@ pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     fn new(f: &'fmt mut PyFormatter<'ast, 'buf>, sequence_end: TextSize) -> Self {
+        // With `MagicTrailingComma::Normalize`, default to `OneOrMore` so that every
+        // multiline expression gets a trailing comma — including single-entry sequences
+        // like `func(\n    arg  # comment\n)`. This ensures `COM812` has zero violations
+        // on normalized output. Callers that cannot accept a single-entry trailing comma
+        // (e.g., unparenthesized generator expressions: `sum(x for x in y)`) must
+        // explicitly override with `TrailingComma::MoreThanOne`.
+        let trailing_comma = if f.options().magic_trailing_comma().is_normalize() {
+            TrailingComma::OneOrMore
+        } else {
+            TrailingComma::default()
+        };
         Self {
             fmt: f,
             result: Ok(()),
             entries: Entries::None,
             sequence_end,
-            trailing_comma: TrailingComma::default(),
+            trailing_comma,
         }
     }
 
@@ -232,8 +243,8 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                     self.fmt.context(),
                 );
 
-                // If there is a single entry, only keep the magic trailing comma, don't add it if
-                // it wasn't there -- unless the trailing comma behavior is set to one-or-more.
+                // If there is a single entry, only keep the magic trailing comma, don't add it
+                // if it wasn't there — unless the trailing comma behavior is set to one-or-more.
                 if magic_trailing_comma
                     || self.trailing_comma == TrailingComma::OneOrMore
                     || self.entries.is_more_than_one()

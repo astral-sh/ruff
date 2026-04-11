@@ -304,16 +304,18 @@ impl FromStr for QuoteStyle {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, CacheKey)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "kebab-case")
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum MagicTrailingComma {
     #[default]
     Respect,
     Ignore,
+    Normalize,
 }
 
 impl MagicTrailingComma {
@@ -324,6 +326,10 @@ impl MagicTrailingComma {
     pub const fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
+
+    pub const fn is_normalize(self) -> bool {
+        matches!(self, Self::Normalize)
+    }
 }
 
 impl fmt::Display for MagicTrailingComma {
@@ -331,6 +337,7 @@ impl fmt::Display for MagicTrailingComma {
         f.write_str(match self {
             MagicTrailingComma::Respect => "respect",
             MagicTrailingComma::Ignore => "ignore",
+            MagicTrailingComma::Normalize => "normalize",
         })
     }
 }
@@ -342,6 +349,7 @@ impl FromStr for MagicTrailingComma {
         match s {
             "respect" | "Respect" => Ok(Self::Respect),
             "ignore" | "Ignore" => Ok(Self::Ignore),
+            "normalize" | "Normalize" => Ok(Self::Normalize),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for MagicTrailingComma"),
         }

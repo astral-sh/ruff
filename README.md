@@ -277,7 +277,7 @@ quote-style = "double"
 indent-style = "space"
 
 # Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
+magic-trailing-comma = "respect"
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"

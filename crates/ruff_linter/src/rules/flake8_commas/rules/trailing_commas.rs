@@ -148,10 +148,19 @@ impl Context {
 /// ```
 ///
 /// ## Formatter compatibility
-/// We recommend against using this rule alongside the [formatter]. The
-/// formatter enforces consistent use of trailing commas, making the rule redundant.
+/// We recommend against using this rule alongside the [formatter] with the
+/// default `magic-trailing-comma = "respect"` setting, as the formatter may
+/// introduce new trailing-comma violations that trigger `COM812`, leading to
+/// a format-lint-format oscillation.
 ///
-/// [formatter]:https://docs.astral.sh/ruff/formatter/
+/// To use `COM812` with the formatter, set
+/// [`magic-trailing-comma = "normalize"`](https://docs.astral.sh/ruff/settings/#format_magic-trailing-comma).
+/// In this mode, the formatter and `COM812` converge to the same output in a
+/// single pass: the formatter adds trailing commas to multi-line expressions
+/// and removes them from single-line expressions, eliminating all `COM812`
+/// violations.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.223")]
 pub(crate) struct MissingTrailingComma;
@@ -228,9 +237,11 @@ impl Violation for TrailingCommaOnBareTuple {
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
-/// formatter enforces consistent use of trailing commas, making the rule redundant.
+/// formatter adds trailing commas to multi-line expressions when the group
+/// breaks, which conflicts with this rule's goal of prohibiting trailing
+/// commas. This rule is most useful without the formatter.
 ///
-/// [formatter]:https://docs.astral.sh/ruff/formatter/
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.223")]
 pub(crate) struct ProhibitedTrailingComma;

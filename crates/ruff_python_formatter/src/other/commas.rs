@@ -5,12 +5,14 @@ use ruff_text_size::TextRange;
 use crate::MagicTrailingComma;
 use crate::prelude::*;
 
-/// Returns `true` if the range ends with a magic trailing comma (and the magic trailing comma
-/// should be respected).
+/// Returns `true` if the range ends with a magic trailing comma that should be respected.
+///
+/// Only returns `true` when `MagicTrailingComma::Respect` is active. With `Ignore` or
+/// `Normalize`, trailing commas are not treated as expansion signals.
 pub(crate) fn has_magic_trailing_comma(range: TextRange, context: &PyFormatContext) -> bool {
     match context.options().magic_trailing_comma() {
         MagicTrailingComma::Respect => has_trailing_comma(range, context),
-        MagicTrailingComma::Ignore => false,
+        MagicTrailingComma::Ignore | MagicTrailingComma::Normalize => false,
     }
 }
 
