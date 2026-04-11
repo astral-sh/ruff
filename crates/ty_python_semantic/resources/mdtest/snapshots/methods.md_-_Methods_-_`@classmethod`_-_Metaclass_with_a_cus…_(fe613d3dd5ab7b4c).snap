@@ -68,6 +68,8 @@ info: Parameter declared here
   |                                  ^^^^^^^^^^^^^^^^^^
 3 |         return "foo"
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -90,6 +92,8 @@ info: Parameter declared here
 21 |
 22 | # error: [missing-argument] "No argument provided for required parameter `meta_arg` of function `__new__`"
    |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -110,5 +114,7 @@ info: Parameter declared here
 31 |
 32 | # error: [missing-argument] "No argument provided for required parameter `init_arg` of bound method `__init__`"
    |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```

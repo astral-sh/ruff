@@ -52,6 +52,8 @@ info: Parameter declared here
   |                                                                                        ^^^^^^^^^^^^^
 5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -74,6 +76,8 @@ info: Function defined here
   |         ^^^^^^^                                                                        ------------- Parameter declared here
 5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -94,5 +98,7 @@ info: Parameter declared here
   |                                                                                        ^^^^^^^^^^^^^
 5 |         return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```

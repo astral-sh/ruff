@@ -73,6 +73,8 @@ info: Parameter declared here
 6 |
 7 | class Valid(Base, arg=5): ...
   |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -96,6 +98,8 @@ info: Function defined here
 6 |
 7 | class Valid(Base, arg=5): ...
   |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -117,6 +121,8 @@ info: Parameter declared here
 15 |
 16 | class Valid(Base, arg=5): ...
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -140,6 +146,8 @@ info: Function defined here
 15 |
 16 | class Valid(Base, arg=5): ...
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -162,6 +170,8 @@ info: Function signature here
 159 |     @classmethod
 160 |     def __subclasshook__(cls, subclass: type, /) -> bool: ...
     |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -182,5 +192,7 @@ info: Parameter declared here
 22 |
 23 | # `object.__init_subclass__` is called before `MetaclassWithFancyInit.__init__` here, so this is an...
    |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```

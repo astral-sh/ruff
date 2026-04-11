@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
@@ -15,6 +16,9 @@ use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
+use crate::types::diagnostic::{
+    attach_dunder_prepare_hints, attach_init_subclass_hints, attach_metaclass_constructor_hints,
+};
 use crate::types::function::FunctionDecorators;
 use crate::{
     Db,
@@ -39,9 +43,10 @@ pub(crate) struct InferContext<'db, 'ast> {
     scope: ScopeId<'db>,
     file: File,
     module: &'ast ParsedModuleRef,
-    diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
+    diagnostics: RefCell<TypeCheckDiagnostics>,
     no_type_check: InNoTypeCheck,
     bomb: DebugDropBomb,
+    class_statement_hints: RefCell<Option<ClassStatementHint>>,
 }
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
@@ -51,12 +56,27 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             scope,
             module,
             file: scope.file(db),
-            diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
+            diagnostics: RefCell::default(),
             no_type_check: InNoTypeCheck::default(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
             ),
+            class_statement_hints: RefCell::default(),
         }
+    }
+
+    /// Attach a class statement hint to the context.
+    ///
+    /// After this has been set, any diagnostics emitted will have an info-level
+    /// subdiagnostic attached that explains the implicit call behavior of certain
+    /// methods during creation of a class object.
+    pub(crate) fn attach_class_statement_hint(&self, hint: ClassStatementHint) {
+        *self.class_statement_hints.borrow_mut() = Some(hint);
+    }
+
+    /// Clear any class statement hint on the context.
+    pub(crate) fn clear_class_statement_hint(&self) {
+        self.class_statement_hints.borrow_mut().take();
     }
 
     /// The file for which the types are inferred.
@@ -136,7 +156,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
-        LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
+        LintDiagnosticGuardBuilder::new(
+            self,
+            lint,
+            ranged.range(),
+            *self.class_statement_hints.borrow(),
+        )
     }
 
     /// Optionally return a builder for a diagnostic guard.
@@ -244,6 +269,21 @@ pub(crate) enum InNoTypeCheck {
     Yes,
 }
 
+/// Certain methods, such as `__init_subclass__` on a superclass, or
+/// `__new__`/`__init__`/`__prepare__` on a metaclass, or indeed `__call__`
+/// on a meta-metaclass, are implicitly called during creation of a class
+/// object. If we emit a diagnostic due to a bad call to one of these
+/// methods, we attach an info-level subdiagnostic to the diagnostic that
+/// explains this implicit call behavior and links to relevant documentation.
+///
+/// This enum tracks which of these "class statement hints" to attach, if any.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ClassStatementHint {
+    InitSubclass,
+    MetaclassPrepare,
+    MetaclassConstructor,
+}
+
 /// An abstraction for mutating a diagnostic through the lense of a lint.
 ///
 /// Callers can build this guard by starting with `InferContext::report_lint`.
@@ -264,6 +304,8 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 
     source: LintSource,
+
+    class_statement_hints: Option<ClassStatementHint>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -353,6 +395,20 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // once.
         let mut diag = self.diag.take().unwrap();
 
+        if let Some(hint) = self.class_statement_hints {
+            match hint {
+                ClassStatementHint::InitSubclass => {
+                    attach_init_subclass_hints(&mut diag);
+                }
+                ClassStatementHint::MetaclassConstructor => {
+                    attach_metaclass_constructor_hints(&mut diag);
+                }
+                ClassStatementHint::MetaclassPrepare => {
+                    attach_dunder_prepare_hints(&mut diag);
+                }
+            }
+        }
+
         if self.ctx.db().verbose() {
             let rule = diag.id();
 
@@ -408,6 +464,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     severity: Severity,
     source: LintSource,
     primary_range: TextRange,
+    class_statement_hints: Option<ClassStatementHint>,
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
@@ -445,6 +502,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: &'static LintMetadata,
         range: TextRange,
+        class_statement_hints: Option<ClassStatementHint>,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
 
@@ -469,6 +527,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             severity,
             source,
             primary_range: range,
+            class_statement_hints,
         })
     }
 
@@ -499,6 +558,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             ctx: self.ctx,
             source: self.source,
             diag: Some(diag),
+            class_statement_hints: self.class_statement_hints,
         }
     }
 }

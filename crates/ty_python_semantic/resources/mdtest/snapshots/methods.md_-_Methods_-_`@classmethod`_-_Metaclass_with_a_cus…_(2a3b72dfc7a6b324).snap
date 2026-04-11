@@ -61,6 +61,8 @@ info: Parameter declared here
   |                                  ^^^^^^^^^^^^^^^^^^
 3 |         return "foo"
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -82,5 +84,7 @@ info: Parameter declared here
 23 |
 24 | # error: [missing-argument] "No argument provided for required parameter `arg` of function `__init_subclass__`"
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```

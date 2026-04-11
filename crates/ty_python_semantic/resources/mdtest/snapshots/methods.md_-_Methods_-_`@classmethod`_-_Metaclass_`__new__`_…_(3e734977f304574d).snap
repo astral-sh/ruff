@@ -57,6 +57,8 @@ info: Function defined here
 5 |
 6 | class A: ...
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
 
@@ -80,5 +82,7 @@ info: Function defined here
 5 |
 6 | class A: ...
   |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```

@@ -113,6 +113,8 @@ info: Parameter declared here
 14 |
 15 | class NoArg:
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -135,6 +137,8 @@ info: Function defined here
 14 |
 15 | class NoArg:
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -158,6 +162,8 @@ info: Parameter declared here
 14 |
 15 | class NoArg:
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -181,6 +187,8 @@ info: Function signature here
 14 |
 15 | class NoArg:
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -222,6 +230,8 @@ info: Function defined here
 47 |
 48 | class Valid(Base, arg=5, metaclass=object): ...
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
@@ -258,5 +268,7 @@ info: Overload implementation defined here
 67 |
 68 | class Valid(Base, mode="a", arg=5): ...
    |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```

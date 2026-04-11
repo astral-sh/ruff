@@ -83,6 +83,8 @@ info: Parameter declared here
 7 |     ) -> dict[str, Any]:
 8 |         return {}
   |
+info: `__prepare__` on a class's metaclass is implicitly called during creation of the class object
+info: See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
 
 ```
 
@@ -104,5 +106,7 @@ info: Parameter declared here
    |                                                                                     ^^^^^^^^^^^^^^^^^^^
 11 |         return super().__new__(mcs, name, bases, namespace)
    |
+info: A `class` statement leads to an implicit call to the class's metaclass
+info: See https://docs.python.org/3/reference/datamodel.html#metaclasses
 
 ```
