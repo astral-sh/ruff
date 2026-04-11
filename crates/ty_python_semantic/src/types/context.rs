@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
@@ -354,26 +354,22 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         if self.ctx.db().verbose() {
-            diag.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                match self.source {
-                    LintSource::Default => {
-                        format!("rule `{}` is enabled by default", diag.id())
-                    }
-                    LintSource::Cli => {
-                        format!("rule `{}` was selected on the command line", diag.id())
-                    }
-                    LintSource::File => {
-                        format!(
-                            "rule `{}` was selected in the configuration file",
-                            diag.id()
-                        )
-                    }
-                    LintSource::Editor => {
-                        format!("rule `{}` was selected in the editor settings", diag.id())
-                    }
-                },
-            ));
+            let rule = diag.id();
+
+            diag.info(match self.source {
+                LintSource::Default => {
+                    format!("rule `{rule}` is enabled by default")
+                }
+                LintSource::Cli => {
+                    format!("rule `{rule}` was selected on the command line")
+                }
+                LintSource::File => {
+                    format!("rule `{rule}` was selected in the configuration file")
+                }
+                LintSource::Editor => {
+                    format!("rule `{rule}` was selected in the editor settings")
+                }
+            });
         }
 
         self.ctx.diagnostics.borrow_mut().push(diag);
