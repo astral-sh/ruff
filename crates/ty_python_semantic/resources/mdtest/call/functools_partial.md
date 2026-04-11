@@ -284,6 +284,27 @@ reveal_type(box_factory)  # revealed: partial[() -> Box[str]]
 reveal_type(box_factory())  # revealed: Box[str]
 ```
 
+## Stored partials specialize through generic instances
+
+```py
+from functools import partial
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.callback = partial(identity, value)
+
+box = Box[int](1)
+reveal_type(box.callback)  # revealed: partial[() -> int]
+
+target: Callable[[], int] = box.callback
+```
+
 ## Overloaded functions
 
 ```py
@@ -299,6 +320,27 @@ def f(a: int | str) -> int | str:
 
 p = partial(f, 1)
 reveal_type(p)  # revealed: partial[() -> int]
+```
+
+## Union of callables preserves union of partials
+
+```py
+from functools import partial
+from typing import Callable
+
+def zero_arg(x: int) -> int:
+    return x
+
+def one_arg(x: int, y: str) -> int:
+    return x + len(y)
+
+def test_union_partial(
+    f: Callable[[int], int] | Callable[[int, str], int],
+) -> None:
+    p = partial(f, 1)
+    reveal_type(p)  # revealed: partial[() -> int] | partial[(str, /) -> int]
+
+    bad: Callable[[bytes, bytes], int] = p  # error: [invalid-assignment]
 ```
 
 ## Keyword-bound overload filtering

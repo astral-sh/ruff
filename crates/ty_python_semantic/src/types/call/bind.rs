@@ -2498,7 +2498,7 @@ impl<'db> Bindings<'db> {
 
                             // Reuse call-binding machinery to resolve which wrapped overloads are
                             // compatible with bound arguments and to surface binding diagnostics.
-                            let mut partial_bindings = match partial_bindings.check_types(
+                            let partial_bindings = match partial_bindings.check_types(
                                 db,
                                 &ConstraintSetBuilder::new(),
                                 &bound_call_arguments,
@@ -2508,80 +2508,63 @@ impl<'db> Bindings<'db> {
                                 Ok(bindings) => bindings,
                                 Err(CallError(_, bindings)) => *bindings,
                             };
-                            let can_synthesize_multi_binding_partial =
-                                partial_bindings.iter_constructor_items().next().is_some();
-                            if !partial_bindings.is_single()
-                                && !can_synthesize_multi_binding_partial
+                            let new_return_type = if func_ty.is_union() || func_ty.is_intersection()
                             {
-                                continue;
-                            }
-                            let mut new_overloads = Vec::new();
-                            let mut seen_overloads = FxHashSet::default();
-
-                            for partial_binding in partial_bindings.iter_flat_mut() {
-                                if partial_binding.overloads().is_empty() {
-                                    continue;
-                                }
-
-                                for overload in &mut partial_binding.overloads {
-                                    overload.retain_partial_application_errors();
-                                }
-
-                                let selected_overload_indexes =
-                                    match partial_binding.matching_overload_index() {
-                                        MatchingOverloadIndex::Single(index) => vec![index],
-                                        MatchingOverloadIndex::Multiple(indexes) => indexes,
-                                        MatchingOverloadIndex::None => {
-                                            let source_overload_index = partial_binding
-                                                .best_failing_overload_index(
-                                                    FailingOverloadSelection::ReportableForPartial,
-                                                )
-                                                .unwrap_or(0);
-                                            let source_errors = &partial_binding.overloads()
-                                                [source_overload_index]
-                                                .errors;
-                                            for error in source_errors {
-                                                if error.is_relevant_for_partial_application() {
-                                                    let error = error
-                                                        .clone()
-                                                        .maybe_apply_argument_index_offset(Some(1));
-                                                    if !overload.errors.contains(&error) {
-                                                        overload.errors.push(error);
-                                                    }
-                                                }
-                                            }
-                                            (0..partial_binding.overloads().len()).collect()
-                                        }
-                                    };
-
-                                let signature_arguments =
-                                    bound_call_arguments.with_self(partial_binding.bound_type);
-                                for index in selected_overload_indexes {
-                                    let Some(bound_overload) =
-                                        partial_binding.overloads().get(index)
+                                partial_bindings.map_types(db, |partial_binding| {
+                                    partial_binding
+                                        .functools_partial_callable(
+                                            db,
+                                            overload,
+                                            &bound_call_arguments,
+                                        )
+                                        .map(|callable| {
+                                            Type::KnownInstance(
+                                                KnownInstanceType::FunctoolsPartial(callable),
+                                            )
+                                        })
+                                })
+                            } else {
+                                let mut new_overloads = Vec::new();
+                                let mut seen_overloads = FxHashSet::default();
+                                for partial_binding in partial_bindings.iter_flat() {
+                                    let Some(callable) = partial_binding
+                                        .functools_partial_callable(
+                                            db,
+                                            overload,
+                                            &bound_call_arguments,
+                                        )
                                     else {
                                         continue;
                                     };
-                                    let signature = bound_overload.partially_applied_signature(
-                                        db,
-                                        signature_arguments.as_ref(),
-                                    );
-                                    let dedup_key = signature.clone().with_definition(None);
-                                    if seen_overloads.insert(dedup_key) {
-                                        new_overloads.push(signature);
+
+                                    for signature in callable.signatures(db) {
+                                        let signature = signature.clone();
+                                        let dedup_key = signature.clone().with_definition(None);
+                                        if seen_overloads.insert(dedup_key) {
+                                            new_overloads.push(signature);
+                                        }
                                     }
                                 }
-                            }
-                            if new_overloads.is_empty() {
+
+                                if new_overloads.is_empty() {
+                                    Type::Never
+                                } else {
+                                    let new_callable_sig =
+                                        CallableSignature::from_overloads(new_overloads);
+                                    let callable = CallableType::new(
+                                        db,
+                                        new_callable_sig,
+                                        CallableTypeKind::Regular,
+                                    );
+                                    Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                                        callable,
+                                    ))
+                                }
+                            };
+                            if new_return_type.is_never() {
                                 continue;
                             }
-
-                            let new_callable_sig = CallableSignature::from_overloads(new_overloads);
-                            let callable =
-                                CallableType::new(db, new_callable_sig, CallableTypeKind::Regular);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::FunctoolsPartial(callable),
-                            ));
+                            overload.set_return_type(new_return_type);
                         }
 
                         Some(KnownClass::Tuple) if overload_index == 1 => {
@@ -2817,6 +2800,92 @@ impl<'db> CallableBinding<'db> {
                 })
                 .map(|(index, _, _)| index)
         })
+    }
+
+    /// Returns the matching overload indexes when `functools.partial(...)` ignores errors that are
+    /// only relevant at invocation time.
+    fn matching_partial_overload_index(&self) -> MatchingOverloadIndex {
+        let mut matching_overloads = self.overloads.iter().enumerate().filter(|(_, overload)| {
+            !overload
+                .errors
+                .iter()
+                .any(BindingError::is_relevant_for_partial_application)
+        });
+        match matching_overloads.next() {
+            None => MatchingOverloadIndex::None,
+            Some((first, _)) => {
+                if let Some((second, _)) = matching_overloads.next() {
+                    let mut indexes = vec![first, second];
+                    for (index, _) in matching_overloads {
+                        indexes.push(index);
+                    }
+                    MatchingOverloadIndex::Multiple(indexes)
+                } else {
+                    MatchingOverloadIndex::Single(first)
+                }
+            }
+        }
+    }
+
+    /// Builds the reduced callable for this `functools.partial(...)` binding.
+    ///
+    /// The synthesized callable preserves the reduced callable signature for this binding and reports
+    /// any partial-construction diagnostics back to the outer `partial(...)` overload.
+    fn functools_partial_callable<'a>(
+        &self,
+        db: &'db dyn Db,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<CallableType<'db>> {
+        if self.overloads().is_empty() {
+            return None;
+        }
+
+        let selected_overload_indexes = match self.matching_partial_overload_index() {
+            MatchingOverloadIndex::Single(index) => vec![index],
+            MatchingOverloadIndex::Multiple(indexes) => indexes,
+            MatchingOverloadIndex::None => {
+                let source_overload_index = self
+                    .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
+                    .unwrap_or(0);
+                let source_errors = &self.overloads()[source_overload_index].errors;
+                for error in source_errors {
+                    if error.is_relevant_for_partial_application() {
+                        let error = error.clone().maybe_apply_argument_index_offset(Some(1));
+                        if !partial_overload.errors.contains(&error) {
+                            partial_overload.errors.push(error);
+                        }
+                    }
+                }
+                (0..self.overloads().len()).collect()
+            }
+        };
+
+        let signature_arguments = bound_call_arguments.with_self(self.bound_type);
+        let mut new_overloads = Vec::new();
+        let mut seen_overloads = FxHashSet::default();
+        for index in selected_overload_indexes {
+            let Some(bound_overload) = self.overloads().get(index) else {
+                continue;
+            };
+            let signature =
+                bound_overload.partially_applied_signature(db, signature_arguments.as_ref());
+            let dedup_key = signature.clone().with_definition(None);
+            if seen_overloads.insert(dedup_key) {
+                new_overloads.push(signature);
+            }
+        }
+
+        if new_overloads.is_empty() {
+            return None;
+        }
+
+        let new_callable_sig = CallableSignature::from_overloads(new_overloads);
+        Some(CallableType::new(
+            db,
+            new_callable_sig,
+            CallableTypeKind::Regular,
+        ))
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -5410,12 +5479,6 @@ impl<'db> Binding<'db> {
     /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
-    }
-
-    /// Keep only call binding errors that should affect `functools.partial(...)` construction.
-    fn retain_partial_application_errors(&mut self) {
-        self.errors
-            .retain(BindingError::is_relevant_for_partial_application);
     }
 
     /// `functools.partial(...)` is allowed to leave required parameters unbound.
