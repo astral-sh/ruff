@@ -1470,6 +1470,27 @@ reveal_type(Perm.READ.value)  # revealed: Literal[1]
 reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
 ```
 
+Explicit-value forms should ignore `start`, just like static enums do:
+
+```py
+from enum import Enum, Flag, auto
+
+Color = Enum("Color", [("RED", auto()), ("GREEN", auto())], start=3)
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+
+Mapped = Enum("Mapped", {"RED": auto(), "GREEN": auto()}, start=3)
+
+reveal_type(Mapped.RED.value)  # revealed: Literal[1]
+reveal_type(Mapped.GREEN.value)  # revealed: Literal[2]
+
+Perm = Flag("Perm", (("READ", auto()), ("WRITE", auto())), start=3)
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+```
+
 ### Duplicate member names
 
 Duplicate member names raise `TypeError` at runtime. We degrade to unknown members rather than
@@ -1517,6 +1538,21 @@ from ty_extensions import enum_members
 
 # error: [too-many-positional-arguments]
 Color = Enum("Color", "RED", "GREEN", "BLUE")
+
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
+
+### Duplicate positional and keyword arguments
+
+Passing the same functional-enum parameter both positionally and by keyword should still report the
+usual duplicate-argument diagnostic:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# error: [parameter-already-assigned]
+Color = Enum("Color", "RED", names="BLUE")
 
 reveal_type(enum_members(Color))  # revealed: Unknown
 ```
@@ -1629,13 +1665,37 @@ reveal_type(Color.BLUE.value)  # revealed: Literal["blue"]
 ### Custom start value
 
 ```py
-from enum import Enum
+from enum import Enum, Flag
 
 Color = Enum("Color", "RED GREEN BLUE", start=0)
 
 reveal_type(Color.RED.value)  # revealed: Literal[0]
 reveal_type(Color.GREEN.value)  # revealed: Literal[1]
 reveal_type(Color.BLUE.value)  # revealed: Literal[2]
+
+Perm = Flag("Perm", "READ WRITE EXECUTE", start=3)
+
+reveal_type(Perm.READ.value)  # revealed: Literal[3]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[4]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[8]
+```
+
+Non-literal integer `start` values should widen member values to `int` rather than pretending the
+default `start=1` was used:
+
+```py
+from enum import Enum, Flag
+
+def make(n: int) -> None:
+    Color = Enum("Color", "RED GREEN", start=n)
+
+    reveal_type(Color.RED.value)  # revealed: int
+    reveal_type(Color.GREEN.value)  # revealed: int
+
+    Perm = Flag("Perm", "READ WRITE", start=n)
+
+    reveal_type(Perm.READ.value)  # revealed: int
+    reveal_type(Perm.WRITE.value)  # revealed: int
 ```
 
 ### Type mixin
@@ -1655,6 +1715,7 @@ bases that are structurally invalid to combine with `Enum`:
 ```py
 from enum import Enum
 from typing import TypedDict
+from ty_extensions import reveal_mro
 
 # error: [invalid-argument-type]
 BadType = Enum("BadType", "RED", type=1)
@@ -1666,6 +1727,8 @@ TD = TypedDict("TD", {"x": int})
 
 # error: [invalid-base]
 BadBase = Enum("BadBase", "RED", type=TD)
+
+reveal_mro(BadBase)  # revealed: (<class 'BadBase'>, <class 'Enum'>, <class 'object'>)
 ```
 
 Functional enums with a `type=` mixin should also have the same MRO as the equivalent static enum

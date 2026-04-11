@@ -9,13 +9,20 @@ use crate::{
         ClassLiteral, KnownClass, Type, TypeContext,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         diagnostic::{
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
+            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
         },
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
     },
 };
+
+#[derive(Copy, Clone, Debug)]
+enum EnumStart {
+    Literal(i64),
+    DynamicInt,
+}
 
 /// Find enum base class of the given type.
 pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
@@ -46,38 +53,22 @@ fn has_duplicate_enum_member_names<'db>(members: &[(Name, Type<'db>)]) -> bool {
     members.iter().any(|(name, _)| !seen.insert(name.clone()))
 }
 
-/// Compute the auto-assigned value for the `i`-th enum member.
+/// Compute the first auto-assigned value for functional enum forms that only specify names.
 ///
-/// `StrEnum` uses the lowercased member name, `Flag`/`IntFlag` use powers
-/// of two (`start << i`), and all others use sequential integers (`start + i`).
-fn enum_auto_value<'db>(
+/// `StrEnum` ignores `start` and uses the lowercased member name. Other enum kinds use the
+/// literal `start` value when available, and widen to `int` when `start` is a non-literal int.
+fn first_enum_auto_value<'db>(
     db: &'db dyn Db,
     base_class: KnownClass,
     name: &str,
-    start: i64,
-    index: usize,
+    start: EnumStart,
 ) -> Type<'db> {
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
-        KnownClass::Flag | KnownClass::IntFlag => {
-            let shift = i64::try_from(index).ok();
-            let headroom = if start >= 0 {
-                start.leading_zeros().saturating_sub(1)
-            } else {
-                start.leading_ones().saturating_sub(1)
-            };
-            shift
-                .and_then(|s| u32::try_from(s).ok())
-                .filter(|&s| s <= headroom)
-                .and_then(|s| start.checked_shl(s))
-                .map(Type::int_literal)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(db))
-        }
-        _ => i64::try_from(index)
-            .ok()
-            .and_then(|i| start.checked_add(i))
-            .map(Type::int_literal)
-            .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
+        _ => match start {
+            EnumStart::Literal(start) => Type::int_literal(start),
+            EnumStart::DynamicInt => KnownClass::Int.to_instance(db),
+        },
     }
 }
 
@@ -107,8 +98,9 @@ fn next_auto_value<'db>(
                         Type::int_literal(1)
                     } else {
                         let shift = i64::BITS - last.leading_zeros();
-                        1_i64
+                        1_u64
                             .checked_shl(shift)
+                            .and_then(|value| i64::try_from(value).ok())
                             .map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(db))
                     }
@@ -120,6 +112,28 @@ fn next_auto_value<'db>(
             }
         }
     }
+}
+
+fn enum_members_from_names<'db>(
+    db: &'db dyn Db,
+    names: Vec<Name>,
+    start: EnumStart,
+    base_class: KnownClass,
+) -> Vec<(Name, Type<'db>)> {
+    let mut members = Vec::with_capacity(names.len());
+    let mut last_int_value = None;
+
+    for (index, name) in names.into_iter().enumerate() {
+        let value = if index == 0 {
+            first_enum_auto_value(db, base_class, name.as_str(), start)
+        } else {
+            next_auto_value(db, base_class, name.as_str(), last_int_value)
+        };
+        last_int_value = value.as_int_literal();
+        members.push((name, value));
+    }
+
+    members
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -156,11 +170,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start_kw = call_expr.arguments.find_keyword("start");
         let type_kw = call_expr.arguments.find_keyword("type");
 
-        // Bail out on positional/keyword conflicts so normal binding can diagnose them.
         let has_positional_keyword_conflict =
             (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
-        if has_positional_keyword_conflict {
-            return None;
+        if !args.is_empty()
+            && let Some(keyword) = value_kw
+            && let Some(builder) = self
+                .context
+                .report_lint(&PARAMETER_ALREADY_ASSIGNED, keyword)
+        {
+            builder.into_diagnostic(format_args!(
+                "Multiple values provided for parameter `value` of `{base_name}()`"
+            ));
+        }
+        if args.len() >= 2
+            && let Some(keyword) = names_kw
+            && let Some(builder) = self
+                .context
+                .report_lint(&PARAMETER_ALREADY_ASSIGNED, keyword)
+        {
+            builder.into_diagnostic(format_args!(
+                "Multiple values provided for parameter `names` of `{base_name}()`"
+            ));
         }
 
         let (name_arg, names_arg): (Option<&ast::Expr>, Option<&ast::Expr>) = match &**args {
@@ -184,8 +214,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
         };
 
-        let start = start_kw.map_or(1, |kw| self.infer_enum_start_argument(&kw.value));
-        let mixin_type = type_kw.map(|kw| self.infer_enum_mixin_argument(&kw.value));
+        let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
+            self.infer_enum_start_argument(&kw.value)
+        });
+        let mixin_type = type_kw.and_then(|kw| self.infer_enum_mixin_argument(&kw.value));
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
@@ -203,7 +235,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Without `names`, this is a value-lookup call, not functional enum creation.
         let names_arg = names_arg?;
-        let spec = self.infer_enum_spec(names_arg, start, base_class, has_too_many_positional);
+        let spec = self.infer_enum_spec(
+            names_arg,
+            start,
+            base_class,
+            has_too_many_positional || has_positional_keyword_conflict,
+        );
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
@@ -247,26 +284,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(Name::new(name_literal.value(db)))
     }
 
-    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> i64 {
+    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> EnumStart {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(literal) = ty.as_int_literal() {
-            return literal;
+            return EnumStart::Literal(literal);
         }
 
-        if !ty.is_assignable_to(db, KnownClass::Int.to_instance(db))
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value)
-        {
+        if ty.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+            return EnumStart::DynamicInt;
+        }
+
+        if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
             builder.into_diagnostic(format_args!(
                 "Expected `int` for `start` argument, got `{}`",
                 ty.display(db),
             ));
         }
 
-        1
+        EnumStart::Literal(1)
     }
 
-    fn infer_enum_mixin_argument(&mut self, value: &ast::Expr) -> Type<'db> {
+    fn infer_enum_mixin_argument(&mut self, value: &ast::Expr) -> Option<Type<'db>> {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(class_lit) = ty.as_class_literal() {
@@ -277,28 +316,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "TypedDict class `{}` cannot be used as an enum mixin",
                     ty.display(db),
                 ));
+                return None;
             }
-        } else if !ty.is_dynamic()
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value)
-        {
+            return Some(ty);
+        }
+
+        if ty.is_dynamic() {
+            return Some(ty);
+        }
+
+        if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
             builder.into_diagnostic(format_args!(
                 "Expected a class for `type` argument, got `{}`",
                 ty.display(db),
             ));
         }
 
-        ty
+        None
     }
 
     fn infer_enum_spec(
         &mut self,
         names_arg: &ast::Expr,
-        start: i64,
+        start: EnumStart,
         base_class: KnownClass,
-        has_too_many_positional: bool,
+        has_invalid_arguments: bool,
     ) -> EnumSpec<'db> {
         let db = self.db();
-        let (members, has_known_members) = if has_too_many_positional {
+        let (members, has_known_members) = if has_invalid_arguments {
             (vec![], false)
         } else {
             let (members, has_known_members) =
@@ -353,7 +398,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn parse_enum_members_arg(
         &mut self,
         names_arg: &ast::Expr,
-        start: i64,
+        start: EnumStart,
         base_class: KnownClass,
     ) -> (Vec<(Name, Type<'db>)>, bool) {
         let db = self.db();
@@ -370,14 +415,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if names.is_empty() {
                 return (vec![], false);
             }
-            let members = names
-                .into_iter()
-                .enumerate()
-                .map(|(i, n)| {
-                    let v = enum_auto_value(db, base_class, n.as_str(), start, i);
-                    (n, v)
-                })
-                .collect();
+            let members = enum_members_from_names(db, names, start, base_class);
             return (members, true);
         }
 
@@ -391,7 +429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if let ast::Expr::Dict(dict) = names_arg {
-            return self.parse_enum_members_from_dict(dict, start, base_class);
+            return self.parse_enum_members_from_dict(dict, base_class);
         }
 
         (vec![], false)
@@ -400,30 +438,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn parse_enum_members_from_sequence(
         &mut self,
         elts: &[ast::Expr],
-        start: i64,
+        start: EnumStart,
         base_class: KnownClass,
     ) -> (Vec<(Name, Type<'db>)>, bool) {
         let db = self.db();
+        let all_names = elts
+            .iter()
+            .map(|elt| {
+                self.expression_type(elt)
+                    .as_string_literal()
+                    .map(|literal| Name::new(literal.value(db)))
+            })
+            .collect::<Option<Vec<_>>>();
+
+        if let Some(names) = all_names {
+            return (enum_members_from_names(db, names, start, base_class), true);
+        }
+
         let mut members = Vec::with_capacity(elts.len());
-        let mut last_int_value: Option<i64> = start.checked_sub(1);
-        for (i, elt) in elts.iter().enumerate() {
-            let ty = self.expression_type(elt);
-            if let Some(string_lit) = ty.as_string_literal() {
-                let member_name = Name::new(string_lit.value(db));
-                let v = enum_auto_value(db, base_class, member_name.as_str(), start, i);
-                last_int_value = v.as_int_literal();
-                members.push((member_name, v));
-            } else if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
-                let value = if value.is_instance_of(db, KnownClass::Auto) {
-                    next_auto_value(db, base_class, name.as_str(), last_int_value)
-                } else {
-                    value
-                };
-                last_int_value = value.as_int_literal();
-                members.push((name, value));
-            } else {
+        // Explicit-value forms match static enums: `start` is ignored and a leading `auto()`
+        // still begins from the default seed of `1`.
+        let mut last_int_value = Some(0);
+        for elt in elts {
+            let Some((name, value)) = self.parse_explicit_enum_member(elt) else {
                 return (vec![], false);
-            }
+            };
+            let value = if value.is_instance_of(db, KnownClass::Auto) {
+                next_auto_value(db, base_class, name.as_str(), last_int_value)
+            } else {
+                value
+            };
+            last_int_value = value.as_int_literal();
+            members.push((name, value));
         }
         (members, true)
     }
@@ -436,12 +482,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn parse_enum_members_from_dict(
         &mut self,
         dict: &ast::ExprDict,
-        start: i64,
         base_class: KnownClass,
     ) -> (Vec<(Name, Type<'db>)>, bool) {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
-        let mut last_int_value: Option<i64> = start.checked_sub(1);
+        let mut last_int_value = Some(0);
         for item in &dict.items {
             let Some(key) = &item.key else {
                 return (vec![], false);
