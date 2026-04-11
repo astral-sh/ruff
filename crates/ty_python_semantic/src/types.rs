@@ -1499,19 +1499,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Intersection(_))
     }
 
-    /// Return `true` if this type is an instance of `type` (i.e., a metaclass instance.)
-    pub(crate) fn is_metaclass_instance(self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance().is_some_and(|instance| {
-            KnownClass::Type
-                .try_to_class_literal(db)
-                .is_some_and(|type_class| {
-                    instance
-                        .class(db)
-                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
-                })
-        })
-    }
-
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
     /// intersection containing a single negative branch, which this method does _not_ consider a
     /// "real" intersection.)
