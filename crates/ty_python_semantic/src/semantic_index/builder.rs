@@ -117,6 +117,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
+    comprehension_iterable_nesting: u32,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -177,6 +178,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
+            comprehension_iterable_nesting: 0,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -216,6 +218,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// The `method` function can see the global scope but not the class scope.
     fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
         VisibleAncestorsIter::new(&self.scopes, scope)
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return false;
+        }
+
+        self.scope_stack
+            .iter()
+            .rev()
+            .skip(1)
+            .find_map(|info| match self.scopes[info.file_scope_id].kind() {
+                ScopeKind::Comprehension => None,
+                ScopeKind::Class => Some(true),
+                _ => Some(false),
+            })
+            .unwrap_or(false)
+    }
+
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
+    }
+
+    fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
+        self.comprehension_iterable_nesting += 1;
+        visit(self);
+        self.comprehension_iterable_nesting -= 1;
     }
 
     /// Returns the scope ID of the current scope if the current scope
@@ -1558,7 +1587,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
-        self.visit_expr(&generator.iter);
+        self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -1584,7 +1613,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for generator in generators_iter {
             let value = self.add_standalone_expression(&generator.iter);
-            self.visit_expr(&generator.iter);
+            self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
@@ -3118,11 +3147,24 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
+                    if self.in_comprehension_iterable() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
+                            range: node.range,
+                            python_version: self.python_version,
+                        });
+                    } else if self.in_class_body_comprehension() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
+                            range: node.range,
+                            python_version: self.python_version,
+                        });
+                    }
+
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();
