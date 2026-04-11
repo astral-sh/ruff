@@ -519,6 +519,10 @@ impl SemanticDb for ProjectDatabase {
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
+    }
 }
 
 #[salsa::db]
@@ -737,6 +741,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+            Box::new(self.clone())
         }
     }
 

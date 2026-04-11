@@ -187,6 +187,10 @@ impl SemanticDb for Db {
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         self.settings().analysis(self)
     }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
+    }
 }
 
 #[salsa::db]

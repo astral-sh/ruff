@@ -3,7 +3,7 @@ use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::SourceText;
-use ruff_db::system::{SystemPath, WritableSystem};
+use ruff_db::system::{SystemPath, SystemPathBuf, WritableSystem};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span},
     files::File,
@@ -11,9 +11,10 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Setter as _;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 use thiserror::Error;
 
 use crate::Db;
@@ -96,38 +97,152 @@ fn fix_all(
             .push(diagnostic);
     }
 
-    let mut fixed_count = 0usize;
+    // Identify all files with fixes and queue them for fixing.
+    let mut queue: Vec<(QueuedFile, Vec<ApplicableFix>)> = Vec::new();
+    let mut source_texts = SourceTexts::default();
 
-    // Try to suppress all lint-diagnostics in the given file.
-    for (&file, file_diagnostics) in &mut by_file {
-        match fix_file(
-            db,
-            &*system,
-            file,
-            fix_mode,
-            &file_diagnostics,
-            &cancellation_token,
-        ) {
-            Ok(FixedFile {
-                applied_fixes,
-                new_diagnostics,
-            }) => {
-                *file_diagnostics = new_diagnostics;
-                fixed_count += applied_fixes;
+    for (&file, diagnostics) in &by_file {
+        let path = file.path(db);
+        let Some(path) = path.as_system_path() else {
+            tracing::debug!("Skipping read-only file `{path}`");
+            continue;
+        };
+
+        let parsed = parsed_module(db, file);
+        if parsed.load(db).has_syntax_errors() {
+            tracing::warn!("Skipping file `{path}` with syntax errors");
+            continue;
+        }
+
+        let fixes = fix_mode.fixes(db, file, diagnostics);
+
+        if fixes.is_empty() {
+            tracing::warn!("Skipping file `{path}` without applicable fixes.");
+            continue;
+        }
+
+        queue.push((QueuedFile::new(file, path, diagnostics), fixes));
+    }
+
+    // Try applying the fixes. Iterate at most `MAX_ITERATIONS` times.
+    let mut remaining_iterations = MAX_ITERATIONS;
+    let mut completed: Vec<FixedFile> = Vec::with_capacity(queue.len());
+
+    while !queue.is_empty() {
+        let mut unstaged_fixes = Vec::with_capacity(queue.len());
+
+        for (file, fixes) in queue.drain(..) {
+            if cancellation_token.is_cancelled() {
+                source_texts.revert_all(db);
+                return Err(Canceled);
             }
-            Err(FixFileError::Canceled) => return Err(Canceled),
-            Err(FixFileError::WriteFailed(error)) => {
+
+            let staged_source = source_texts.staged(db, file.file);
+
+            let FixedCode {
+                source,
+                source_map,
+                applied_fixes,
+            } = apply_fixes(&staged_source, fixes);
+
+            let fixed_source = staged_source.with_text(source, &source_map);
+            source_texts.set_unstaged(db, file.file, fixed_source.clone());
+
+            unstaged_fixes.push((file, applied_fixes));
+        }
+
+        // Check if applying the files introduced any syntax errors, compute the remaining diagnostics and any new fixes.
+        // This is done outside the above loop so that it can run in parallel.
+        let check_results = recheck_files(&*db, unstaged_fixes, fix_mode, cancellation_token);
+
+        if cancellation_token.is_cancelled() {
+            source_texts.revert_all(db);
+            return Err(Canceled);
+        }
+
+        for result in check_results {
+            if cancellation_token.is_cancelled() {
+                source_texts.revert_all(db);
+                return Err(Canceled);
+            }
+
+            match result {
+                CheckResult::Checked { mut file, fixes } => {
+                    source_texts.stage(file.file);
+
+                    if fixes.is_empty() {
+                        completed.push(file.into_fixed());
+                        continue;
+                    }
+
+                    if remaining_iterations == 0 {
+                        file.push_diagnostic(create_too_many_iterations_diagnostics(
+                            file.file,
+                            fix_mode,
+                            &diagnostics,
+                        ));
+                        completed.push(file.into_fixed());
+                        continue;
+                    }
+
+                    // Requeue the file for another round of fixes.
+                    queue.push((file, fixes));
+                }
+
+                CheckResult::SyntaxError {
+                    mut file,
+                    diagnostic,
+                } => {
+                    // Reset the file's state to the last staged changes (or the original source text if this is the first iteration)
+                    source_texts.reset_unstaged(db, file.file);
+                    file.push_diagnostic(diagnostic);
+
+                    completed.push(file.into_fixed());
+                }
+            }
+        }
+
+        if remaining_iterations == 0 {
+            break;
+        }
+
+        remaining_iterations -= 1;
+    }
+
+    // commit the changes: Write the changes to disk
+    let mut fix_count = 0;
+
+    for file in completed {
+        if cancellation_token.is_cancelled() {
+            source_texts.revert_all(db);
+            return Err(Canceled);
+        }
+
+        if let Some(fixed) = source_texts.uncommitted(file.file) {
+            if let Err(error) = write_changes(db, &*system, file.file, &file.path, fixed) {
+                // revert the source text back to its original content.
+                source_texts.revert(db, file.file);
+
+                // Writing failed, revert the source text override back to the file's original source.
+                let mut diagnostics = by_file.remove(&file.file).unwrap_or_default();
                 let mut diag = Diagnostic::new(
                     DiagnosticId::Io,
                     Severity::Error,
                     format_args!("Failed to write fixes to file: {error}"),
                 );
 
-                diag.annotate(Annotation::primary(Span::from(file)));
-                file_diagnostics.push(diag);
+                diag.annotate(Annotation::primary(Span::from(file.file)));
+                diagnostics.push(diag);
+                by_file.insert(file.file, diagnostics);
+
+                continue;
             }
-            Err(FixFileError::NoChanges) => {}
+
+            source_texts.commit(file.file);
         }
+
+        fix_count += file.applied_fixes;
+        by_file.insert(file.file, file.remaining_diagnostics);
     }
 
     // Stitch the remaining diagnostics back together.
@@ -139,126 +254,7 @@ fn fix_all(
 
     Ok(FixAllResults {
         diagnostics,
-        count: fixed_count,
-    })
-}
-
-fn fix_file(
-    db: &mut dyn Db,
-    system: &dyn WritableSystem,
-    file: File,
-    mode: FixMode,
-    diagnostics: &[Diagnostic],
-    cancellation_token: &CancellationToken,
-) -> Result<FixedFile, FixFileError> {
-    if cancellation_token.is_cancelled() {
-        return Err(FixFileError::Canceled);
-    }
-
-    let path = file.path(db);
-    let Some(path) = path.as_system_path() else {
-        tracing::debug!("Skipping read-only file `{path}`");
-
-        return Err(FixFileError::NoChanges);
-    };
-
-    let parsed = parsed_module(db, file);
-    if parsed.load(db).has_syntax_errors() {
-        tracing::warn!("Skipping file `{path}` with syntax errors");
-
-        return Err(FixFileError::NoChanges);
-    }
-
-    let mut fixes = mode.fixes(db, file, diagnostics);
-
-    if fixes.is_empty() {
-        tracing::warn!("Skipping file `{path}` without applicable fixes.");
-        return Err(FixFileError::NoChanges);
-    }
-
-    let mut fuel = MAX_ITERATIONS;
-    // The remaining diagnostics after fixing all errors in file.
-    let mut new_diagnostics = vec![];
-    let mut total_fixes = 0;
-
-    // Make the borrow checker happy
-    let path = path.to_path_buf();
-
-    let mut source_text_guard = SourceTextGuard::new(db, file);
-
-    loop {
-        tracing::debug!("Applying {} fixes to `{path}`.", fixes.len());
-
-        let source_text = source_text_guard.current();
-        let FixedCode {
-            source: new_source,
-            source_map,
-            applied_fixes,
-        } = apply_fixes(&source_text, fixes);
-
-        let new_source = source_text.with_text(new_source, &source_map);
-        source_text_guard.replace(new_source.clone());
-
-        let db = &*source_text_guard.db;
-
-        // Verify that the fix didn't introduce any syntax errors by overriding
-        // the source text for `file`.
-        // let mut source_guard = WithUpdatedSourceGuard::new(db, file, &source, new_source.clone());
-        // let db = source_guard.db();
-        let new_parsed = parsed_module(db, file);
-        let new_parsed = new_parsed.load(db);
-
-        // Two cases: First iteration, bail
-        // Later iteration, preserve result from previous iteration.
-        if new_parsed.has_syntax_errors() {
-            new_diagnostics.push(create_fix_introduced_syntax_error_diagnostic(
-                db,
-                file,
-                &new_parsed,
-            ));
-
-            if total_fixes == 0 {
-                return Err(FixFileError::NoChanges);
-            }
-
-            // Restore the file's source to the version from the previous iteration that
-            // didn't contain any syntax errors.
-            source_text_guard.replace(source_text);
-            break;
-        }
-
-        total_fixes += applied_fixes;
-        let prev_iteration_diagnostics = new_diagnostics;
-
-        new_diagnostics = db.check_file(file);
-        fixes = mode.fixes(db, file, &new_diagnostics);
-
-        if fixes.is_empty() {
-            break;
-        }
-
-        if fuel == 0 {
-            new_diagnostics.push(create_too_many_iterations_diagnostics(
-                file,
-                mode,
-                &prev_iteration_diagnostics,
-            ));
-            break;
-        }
-
-        fuel -= 1;
-
-        if cancellation_token.is_cancelled() {
-            return Err(FixFileError::Canceled);
-        }
-    }
-
-    // Write the changes back to disk.
-    write_changes(source_text_guard, &*system, file, &path)?;
-
-    Ok(FixedFile {
-        new_diagnostics,
-        applied_fixes: total_fixes,
+        count: fix_count,
     })
 }
 
@@ -325,23 +321,6 @@ fn create_too_many_iterations_diagnostics(
     diag.add_bug_sub_diagnostics("%5BInfinite%20loop%5D");
     diag.info(format_args!("Fixable diagnostics: {codes}"));
     diag
-}
-
-#[derive(Debug, Error)]
-enum FixFileError {
-    #[error("operation was cancelled")]
-    Canceled,
-
-    #[error("no fixes were applied")]
-    NoChanges,
-
-    #[error(transparent)]
-    WriteFailed(#[from] WriteChangesError),
-}
-
-struct FixedFile {
-    new_diagnostics: Vec<Diagnostic>,
-    applied_fixes: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -435,23 +414,19 @@ struct ApplicableFix {
 }
 
 fn write_changes(
-    guard: SourceTextGuard,
+    db: &dyn Db,
     system: &dyn WritableSystem,
     file: File,
     path: &SystemPath,
+    new_text: &SourceText,
 ) -> Result<(), WriteChangesError> {
     let metadata = system.path_metadata(path)?;
 
-    let db = &*guard.db;
     if metadata.revision() != file.revision(db) {
         return Err(WriteChangesError::FileWasModified);
     }
 
-    let new_source = source_text(db, file);
-
-    system.write_file_bytes(path, &new_source.to_bytes())?;
-
-    guard.commit();
+    system.write_file_bytes(path, &new_text.to_bytes())?;
 
     Ok(())
 }
@@ -551,46 +526,217 @@ struct FixedCode {
     applied_fixes: usize,
 }
 
-/// Guard that sets [`File::set_source_text_override`] and guarantees to restore the original source
-/// text unless the guard is explicitly defused.
-struct SourceTextGuard<'db> {
+/// Tracks the source text overrides per file.
+#[derive(Default)]
+struct SourceTexts {
+    /// Stores the original source text for each file that has outstanding writes.
+    originals: FxHashMap<File, SourceText>,
+    unstaged_changes: FxHashMap<File, SourceText>,
+    staged_changes: FxHashMap<File, SourceText>,
+}
+
+impl SourceTexts {
+    /// Returns the staged source text of `file`, ignoring any unstaged changes.
+    fn staged(&self, db: &dyn Db, file: File) -> SourceText {
+        if let Some(staged) = self.staged_changes.get(&file) {
+            staged.clone()
+        } else {
+            source_text(db, file)
+        }
+    }
+
+    /// Returns any uncommitted changes (staged or unstaged).
+    ///
+    /// Returns `None` if there are no uncommitted changes.
+    fn uncommitted(&self, file: File) -> Option<&SourceText> {
+        self.unstaged_changes
+            .get(&file)
+            .or_else(|| self.staged_changes.get(&file))
+    }
+
+    /// Promotes any unstaged changes of `file` to staged.
+    ///
+    /// This is a no-op if there are no unstaged changes.
+    fn stage(&mut self, file: File) {
+        let Some(changes) = self.unstaged_changes.remove(&file) else {
+            return;
+        };
+
+        self.staged_changes.insert(file, changes);
+    }
+
+    /// Sets unstaged changes for `file`.
+    fn set_unstaged(&mut self, db: &mut dyn Db, file: File, new_text: SourceText) {
+        self.originals
+            .entry(file)
+            .or_insert_with(|| source_text(db, file));
+
+        file.set_source_text_override(db).to(Some(new_text.clone()));
+        self.unstaged_changes.insert(file, new_text);
+    }
+
+    /// Reverts any unstaged changes and reverts the source text of `file` to
+    /// the last staged changed or its original content.
+    fn reset_unstaged(&mut self, db: &mut dyn Db, file: File) {
+        if self.unstaged_changes.remove(&file).is_none() {
+            return;
+        }
+
+        // Try to reset to the last staged changes
+        let source = if let Some(staged) = self.staged_changes.get(&file) {
+            staged
+        } else if let Some(original) = self.originals.get(&file) {
+            original
+        } else {
+            // File was never overridden, nothing to do
+            return;
+        };
+
+        file.set_source_text_override(db).to(Some(source.clone()));
+    }
+
+    /// Revert all files with a tracked override back to their original source text.
+    fn revert_all(self, db: &mut dyn Db) {
+        for (file, original) in self.originals {
+            file.set_source_text_override(db).to(Some(original));
+        }
+    }
+
+    /// Revert `file` back to its original source text.
+    ///
+    /// ## Panics
+    /// If `file` has no override.
+    fn revert(&mut self, db: &mut dyn Db, file: File) {
+        let Some(original) = self.originals.remove(&file) else {
+            return;
+        };
+
+        file.set_source_text_override(db).to(Some(original));
+    }
+
+    /// Commits any staged changes.
+    fn commit(&mut self, file: File) {
+        self.staged_changes.remove(&file);
+
+        if !self.unstaged_changes.contains_key(&file) {
+            self.originals.remove(&file);
+        }
+    }
+}
+
+/// A file that's queued for fixing
+struct QueuedFile<'a> {
     file: File,
-    original: SourceText,
-    db: &'db mut dyn Db,
+
+    path: SystemPathBuf,
+
+    /// The original diagnostics of the source text as on disk.
+    original_diagnostics: &'a [Diagnostic],
+
+    /// The new diagnostics for this after fixes were applied or `None` if it's still the original diagnostics.
+    diagnostics: Option<Vec<Diagnostic>>,
+
+    applied_fixes: usize,
 }
 
-impl<'db> SourceTextGuard<'db> {
-    fn new(db: &'db mut dyn Db, file: File) -> Self {
-        let original = source_text(db, file);
-        Self { file, original, db }
+impl<'a> QueuedFile<'a> {
+    fn new(file: File, path: &SystemPath, original_diagnostics: &'a [Diagnostic]) -> Self {
+        Self {
+            file,
+            path: path.to_path_buf(),
+            original_diagnostics,
+            diagnostics: None,
+            applied_fixes: 0,
+        }
     }
 
-    fn current(&self) -> SourceText {
-        source_text(self.db, self.file)
+    fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
+        let diagnostics = self
+            .diagnostics
+            .get_or_insert_with(|| self.original_diagnostics.to_vec());
+
+        diagnostics.push(diagnostic);
     }
 
-    fn replace(&mut self, new_source: SourceText) {
-        self.file
-            .set_source_text_override(self.db)
-            .to(Some(new_source));
-    }
-
-    fn commit(self) {
-        std::mem::forget(self);
+    fn into_fixed(self) -> FixedFile {
+        FixedFile {
+            file: self.file,
+            path: self.path,
+            remaining_diagnostics: self.diagnostics.unwrap_or_default(),
+            applied_fixes: self.applied_fixes,
+        }
     }
 }
 
-impl Drop for SourceTextGuard<'_> {
-    fn drop(&mut self) {
-        // We don't set `source_text_override` to `None` here because setting the value
-        // invalidates the `source_text` query and there's the chance that reading the file's content
-        // will fail this time (e.g. because the file was deleted), resulting in ty panicking
-        // when trying to render any diagnostic for that file (because all offsets now point nowhere).
-        // The override will be cleared by `File::sync_path`, the next time the revision changes.
-        self.file
-            .set_source_text_override(self.db)
-            .to(Some(self.original.clone()));
+struct FixedFile {
+    file: File,
+    path: SystemPathBuf,
+    remaining_diagnostics: Vec<Diagnostic>,
+    applied_fixes: usize,
+}
+
+enum CheckResult<'a> {
+    /// The unstaged fixes introduced a syntax error.
+    SyntaxError {
+        diagnostic: Diagnostic,
+        file: QueuedFile<'a>,
+    },
+    /// The fixes were successfully applied without introducing any syntax errors.
+    Checked {
+        file: QueuedFile<'a>,
+        /// The fixes for the next round (may be empty)
+        fixes: Vec<ApplicableFix>,
+    },
+}
+
+fn recheck_files<'a>(
+    db: &dyn Db,
+    changes: Vec<(QueuedFile<'a>, usize)>,
+    fix_mode: FixMode,
+    cancellation_token: &CancellationToken,
+) -> Vec<CheckResult<'a>> {
+    let results = Mutex::new(Vec::with_capacity(changes.len()));
+
+    {
+        let outcomes = &results;
+        let db = db.dyn_clone();
+
+        rayon::scope(move |scope| {
+            for (mut file, applied_fixes) in changes {
+                let db = db.dyn_clone();
+
+                scope.spawn(move |_| {
+                    if cancellation_token.is_cancelled() {
+                        return;
+                    }
+
+                    let db = &*db;
+
+                    let parsed = parsed_module(db, file.file);
+                    let parsed = parsed.load(db);
+
+                    let result = if parsed.has_syntax_errors() {
+                        let diagnostic =
+                            create_fix_introduced_syntax_error_diagnostic(db, file.file, &parsed);
+
+                        CheckResult::SyntaxError { diagnostic, file }
+                    } else {
+                        let diagnostics = db.check_file(file.file);
+                        let fixes = fix_mode.fixes(db, file.file, &diagnostics);
+
+                        file.applied_fixes += applied_fixes;
+                        file.diagnostics = Some(diagnostics);
+
+                        CheckResult::Checked { file, fixes }
+                    };
+
+                    outcomes.lock().unwrap().push(result);
+                });
+            }
+        });
     }
+
+    results.into_inner().unwrap()
 }
 
 #[cfg(test)]

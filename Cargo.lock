@@ -4640,6 +4640,7 @@ dependencies = [
  "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
+ "rayon",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_index",
