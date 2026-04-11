@@ -6,8 +6,9 @@ use crate::{
     Db, Program,
     semantic_index::definition::Definition,
     types::{
-        ClassLiteral, KnownClass, Type, TypeContext, UnionType,
+        ClassLiteral, KnownClass, LiteralValueTypeKind, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
+        constraints::ConstraintSetBuilder,
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
             TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
@@ -55,6 +56,16 @@ enum SequenceEnumMemberForm {
     Names,
     /// The sequence is a list of explicit `(name, value)` pairs.
     Pairs,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum EnumValueTransform {
+    Identity,
+    Int,
+    Str,
+    Bytes,
+    Float,
+    Any,
 }
 
 /// Find enum base class of the given type.
@@ -107,6 +118,74 @@ fn enum_names_type(db: &dyn Db) -> Type<'_> {
             mapping_str_object,
         ],
     )
+}
+
+fn enum_member_value_transform<'db>(
+    db: &'db dyn Db,
+    mixin_type: Option<Type<'db>>,
+) -> EnumValueTransform {
+    let Some(mixin_type) = mixin_type else {
+        return EnumValueTransform::Identity;
+    };
+
+    if mixin_type.is_dynamic() {
+        return EnumValueTransform::Any;
+    }
+
+    if mixin_type.is_subtype_of(db, KnownClass::Str.to_subclass_of(db)) {
+        EnumValueTransform::Str
+    } else if mixin_type.is_subtype_of(db, KnownClass::Int.to_subclass_of(db)) {
+        EnumValueTransform::Int
+    } else if mixin_type.is_subtype_of(db, KnownClass::Bytes.to_subclass_of(db)) {
+        EnumValueTransform::Bytes
+    } else if mixin_type.is_subtype_of(db, KnownClass::Float.to_subclass_of(db)) {
+        EnumValueTransform::Float
+    } else {
+        // Arbitrary mixins can override construction in ways that are hard to model
+        // precisely. Preserve member names, but widen the synthesized values.
+        EnumValueTransform::Any
+    }
+}
+
+fn transform_enum_member_value<'db>(
+    db: &'db dyn Db,
+    value: Type<'db>,
+    transform: EnumValueTransform,
+) -> Type<'db> {
+    match transform {
+        EnumValueTransform::Identity => value,
+        EnumValueTransform::Int => match value.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => Type::int_literal(value.as_i64()),
+            Some(LiteralValueTypeKind::Bool(value)) => Type::int_literal(i64::from(value)),
+            Some(LiteralValueTypeKind::String(value)) => value
+                .value(db)
+                .parse::<i64>()
+                .map(Type::int_literal)
+                .unwrap_or_else(|_| KnownClass::Int.to_instance(db)),
+            _ => KnownClass::Int.to_instance(db),
+        },
+        EnumValueTransform::Str => match value.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => {
+                Type::string_literal(db, &value.as_i64().to_string())
+            }
+            Some(LiteralValueTypeKind::Bool(value)) => {
+                Type::string_literal(db, if value { "True" } else { "False" })
+            }
+            Some(LiteralValueTypeKind::String(value)) => Type::string_literal(db, value.value(db)),
+            _ => KnownClass::Str.to_instance(db),
+        },
+        EnumValueTransform::Bytes => match value.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Bytes(value)) => Type::bytes_literal(db, value.value(db)),
+            Some(LiteralValueTypeKind::Int(value)) => usize::try_from(value.as_i64())
+                .ok()
+                .filter(|length| *length <= 1024)
+                .map(|length| Type::bytes_literal(db, &vec![0; length]))
+                .unwrap_or_else(|| KnownClass::Bytes.to_instance(db)),
+            _ => KnownClass::Bytes.to_instance(db),
+        },
+        EnumValueTransform::Float => KnownClass::Float.to_instance(db),
+        EnumValueTransform::Any => Type::any(),
+    }
 }
 
 /// Compute the first auto-assigned value for functional enum forms that only specify names.
@@ -175,17 +254,19 @@ fn enum_members_from_names(
     names: Vec<Name>,
     start: EnumStart,
     base_class: KnownClass,
+    value_transform: EnumValueTransform,
 ) -> Vec<(Name, Type<'_>)> {
     let mut members = Vec::with_capacity(names.len());
     let mut last_int_value = None;
 
     for (index, name) in names.into_iter().enumerate() {
-        let value = if index == 0 {
+        let raw_value = if index == 0 {
             first_enum_auto_value(db, base_class, name.as_str(), start)
         } else {
             next_auto_value(db, base_class, name.as_str(), last_int_value)
         };
-        last_int_value = value.as_int_literal();
+        last_int_value = raw_value.as_int_literal();
+        let value = transform_enum_member_value(db, raw_value, value_transform);
         members.push((name, value));
     }
 
@@ -267,7 +348,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
         });
-        let mixin_type = type_kw.and_then(|kw| self.infer_enum_mixin_argument(&kw.value));
+        let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
+            self.infer_enum_mixin_argument(&kw.value, base_class)
+        });
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
@@ -289,7 +372,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             names_arg,
             start,
             base_class,
-            has_too_many_positional || has_positional_keyword_conflict,
+            mixin_type,
+            has_too_many_positional || has_positional_keyword_conflict || !valid_mixin_type,
         );
 
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
@@ -361,7 +445,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         EnumStart::Literal(1)
     }
 
-    fn infer_enum_mixin_argument(&mut self, value: &ast::Expr) -> Option<Type<'db>> {
+    fn infer_enum_mixin_argument(
+        &mut self,
+        value: &ast::Expr,
+        base_class: KnownClass,
+    ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(class_lit) = ty.as_class_literal() {
@@ -372,13 +460,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "TypedDict class `{}` cannot be used as an enum mixin",
                     ty.display(db),
                 ));
-                return None;
+                return (None, false);
             }
-            return Some(ty);
+
+            let Some(mixin_class) = ty.to_class_type(db) else {
+                return (Some(ty), true);
+            };
+            let Some(enum_base) = base_class.to_class_literal(db).to_class_type(db) else {
+                return (Some(ty), true);
+            };
+            let constraints = ConstraintSetBuilder::new();
+            if !mixin_class.could_coexist_in_mro_with(db, enum_base, &constraints)
+                && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Class `{}` cannot be used as an enum mixin with `{}`",
+                    mixin_class.name(db),
+                    base_class.name(db),
+                ));
+                return (None, false);
+            }
+            return (Some(ty), true);
         }
 
         if ty.is_dynamic() {
-            return Some(ty);
+            return (Some(ty), true);
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
@@ -388,7 +494,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        None
+        (None, false)
     }
 
     fn infer_enum_spec(
@@ -396,13 +502,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         names_arg: &ast::Expr,
         start: EnumStart,
         base_class: KnownClass,
+        mixin_type: Option<Type<'db>>,
         has_invalid_arguments: bool,
     ) -> EnumSpec<'db> {
         let db = self.db();
+        let value_transform = enum_member_value_transform(db, mixin_type);
         let (members, has_known_members) = if has_invalid_arguments {
             (vec![], false)
         } else {
-            match self.parse_enum_members_arg(names_arg, start, base_class) {
+            match self.parse_enum_members_arg(names_arg, start, base_class, value_transform) {
                 EnumMembersArgParseResult::Known(members) => {
                     if has_duplicate_enum_member_names(&members) {
                         // Duplicate member names raise at runtime, so degrade to an unknown
@@ -463,6 +571,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         names_arg: &ast::Expr,
         start: EnumStart,
         base_class: KnownClass,
+        value_transform: EnumValueTransform,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let ty = self.expression_type(names_arg);
@@ -475,10 +584,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .filter(|s| !s.is_empty())
                 .map(Name::new)
                 .collect();
-            if names.is_empty() {
-                return EnumMembersArgParseResult::Invalid;
-            }
-            let members = enum_members_from_names(db, names, start, base_class);
+            let members = enum_members_from_names(db, names, start, base_class, value_transform);
             return EnumMembersArgParseResult::Known(members);
         }
 
@@ -488,11 +594,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => None,
         };
         if let Some(elts) = elts {
-            return self.parse_enum_members_from_sequence(elts, start, base_class);
+            return self.parse_enum_members_from_sequence(elts, start, base_class, value_transform);
         }
 
         if let ast::Expr::Dict(dict) = names_arg {
-            return self.parse_enum_members_from_dict(dict, base_class);
+            return self.parse_enum_members_from_dict(dict, base_class, value_transform);
         }
 
         if ty.is_dynamic() || ty.is_assignable_to(db, enum_names_type(db)) {
@@ -507,6 +613,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         elts: &[ast::Expr],
         start: EnumStart,
         base_class: KnownClass,
+        value_transform: EnumValueTransform,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let mut names = Vec::with_capacity(elts.len());
@@ -515,6 +622,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_members = false;
 
         for elt in elts {
+            if matches!(elt, ast::Expr::Starred(_)) {
+                return EnumMembersArgParseResult::Unknown;
+            }
             match self.classify_sequence_enum_member(elt) {
                 SequenceEnumMember::NameKnown(name) => {
                     if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
@@ -554,11 +664,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         if matches!(form, Some(SequenceEnumMemberForm::Names)) {
             return EnumMembersArgParseResult::Known(enum_members_from_names(
-                db, names, start, base_class,
+                db,
+                names,
+                start,
+                base_class,
+                value_transform,
             ));
         }
         if form.is_none() {
-            return EnumMembersArgParseResult::Invalid;
+            return EnumMembersArgParseResult::Known(vec![]);
         }
 
         let mut members = Vec::with_capacity(elts.len());
@@ -566,12 +680,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // still begins from the default seed of `1`.
         let mut last_int_value = Some(0);
         for (name, value) in explicit_members {
-            let value = if value.is_instance_of(db, KnownClass::Auto) {
+            let raw_value = if value.is_instance_of(db, KnownClass::Auto) {
                 next_auto_value(db, base_class, name.as_str(), last_int_value)
             } else {
                 value
             };
-            last_int_value = value.as_int_like_literal();
+            last_int_value = raw_value.as_int_like_literal();
+            let value = transform_enum_member_value(db, raw_value, value_transform);
             members.push((name, value));
         }
         EnumMembersArgParseResult::Known(members)
@@ -586,6 +701,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         dict: &ast::ExprDict,
         base_class: KnownClass,
+        value_transform: EnumValueTransform,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
@@ -593,7 +709,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_keys = false;
         for item in &dict.items {
             let Some(key) = &item.key else {
-                return EnumMembersArgParseResult::Invalid;
+                return EnumMembersArgParseResult::Unknown;
             };
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
@@ -613,12 +729,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 raw_value
             };
             last_int_value = value.as_int_like_literal();
+            let value = transform_enum_member_value(db, value, value_transform);
             members.push((name, value));
         }
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
-        } else if members.is_empty() {
-            EnumMembersArgParseResult::Invalid
         } else {
             EnumMembersArgParseResult::Known(members)
         }

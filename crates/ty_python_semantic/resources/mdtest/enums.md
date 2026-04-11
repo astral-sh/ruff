@@ -1648,6 +1648,36 @@ Color = Enum("Color", 123)
 reveal_type(enum_members(Color))  # revealed: Unknown
 ```
 
+Empty functional enums are valid, even though they have no members:
+
+```py
+from enum import Enum
+
+EmptyFromString = Enum("EmptyFromString", "")
+EmptyFromList = Enum("EmptyFromList", [])
+EmptyFromDict = Enum("EmptyFromDict", {})
+```
+
+Literal list/tuple/dict inputs that use unpacking should degrade to unknown members rather than
+being rejected outright:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+names: list[str] = ["B"]
+pairs: list[tuple[str, int]] = [("B", 2)]
+more: dict[str, int] = {"B": 2}
+
+FromNames = Enum("FromNames", ["A", *names])
+FromPairs = Enum("FromPairs", [("A", 1), *pairs])
+FromMapping = Enum("FromMapping", {"A": 1, **more})
+
+reveal_type(enum_members(FromNames))  # revealed: Unknown
+reveal_type(enum_members(FromPairs))  # revealed: Unknown
+reveal_type(enum_members(FromMapping))  # revealed: Unknown
+```
+
 ### Keyword argument type validation
 
 Functional enum construction should still preserve overload-based argument validation:
@@ -1751,11 +1781,27 @@ def make(n: int) -> None:
 
 ```py
 from enum import Enum
+from ty_extensions import enum_members
 
 Http = Enum("Http", "OK NOT_FOUND", type=int)
 
 reveal_type(Http.OK.value)  # revealed: Literal[1]
 reveal_type(Http.NOT_FOUND.value)  # revealed: Literal[2]
+
+Stringy = Enum("Stringy", "A B", type=str)
+
+reveal_type(Stringy.A.value)  # revealed: Literal["1"]
+reveal_type(Stringy.B.value)  # revealed: Literal["2"]
+
+Parsed = Enum("Parsed", {"A": "1"}, type=int)
+
+reveal_type(Parsed.A.value)  # revealed: Literal[1]
+
+AliasAfterCoercion = Enum("AliasAfterCoercion", {"A": "1", "B": 1}, type=str)
+
+reveal_type(AliasAfterCoercion.B.value)  # revealed: Literal["1"]
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(AliasAfterCoercion))
 ```
 
 Functional enums should still validate `type=` arguments eagerly, both for obvious non-types and for
@@ -1778,6 +1824,23 @@ TD = TypedDict("TD", {"x": int})
 BadBase = Enum("BadBase", "RED", type=TD)
 
 reveal_mro(BadBase)  # revealed: (<class 'BadBase'>, <class 'Enum'>, <class 'object'>)
+```
+
+Mixins that are incompatible with the enum base should still report an error and avoid exposing a
+precise member set:
+
+```py
+from enum import IntEnum, IntFlag
+from ty_extensions import enum_members
+
+# error: [invalid-base]
+BadIntEnum = IntEnum("BadIntEnum", "RED", type=str)
+
+# error: [invalid-base]
+BadIntFlag = IntFlag("BadIntFlag", "RED", type=float)
+
+reveal_type(enum_members(BadIntEnum))  # revealed: Unknown
+reveal_type(enum_members(BadIntFlag))  # revealed: Unknown
 ```
 
 Functional enums with a `type=` mixin should also have the same MRO as the equivalent static enum
