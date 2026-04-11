@@ -1549,10 +1549,10 @@ from enum import Enum
 names: list[str] = ["A", "B"]
 E = Enum("E", names)
 
-# inherited class attributes resolve from Enum base
+# Inherited class attributes resolve from Enum base.
 reveal_type(E.__members__)  # revealed: MappingProxyType[str, E]
 
-# own member access is unknown (can't tell if it exists)
+# But own member access is unknown.
 reveal_type(E.FOO)  # revealed: Unknown
 ```
 
@@ -1590,7 +1590,7 @@ reveal_type(enum_members(Color))  # revealed: Unknown
 ```py
 from enum import Enum
 
-# this is invalid at runtime but should not panic
+# This is invalid at runtime but should not panic.
 Color = Enum()
 
 reveal_type(Color)  # revealed: Enum

@@ -6805,14 +6805,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
-        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-            return self.infer_typeddict_call_expression(call_expression, None);
-        }
-
+        // Handle `Enum(name, members)`.
         if let Some(base_class) = enum_call::enum_functional_call_base(self.db(), callable_type)
             && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
         {
             return ty;
+        }
+
+        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
+            return self.infer_typeddict_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the

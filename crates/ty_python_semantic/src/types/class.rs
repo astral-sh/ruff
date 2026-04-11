@@ -329,7 +329,7 @@ pub enum ClassLiteral<'db> {
     DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
     /// A class created via functional `TypedDict("Name", {...})`.
     DynamicTypedDict(DynamicTypedDictLiteral<'db>),
-    /// A class created via the functional enum syntax, e.g. `Enum('Color', 'RED GREEN BLUE')`.
+    /// A class created via functional enum syntax, e.g., `Enum("Color", "RED GREEN BLUE")`.
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 

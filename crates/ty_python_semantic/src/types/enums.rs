@@ -407,8 +407,8 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            // track whether this member's value is a non-literal int, so a
-            // following `auto()` knows to widen its result to `int`
+            //Ttrack whether this member's value is a non-literal `int`, so a
+            // following `auto()` knows to widen its result to `int`.
             prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
                 && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
             prev_bool_literal =
