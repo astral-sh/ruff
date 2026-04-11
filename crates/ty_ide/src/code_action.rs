@@ -2,6 +2,7 @@ use crate::completion;
 
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_diagnostics::Edit;
+use ruff_python_ast::NodeKind;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -53,6 +54,8 @@ pub fn diagnostic_code_actions(
 pub fn refactor_code_actions(db: &dyn Db, file: File, range: TextRange) -> Vec<CodeAction> {
     let mut actions = Vec::new();
 
+    actions.extend(unwrap_block(db, file, range));
+
     actions
 }
 
@@ -74,6 +77,79 @@ fn unresolved_fixes(
                 preferred: true,
             }),
     )
+}
+
+fn unwrap_block(db: &dyn Db, file: File, range: TextRange) -> Option<CodeAction> {
+    if !range.is_empty() {
+        return None;
+    }
+    let parsed = parsed_module(db, file).load(db);
+    let colon = parsed
+        .tokens()
+        .at_offset(range.start())
+        .find(|it| it.kind() == TokenKind::Colon)?;
+
+    let target = covering_node(parsed.syntax().into(), colon.range())
+        .ancestors()
+        .find(|it| {
+            matches!(
+                it.kind(),
+                NodeKind::StmtIf
+                    | NodeKind::StmtMatch
+                    | NodeKind::StmtTry
+                    | NodeKind::StmtWith
+                    | NodeKind::StmtFor
+                    | NodeKind::StmtWhile
+            )
+        })?;
+
+    let trigger_ranges = target.as_stmt_if().into_iter().flat_map(|stmt_if| {
+        stmt_if
+            .elif_else_clauses
+            .iter()
+            .map(|elif| {
+                let delete_range = elif.range.cover_offset(stmt_if.end());
+                (&elif.body, delete_range, elif.range)
+            })
+            .chain([(&stmt_if.body, stmt_if.range, stmt_if.range)])
+    });
+    let trigger_ranges =
+        trigger_ranges.chain(target.as_stmt_match().into_iter().flat_map(|stmt_match| {
+            stmt_match
+                .cases
+                .iter()
+                .map(|case| (&case.body, stmt_match.range(), case.range))
+        }));
+    let mut trigger_ranges = trigger_ranges.chain(
+        target
+            .as_stmt_try()
+            .map(|it| &it.body)
+            .or_else(|| target.as_stmt_with().map(|it| &it.body))
+            .or_else(|| target.as_stmt_for().map(|it| &it.body))
+            .or_else(|| target.as_stmt_while().map(|it| &it.body))
+            .map(|body| (body, target.range(), target.range())),
+    );
+
+    let (stmts, delete_range, _) =
+        trigger_ranges.find(|(_, _, trigger_range)| range.intersect(*trigger_range).is_some())?;
+    let current_indent = IndentSpan::of(parsed.tokens(), target);
+    let stmts_indent = IndentSpan::of(parsed.tokens(), stmts.first()?);
+    let dedent = stmts_indent.len().checked_sub(current_indent.len())?;
+
+    let stmts_range = TextRange::new(stmts.first()?.start(), stmts.last()?.end());
+    let before = Edit::deletion(delete_range.start(), stmts_range.start());
+    let after = Edit::deletion(stmts_range.end(), delete_range.end());
+
+    let mut edits = vec![before, after];
+    for indent in IndentSpan::indent_spans(parsed.tokens().in_range(stmts_range)) {
+        edits.extend(indent.dedent(dedent));
+    }
+
+    Some(CodeAction {
+        title: "Unwrap this statements block".to_owned(),
+        edits,
+        preferred: false,
+    })
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -831,6 +907,189 @@ mod tests {
         2 | import importlib.abc
           - ExecutionLoader
         3 + ExecutionLoader  # ty:ignore[unresolved-reference]
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_if_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if True<START><END>:
+                    # comments
+                    foo
+                    bar()
+                    if 1:
+                        baz
+                        xxx
+                    ...
+                    # comments
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:12
+          |
+        2 | if 1:
+        3 |     if True:
+          |            ^
+        4 |         # comments
+        5 |         foo
+          |
+        1  |
+        2  | if 1:
+           -     if True:
+           -         # comments
+           -         foo
+           -         bar()
+           -         if 1:
+           -             baz
+           -             xxx
+           -         ...
+        3  +     foo
+        4  +     bar()
+        5  +     if 1:
+        6  +         baz
+        7  +         xxx
+        8  +     ...
+        9  |         # comments
+        10 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_elif_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if False:
+                    xxx()
+                elif True<START><END>:
+                    foo
+                    bar()
+                    if 1:
+                        baz
+                        xxx
+                    ...
+                else:
+                    redundant()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:14
+          |
+        3 |     if False:
+        4 |         xxx()
+        5 |     elif True:
+          |              ^
+        6 |         foo
+        7 |         bar()
+          |
+        2  | if 1:
+        3  |     if False:
+        4  |         xxx()
+           -     elif True:
+           -         foo
+           -         bar()
+           -         if 1:
+           -             baz
+           -             xxx
+           -         ...
+           -     else:
+           -         redundant()
+        5  +     foo
+        6  +     bar()
+        7  +     if 1:
+        8  +         baz
+        9  +         xxx
+        10 +     ...
+        11 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_body_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try<START><END>:
+                    foo
+                    bar()
+                except:
+                    ...
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:8
+          |
+        2 | if 1:
+        3 |     try:
+          |        ^
+        4 |         foo
+        5 |         bar()
+          |
+        1 |
+        2 | if 1:
+          -     try:
+          -         foo
+          -         bar()
+          -     except:
+          -         ...
+        3 +     foo
+        4 +     bar()
+        5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_match_case_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                match x:
+                    case 0:
+                        ...
+                    case 1:<START><END>
+                        foo
+                        bar()
+                    case _:
+                        ...
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:6:16
+          |
+        4 |         case 0:
+        5 |             ...
+        6 |         case 1:
+          |                ^
+        7 |             foo
+        8 |             bar()
+          |
+        1 |
+        2 | if 1:
+          -     match x:
+          -         case 0:
+          -             ...
+          -         case 1:
+          -             foo
+          -             bar()
+          -         case _:
+          -             ...
+        3 +     foo
+        4 +     bar()
+        5 |     ...
         ");
     }
 
