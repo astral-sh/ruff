@@ -715,6 +715,18 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        for binding in self.iter_flat_mut() {
+            binding.clear_deferred_constructor_errors_for_partial_application();
+        }
+
+        for constructor in self.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_deferred_constructor_errors_for_partial_application();
+            }
+        }
+    }
+
     fn collect_type_context_callables<'a>(&'a self, out: &mut Vec<&'a CallableBinding<'db>>) {
         for item in self.iter_callable_items() {
             out.push(item.callable());
@@ -764,19 +776,6 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<ArgumentInferenceRefinementBindings<'db>> {
         if !self.may_request_argument_inference_refinement(db) {
-            return None;
-        }
-
-        let should_refine = !matches!(
-            self.return_type(db),
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial { .. })
-        ) || self
-            .iter_flat()
-            .flat_map(CallableBinding::overloads)
-            .flat_map(Binding::errors)
-            .any(BindingError::is_relevant_for_partial_application);
-
-        if !should_refine {
             return None;
         }
 
@@ -867,6 +866,11 @@ impl<'db> Bindings<'db> {
             .match_parameters(db, &bound_call_arguments);
         for binding in partial_bindings.iter_flat_mut() {
             binding.clear_missing_argument_errors_for_partial_application();
+        }
+        for constructor in partial_bindings.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_deferred_constructor_errors_for_partial_application();
+            }
         }
         Some((bound_call_arguments, partial_bindings))
     }
@@ -2543,6 +2547,8 @@ impl<'db> Bindings<'db> {
                                 [Some(func_ty), ..] => *func_ty,
                                 _ => continue,
                             };
+                            let fallback_return_type = KnownClass::FunctoolsPartial
+                                .to_specialized_instance(db, &[Type::unknown()]);
 
                             let Some((bound_call_arguments, partial_bindings)) =
                                 Self::functools_partial_matched_bindings(
@@ -2636,6 +2642,7 @@ impl<'db> Bindings<'db> {
                                 }
                             };
                             if new_return_type.is_never() {
+                                overload.set_return_type(fallback_return_type);
                                 continue;
                             }
                             overload.set_return_type(new_return_type);
@@ -2843,6 +2850,18 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Ignore downstream constructor call-shape errors when constructing
+    /// `functools.partial(...)`.
+    ///
+    /// The merged partial signature decides which parameters remain callable, so downstream
+    /// arity/name mismatches caused by as-yet-unbound constructor parameters should not reject
+    /// partial construction. Explicit bound-argument type errors are still preserved.
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        for overload in &mut self.overloads {
+            overload.clear_deferred_constructor_errors_for_partial_application();
+        }
+    }
+
     /// Chooses which overload to use as the source for diagnostics when no overload fully matches.
     ///
     /// If step 1 of overload resolution identified a single arity match, we keep using that
@@ -2931,7 +2950,14 @@ impl<'db> CallableBinding<'db> {
                         }
                     }
                 }
-                (0..self.overloads().len()).collect()
+
+                // When no overload is compatible with the bound arguments, don't manufacture a
+                // precise reduced signature from an arbitrary overloaded callable shape.
+                if self.overloads().len() > 1 {
+                    return None;
+                }
+
+                vec![source_overload_index]
             }
         };
 
@@ -5559,6 +5585,20 @@ impl<'db> Binding<'db> {
     fn clear_missing_argument_errors_for_partial_application(&mut self) {
         self.errors
             .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
+    }
+
+    /// Downstream constructor validation is deferred until after partial signatures are merged.
+    fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        self.errors.retain(|error| {
+            !matches!(
+                error,
+                BindingError::MissingArguments { .. }
+                    | BindingError::UnknownArgument { .. }
+                    | BindingError::PositionalOnlyParameterAsKwarg { .. }
+                    | BindingError::TooManyPositionalArguments { .. }
+                    | BindingError::ParameterAlreadyAssigned { .. }
+            )
+        });
     }
 
     /// Returns the callable signature produced by partially applying this bound overload.

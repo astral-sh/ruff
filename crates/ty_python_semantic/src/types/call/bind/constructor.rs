@@ -197,15 +197,18 @@ impl<'db> ConstructorBinding<'db> {
         let Some(downstream_item) = downstream.single_item() else {
             return Some(entry_partial);
         };
-        let Some(Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
-            partial: downstream_callable,
-            ..
-        })) = downstream_item.functools_partial_type(
+        let Some(downstream_partial) = downstream_item.functools_partial_type(
             db,
             wrapped_callable_ty,
             partial_overload,
             bound_call_arguments,
-        )
+        ) else {
+            return Some(entry_partial);
+        };
+        let Type::KnownInstance(KnownInstanceType::FunctoolsPartial {
+            partial: downstream_callable,
+            ..
+        }) = downstream_partial
         else {
             return Some(entry_partial);
         };
@@ -226,14 +229,15 @@ impl<'db> ConstructorBinding<'db> {
                 constructor_returns_instance(db, constructor_class_literal, signature.return_ty)
             });
 
-        let mut overloads = non_instance_signatures;
+        let mut merged_signatures = non_instance_signatures;
+
         if !instance_signatures.is_empty() {
             let instance_entry_callable = CallableType::new(
                 db,
                 CallableSignature::from_overloads(instance_signatures),
                 CallableTypeKind::Regular,
             );
-            overloads.extend(
+            merged_signatures.extend(
                 merge_constructor_partial_callables(
                     db,
                     instance_entry_callable,
@@ -245,15 +249,19 @@ impl<'db> ConstructorBinding<'db> {
             );
         }
 
-        Some(functools_partial_instance(
-            db,
-            wrapped_callable_ty,
-            CallableType::new(
+        if merged_signatures.is_empty() {
+            Some(entry_partial)
+        } else {
+            Some(functools_partial_instance(
                 db,
-                CallableSignature::from_overloads(overloads),
-                CallableTypeKind::Regular,
-            ),
-        ))
+                wrapped_callable_ty,
+                CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(merged_signatures),
+                    CallableTypeKind::Regular,
+                ),
+            ))
+        }
     }
 
     pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
@@ -642,39 +650,355 @@ fn merge_constructor_partial_signature<'db>(
     entry: &Signature<'db>,
     downstream: &Signature<'db>,
 ) -> Signature<'db> {
-    let entry_callable = Type::single_callable(db, entry.clone());
-    let downstream_callable = Type::single_callable(db, downstream.clone());
-    if entry_callable.is_subtype_of(db, downstream_callable) {
-        return downstream.clone();
-    }
-    if downstream_callable.is_subtype_of(db, entry_callable) {
-        return entry.clone();
-    }
+    let (parameter_matches, downstream_used) =
+        find_constructor_partial_parameter_matches(entry.parameters(), downstream.parameters());
+    let entry = specialize_constructor_partial_signature_correlations(
+        db,
+        entry,
+        downstream,
+        &parameter_matches,
+    );
+    let downstream = specialize_constructor_partial_signature_correlations(
+        db,
+        downstream,
+        &entry,
+        &reverse_constructor_partial_parameter_matches(&parameter_matches, downstream.parameters()),
+    );
 
     Signature::new_generic(
         GenericContext::merge_optional(db, entry.generic_context, downstream.generic_context),
-        merge_constructor_partial_parameters(db, entry.parameters(), downstream.parameters()),
+        merge_constructor_partial_parameters_with_matches(
+            db,
+            entry.parameters(),
+            downstream.parameters(),
+            &parameter_matches,
+            &downstream_used,
+        ),
         combine_constructor_partial_return_types(db, entry.return_ty, downstream.return_ty),
     )
 }
 
-fn merge_constructor_partial_parameters<'db>(
+#[derive(Debug, Clone, Copy)]
+enum ConstructorPartialParameterMatchKind {
+    KeywordName,
+    PositionalOrder,
+    SameNameConflict,
+    Variadic,
+}
+
+type ConstructorPartialParameterMatches =
+    Vec<Option<(usize, ConstructorPartialParameterMatchKind)>>;
+
+fn find_constructor_partial_parameter_matches<'db>(
+    entry: &Parameters<'db>,
+    downstream: &Parameters<'db>,
+) -> (ConstructorPartialParameterMatches, Vec<bool>) {
+    let mut entry_matches = vec![None; entry.len()];
+    let mut downstream_used = vec![false; downstream.len()];
+
+    for (entry_index, entry_parameter) in entry.iter().enumerate() {
+        let Some(entry_keyword_name) = entry_parameter.keyword_name() else {
+            continue;
+        };
+        let Some((downstream_index, _)) =
+            downstream
+                .iter()
+                .enumerate()
+                .find(|(downstream_index, downstream_parameter)| {
+                    !downstream_used[*downstream_index]
+                        && downstream_parameter.keyword_name() == Some(entry_keyword_name)
+                })
+        else {
+            continue;
+        };
+
+        entry_matches[entry_index] = Some((
+            downstream_index,
+            ConstructorPartialParameterMatchKind::KeywordName,
+        ));
+        downstream_used[downstream_index] = true;
+    }
+
+    let mut downstream_positional_start = 0;
+    for (entry_index, entry_parameter) in entry.iter().enumerate() {
+        if entry_matches[entry_index].is_some() || !entry_parameter.is_positional() {
+            continue;
+        }
+
+        let Some(downstream_index) = next_unmatched_positional_parameter_index(
+            downstream,
+            &downstream_used,
+            &mut downstream_positional_start,
+        ) else {
+            continue;
+        };
+
+        entry_matches[entry_index] = Some((
+            downstream_index,
+            ConstructorPartialParameterMatchKind::PositionalOrder,
+        ));
+        downstream_used[downstream_index] = true;
+    }
+
+    for (entry_index, entry_parameter) in entry.iter().enumerate() {
+        if entry_matches[entry_index].is_some() {
+            continue;
+        }
+
+        let Some(entry_name) = entry_parameter.name() else {
+            continue;
+        };
+        let Some((downstream_index, _)) =
+            downstream
+                .iter()
+                .enumerate()
+                .find(|(downstream_index, downstream_parameter)| {
+                    !downstream_used[*downstream_index]
+                        && downstream_parameter.name() == Some(entry_name)
+                })
+        else {
+            continue;
+        };
+
+        entry_matches[entry_index] = Some((
+            downstream_index,
+            ConstructorPartialParameterMatchKind::SameNameConflict,
+        ));
+        downstream_used[downstream_index] = true;
+    }
+
+    for (entry_index, entry_parameter) in entry.iter().enumerate() {
+        if entry_matches[entry_index].is_some() {
+            continue;
+        }
+
+        let Some((downstream_index, _)) =
+            downstream
+                .iter()
+                .enumerate()
+                .find(|(downstream_index, downstream_parameter)| {
+                    !downstream_used[*downstream_index]
+                        && matches!(
+                            (entry_parameter.kind(), downstream_parameter.kind()),
+                            (
+                                ParameterKind::Variadic { .. },
+                                ParameterKind::Variadic { .. }
+                            ) | (
+                                ParameterKind::KeywordVariadic { .. },
+                                ParameterKind::KeywordVariadic { .. }
+                            )
+                        )
+                })
+        else {
+            continue;
+        };
+
+        entry_matches[entry_index] = Some((
+            downstream_index,
+            ConstructorPartialParameterMatchKind::Variadic,
+        ));
+        downstream_used[downstream_index] = true;
+    }
+
+    (entry_matches, downstream_used)
+}
+
+fn reverse_constructor_partial_parameter_matches<'db>(
+    parameter_matches: &ConstructorPartialParameterMatches,
+    reversed: &Parameters<'db>,
+) -> ConstructorPartialParameterMatches {
+    let mut reversed_matches = vec![None; reversed.len()];
+    for (parameter_index, matched_parameter) in parameter_matches.iter().enumerate() {
+        let Some((matched_index, match_kind)) = matched_parameter else {
+            continue;
+        };
+        reversed_matches[*matched_index] = Some((parameter_index, *match_kind));
+    }
+    reversed_matches
+}
+
+fn specialize_constructor_partial_signature_correlations<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    counterpart: &Signature<'db>,
+    parameter_matches: &ConstructorPartialParameterMatches,
+) -> Signature<'db> {
+    let Some(generic_context) = signature.generic_context else {
+        return signature.clone();
+    };
+
+    let mut specialization_types = Vec::with_capacity(generic_context.len(db));
+    let mut changed = false;
+    for bound_typevar in generic_context.variables(db) {
+        let typevar_identity = bound_typevar.typevar(db).identity(db);
+        let mut counterpart_types =
+            signature
+                .parameters()
+                .iter()
+                .enumerate()
+                .filter_map(|(parameter_index, parameter)| {
+                    if parameter.annotated_type() != Type::TypeVar(bound_typevar) {
+                        return None;
+                    }
+                    let Some((matched_index, _)) = parameter_matches
+                        .get(parameter_index)
+                        .and_then(|matched_parameter| *matched_parameter)
+                    else {
+                        return None;
+                    };
+                    counterpart
+                        .parameters()
+                        .get(matched_index)
+                        .map(|parameter| parameter.annotated_type())
+                });
+        let Some(first_counterpart_type) = counterpart_types.next() else {
+            specialization_types.push(Some(Type::TypeVar(bound_typevar)));
+            continue;
+        };
+        let specialized_type = IntersectionType::from_elements(
+            db,
+            std::iter::once(first_counterpart_type).chain(counterpart_types),
+        );
+        if specialized_type == Type::TypeVar(bound_typevar)
+            || specialized_type.references_typevar(db, typevar_identity)
+        {
+            specialization_types.push(Some(Type::TypeVar(bound_typevar)));
+            continue;
+        }
+
+        changed = true;
+        specialization_types.push(Some(specialized_type));
+    }
+
+    if !changed {
+        return signature.clone();
+    }
+
+    let specialization = generic_context.specialize_recursive(db, specialization_types);
+    let mut specialized_signature = signature.apply_specialization(db, specialization);
+    specialized_signature.generic_context =
+        retain_referenced_constructor_partial_typevars(db, &specialized_signature);
+    specialized_signature
+}
+
+fn retain_referenced_constructor_partial_typevars<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+) -> Option<GenericContext<'db>> {
+    let generic_context = signature.generic_context?;
+    let referenced_typevars: Vec<_> = generic_context
+        .variables(db)
+        .filter(|bound_typevar| {
+            let typevar_identity = bound_typevar.typevar(db).identity(db);
+            signature.parameters().iter().any(|parameter| {
+                parameter
+                    .annotated_type()
+                    .references_typevar(db, typevar_identity)
+            }) || signature.return_ty.references_typevar(db, typevar_identity)
+        })
+        .collect();
+    if referenced_typevars.is_empty() {
+        None
+    } else {
+        Some(GenericContext::from_typevar_instances(
+            db,
+            referenced_typevars,
+        ))
+    }
+}
+
+fn merge_constructor_partial_parameters_with_matches<'db>(
     db: &'db dyn Db,
     entry: &Parameters<'db>,
     downstream: &Parameters<'db>,
+    entry_matches: &ConstructorPartialParameterMatches,
+    downstream_used: &[bool],
 ) -> Parameters<'db> {
-    let len = entry.len().max(downstream.len());
+    let entry_used: Vec<_> = entry_matches.iter().map(Option::is_some).collect();
+    let mut merged_parameters = Vec::with_capacity(entry.len().max(downstream.len()));
+    for (entry_index, entry_parameter) in entry.iter().enumerate() {
+        if let Some((downstream_index, match_kind)) = entry_matches[entry_index] {
+            if let Some(downstream_parameter) = downstream.get(downstream_index) {
+                merged_parameters.push(merge_constructor_partial_parameter(
+                    db,
+                    entry_parameter,
+                    downstream_parameter,
+                    match_kind,
+                ));
+                continue;
+            }
+        }
+
+        if let Some(parameter) = merge_unmatched_constructor_partial_parameter(
+            entry_parameter,
+            downstream,
+            &downstream_used,
+        ) {
+            merged_parameters.push(parameter);
+        }
+    }
+
+    for (downstream_index, downstream_parameter) in downstream.iter().enumerate() {
+        if !downstream_used[downstream_index] {
+            if let Some(parameter) = merge_unmatched_constructor_partial_parameter(
+                downstream_parameter,
+                entry,
+                &entry_used,
+            ) {
+                merged_parameters.push(parameter);
+            }
+        }
+    }
+
+    reorder_constructor_partial_parameters(db, merged_parameters)
+}
+
+fn next_unmatched_positional_parameter_index<'db>(
+    parameters: &Parameters<'db>,
+    used: &[bool],
+    start: &mut usize,
+) -> Option<usize> {
+    while let Some((index, _parameter)) = parameters
+        .iter()
+        .enumerate()
+        .skip(*start)
+        .find(|(index, parameter)| !used[*index] && parameter.is_positional())
+    {
+        *start = index + 1;
+        return Some(index);
+    }
+
+    None
+}
+
+fn reorder_constructor_partial_parameters<'db>(
+    db: &'db dyn Db,
+    parameters: Vec<Parameter<'db>>,
+) -> Parameters<'db> {
+    let mut positional_only = Vec::new();
+    let mut positional_or_keyword = Vec::new();
+    let mut variadic = Vec::new();
+    let mut keyword_only = Vec::new();
+    let mut keyword_variadic = Vec::new();
+
+    for parameter in parameters {
+        match parameter.kind() {
+            ParameterKind::PositionalOnly { .. } => positional_only.push(parameter),
+            ParameterKind::PositionalOrKeyword { .. } => positional_or_keyword.push(parameter),
+            ParameterKind::Variadic { .. } => variadic.push(parameter),
+            ParameterKind::KeywordOnly { .. } => keyword_only.push(parameter),
+            ParameterKind::KeywordVariadic { .. } => keyword_variadic.push(parameter),
+        }
+    }
+
     Parameters::new(
         db,
-        (0..len).map(|index| match (entry.get(index), downstream.get(index)) {
-            (Some(entry_parameter), Some(downstream_parameter)) => {
-                merge_constructor_partial_parameter(db, entry_parameter, downstream_parameter)
-            }
-            (Some(entry_parameter), None) | (None, Some(entry_parameter)) => {
-                entry_parameter.clone().with_annotated_type(Type::Never)
-            }
-            (None, None) => unreachable!(),
-        }),
+        positional_only
+            .into_iter()
+            .chain(positional_or_keyword)
+            .chain(variadic)
+            .chain(keyword_only)
+            .chain(keyword_variadic),
     )
 }
 
@@ -682,12 +1006,8 @@ fn merge_constructor_partial_parameter<'db>(
     db: &'db dyn Db,
     entry: &Parameter<'db>,
     downstream: &Parameter<'db>,
+    match_kind: ConstructorPartialParameterMatchKind,
 ) -> Parameter<'db> {
-    let annotated_type = combine_constructor_partial_return_types(
-        db,
-        entry.annotated_type(),
-        downstream.annotated_type(),
-    );
     let default_type = match (entry.default_type(), downstream.default_type()) {
         (Some(entry_default), Some(downstream_default)) => Some(
             combine_constructor_partial_return_types(db, entry_default, downstream_default),
@@ -695,38 +1015,174 @@ fn merge_constructor_partial_parameter<'db>(
         _ => None,
     };
 
+    let (parameter, annotated_type) = match match_kind {
+        ConstructorPartialParameterMatchKind::KeywordName => (
+            merge_constructor_partial_keyword_parameter(entry, downstream),
+            combine_constructor_partial_return_types(
+                db,
+                entry.annotated_type(),
+                downstream.annotated_type(),
+            ),
+        ),
+        ConstructorPartialParameterMatchKind::PositionalOrder => (
+            merge_constructor_partial_positional_parameter(entry, downstream),
+            combine_constructor_partial_return_types(
+                db,
+                entry.annotated_type(),
+                downstream.annotated_type(),
+            ),
+        ),
+        ConstructorPartialParameterMatchKind::SameNameConflict => (entry.clone(), Type::Never),
+        ConstructorPartialParameterMatchKind::Variadic => (
+            entry.clone(),
+            combine_constructor_partial_return_types(
+                db,
+                entry.annotated_type(),
+                downstream.annotated_type(),
+            ),
+        ),
+    };
+
+    parameter
+        .with_annotated_type(annotated_type)
+        .with_optional_default_type(default_type)
+}
+
+fn merge_constructor_partial_keyword_parameter<'db>(
+    entry: &Parameter<'db>,
+    downstream: &Parameter<'db>,
+) -> Parameter<'db> {
+    let shared_name = entry
+        .keyword_name()
+        .filter(|entry_name| downstream.keyword_name() == Some(*entry_name))
+        .cloned()
+        .unwrap_or_else(|| {
+            entry
+                .keyword_name()
+                .or_else(|| downstream.keyword_name())
+                .cloned()
+                .expect("keyword-matched parameters must have a shared keyword name")
+        });
+
     match (entry.kind(), downstream.kind()) {
-        (
-            ParameterKind::PositionalOnly { name, .. },
-            ParameterKind::PositionalOnly { .. },
-        ) => Parameter::positional_only(name.clone()),
-        (
-            ParameterKind::PositionalOnly { name, .. },
-            ParameterKind::PositionalOrKeyword { .. },
-        )
-        | (
-            ParameterKind::PositionalOrKeyword { .. },
-            ParameterKind::PositionalOnly { name, .. },
-        ) => Parameter::positional_only(name.clone()),
+        (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::PositionalOrKeyword { .. }) => {
+            Parameter::positional_or_keyword(shared_name)
+        }
+        (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::KeywordOnly { .. })
+        | (ParameterKind::KeywordOnly { .. }, ParameterKind::PositionalOrKeyword { .. })
+        | (ParameterKind::KeywordOnly { .. }, ParameterKind::KeywordOnly { .. }) => {
+            Parameter::keyword_only(shared_name)
+        }
+        _ => entry.clone(),
+    }
+}
+
+fn merge_constructor_partial_positional_parameter<'db>(
+    entry: &Parameter<'db>,
+    downstream: &Parameter<'db>,
+) -> Parameter<'db> {
+    let positional_name = entry.name().cloned().or_else(|| downstream.name().cloned());
+
+    match (entry.kind(), downstream.kind()) {
+        (ParameterKind::PositionalOnly { .. }, ParameterKind::PositionalOnly { .. })
+        | (ParameterKind::PositionalOnly { .. }, ParameterKind::PositionalOrKeyword { .. })
+        | (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::PositionalOnly { .. }) => {
+            Parameter::positional_only(positional_name)
+        }
         (
             ParameterKind::PositionalOrKeyword { name, .. },
             ParameterKind::PositionalOrKeyword { .. },
-        ) => Parameter::positional_or_keyword(name.clone()),
-        (ParameterKind::Variadic { name }, ParameterKind::Variadic { .. }) => {
-            Parameter::variadic(name.clone())
+        ) if downstream.keyword_name() == Some(name) => {
+            Parameter::positional_or_keyword(name.clone())
         }
-        (
-            ParameterKind::KeywordOnly { name, .. },
-            ParameterKind::KeywordOnly { .. },
-        ) => Parameter::keyword_only(name.clone()),
-        (
-            ParameterKind::KeywordVariadic { name },
-            ParameterKind::KeywordVariadic { .. },
-        ) => Parameter::keyword_variadic(name.clone()),
+        (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::PositionalOrKeyword { .. }) => {
+            Parameter::positional_only(positional_name)
+        }
         _ => entry.clone(),
     }
-    .with_annotated_type(annotated_type)
-    .with_optional_default_type(default_type)
+}
+
+fn merge_unmatched_constructor_partial_parameter<'db>(
+    parameter: &Parameter<'db>,
+    other_parameters: &Parameters<'db>,
+    other_used: &[bool],
+) -> Option<Parameter<'db>> {
+    let other_has_variadic =
+        has_unmatched_constructor_partial_variadic(other_parameters, other_used);
+    let other_has_keyword_variadic =
+        has_unmatched_constructor_partial_keyword_variadic(other_parameters, other_used);
+    let default_type = parameter.default_type();
+
+    match parameter.kind() {
+        ParameterKind::PositionalOnly { name, .. } => {
+            if other_has_variadic {
+                Some(
+                    Parameter::positional_only(name.clone())
+                        .with_annotated_type(parameter.annotated_type())
+                        .with_optional_default_type(default_type),
+                )
+            } else if default_type.is_some() {
+                None
+            } else {
+                Some(Parameter::positional_only(name.clone()).with_annotated_type(Type::Never))
+            }
+        }
+        ParameterKind::PositionalOrKeyword { name, .. } => {
+            let parameter = match (other_has_variadic, other_has_keyword_variadic) {
+                (true, true) => Some(
+                    Parameter::positional_or_keyword(name.clone())
+                        .with_annotated_type(parameter.annotated_type()),
+                ),
+                (true, false) => Some(
+                    Parameter::positional_only(Some(name.clone()))
+                        .with_annotated_type(parameter.annotated_type()),
+                ),
+                (false, true) => Some(
+                    Parameter::keyword_only(name.clone())
+                        .with_annotated_type(parameter.annotated_type()),
+                ),
+                (false, false) if default_type.is_some() => None,
+                (false, false) => Some(
+                    Parameter::positional_or_keyword(name.clone()).with_annotated_type(Type::Never),
+                ),
+            };
+            parameter.map(|parameter| parameter.with_optional_default_type(default_type))
+        }
+        ParameterKind::KeywordOnly { name, .. } => {
+            if other_has_keyword_variadic {
+                Some(
+                    Parameter::keyword_only(name.clone())
+                        .with_annotated_type(parameter.annotated_type())
+                        .with_optional_default_type(default_type),
+                )
+            } else if default_type.is_some() {
+                None
+            } else {
+                Some(Parameter::keyword_only(name.clone()).with_annotated_type(Type::Never))
+            }
+        }
+        ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
+    }
+}
+
+fn has_unmatched_constructor_partial_variadic<'db>(
+    parameters: &Parameters<'db>,
+    used: &[bool],
+) -> bool {
+    parameters
+        .iter()
+        .enumerate()
+        .any(|(index, parameter)| !used[index] && parameter.is_variadic())
+}
+
+fn has_unmatched_constructor_partial_keyword_variadic<'db>(
+    parameters: &Parameters<'db>,
+    used: &[bool],
+) -> bool {
+    parameters
+        .iter()
+        .enumerate()
+        .any(|(index, parameter)| !used[index] && parameter.is_keyword_variadic())
 }
 
 fn combine_constructor_partial_return_types<'db>(
