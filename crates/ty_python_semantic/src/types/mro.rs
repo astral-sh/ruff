@@ -433,24 +433,16 @@ impl<'db> Mro<'db> {
     ) -> Result<Self, DynamicMroError<'db>> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic_enum.into()));
 
-        // Build the bases list: [mixin, base_class] when a `type=` mixin is present,
-        // or just [base_class] otherwise. For example:
-        //   Enum("Color", ...)           -> resolved_bases = [Enum]
-        //   Enum("Http", ..., type=int)  -> resolved_bases = [int, Enum]
-        //   StrEnum("Method", ...)       -> resolved_bases = [StrEnum]
-        let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(2);
-        if let Some(mixin) = dynamic_enum.mixin_type(db) {
-            if let Some(base) = ClassBase::try_from_type(db, mixin, None) {
+        // Convert the functional enum bases (`type=` mixin first, enum base second)
+        // into `ClassBase`s, skipping any invalid mixin that we already diagnosed
+        // during call inference.
+        let original_bases = dynamic_enum.explicit_bases(db);
+        let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(original_bases.len());
+        for base_type in original_bases.iter().copied() {
+            if let Some(base) = ClassBase::try_from_type(db, base_type, None) {
                 resolved_bases.push(base);
             }
         }
-        let enum_base = dynamic_enum
-            .base_class(db)
-            .to_class_literal(db)
-            .as_class_literal()
-            .expect("enum base should be a class literal")
-            .default_specialization(db);
-        resolved_bases.push(ClassBase::Class(enum_base));
 
         // When C3 linearization fails (e.g. a bad `type=` mixin), we still need a
         // usable MRO for downstream type inference. Rather than falling back to the

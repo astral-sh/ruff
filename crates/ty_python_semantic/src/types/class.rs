@@ -771,7 +771,7 @@ impl<'db> ClassLiteral<'db> {
                 // TypedDicts always inherit from `dict`
                 Box::default()
             }
-            Self::DynamicEnum(_) => [KnownClass::Enum.to_class_literal(db)].into(),
+            Self::DynamicEnum(enum_lit) => enum_lit.explicit_bases(db),
         }
     }
 }

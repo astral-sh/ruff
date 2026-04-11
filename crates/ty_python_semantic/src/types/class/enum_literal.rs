@@ -15,6 +15,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
 
+/// Functional enum member specification captured from the call site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumSpec<'db> {
     #[returns(deref)]
@@ -24,6 +25,11 @@ pub struct EnumSpec<'db> {
 
 impl get_size2::GetSize for EnumSpec<'_> {}
 
+/// Anchor for identifying a functional enum class literal.
+///
+/// This mirrors the dynamic `TypedDict` / `NamedTuple` pattern:
+/// - assigned calls use the `Definition` as stable identity;
+/// - dangling calls use a relative offset within the enclosing scope.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicEnumAnchor<'db> {
     Definition {
@@ -37,6 +43,7 @@ pub enum DynamicEnumAnchor<'db> {
     },
 }
 
+/// A class created via the functional enum syntax, e.g. `Enum("Color", "RED GREEN BLUE")`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicEnumLiteral<'db> {
     #[returns(ref)]
@@ -70,6 +77,15 @@ impl<'db> DynamicEnumLiteral<'db> {
             DynamicEnumAnchor::Definition { spec, .. }
             | DynamicEnumAnchor::ScopeOffset { spec, .. } => *spec,
         }
+    }
+
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let mut bases = Vec::with_capacity(2);
+        if let Some(mixin) = self.mixin_type(db) {
+            bases.push(mixin);
+        }
+        bases.push(self.base_class(db).to_class_literal(db));
+        bases.into_boxed_slice()
     }
 
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
@@ -115,6 +131,30 @@ impl<'db> DynamicEnumLiteral<'db> {
         Mro::of_dynamic_enum(db, self)
     }
 
+    fn has_known_members(self, db: &'db dyn Db) -> bool {
+        self.spec(db).has_known_members(db)
+    }
+
+    fn mixin_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        let mixin = self.mixin_type(db)?;
+        let ClassBase::Class(class) = ClassBase::try_from_type(db, mixin, None)? else {
+            return None;
+        };
+        Some(class)
+    }
+
+    fn with_unknown_member_fallback(
+        self,
+        db: &'db dyn Db,
+        result: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        if !self.has_known_members(db) && result.place.is_undefined() {
+            Place::bound(Type::unknown()).into()
+        } else {
+            result
+        }
+    }
+
     /// Look up an own class member (not inherited) by name.
     ///
     /// For known members, returns the `EnumLiteralType` if `name` matches.
@@ -123,13 +163,16 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// the full MRO (matching the `NamedTuple` pattern).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let spec = self.spec(db);
-        if spec.has_known_members(db) {
-            if spec.members(db).iter().any(|(n, _)| n.as_str() == name) {
-                let class_lit = ClassLiteral::DynamicEnum(self);
-                let enum_lit =
-                    crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
-                return Member::definitely_declared(Type::enum_literal(enum_lit));
-            }
+        if spec.has_known_members(db)
+            && spec
+                .members(db)
+                .iter()
+                .any(|(member_name, _)| member_name == name)
+        {
+            let class_lit = ClassLiteral::DynamicEnum(self);
+            let enum_lit =
+                crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
+            return Member::definitely_declared(Type::enum_literal(enum_lit));
         }
         Member::unbound()
     }
@@ -143,12 +186,10 @@ impl<'db> DynamicEnumLiteral<'db> {
         if !own.is_undefined() {
             return own.inner;
         }
-        if let Some(mixin) = self.mixin_type(db) {
-            if let Some(ClassBase::Class(class)) = ClassBase::try_from_type(db, mixin, None) {
-                let result = class.class_member(db, name, MemberLookupPolicy::default());
-                if !result.place.is_undefined() {
-                    return result;
-                }
+        if let Some(mixin_class) = self.mixin_class(db) {
+            let result = mixin_class.class_member(db, name, MemberLookupPolicy::default());
+            if !result.place.is_undefined() {
+                return result;
             }
         }
         let result = self
@@ -158,14 +199,11 @@ impl<'db> DynamicEnumLiteral<'db> {
             .map(|cls| cls.class_member(db, name, MemberLookupPolicy::default()))
             .unwrap_or_else(|| Place::Undefined.into());
 
-        // when members are unknown (e.g. `Enum("E", some_var)`), any name could
-        // be a member. return `Unknown` as a last resort after checking the full
-        // MRO so that inherited attributes like `__members__` still resolve.
-        if !self.spec(db).has_known_members(db) && result.place.is_undefined() {
-            return Place::bound(Type::unknown()).into();
-        }
-
-        result
+        // When members are unknown (e.g. `Enum("E", some_var)`), any name could
+        // still be a member. Only fall back to `Unknown` after exhausting the
+        // mixin and enum-base lookups so inherited attributes like `__members__`
+        // continue to resolve precisely.
+        self.with_unknown_member_fallback(db, result)
     }
 
     /// Look up an instance member by name, checking mixin and base class.
@@ -173,12 +211,10 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// If members are unknown and nothing was found, returns `Unknown`
     /// as a last resort.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        if let Some(mixin) = self.mixin_type(db) {
-            if let Some(ClassBase::Class(class)) = ClassBase::try_from_type(db, mixin, None) {
-                let result = class.instance_member(db, name);
-                if !result.place.is_undefined() {
-                    return result;
-                }
+        if let Some(mixin_class) = self.mixin_class(db) {
+            let result = mixin_class.instance_member(db, name);
+            if !result.place.is_undefined() {
+                return result;
             }
         }
         let result = self
@@ -186,11 +222,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             .to_instance(db)
             .instance_member(db, name);
 
-        if !self.spec(db).has_known_members(db) && result.place.is_undefined() {
-            return Place::bound(Type::unknown()).into();
-        }
-
-        result
+        self.with_unknown_member_fallback(db, result)
     }
 
     /// Functional enums don't define own instance attributes — `.name`, `.value`

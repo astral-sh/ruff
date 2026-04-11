@@ -1,5 +1,6 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
+use rustc_hash::FxHashSet;
 
 use crate::{
     Db, Program,
@@ -31,6 +32,18 @@ pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> 
                 | KnownClass::IntFlag
         )
     })
+}
+
+fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersion) -> bool {
+    matches!(
+        name,
+        "value" | "names" | "start" | "type" | "module" | "qualname"
+    ) || (name == "boundary" && python_version >= PythonVersion::PY311)
+}
+
+fn has_duplicate_enum_member_names<'db>(members: &[(Name, Type<'db>)]) -> bool {
+    let mut seen = FxHashSet::default();
+    members.iter().any(|(name, _)| !seen.insert(name.clone()))
 }
 
 /// Compute the auto-assigned value for the `i`-th enum member.
@@ -117,26 +130,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         base_class: KnownClass,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let args = &call_expr.arguments.args;
-        let keywords = &call_expr.arguments.keywords;
+        let ast::Arguments {
+            args,
+            keywords,
+            range: _,
+            node_index: _,
+        } = &call_expr.arguments;
 
         let base_name = base_class.name(db);
         let python_version = Program::get(db).python_version(db);
 
         for kw in keywords {
-            if let Some(name) = &kw.arg {
-                let is_valid_keyword = matches!(
-                    name.as_str(),
-                    "value" | "names" | "start" | "type" | "module" | "qualname"
-                ) || (name.as_str() == "boundary"
-                    && python_version >= PythonVersion::PY311);
-                if !is_valid_keyword {
-                    if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
-                        builder.into_diagnostic(format_args!(
-                            "Argument `{name}` does not match any known parameter of function `{base_name}`",
-                        ));
-                    }
-                }
+            if let Some(name) = &kw.arg
+                && !enum_functional_call_keyword_is_valid(name.as_str(), python_version)
+                && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Argument `{name}` does not match any known parameter of function `{base_name}`",
+                ));
             }
         }
 
@@ -145,7 +156,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start_kw = call_expr.arguments.find_keyword("start");
         let type_kw = call_expr.arguments.find_keyword("type");
 
-        // bail out on positional/keyword conflicts so normal binding can diagnose them
+        // Bail out on positional/keyword conflicts so normal binding can diagnose them.
         let has_positional_keyword_conflict =
             (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
         if has_positional_keyword_conflict {
@@ -160,7 +171,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_arg = name_arg?;
 
-        // Infer all positional arg types.
         for arg in args {
             self.infer_expression(arg, TypeContext::default());
         }
@@ -168,10 +178,58 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(&kw.value, TypeContext::default());
         }
 
-        // Non-literal name: return type[base_class] without creating a
-        // DynamicEnumLiteral. This matches the typeshed overload return type.
-        if !name_arg.is_string_literal_expr() {
-            let name_type = self.expression_type(name_arg);
+        // Non-literal names use the ordinary `type[EnumSubclass]` overload result
+        // instead of synthesizing a `DynamicEnumLiteral`.
+        let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
+            return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
+        };
+
+        let start = start_kw.map_or(1, |kw| self.infer_enum_start_argument(&kw.value));
+        let mixin_type = type_kw.map(|kw| self.infer_enum_mixin_argument(&kw.value));
+
+        // Only 1 extra positional arg is allowed (the `names` parameter).
+        // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
+        let has_too_many_positional = args.len() > 2;
+        if has_too_many_positional
+            && let Some(builder) = self
+                .context
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
+        {
+            builder.into_diagnostic(format_args!(
+                "Too many positional arguments to function `{base_name}`: expected 2, got {}",
+                args.len(),
+            ));
+        }
+
+        // Without `names`, this is a value-lookup call, not functional enum creation.
+        let names_arg = names_arg?;
+        let spec = self.infer_enum_spec(names_arg, start, base_class, has_too_many_positional);
+
+        let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
+        let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
+        if let Err(error) = enum_lit.try_mro(db) {
+            report_mro_error_kind(
+                &self.context,
+                error,
+                enum_lit.name(db),
+                call_expr,
+                None,
+                None,
+            );
+        }
+        Some(Type::ClassLiteral(ClassLiteral::DynamicEnum(enum_lit)))
+    }
+
+    fn infer_enum_name_argument(
+        &mut self,
+        name_arg: &ast::Expr,
+        base_class: KnownClass,
+    ) -> Option<Name> {
+        let db = self.db();
+        let base_name = base_class.name(db);
+        let name_type = self.expression_type(name_arg);
+
+        let Some(name_literal) = name_type.as_string_literal() else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
@@ -183,102 +241,90 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     name_type.display(db)
                 ));
             }
-            return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
+            return None;
+        };
+
+        Some(Name::new(name_literal.value(db)))
+    }
+
+    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> i64 {
+        let db = self.db();
+        let ty = self.expression_type(value);
+        if let Some(literal) = ty.as_int_literal() {
+            return literal;
         }
 
-        let start = start_kw
-            .and_then(|kw| {
-                let ty = self.expression_type(&kw.value);
-                if let Some(lit) = ty.as_int_literal() {
-                    return Some(lit);
-                }
-                if !ty.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Expected `int` for `start` argument, got `{}`",
-                            ty.display(db),
-                        ));
-                    }
-                }
-                None
-            })
-            .unwrap_or(1);
+        if !ty.is_assignable_to(db, KnownClass::Int.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value)
+        {
+            builder.into_diagnostic(format_args!(
+                "Expected `int` for `start` argument, got `{}`",
+                ty.display(db),
+            ));
+        }
 
-        let mixin_type = type_kw.map(|kw| {
-            let ty = self.expression_type(&kw.value);
-            if let Some(class_lit) = ty.as_class_literal() {
-                if class_lit.is_typed_dict(db) {
-                    if let Some(builder) = self.context.report_lint(&INVALID_BASE, &kw.value) {
-                        builder.into_diagnostic(format_args!(
-                            "TypedDict class `{}` cannot be used as an enum mixin",
-                            ty.display(db),
-                        ));
-                    }
-                }
-            } else if !ty.is_dynamic() {
-                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value) {
-                    builder.into_diagnostic(format_args!(
-                        "Expected a class for `type` argument, got `{}`",
-                        ty.display(db),
-                    ));
-                }
-            }
-            ty
-        });
+        1
+    }
 
-        let name_type = self.expression_type(name_arg);
-        let name = Name::new(
-            name_type
-                .as_string_literal()
-                .expect("name arg should be a string literal")
-                .value(db),
-        );
-
-        // Only 1 extra positional arg is allowed (the `names` parameter).
-        // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
-        let has_too_many_positional = args.len() > 2;
-        if has_too_many_positional {
-            if let Some(builder) = self
-                .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
+    fn infer_enum_mixin_argument(&mut self, value: &ast::Expr) -> Type<'db> {
+        let db = self.db();
+        let ty = self.expression_type(value);
+        if let Some(class_lit) = ty.as_class_literal() {
+            if class_lit.is_typed_dict(db)
+                && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
             {
                 builder.into_diagnostic(format_args!(
-                    "Too many positional arguments to function `{base_name}`: expected 2, got {}",
-                    args.len(),
+                    "TypedDict class `{}` cannot be used as an enum mixin",
+                    ty.display(db),
                 ));
             }
+        } else if !ty.is_dynamic()
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value)
+        {
+            builder.into_diagnostic(format_args!(
+                "Expected a class for `type` argument, got `{}`",
+                ty.display(db),
+            ));
         }
 
-        // without `names`, this is a value-lookup call, not functional enum creation
-        let names_arg = names_arg?;
+        ty
+    }
 
-        let (spec, has_known_members) = if has_too_many_positional {
+    fn infer_enum_spec(
+        &mut self,
+        names_arg: &ast::Expr,
+        start: i64,
+        base_class: KnownClass,
+        has_too_many_positional: bool,
+    ) -> EnumSpec<'db> {
+        let db = self.db();
+        let (members, has_known_members) = if has_too_many_positional {
             (vec![], false)
         } else {
-            let (spec, has_known_members) = self.parse_enum_names(names_arg, start, base_class);
-            // degrade on duplicate member names (runtime raises TypeError)
-            let has_duplicates = has_known_members
-                && spec
-                    .iter()
-                    .enumerate()
-                    .any(|(i, (name, _))| spec[..i].iter().any(|(prev, _)| prev == name));
-            if has_duplicates {
+            let (members, has_known_members) =
+                self.parse_enum_members_arg(names_arg, start, base_class);
+            if has_known_members && has_duplicate_enum_member_names(&members) {
+                // Duplicate member names raise at runtime, so degrade to an unknown
+                // member set and let normal call binding surface the rest.
                 (vec![], false)
             } else {
-                (spec, has_known_members)
+                (members, has_known_members)
             }
         };
 
-        let spec = EnumSpec::new(db, spec.into_boxed_slice(), has_known_members);
+        EnumSpec::new(db, members.into_boxed_slice(), has_known_members)
+    }
 
-        let anchor = match definition {
-            Some(def) => DynamicEnumAnchor::Definition {
-                definition: def,
-                spec,
-            },
+    fn create_dynamic_enum_anchor(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        definition: Option<Definition<'db>>,
+        spec: EnumSpec<'db>,
+    ) -> DynamicEnumAnchor<'db> {
+        match definition {
+            Some(definition) => DynamicEnumAnchor::Definition { definition, spec },
             None => {
+                let db = self.db();
                 let call_node_index = call_expr.node_index.load();
                 let scope = self.scope();
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
@@ -294,20 +340,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     spec,
                 }
             }
-        };
-
-        let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
-        if let Err(error) = enum_lit.try_mro(db) {
-            report_mro_error_kind(
-                &self.context,
-                error,
-                enum_lit.name(db),
-                call_expr,
-                None,
-                None,
-            );
         }
-        Some(Type::ClassLiteral(ClassLiteral::DynamicEnum(enum_lit)))
     }
 
     /// Parse the `names` argument of a functional enum call.
@@ -317,7 +350,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// - `["RED", "GREEN", "BLUE"]` (list of strings)
     /// - `[("RED", 1), ("GREEN", 2)]` (list of tuples)
     /// - `{"RED": 1, "GREEN": 2}` (dict mapping)
-    fn parse_enum_names(
+    fn parse_enum_members_arg(
         &mut self,
         names_arg: &ast::Expr,
         start: i64,
@@ -354,7 +387,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => None,
         };
         if let Some(elts) = elts {
-            return self.parse_enum_members_from_already_inferred(elts, start, base_class);
+            return self.parse_enum_members_from_sequence(elts, start, base_class);
         }
 
         if let ast::Expr::Dict(dict) = names_arg {
@@ -364,7 +397,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         (vec![], false)
     }
 
-    fn parse_enum_members_from_already_inferred(
+    fn parse_enum_members_from_sequence(
         &mut self,
         elts: &[ast::Expr],
         start: i64,
@@ -380,7 +413,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let v = enum_auto_value(db, base_class, member_name.as_str(), start, i);
                 last_int_value = v.as_int_literal();
                 members.push((member_name, v));
-            } else if let Some((name, value)) = self.extract_enum_tuple_entry(elt) {
+            } else if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
                 let value = if value.is_instance_of(db, KnownClass::Auto) {
                     next_auto_value(db, base_class, name.as_str(), last_int_value)
                 } else {
@@ -435,7 +468,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Extract a `(name, value)` pair from a tuple element like `("RED", 1)`.
-    fn extract_enum_tuple_entry(&mut self, elt: &ast::Expr) -> Option<(Name, Type<'db>)> {
+    fn parse_explicit_enum_member(&mut self, elt: &ast::Expr) -> Option<(Name, Type<'db>)> {
         let pair = match elt {
             ast::Expr::Tuple(tup) => &tup.elts,
             ast::Expr::List(list) => &list.elts,
