@@ -89,6 +89,16 @@ struct ScopeInfo {
     current_loop: Option<Loop>,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum WalrusTargetScope {
+    Current,
+    Enclosing {
+        file_scope_id: FileScopeId,
+        scope_index: usize,
+    },
+    InvalidClassBodyComprehension,
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -117,6 +127,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
+    comprehension_iterable_nesting: u32,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -177,6 +188,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
+            comprehension_iterable_nesting: 0,
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -278,6 +290,46 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         false
+    }
+
+    /// Returns the scope that owns a walrus target.
+    ///
+    /// Per [PEP 572], named expressions in comprehensions bind in the first enclosing scope that
+    /// is not a comprehension, except that assignment expressions within comprehensions are not
+    /// allowed in class bodies.
+    ///
+    /// [PEP 572]: https://peps.python.org/pep-0572/#scope-of-the-target
+    fn walrus_target_scope(&self) -> WalrusTargetScope {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return WalrusTargetScope::Current;
+        }
+
+        self.scope_stack
+            .iter()
+            .enumerate()
+            .rev()
+            .skip(1)
+            .find_map(
+                |(index, info)| match self.scopes[info.file_scope_id].kind() {
+                    ScopeKind::Comprehension => None,
+                    ScopeKind::Class => Some(WalrusTargetScope::InvalidClassBodyComprehension),
+                    _ => Some(WalrusTargetScope::Enclosing {
+                        file_scope_id: info.file_scope_id,
+                        scope_index: index,
+                    }),
+                },
+            )
+            .unwrap_or(WalrusTargetScope::Current)
+    }
+
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
+    }
+
+    fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
+        self.comprehension_iterable_nesting += 1;
+        visit(self);
+        self.comprehension_iterable_nesting -= 1;
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -783,10 +835,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
             Some(CurrentAssignment::Named(named)) => {
-                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                // named expression is implicitly nonlocal. This is yet to be
-                // implemented.
-                self.add_definition(place_id, named);
+                if let WalrusTargetScope::Enclosing {
+                    file_scope_id: enclosing_scope,
+                    scope_index,
+                } = self.walrus_target_scope()
+                {
+                    // PEP 572: walrus in comprehension binds in enclosing scope.
+                    let target_name = named
+                        .target
+                        .as_name_expr()
+                        .expect("target should be a Name expression")
+                        .id
+                        .clone();
+                    let (symbol_id, added) =
+                        self.place_tables[enclosing_scope].add_symbol(Symbol::new(target_name));
+                    if added {
+                        self.use_def_maps[enclosing_scope].add_place(symbol_id.into());
+                    }
+                    self.push_additional_definition_in_scope(
+                        enclosing_scope,
+                        scope_index,
+                        symbol_id.into(),
+                        named,
+                    );
+                } else {
+                    self.add_definition(place_id, named);
+                }
             }
             Some(CurrentAssignment::Comprehension {
                 unpack,
@@ -1584,7 +1658,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
-        self.visit_expr(&generator.iter);
+        self.with_comprehension_iterable_context(|builder| builder.visit_expr(&generator.iter));
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -3144,11 +3218,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
+                    let walrus_target_scope = self.walrus_target_scope();
+
+                    if self.in_comprehension_iterable() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
+                            range: node.range,
+                            python_version: self.python_version,
+                        });
+                    } else if walrus_target_scope
+                        == WalrusTargetScope::InvalidClassBodyComprehension
+                    {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
+                            range: node.range,
+                            python_version: self.python_version,
+                        });
+                    }
+
+                    // PEP 572: walrus in comprehension binds in the enclosing scope.
+                    // Make the value a standalone expression so inference can evaluate
+                    // it in the comprehension scope where the iteration variables are visible.
+                    if matches!(walrus_target_scope, WalrusTargetScope::Enclosing { .. }) {
+                        self.add_standalone_expression(&node.value);
+                    }
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();

@@ -184,6 +184,23 @@ Walrus operators cannot rebind variables already in use as iterators:
 {y := 5 for y in range(10)}
 ```
 
+## Walrus in invalid comprehension contexts
+
+```py
+class C:
+    # error: [invalid-syntax] "assignment expression within a comprehension cannot be used in a class body"
+    [(x := y) for y in range(3)]
+    # error: [unresolved-reference]
+    reveal_type(x)  # revealed: Unknown
+
+def returns_list() -> list[int]:
+    return [1, 2, 3]
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in (y := returns_list())]
+reveal_type(y)  # revealed: list[int]
+```
+
 ## Multiple case assignments
 
 Variable names in pattern matching must be unique within a single pattern:
