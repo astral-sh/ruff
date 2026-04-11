@@ -884,10 +884,16 @@ def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
     else:
         reveal_type(value)  # revealed: Vulnerability & ~Top[dict[Unknown, Unknown]]
         reveal_type(value.package.ecosystem)  # revealed: str
+
+def narrow_non_dict_object(value: object) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value)  # revealed: ~Top[dict[Unknown, Unknown]] & ~TypedDictTop
 ```
 
-`dict` methods should also remain callable on the narrowed value, even when the original type only
-exposed `Mapping` or `Iterable` APIs.
+Read-only `dict` APIs should remain callable on the narrowed value, but mutation APIs must still be
+rejected when a `TypedDict` arm remains possible.
 
 ```py
 from typing import Any, Iterable, Mapping
@@ -896,11 +902,11 @@ def sink(x: object) -> None: ...
 def narrow_mapping_items(value: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
     if isinstance(value, dict):
         sink(value.items())
-        value.clear()
+        value.clear()  # error: [unresolved-attribute]
 
 def narrow_dict_items(value: dict[str, Any] | Iterable[tuple[str, Any]]) -> None:
     if isinstance(value, dict):
-        value.clear()
+        value.clear()  # error: [unresolved-attribute]
 
 def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
     if isinstance(choices, dict):
