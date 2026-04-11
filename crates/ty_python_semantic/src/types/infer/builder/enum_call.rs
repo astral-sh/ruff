@@ -8,6 +8,7 @@ use crate::{
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
+        constraints::ConstraintSetBuilder,
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
             TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
@@ -27,11 +28,60 @@ enum EnumStart {
 /// Result of parsing the `names` argument of a functional enum call.
 enum EnumMembersArgParseResult<'db> {
     /// The argument was parsed into a fully known member list.
-    Known(Vec<(Name, Type<'db>)>),
+    Known(KnownEnumMembers<'db>),
     /// The argument is valid, but some members are not known precisely.
     Unknown,
     /// The argument is definitely invalid for functional enum creation.
     Invalid,
+}
+
+/// Known members parsed from a functional enum `names` argument.
+struct KnownEnumMembers<'db> {
+    members: Vec<(Name, Type<'db>)>,
+    value_form: EnumMemberValueForm,
+}
+
+/// Distinguishes whether member values are auto-generated from names or provided explicitly.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum EnumMemberValueForm {
+    /// Values are derived from member names via the enum's implicit auto-value rules.
+    Generated,
+    /// Values are supplied directly by the functional enum input.
+    Explicit,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum TypeMixinMemberBehavior {
+    /// Preserve both member names and values precisely.
+    Precise,
+    /// Convert generated values through a known builtin mixin, widening when exact literals are
+    /// not representable or would be impractical to materialize.
+    ConvertedValues,
+    /// Hide the member set entirely because the mixin may change canonical members or aliasing.
+    UnknownMembers,
+}
+
+impl TypeMixinMemberBehavior {
+    /// Classifies how much member information can be preserved for a functional enum with `type=`.
+    ///
+    /// Generated-name forms can keep more information for a small set of builtin mixins whose value
+    /// conversion rules we model explicitly. Explicit-value forms are treated more conservatively,
+    /// since applying the mixin can change aliasing and therefore the canonical member set.
+    fn from_mixin(db: &dyn Db, mixin_type: Type<'_>, value_form: EnumMemberValueForm) -> Self {
+        match value_form {
+            EnumMemberValueForm::Explicit => Self::UnknownMembers,
+            EnumMemberValueForm::Generated => match mixin_type {
+                Type::ClassLiteral(ClassLiteral::Static(class)) => match class.known(db) {
+                    Some(KnownClass::Int) => Self::Precise,
+                    Some(KnownClass::Str | KnownClass::Bytes | KnownClass::Float) => {
+                        Self::ConvertedValues
+                    }
+                    _ => Self::UnknownMembers,
+                },
+                _ => Self::UnknownMembers,
+            },
+        }
+    }
 }
 
 /// Classification of one element in a sequence-form `names` argument.
@@ -187,6 +237,67 @@ fn enum_members_from_names(
     members
 }
 
+/// Converts generated functional-enum member values through a known builtin `type=` mixin.
+///
+/// This preserves exact `str` literals when the generated auto-values are known integer literals,
+/// otherwise preserving at least the builtin result type for `str`, `bytes`, and `float`.
+///
+/// Returns `None` when the mixin is not a supported builtin or when the generated values are not
+/// compatible with the corresponding builtin conversion.
+fn apply_generated_type_mixin_member_values<'db>(
+    db: &'db dyn Db,
+    mixin_type: Type<'_>,
+    members: Vec<(Name, Type<'db>)>,
+) -> Option<Vec<(Name, Type<'db>)>> {
+    let Type::ClassLiteral(ClassLiteral::Static(class)) = mixin_type else {
+        return None;
+    };
+
+    match class.known(db) {
+        Some(KnownClass::Str) => Some(
+            members
+                .into_iter()
+                .map(|(name, value)| {
+                    let value = if let Some(literal) = value.as_int_literal() {
+                        Type::string_literal(db, &literal.to_string())
+                    } else if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                        KnownClass::Str.to_instance(db)
+                    } else {
+                        return None;
+                    };
+                    Some((name, value))
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Some(KnownClass::Bytes) => Some(
+            members
+                .into_iter()
+                .map(|(name, value)| {
+                    let value = if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                        KnownClass::Bytes.to_instance(db)
+                    } else {
+                        return None;
+                    };
+                    Some((name, value))
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        Some(KnownClass::Float) => Some(
+            members
+                .into_iter()
+                .map(|(name, value)| {
+                    if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                        Some((name, KnownClass::Float.to_instance(db)))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        _ => None,
+    }
+}
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(crate) fn infer_enum_call_expression(
         &mut self,
@@ -262,7 +373,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
         });
-        let mixin_type = type_kw.and_then(|kw| self.infer_enum_mixin_argument(&kw.value));
+        let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
+            self.infer_enum_mixin_argument(&kw.value, base_class)
+        });
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
@@ -284,7 +397,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             names_arg,
             start,
             base_class,
-            has_too_many_positional || has_positional_keyword_conflict,
+            mixin_type,
+            has_too_many_positional || has_positional_keyword_conflict || !valid_mixin_type,
         );
 
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
@@ -356,7 +470,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         EnumStart::Literal(1)
     }
 
-    fn infer_enum_mixin_argument(&mut self, value: &ast::Expr) -> Option<Type<'db>> {
+    fn infer_enum_mixin_argument(
+        &mut self,
+        value: &ast::Expr,
+        base_class: KnownClass,
+    ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(class_lit) = ty.as_class_literal() {
@@ -367,13 +485,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "TypedDict class `{}` cannot be used as an enum mixin",
                     ty.display(db),
                 ));
-                return None;
+                return (None, false);
             }
-            return Some(ty);
+
+            let Some(mixin_class) = ty.to_class_type(db) else {
+                return (Some(ty), true);
+            };
+            let Some(enum_base) = base_class.to_class_literal(db).to_class_type(db) else {
+                return (Some(ty), true);
+            };
+            let constraints = ConstraintSetBuilder::new();
+            if !mixin_class.could_coexist_in_mro_with(db, enum_base, &constraints)
+                && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Class `{}` cannot be used as an enum mixin with `{}`",
+                    mixin_class.name(db),
+                    base_class.name(db),
+                ));
+                return (None, false);
+            }
+            return (Some(ty), true);
         }
 
         if ty.is_dynamic() {
-            return Some(ty);
+            return (Some(ty), true);
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
@@ -383,7 +519,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        None
+        (None, false)
     }
 
     fn infer_enum_spec(
@@ -391,6 +527,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         names_arg: &ast::Expr,
         start: EnumStart,
         base_class: KnownClass,
+        mixin_type: Option<Type<'db>>,
         has_invalid_arguments: bool,
     ) -> EnumSpec<'db> {
         let db = self.db();
@@ -398,14 +535,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (vec![], false)
         } else {
             match self.parse_enum_members_arg(names_arg, start, base_class) {
-                EnumMembersArgParseResult::Known(members) => {
+                EnumMembersArgParseResult::Known(known_members) => {
                     let mut seen = FxHashSet::default();
-                    if members.iter().any(|(name, _)| !seen.insert(name.clone())) {
+                    if known_members
+                        .members
+                        .iter()
+                        .any(|(name, _)| !seen.insert(name.clone()))
+                    {
                         // Duplicate member names raise at runtime, so degrade to an unknown
                         // member set and let normal call binding surface the rest.
                         (vec![], false)
+                    } else if let Some(mixin_type) = mixin_type {
+                        match TypeMixinMemberBehavior::from_mixin(
+                            db,
+                            mixin_type,
+                            known_members.value_form,
+                        ) {
+                            TypeMixinMemberBehavior::Precise => (known_members.members, true),
+                            TypeMixinMemberBehavior::ConvertedValues => {
+                                match apply_generated_type_mixin_member_values(
+                                    db,
+                                    mixin_type,
+                                    known_members.members,
+                                ) {
+                                    Some(members) => (members, true),
+                                    None => (vec![], false),
+                                }
+                            }
+                            // `type=` can change aliasing and resulting values, so when the mixin
+                            // semantics are not predictable we avoid exposing a precise member set.
+                            TypeMixinMemberBehavior::UnknownMembers => (vec![], false),
+                        }
                     } else {
-                        (members, true)
+                        (known_members.members, true)
                     }
                 }
                 EnumMembersArgParseResult::Unknown => (vec![], false),
@@ -471,7 +633,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .map(Name::new)
                 .collect();
             let members = enum_members_from_names(db, names, start, base_class);
-            return EnumMembersArgParseResult::Known(members);
+            return EnumMembersArgParseResult::Known(KnownEnumMembers {
+                members,
+                value_form: EnumMemberValueForm::Generated,
+            });
         }
 
         let elts = match names_arg {
@@ -548,12 +713,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if matches!(form, Some(SequenceEnumMemberForm::Names)) {
-            return EnumMembersArgParseResult::Known(enum_members_from_names(
-                db, names, start, base_class,
-            ));
+            return EnumMembersArgParseResult::Known(KnownEnumMembers {
+                members: enum_members_from_names(db, names, start, base_class),
+                value_form: EnumMemberValueForm::Generated,
+            });
         }
         if form.is_none() {
-            return EnumMembersArgParseResult::Known(vec![]);
+            return EnumMembersArgParseResult::Known(KnownEnumMembers {
+                members: vec![],
+                value_form: EnumMemberValueForm::Generated,
+            });
         }
 
         let mut members = Vec::with_capacity(elts.len());
@@ -569,7 +738,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             last_int_value = value.as_int_like_literal();
             members.push((name, value));
         }
-        EnumMembersArgParseResult::Known(members)
+        EnumMembersArgParseResult::Known(KnownEnumMembers {
+            members,
+            value_form: EnumMemberValueForm::Explicit,
+        })
     }
 
     /// Parse enum members from a dict literal like `{"RED": 1, "GREEN": 2}`.
@@ -613,7 +785,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
         } else {
-            EnumMembersArgParseResult::Known(members)
+            EnumMembersArgParseResult::Known(KnownEnumMembers {
+                members,
+                value_form: EnumMemberValueForm::Explicit,
+            })
         }
     }
 
