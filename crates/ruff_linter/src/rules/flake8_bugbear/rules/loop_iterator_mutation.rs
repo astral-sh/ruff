@@ -4,9 +4,10 @@ use std::fmt::Debug;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign, StmtAugAssign,
-    StmtDelete, StmtFor, StmtIf,
+    ExceptHandler, ExceptHandlerExceptHandler, Expr, ExprAttribute, ExprCall, ExprSubscript,
+    ExprTuple, Stmt, StmtAssign, StmtAugAssign, StmtDelete, StmtFor, StmtIf, StmtTry, StmtWhile,
     visitor::{self, Visitor},
 };
 use ruff_text_size::TextRange;
@@ -115,6 +116,40 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
     }
 }
 
+/// Whether `body` contains a `break` that would exit the enclosing loop
+/// (not one inside a further-nested loop). When absent, the loop's `else`
+/// clause is guaranteed to run.
+fn body_has_reachable_break(body: &[Stmt]) -> bool {
+    let mut finder = BreakFinder::default();
+    finder.visit_body(body);
+    finder.found
+}
+
+#[derive(Default)]
+struct BreakFinder {
+    found: bool,
+}
+
+impl StatementVisitor<'_> for BreakFinder {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        if self.found {
+            return;
+        }
+        match stmt {
+            Stmt::Break(_) => self.found = true,
+            // Don't look inside nested loop bodies, but do check their
+            // `else` clause — a `break` there targets the enclosing loop.
+            Stmt::For(StmtFor { orelse, .. }) | Stmt::While(StmtWhile { orelse, .. }) => {
+                self.visit_body(orelse);
+            }
+            // Nested function/class bodies can't affect the enclosing
+            // loop's control flow.
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            _ => statement_visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
 /// Returns `true` if the method mutates when called on an iterator.
 fn is_mutating_function(function_name: &str) -> bool {
     matches!(
@@ -138,17 +173,23 @@ fn is_mutating_function(function_name: &str) -> bool {
     )
 }
 
-/// A visitor to collect mutations to a variable in a loop.
-#[derive(Debug, Clone)]
+/// Collects mutations to a loop iterable, accounting for control flow.
+///
+/// Mutations in different arms of `if`/`try`/`for`/`while` are tracked in
+/// separate branches so a terminator in one arm can't clear a sibling's
+/// mutations. On arm exit, mutations merge back into the enclosing branch.
+///
+/// `loop_depth` prevents a nested loop's `break` from clearing the outer
+/// loop's mutations.
+#[derive(Debug)]
 struct LoopMutationsVisitor<'a> {
     iter: &'a Expr,
     target: &'a Expr,
     index: &'a Expr,
     mutations: HashMap<u32, Vec<TextRange>>,
-    /// The branch ID for the current scope.
     branch: u32,
-    /// Counter for generating unique branch IDs.
     next_branch_id: u32,
+    loop_depth: u32,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
@@ -161,7 +202,25 @@ impl<'a> LoopMutationsVisitor<'a> {
             mutations: HashMap::new(),
             branch: 0,
             next_branch_id: 0,
+            loop_depth: 0,
         }
+    }
+
+    /// Allocate a fresh branch ID and make it current.
+    fn enter_new_branch(&mut self) {
+        self.next_branch_id += 1;
+        self.branch = self.next_branch_id;
+    }
+
+    /// Merge the current branch's mutations into `parent` and switch to it.
+    fn merge_branch_into(&mut self, parent: u32) {
+        if let Some(child_mutations) = self.mutations.remove(&self.branch) {
+            self.mutations
+                .entry(parent)
+                .or_default()
+                .extend(child_mutations);
+        }
+        self.branch = parent;
     }
 
     /// Register a mutation.
@@ -239,7 +298,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 }
 
-/// `Visitor` to collect all used identifiers in a statement.
+/// Walk statements to detect mutations and track control-flow terminators.
 impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_body(&mut self, body: &'a [Stmt]) {
         for stmt in body {
@@ -275,6 +334,63 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
             }
 
+            // Ex) `for y in other: ...`
+            Stmt::For(StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            }) => {
+                self.visit_expr(iter);
+                self.visit_expr(target);
+
+                let saved_branch = self.branch;
+
+                self.enter_new_branch();
+                self.loop_depth += 1;
+                self.visit_body(body);
+                self.loop_depth -= 1;
+                self.merge_branch_into(saved_branch);
+
+                // If the body never breaks, the else clause always runs,
+                // so a terminator there can clear earlier mutations.
+                if !orelse.is_empty() {
+                    if body_has_reachable_break(body) {
+                        self.enter_new_branch();
+                        self.visit_body(orelse);
+                        self.merge_branch_into(saved_branch);
+                    } else {
+                        self.visit_body(orelse);
+                    }
+                }
+            }
+
+            // Ex) `while cond: ...`
+            Stmt::While(StmtWhile {
+                test, body, orelse, ..
+            }) => {
+                self.visit_expr(test);
+
+                let saved_branch = self.branch;
+
+                self.enter_new_branch();
+                self.loop_depth += 1;
+                self.visit_body(body);
+                self.loop_depth -= 1;
+                self.merge_branch_into(saved_branch);
+
+                if !orelse.is_empty() {
+                    if body_has_reachable_break(body) {
+                        self.enter_new_branch();
+                        self.visit_body(orelse);
+                        self.merge_branch_into(saved_branch);
+                    } else {
+                        self.visit_body(orelse);
+                    }
+                }
+            }
+
             // Ex) `if True: items.append(1)`
             Stmt::If(StmtIf {
                 test,
@@ -285,32 +401,83 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 let saved_branch = self.branch;
 
                 // Handle the `if` branch.
-                self.next_branch_id += 1;
-                self.branch = self.next_branch_id;
+                self.enter_new_branch();
                 self.visit_expr(test);
                 self.visit_body(body);
+                self.merge_branch_into(saved_branch);
 
                 // Handle the `elif` and `else` branches.
                 for clause in elif_else_clauses {
-                    self.next_branch_id += 1;
-                    self.branch = self.next_branch_id;
+                    self.enter_new_branch();
                     if let Some(test) = &clause.test {
                         self.visit_expr(test);
                     }
                     self.visit_body(&clause.body);
+                    self.merge_branch_into(saved_branch);
                 }
-
-                self.branch = saved_branch;
             }
 
-            // On break or return, the loop exits, so the mutation is safe.
-            Stmt::Break(_) | Stmt::Return(_) => {
+            // Ex) `try: ... except: ... else: ... finally: ...`
+            Stmt::Try(StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                let saved_branch = self.branch;
+
+                self.enter_new_branch();
+                self.visit_body(body);
+                self.merge_branch_into(saved_branch);
+
+                if !orelse.is_empty() {
+                    self.enter_new_branch();
+                    self.visit_body(orelse);
+                    self.merge_branch_into(saved_branch);
+                }
+
+                for handler in handlers {
+                    let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
+                        type_,
+                        body,
+                        ..
+                    }) = handler;
+                    self.enter_new_branch();
+                    if let Some(type_) = type_ {
+                        self.visit_expr(type_);
+                    }
+                    self.visit_body(body);
+                    self.merge_branch_into(saved_branch);
+                }
+
+                // Give `finally` its own branch so siblings don't
+                // cross-clear through it.
+                if !finalbody.is_empty() {
+                    self.enter_new_branch();
+                    self.visit_body(finalbody);
+                    self.merge_branch_into(saved_branch);
+                }
+            }
+
+            // Return exits the function; the loop can't re-iterate.
+            Stmt::Return(_) => {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
             }
 
-            // On continue, the mutation is NOT safe (loop keeps iterating).
+            // Only clear at the outermost loop — a nested break doesn't
+            // stop the outer iteration.
+            Stmt::Break(_) => {
+                if self.loop_depth == 0
+                    && let Some(mutations) = self.mutations.get_mut(&self.branch)
+                {
+                    mutations.clear();
+                }
+            }
+
+            // Mutation still reachable on the next iteration.
             Stmt::Continue(_) => {}
 
             // Avoid recursion for class and function definitions.

@@ -206,3 +206,70 @@ for item in some_list:
     some_list.remove(item)
     continue
     break
+
+# should error - nested `break` does not exit the outer loop
+for item in some_list:
+    some_list.append(item)
+    for _ in range(3):
+        break
+
+# should error - nested `continue` does not exit the outer loop
+for item in some_list:
+    some_list.append(item)
+    for _ in range(3):
+        continue
+
+# should error - nested `while`'s `break` only exits the inner loop
+for item in some_list:
+    some_list.append(item)
+    while True:
+        break
+
+# should error - nested `for`'s `break` can bypass `else: return`,
+# so outer mutation may still be reached on re-iteration
+def fail_nested_for_else(some_list, other):
+    for item in some_list:
+        some_list.append(item)
+        for y in other:
+            if y:
+                break
+        else:
+            return
+
+# should error - nested `while`'s `break` can bypass `else: return`,
+# so outer mutation may still be reached on re-iteration
+def fail_nested_while_else(some_list):
+    for item in some_list:
+        some_list.append(item)
+        while True:
+            break
+        else:
+            return
+
+# should error - `return` in `except` must not clear mutation in `try`
+def fail_try_except(some_list):
+    for item in some_list:
+        try:
+            some_list.append(item)
+        except Exception:
+            return
+
+# should error - `return` in `except` must not clear mutation in `else`
+def fail_try_else(some_list):
+    for item in some_list:
+        try:
+            pass
+        except Exception:
+            return
+        else:
+            some_list.append(item)
+
+# should error - `return` in `except` must not clear mutation in `finally`
+def fail_try_finally(some_list):
+    for item in some_list:
+        try:
+            pass
+        except Exception:
+            return
+        finally:
+            some_list.append(item)

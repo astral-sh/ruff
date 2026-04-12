@@ -417,3 +417,89 @@ B909 Mutation to loop iterable `some_list` during iteration
 207 |     continue
 208 |     break
     |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:212:5
+    |
+210 | # should error - nested `break` does not exit the outer loop
+211 | for item in some_list:
+212 |     some_list.append(item)
+    |     ^^^^^^^^^^^^^^^^
+213 |     for _ in range(3):
+214 |         break
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:218:5
+    |
+216 | # should error - nested `continue` does not exit the outer loop
+217 | for item in some_list:
+218 |     some_list.append(item)
+    |     ^^^^^^^^^^^^^^^^
+219 |     for _ in range(3):
+220 |         continue
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:224:5
+    |
+222 | # should error - nested `while`'s `break` only exits the inner loop
+223 | for item in some_list:
+224 |     some_list.append(item)
+    |     ^^^^^^^^^^^^^^^^
+225 |     while True:
+226 |         break
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:232:9
+    |
+230 | def fail_nested_for_else(some_list, other):
+231 |     for item in some_list:
+232 |         some_list.append(item)
+    |         ^^^^^^^^^^^^^^^^
+233 |         for y in other:
+234 |             if y:
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:243:9
+    |
+241 | def fail_nested_while_else(some_list):
+242 |     for item in some_list:
+243 |         some_list.append(item)
+    |         ^^^^^^^^^^^^^^^^
+244 |         while True:
+245 |             break
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:253:13
+    |
+251 |     for item in some_list:
+252 |         try:
+253 |             some_list.append(item)
+    |             ^^^^^^^^^^^^^^^^
+254 |         except Exception:
+255 |             return
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:265:13
+    |
+263 |             return
+264 |         else:
+265 |             some_list.append(item)
+    |             ^^^^^^^^^^^^^^^^
+266 |
+267 | # should error - `return` in `except` must not clear mutation in `finally`
+    |
+
+B909 Mutation to loop iterable `some_list` during iteration
+   --> B909.py:275:13
+    |
+273 |             return
+274 |         finally:
+275 |             some_list.append(item)
+    |             ^^^^^^^^^^^^^^^^
+    |
