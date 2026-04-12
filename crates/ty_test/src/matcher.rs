@@ -14,7 +14,10 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
-use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::assertion::{
+    FilePragmaComments, LinePragmaComments, ParsedAssertion, UnparsedAssertion,
+    UnparsedPragmaComment,
+};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 
@@ -43,7 +46,7 @@ impl FailuresByLine {
         });
     }
 
-    fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
 }
@@ -57,6 +60,7 @@ struct LineFailures {
 pub(super) fn match_file(
     db: &Db,
     file: File,
+    pragmas: &FilePragmaComments,
     diagnostics: &[Diagnostic],
 ) -> Result<(), FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
@@ -83,36 +87,37 @@ pub(super) fn match_file(
     });
     let mut line_diagnostics = diagnostics.iter_lines();
 
-    let mut current_assertions = line_assertions.next();
+    let mut line_pragmas = pragmas.into_iter();
+    let mut current_pragmas = line_pragmas.next();
     let mut current_diagnostics = line_diagnostics.next();
 
     let matcher = Matcher::from_file(db, file);
     let mut failures = FailuresByLine::default();
 
     loop {
-        match (&current_assertions, &current_diagnostics) {
-            (Some(assertions), Some(diagnostics)) => {
-                match assertions.line_number.cmp(&diagnostics.line_number) {
+        match (&current_pragmas, &current_diagnostics) {
+            (Some(pragmas), Some(diagnostics)) => {
+                match pragmas.line_number.cmp(&diagnostics.line_number) {
                     Ordering::Equal => {
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
                         // iterators.
                         matcher
-                            .match_line(diagnostics, assertions)
+                            .match_line(diagnostics, pragmas)
                             .unwrap_or_else(|messages| {
-                                failures.push(assertions.line_number, messages);
+                                failures.push(pragmas.line_number, messages);
                             });
-                        current_assertions = line_assertions.next();
+                        current_pragmas = line_pragmas.next();
                         current_diagnostics = line_diagnostics.next();
                     }
                     Ordering::Less => {
-                        // We have assertions on an earlier line than diagnostics; report these
-                        // assertions as all unmatched, and advance the assertions iterator.
-                        failures.push(assertions.line_number, unmatched(assertions));
-                        current_assertions = line_assertions.next();
+                        // We have pragmas on an earlier line than diagnostics; report these
+                        // pragmas as all unmatched, and advance the assertions iterator.
+                        failures.push(pragmas.line_number, unmatched(pragmas));
+                        current_pragmas = line_pragmas.next();
                     }
                     Ordering::Greater => {
-                        // We have diagnostics on an earlier line than assertions; report these
+                        // We have diagnostics on an earlier line than pragmas; report these
                         // diagnostics as all unmatched, and advance the diagnostics iterator.
                         failures.push(diagnostics.line_number, unmatched(diagnostics));
                         current_diagnostics = line_diagnostics.next();
@@ -120,13 +125,13 @@ pub(super) fn match_file(
                 }
             }
             (Some(assertions), None) => {
-                // We've exhausted diagnostics but still have assertions; report these assertions
-                // as unmatched and advance the assertions iterator.
+                // We've exhausted diagnostics but still have pragmas; report these pragmas
+                // as unmatched and advance the pragmas iterator.
                 failures.push(assertions.line_number, unmatched(assertions));
-                current_assertions = line_assertions.next();
+                current_pragmas = line_pragmas.next();
             }
             (None, Some(diagnostics)) => {
-                // We've exhausted assertions but still have diagnostics; report these
+                // We've exhausted pragmas but still have diagnostics; report these
                 // diagnostics as unmatched and advance the diagnostics iterator.
                 failures.push(diagnostics.line_number, unmatched(diagnostics));
                 current_diagnostics = line_diagnostics.next();
@@ -162,7 +167,7 @@ trait UnmatchedWithColumn {
 // TODO: the lazy parsing means that we sometimes won't report malformed assertions as
 // being invalid if we detect that they'll be unmatched before parsing them.
 // That's perhaps not the best user experience.
-impl Unmatched for UnparsedAssertion<'_> {
+impl Unmatched for UnparsedPragmaComment<'_> {
     fn unmatched(&self) -> String {
         format!("{} {self}", "unmatched assertion:".red())
     }
@@ -284,21 +289,25 @@ impl Matcher {
     }
 
     /// Check a slice of [`Diagnostic`]s against a slice of
-    /// [`UnparsedAssertion`]s.
+    /// [`UnparsedPragma`]s.
     ///
     /// Return vector of [`Unmatched`] for any unmatched diagnostics or
     /// assertions.
     fn match_line<'a, 'b>(
         &self,
         diagnostics: &'a [&'a Diagnostic],
-        assertions: &'a [UnparsedAssertion<'b>],
+        pragmas: &'a [UnparsedPragmaComment<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
         let mut unmatched = diagnostics.to_vec();
-        for assertion in assertions {
+        for pragma in pragmas {
+            let Some(assertion) = pragma.as_assertion() else {
+                continue;
+            };
+
             match assertion.parse() {
                 Ok(assertion) => {
                     if !self.matches(&assertion, &mut unmatched) {

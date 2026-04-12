@@ -2,6 +2,9 @@ use anyhow::anyhow;
 use camino::Utf8Path;
 use ty_test::OutputFormat;
 
+/// Switch mdtest output format to GitHub Actions annotations.
+///
+/// If set (to any value), mdtest will output errors in GitHub Actions format.
 const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
 
 /// See `crates/ty_test/README.md` for documentation on these tests.

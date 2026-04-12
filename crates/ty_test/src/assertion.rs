@@ -43,7 +43,7 @@ use smallvec::SmallVec;
 use std::ops::Deref;
 use std::str::FromStr;
 
-/// Diagnostic assertion comments in a single embedded file.
+/// Test pragma comments a single embedded file.
 #[derive(Debug)]
 pub(crate) struct InlineFileAssertions<'s> {
     assertions: Vec<LineAssertions<'s>>,
@@ -189,54 +189,94 @@ impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
 /// element to avoid most heap vector allocations.
 type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
 
-/// One or more assertions referring to the same line of code.
+/// One or more pragma comment referring to the same line of code.
 #[derive(Debug)]
-pub(crate) struct LineAssertions<'a> {
+pub(crate) struct LinePragmaComments<'a> {
     /// The line these assertions refer to.
     ///
     /// Not necessarily the same line the assertion comment is located on; for an own-line comment,
     /// it's the next non-assertion line.
     pub(crate) line_number: OneIndexed,
 
-    /// The assertions referring to this line.
-    pub(crate) assertions: AssertionVec<'a>,
+    /// The comments referring to this line.
+    pub(crate) comments: PragmaCommentVec<'a>,
 }
 
-impl<'a> Deref for LineAssertions<'a> {
-    type Target = [UnparsedAssertion<'a>];
+impl<'a> Deref for LinePragmaComments<'a> {
+    type Target = [UnparsedPragmaComment<'a>];
 
     fn deref(&self) -> &Self::Target {
-        &self.assertions
+        &self.comments
     }
 }
 
-/// A single diagnostic assertion comment.
+/// A single pargma comment comment.
 ///
-/// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
+/// This type represents an *attempted* pragma comment, but not necessarily a *valid* pragma comment.
 /// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
-/// in the event of an invalid assertion
+/// in the event of an invalid comment.
 #[derive(Debug)]
-pub(crate) enum UnparsedAssertion<'a> {
-    /// A `# snapshot` assertion.
+pub(crate) enum UnparsedPragmaComment<'a> {
+    /// A `# snapshot` pragma comment.
     Snapshot,
 
+    Assertion(UnparsedAssertion<'a>),
+}
+
+#[derive(Debug)]
+pub(crate) enum UnparsedAssertion<'a> {
     /// A `# revealed:` assertion.
     Revealed(&'a str),
-
     /// An `# error:` assertion.
     Error(&'a str),
 }
 
-impl<'a> UnparsedAssertion<'a> {
-    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
-    /// indicating that it is an assertion comment.
+impl<'a> UnparsedPragmaComment<'a> {
+    /// Returns `Some(_)` if the comment starts with `# snapshot`, `# error:` or `# revealed:`,
+    /// indicating that it is a pragma comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         let comment = comment.trim().strip_prefix('#')?.trim();
         if comment == "snapshot" {
             return Some(Self::Snapshot);
         }
 
-        let (keyword, body) = comment.split_once(':')?;
+        UnparsedAssertion::from_comment(comment).map(Self::Assertion)
+    }
+
+    pub(crate) const fn as_assertion(&self) -> Option<&UnparsedAssertion<'a>> {
+        match self {
+            Self::Assertion(assertion) => Some(assertion),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn into_snapshot(&self) -> Option<&UnparsedAssertion<'a>> {
+        match self {
+            Self::Assertion(assertion) => Some(assertion),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for UnparsedPragmaComment<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Snapshot => f.write_str("snapshot"),
+            Self::Assertion(UnparsedAssertion::Revealed(expected_type)) => {
+                write!(f, "revealed: {expected_type}")
+            }
+            Self::Assertion(UnparsedAssertion::Error(assertion)) => write!(f, "error: {assertion}"),
+        }
+    }
+}
+
+impl<'a> UnparsedAssertion<'a> {
+    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
+    /// indicating that it is a assertion comment.
+    fn from_comment(comment_body: &'a str) -> Option<Self> {
+        let (keyword, body) = comment_body.split_once(':')?;
+        let keyword = keyword.trim();
+
         let keyword = keyword.trim();
 
         // Support other pragma comments coming after `error` or `revealed`, e.g.
@@ -259,7 +299,6 @@ impl<'a> UnparsedAssertion<'a> {
     /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
     pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
         match self {
-            Self::Snapshot => Err(PragmaParseError::UnexpectedSnapshotAssertion),
             Self::Revealed(revealed) => {
                 if revealed.is_empty() {
                     Err(PragmaParseError::EmptyRevealTypeAssertion)
@@ -270,20 +309,6 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-        }
-    }
-
-    pub(crate) const fn is_snapshot(&self) -> bool {
-        matches!(self, Self::Snapshot)
-    }
-}
-
-impl std::fmt::Display for UnparsedAssertion<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Snapshot => f.write_str("snapshot"),
-            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
-            Self::Error(assertion) => write!(f, "error: {assertion}"),
         }
     }
 }
@@ -460,8 +485,6 @@ impl<'a> ErrorAssertionParser<'a> {
 /// The assertion comment could be either a "revealed" assertion or an "error" assertion.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum PragmaParseError<'a> {
-    #[error("`# snapshot` cannot be used as an inline assertion")]
-    UnexpectedSnapshotAssertion,
     #[error("Must specify which type should be revealed")]
     EmptyRevealTypeAssertion,
     #[error("{0}")]
@@ -545,7 +568,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -567,7 +590,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -590,7 +613,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -614,7 +637,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [assert1, assert2] = &line.assertions[..] else {
+        let [assert1, assert2] = &line.comments[..] else {
             panic!("expected two assertions");
         };
 
@@ -638,7 +661,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert1, assert2] = &line.assertions[..] else {
+        let [assert1, assert2] = &line.comments[..] else {
             panic!("expected two assertions");
         };
 
@@ -664,7 +687,7 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [UnparsedAssertion::Error(error1)] = &line1.assertions[..] else {
+        let [UnparsedPragmaComment::Error(error1)] = &line1.comments[..] else {
             panic!("expected one error assertion");
         };
 
@@ -672,7 +695,7 @@ mod tests {
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
 
-        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
+        let [UnparsedPragmaComment::Error(error2)] = &line2.comments[..] else {
             panic!("expected one error assertion");
         };
 
@@ -700,9 +723,9 @@ mod tests {
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
         let [
-            UnparsedAssertion::Error(error1),
-            UnparsedAssertion::Revealed(expected_ty),
-        ] = &line1.assertions[..]
+            UnparsedPragmaComment::Error(error1),
+            UnparsedPragmaComment::Revealed(expected_ty),
+        ] = &line1.comments[..]
         else {
             panic!("expected one error assertion and one Revealed assertion");
         };
@@ -712,7 +735,7 @@ mod tests {
         assert_eq!(error1.rule, Some("invalid-assignment"));
         assert_eq!(expected_ty.trim(), "str");
 
-        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
+        let [UnparsedPragmaComment::Error(error2)] = &line2.comments[..] else {
             panic!("expected one error assertion");
         };
 
@@ -736,7 +759,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -758,7 +781,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -781,7 +804,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -807,7 +830,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
@@ -830,7 +853,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.assertions[..] else {
+        let [assert] = &line.comments[..] else {
             panic!("expected one assertion");
         };
 
