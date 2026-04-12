@@ -13,7 +13,7 @@
 //! [`Predicate`]: crate::semantic_index::predicate::Predicate
 
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
+use crate::semantic_index::reachability_constraints_datastructures::ScopedReachabilityConstraintId;
 use crate::semantic_index::scope::FileScopeId;
 
 /// A narrowing constraint associated with a live binding.

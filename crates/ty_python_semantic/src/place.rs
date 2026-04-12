@@ -13,8 +13,8 @@ use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{Predicate, ScopedPredicateId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
-    ReachabilityConstraints, get_loop_header, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table, reachability_constraints_datastructures::ReachabilityConstraints,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -1702,14 +1702,13 @@ fn place_from_declarations_impl<'db>(
             return None;
         }
 
-        first_declaration.get_or_insert(declaration);
-
         let static_reachability =
             reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
         if static_reachability.is_always_false() {
             None
         } else {
+            first_declaration.get_or_insert(declaration);
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 

@@ -568,7 +568,7 @@ class IncorrectArg(RequiresArg, not_arg="foo"):
 class NotCallableInitSubclass:
     __init_subclass__ = None
 
-# TODO: this should be an error because `__init_subclass__` on the superclass is not callable
+# error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition that may not be callable"
 class Bad(NotCallableInitSubclass):
     a = 1
     b = 2
