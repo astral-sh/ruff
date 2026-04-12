@@ -1,7 +1,7 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::Stmt;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{HasType, SemanticModel};
@@ -11,7 +11,7 @@ use crate::Db;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CodeLensCommand {
     RunTest {
-        class_names: Vec<Name>,
+        class_name: Option<Name>,
         function_name: Option<Name>,
     },
 }
@@ -24,80 +24,69 @@ pub struct CodeLensItem {
 }
 
 pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
-    let mut items = vec![];
-    collect_run_test_items(db, file, &mut items);
-    items
-}
-
-fn collect_run_test_items(db: &dyn Db, file: File, items: &mut Vec<CodeLensItem>) {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
-    collect_test_functions(db, &model, &parsed.syntax().body, &mut vec![], items);
-}
+    let mut items = vec![];
 
-fn collect_test_functions(
-    db: &dyn Db,
-    model: &SemanticModel,
-    body: &[Stmt],
-    class_names: &mut Vec<Name>,
-    items: &mut Vec<CodeLensItem>,
-) {
-    for stmt in body {
+    for stmt in &parsed.syntax().body {
         match stmt {
             Stmt::FunctionDef(func) => {
-                if func.name.as_str().starts_with("test_") {
-                    items.push(CodeLensItem {
-                        range: func.name.range(),
-                        title: String::from("Run test"),
-                        command: CodeLensCommand::RunTest {
-                            class_names: class_names.clone(),
-                            function_name: Some(func.name.id.clone()),
-                        },
-                    });
+                if let Some(lens) = test_func_codelens(func) {
+                    items.push(lens);
                 }
             }
             Stmt::ClassDef(class) => {
-                collect_class_tests(db, model, class, class_names, items);
+                // https://doc.pytest.org/en/latest/explanation/goodpractices.html#conventions-for-python-test-discovery
+                let is_pytest_class = class.name.as_str().starts_with("Test")
+                    && !class.body.iter().any(
+                        |s| matches!(s, Stmt::FunctionDef(f) if f.name.as_str() == "__init__"),
+                    );
+                // https://docs.python.org/3/library/unittest.html#basic-example
+                let is_unittest_test_case = class
+                    .inferred_type(&model)
+                    .and_then(Type::as_class_literal)
+                    .is_some_and(|c| c.is_unittest_test_case(db));
+
+                if !is_pytest_class && !is_unittest_test_case {
+                    continue;
+                }
+
+                items.push(CodeLensItem {
+                    range: class.name.range(),
+                    title: String::from("Run tests"),
+                    command: CodeLensCommand::RunTest {
+                        class_name: Some(class.name.id.clone()),
+                        function_name: None,
+                    },
+                });
+
+                for class_stmt in &class.body {
+                    if let Stmt::FunctionDef(func) = class_stmt
+                        && let Some(lens) = test_func_codelens(func)
+                    {
+                        items.push(lens);
+                    }
+                }
             }
             _ => {}
         }
     }
+
+    items
 }
 
-fn collect_class_tests(
-    db: &dyn Db,
-    model: &SemanticModel,
-    class: &ruff_python_ast::StmtClassDef,
-    class_names: &mut Vec<Name>,
-    items: &mut Vec<CodeLensItem>,
-) {
-    let is_pytest_class = class.name.as_str().starts_with("Test")
-        && !class
-            .body
-            .iter()
-            .any(|s| matches!(s, Stmt::FunctionDef(f) if f.name.as_str() == "__init__"));
-    let is_unittest_test_case = class
-        .inferred_type(model)
-        .and_then(Type::as_class_literal)
-        .is_some_and(|c| c.is_unittest_test_case(db));
-    if !is_pytest_class && !is_unittest_test_case {
-        return;
+fn test_func_codelens(func: &StmtFunctionDef) -> Option<CodeLensItem> {
+    if func.name.as_str().starts_with("test") {
+        return None;
     }
-
-    class_names.push(class.name.id.clone());
-
-    items.push(CodeLensItem {
-        range: class.name.range(),
-        title: String::from("Run tests"),
+    Some(CodeLensItem {
+        range: func.name.range(),
+        title: String::from("Run test"),
         command: CodeLensCommand::RunTest {
-            class_names: class_names.clone(),
-            function_name: None,
+            class_name: None,
+            function_name: Some(func.name.id.clone()),
         },
-    });
-
-    collect_test_functions(db, model, &class.body, class_names, items);
-
-    class_names.pop();
+    })
 }
 
 #[cfg(test)]
@@ -124,15 +113,14 @@ mod tests {
         fn into_diagnostic(self) -> Diagnostic {
             let label = match &self.item.command {
                 CodeLensCommand::RunTest {
-                    class_names,
+                    class_name,
                     function_name,
-                } => {
-                    let mut parts: Vec<&str> = class_names.iter().map(Name::as_str).collect();
-                    if let Some(func) = function_name {
-                        parts.push(func.as_str());
-                    }
-                    parts.join("::")
-                }
+                } => match (class_name, function_name) {
+                    (Some(c), Some(f)) => format!("{c}::{f}"),
+                    (Some(c), None) => c.to_string(),
+                    (None, Some(f)) => f.to_string(),
+                    (None, None) => String::new(),
+                },
             };
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("code-lens")),
@@ -372,6 +360,7 @@ async def helper():
         ");
     }
 
+    // We intentionally do not support nested test classes because this pattern is uncommon.
     #[test]
     fn test_code_lens_nested_test_class() {
         let test = code_lens_test(
@@ -404,26 +393,6 @@ class TestOuter:
         3 |     def test_outer(self):
           |         ^^^^^^^^^^
         4 |         pass
-          |
-
-        info[code-lens]: Run tests: TestOuter::TestInner
-         --> test_a.py:6:11
-          |
-        4 |         pass
-        5 |
-        6 |     class TestInner:
-          |           ^^^^^^^^^
-        7 |         def test_inner(self):
-        8 |             pass
-          |
-
-        info[code-lens]: Run test: TestOuter::TestInner::test_inner
-         --> test_a.py:7:13
-          |
-        6 |     class TestInner:
-        7 |         def test_inner(self):
-          |             ^^^^^^^^^^
-        8 |             pass
           |
         ");
     }
