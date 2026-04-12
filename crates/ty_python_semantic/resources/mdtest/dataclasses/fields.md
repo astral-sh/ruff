@@ -117,12 +117,22 @@ class DC2:
 
 dc2 = DC2(Desc2(), Desc2())
 
-# This is a known modeling limitation: descriptor-typed dataclass
-# fields are resolved through `__get__` even without a class-body
-# binding.
+# This is a known modeling limitation in ty: if the field annotation
+# defines `__get__`, we model the dataclass field as though a
+# descriptor object were present on the class. At runtime, an
+# annotation-only field has no class-body binding, and `__init__`
+# stores the passed value directly on the instance instead.
+# TODO: `DC2.x` should be unresolved because there is no class-body
+# binding for `x`.
 reveal_type(DC2.x)  # revealed: list[int]
+# TODO: `DC2.y` should be unresolved because there is no class-body
+# binding for `y`.
 reveal_type(DC2.y)  # revealed: list[str]
+# TODO: `dc2.x` should be `Desc2[int]` because `__init__` stores the
+# passed value directly on the instance.
 reveal_type(dc2.x)  # revealed: int
+# TODO: `dc2.y` should be `Desc2[str]` because `__init__` stores the
+# passed value directly on the instance.
 reveal_type(dc2.y)  # revealed: str
 ```
 
