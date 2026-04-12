@@ -567,6 +567,16 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    pub(crate) fn retain_overloads(
+        mut self,
+        mut predicate: impl FnMut(&Binding<'db>) -> bool,
+    ) -> Self {
+        for binding in self.iter_flat_mut() {
+            binding.retain_overloads(&mut predicate);
+        }
+        self
+    }
+
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
         for binding in self.iter_flat_mut() {
             binding.dunder_call_is_possibly_unbound = true;
@@ -2551,6 +2561,12 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
+    }
+
+    fn retain_overloads(&mut self, predicate: &mut impl FnMut(&Binding<'db>) -> bool) {
+        self.overloads.retain(|overload| predicate(overload));
+        self.overload_call_return_type = None;
+        self.matching_overload_before_type_checking = None;
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {

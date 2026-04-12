@@ -22,6 +22,77 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Multi-argument calls on final enums
+
+Multi-argument calls to final enum classes are rejected under the default target version:
+
+```py
+from enum import Enum
+
+class Pair(Enum):
+    A = ("x", 1)
+    B = ("y", 2)
+
+Pair("x", 1)  # error: [invalid-argument-type]
+```
+
+## Multi-argument calls on final enums in Python 3.12+
+
+In Python 3.12 and later, `EnumType.__call__` supports tuple-packed value lookup for final enums:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class Pair(Enum):
+    A = ("x", 1)
+    B = ("y", 2)
+
+reveal_type(Pair("x", 1))  # revealed: Pair
+```
+
+## Functional-style syntax on final enums
+
+Functional-style calls on final enum classes stay on the value-lookup path rather than constructing
+new enum types:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+
+Color("Color", "RED")  # error: [invalid-argument-type]
+```
+
+## Functional-style syntax on final enums in Python 3.12+
+
+In Python 3.12 and later, the same call still stays on the value-lookup path rather than being
+interpreted as functional enum creation:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+
+reveal_type(Color("Color", "RED"))  # revealed: Color
+```
+
 ## Enum members
 
 ### Basic
@@ -53,6 +124,7 @@ reveal_type(enum_members(ColorStr))
 
 ```py
 from enum import IntEnum
+from typing import Literal
 from ty_extensions import enum_members
 
 class ColorInt(IntEnum):
@@ -62,6 +134,13 @@ class ColorInt(IntEnum):
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(ColorInt))
+
+class SingleValue(IntEnum):
+    _value_: Literal[1]
+    OK = 1
+    BAD = 2  # error: [invalid-assignment]
+
+reveal_type(SingleValue.OK.value)  # revealed: Literal[1]
 ```
 
 ### Annotated assignments with values are still members
@@ -312,6 +391,69 @@ reveal_type(Planet.MERCURY.value)  # revealed: int
 reveal_type(Planet.MERCURY._value_)  # revealed: int
 ```
 
+### `_value_` annotation with `__new__`
+
+When `__new__` is defined, member values are validated by synthesizing a call to `__new__`. If
+`_value_` is explicitly annotated, `.value` and `._value_` use that annotation:
+
+```py
+from enum import Enum
+
+class PlanetViaNew(Enum):
+    _value_: int
+
+    def __new__(cls, value: int, mass: float):
+        member = object.__new__(cls)
+        member._value_ = value
+        member.mass = mass
+        return member
+
+    MERCURY = (1, 3.303e23)
+    SATURN = "saturn"  # error: [invalid-assignment]
+
+reveal_type(PlanetViaNew.MERCURY.value)  # revealed: int
+reveal_type(PlanetViaNew.MERCURY._value_)  # revealed: int
+```
+
+If `__new__` leaves `_value_` to the enum runtime, the explicit annotation still determines
+`.value`:
+
+```py
+from enum import Enum
+
+class PlanetViaNewWithoutValueAssignment(Enum):
+    _value_: str
+
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+    MERCURY = 1
+
+reveal_type(PlanetViaNewWithoutValueAssignment.MERCURY.value)  # revealed: str
+```
+
+The same applies if `_value_` is manipulated indirectly inside `__new__`:
+
+```py
+from enum import Enum
+
+class Box:
+    _value_: str
+
+class PlanetViaNewWithOtherValueAssignments(Enum):
+    _value_: str
+
+    def __new__(cls, value: int):
+        cls._value_ = "sentinel"
+        other = Box()
+        other._value_ = "sentinel"
+        return object.__new__(cls)
+
+    MERCURY = 1
+
+reveal_type(PlanetViaNewWithOtherValueAssignments.MERCURY.value)  # revealed: str
+```
+
 `Final`-annotated members are also validated against `__init__`:
 
 ```py
@@ -347,6 +489,24 @@ reveal_type(Planet.MERCURY.value)  # revealed: str
 reveal_type(Planet.MERCURY._value_)  # revealed: str
 ```
 
+An explicit `_value_` annotation still determines `.value` even if `__init__` assigns through an
+alias:
+
+```py
+from enum import Enum
+
+class PlanetViaAlias(Enum):
+    _value_: int
+
+    def __init__(self, value: str):
+        alias = self
+        alias._value_ = int(value)
+
+    MERCURY = "1"
+
+reveal_type(PlanetViaAlias.MERCURY.value)  # revealed: int
+```
+
 ### `__init__` without `_value_` annotation
 
 When `__init__` is defined but no explicit `_value_` annotation exists, member values are validated
@@ -366,6 +526,108 @@ class Planet2(Enum):
 
 reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
+```
+
+The same applies when `__init__` comes from a non-enum mixin:
+
+```py
+from enum import Enum
+
+class PairInit:
+    def __init__(self, left: int, right: int):
+        self.left = left
+        self.right = right
+
+class PlanetViaMixinInit(PairInit, Enum):
+    MERCURY = (1, 2)
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(PlanetViaMixinInit.MERCURY.value)  # revealed: Any
+```
+
+Generic mixin specializations are preserved when validating inherited `__init__`:
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.value = value
+
+class PlanetViaGenericMixin(Box[int], Enum):
+    MERCURY = 1
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(PlanetViaGenericMixin.MERCURY.value)  # revealed: Any
+```
+
+### `__new__` without `_value_` annotation
+
+When `__new__` is defined but no explicit `_value_` annotation exists, member values are validated
+against the `__new__` signature. Values that are incompatible with `__new__` are flagged:
+
+```py
+from enum import Enum
+
+class Planet3(Enum):
+    def __new__(cls, value: int, mass: float):
+        member = object.__new__(cls)
+        member._value_ = value
+        member.mass = mass
+        return member
+
+    MERCURY = (1, 3.303e23)
+    VENUS = (2, 4.869e24)
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(Planet3.MERCURY.value)  # revealed: Any
+reveal_type(Planet3.MERCURY._value_)  # revealed: Any
+```
+
+If `__new__` leaves `_value_` implicit and there is no explicit annotation, `.value` widens to
+`Any`:
+
+```py
+from enum import Enum
+
+class Planet4(Enum):
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+    MERCURY = 1
+    VENUS = 2
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(Planet4.MERCURY.value)  # revealed: Any
+
+class Planet5(Enum):
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+    MERCURY = 1
+    VENUS = 2
+
+def _(planet: Planet5):
+    reveal_type(planet.value)  # revealed: Any
+```
+
+The same `__new__` validation applies when the member constructor comes from a non-enum mixin:
+
+```py
+from enum import Enum
+
+class Pair(tuple):
+    def __new__(cls, left: int, right: int):
+        return super().__new__(cls, (left, right))
+
+class PlanetViaMixinNew(Pair, Enum):
+    MERCURY = (1, 2)
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(PlanetViaMixinNew.MERCURY.value)  # revealed: Any
 ```
 
 ### Inherited `_value_` annotation
@@ -441,6 +703,71 @@ class Child(Parent):
     B = "bad"  # error: [invalid-assignment]
 
 reveal_type(Child.A.value)  # revealed: Any
+```
+
+### Inherited `__new__`
+
+A custom `__new__` on a parent enum is inherited by subclasses. Member values are validated against
+the inherited `__new__` signature:
+
+```py
+from enum import Enum
+
+class BaseViaNew(Enum):
+    def __new__(cls, value: int, label: str):
+        member = object.__new__(cls)
+        member._value_ = value
+        member.label = label
+        return member
+
+class ChildViaNew(BaseViaNew):
+    A = (1, "foo")
+    B = "should be checked against __new__"  # error: [invalid-assignment]
+
+reveal_type(ChildViaNew.A.value)  # revealed: Any
+```
+
+If the parent enum gets its member constructor from a mixin, subclasses inherit that signature:
+
+```py
+from enum import Enum
+
+class Pair(tuple):
+    def __new__(cls, left: int, right: int):
+        return super().__new__(cls, (left, right))
+
+class BaseViaMixinNew(Pair, Enum):
+    pass
+
+class ChildViaMixinNew(BaseViaMixinNew):
+    A = (1, 2)
+    B = "should be checked against inherited mixin __new__"  # error: [invalid-assignment]
+
+reveal_type(ChildViaMixinNew.A.value)  # revealed: Any
+```
+
+If an intermediate subclass overrides `__new__`, its signature is used for member validation while
+an inherited `_value_` annotation still determines `.value`:
+
+```py
+from enum import Enum
+
+class BaseViaNewWithValue(Enum):
+    _value_: int
+
+    def __new__(cls, value: int, label: str):
+        member = object.__new__(cls)
+        member._value_ = value
+        return member
+
+class MidViaNewWithoutValue(BaseViaNewWithValue):
+    def __new__(cls, value: str):
+        return object.__new__(cls)
+
+class ChildViaOverriddenNew(MidViaNewWithoutValue):
+    A = "a"
+
+reveal_type(ChildViaOverriddenNew.A.value)  # revealed: int
 ```
 
 ### Non-member attributes with disallowed type
@@ -836,7 +1163,7 @@ reveal_type(enum_members(Answer))
 ```
 
 `auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
-`_value_` annotations and custom `__init__` signatures:
+`_value_` annotations and custom `__new__` / `__init__` signatures:
 
 ```py
 from enum import Enum, auto
@@ -1578,6 +1905,33 @@ def f(
     reveal_type(E1.FOO)  # revealed: Unknown
 ```
 
+When members are unknown, enum calls should still stay on `EnumMeta`'s value-lookup path rather than
+cascading into a `type=` mixin constructor:
+
+```py
+from enum import Enum
+
+class Pair(tuple):
+    def __new__(cls, left: int, right: int):
+        return super().__new__(cls, (left, right))
+
+def f(members: dict[str, tuple[int, int]]) -> None:
+    Color = Enum("Color", members, type=Pair)
+    reveal_type(Color((1, 2)))  # revealed: Color
+```
+
+Factory-shaped calls on these dynamic enums should also stay on the value-lookup path rather than
+re-exposing the functional-enum overload:
+
+```py
+from enum import Enum
+
+def f(names: str) -> None:
+    E = Enum("E", names)
+    bad = E("X", "A B")  # error: [invalid-argument-type]
+    reveal_type(bad)  # revealed: E
+```
+
 ### Too many positional args
 
 `Enum(value, names, *, ...)` only accepts two positional args at runtime.
@@ -1689,6 +2043,116 @@ class ExtendedEmpty(EmptyFromString):
 
 # revealed: tuple[Literal["A"]]
 reveal_type(enum_members(ExtendedEmpty))
+```
+
+Empty custom enum bases can also be used with the functional API, and the resulting class keeps the
+custom base's API:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    @classmethod
+    def helper(cls) -> int:
+        return 1
+
+Color = Base("Color", "RED")
+
+reveal_type(Color)  # revealed: <class 'Color'>
+reveal_type(Color.helper())  # revealed: int
+```
+
+Inherited non-enum mixins on a custom enum base still affect generated member value types:
+
+```py
+from enum import Enum
+
+class StringBase(str, Enum):
+    pass
+
+Color = StringBase("Color", "RED GREEN")
+reveal_type(Color.RED.value)  # revealed: Literal["1"]
+reveal_type(Color.GREEN.value)  # revealed: Literal["2"]
+```
+
+This also works when the mixin is inherited through an intermediate enum base:
+
+```py
+from enum import Enum
+
+class MiddleStringBase(str, Enum):
+    pass
+
+class NestedStringBase(MiddleStringBase):
+    pass
+
+Color = NestedStringBase("Color", "RED GREEN")
+reveal_type(Color.RED.value)  # revealed: Literal["1"]
+```
+
+Dynamic empty enum bases created with `type=` also preserve that inherited mixin behavior:
+
+```py
+from enum import Enum
+
+DynamicStringBase = Enum("DynamicStringBase", "", type=str)
+Color = DynamicStringBase("Color", "RED GREEN")
+
+reveal_type(Color.RED.value)  # revealed: Literal["1"]
+```
+
+This also preserves a custom enum metaclass inherited from the base:
+
+```py
+from enum import Enum, EnumMeta
+
+class Meta(EnumMeta):
+    def helper(cls) -> int:
+        return 1
+
+class Base(Enum, metaclass=Meta):
+    pass
+
+Color = Base("Color", "RED")
+reveal_type(Color.helper())  # revealed: int
+```
+
+Single-argument calls on empty custom enum bases still use ordinary value lookup rather than being
+treated as functional-enum construction:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    pass
+
+reveal_type(Base(1))  # revealed: Base
+```
+
+This also stays on the value-lookup path when the empty custom base defines a constructor hook:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __init__(self, x: int):
+        pass
+
+reveal_type(Base("x"))  # revealed: Base
+```
+
+Inherited constructor semantics from a custom base still affect `.value` typing for functional
+enums:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __init__(self, x: int):
+        pass
+
+Color = Base("Color", {"A": 1})
+reveal_type(Color.A.value)  # revealed: Any
 ```
 
 Literal list/tuple/dict inputs that use unpacking are rejected:

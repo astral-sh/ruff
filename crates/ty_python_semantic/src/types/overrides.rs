@@ -211,36 +211,69 @@ fn check_class_declaration<'db>(
                     if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
             );
             // `auto()` values are computed at runtime by the enum metaclass,
-            // so we can't validate them against _value_ or __init__ at the type level.
+            // so we can't validate them against `_value_`, `__new__`, or `__init__` at the type
+            // level.
             let is_auto = enum_info.auto_members.contains(&member.name);
             let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
 
             if !skip_type_check {
-                if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_init(
+                let expected_type = enum_info.value_annotation;
+                let has_custom_member_constructor =
+                    enum_info.new_function.is_some() || enum_info.init_function.is_some();
+
+                if let Some(new_function) = enum_info.new_function {
+                    let new_is_compatible = check_enum_member_against_method(
                         context,
+                        "__new__",
+                        new_function,
+                        Type::from(class),
+                        member_value_type,
+                        &member.name,
+                        *first_reachable_definition,
+                    );
+                    if new_is_compatible && let Some(init_function) = enum_info.init_function {
+                        check_enum_member_against_method(
+                            context,
+                            "__init__",
+                            init_function,
+                            instance_of_class,
+                            member_value_type,
+                            &member.name,
+                            *first_reachable_definition,
+                        );
+                    }
+                } else if let Some(init_function) = enum_info.init_function {
+                    check_enum_member_against_method(
+                        context,
+                        "__init__",
                         init_function,
                         instance_of_class,
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
                     );
-                } else if let Some(expected_type) = enum_info.value_annotation {
-                    if !member_value_type.is_assignable_to(db, expected_type) {
-                        if let Some(builder) = context.report_lint(
-                            &INVALID_ASSIGNMENT,
-                            first_reachable_definition.focus_range(db, context.module()),
-                        ) {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Enum member `{}` value is not assignable to expected type",
-                                &member.name
-                            ));
-                            diagnostic.info(format_args!(
-                                "Expected `{}`, got `{}`",
-                                expected_type.display(db),
-                                member_value_type.display(db)
-                            ));
-                        }
+                }
+
+                // Follow pyright/mypy here: once a custom member constructor exists, rely on the
+                // constructor signature check above rather than re-checking the raw enum literal
+                // against `_value_`.
+                if let Some(expected_type) = expected_type
+                    && !has_custom_member_constructor
+                    && !member_value_type.is_assignable_to(db, expected_type)
+                {
+                    if let Some(builder) = context.report_lint(
+                        &INVALID_ASSIGNMENT,
+                        first_reachable_definition.focus_range(db, context.module()),
+                    ) {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Enum member `{}` value is not assignable to expected type",
+                            &member.name
+                        ));
+                        diagnostic.info(format_args!(
+                            "Expected `{}`, got `{}`",
+                            expected_type.display(db),
+                            member_value_type.display(db)
+                        ));
                     }
                 }
             }
@@ -736,32 +769,33 @@ fn check_post_init_signature<'db>(
     );
 }
 
-/// Validates an enum member value against the enum's `__init__` signature.
+/// Validates an enum member value against an enum constructor method signature.
 ///
-/// The enum metaclass unpacks tuple values as positional arguments to `__init__`,
+/// The enum metaclass unpacks tuple values as positional arguments to `__new__` / `__init__`,
 /// and passes non-tuple values as a single argument. This function synthesizes
-/// a call to `__init__` with the appropriate arguments and reports a diagnostic
+/// a call with the appropriate arguments and reports a diagnostic
 /// if the call would fail.
-fn check_enum_member_against_init<'db>(
+fn check_enum_member_against_method<'db>(
     context: &InferContext<'db, '_>,
-    init_function: FunctionType<'db>,
-    self_type: Type<'db>,
+    method_name: &str,
+    method: FunctionType<'db>,
+    bound_type: Type<'db>,
     member_value_type: Type<'db>,
     member_name: &Name,
     definition: Definition<'db>,
-) {
+) -> bool {
     let db = context.db();
 
     // The enum metaclass unpacks tuple values as positional args:
-    //   MEMBER = (a, b, c)  →  __init__(self, a, b, c)
-    //   MEMBER = x          →  __init__(self, x)
+    //   MEMBER = (a, b, c)  →  __new__/__init__(..., a, b, c)
+    //   MEMBER = x          →  __new__/__init__(..., x)
     let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
         if let Some(spec) = instance.tuple_spec(db) {
             if let Tuple::Fixed(fixed) = &*spec {
                 fixed.all_elements().to_vec()
             } else {
                 // Variable-length tuples: can't determine exact args, skip validation.
-                return;
+                return true;
             }
         } else {
             vec![member_value_type]
@@ -771,11 +805,10 @@ fn check_enum_member_against_init<'db>(
     };
 
     let call_args = CallArguments::positional(args);
-    let call_args = call_args.with_self(Some(self_type));
-
     let constraints = ConstraintSetBuilder::new();
-    let result = Type::FunctionLiteral(init_function)
+    let result = Type::FunctionLiteral(method)
         .bindings(db)
+        .map(|binding| binding.with_bound_type(bound_type))
         .match_parameters(db, &call_args)
         .check_types(db, &constraints, &call_args, TypeContext::default(), &[]);
 
@@ -785,12 +818,15 @@ fn check_enum_member_against_init<'db>(
             definition.focus_range(db, context.module()),
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Enum member `{member_name}` is incompatible with `__init__`",
+                "Enum member `{member_name}` is incompatible with `{method_name}`",
             ));
             diagnostic.info(format_args!(
                 "Expected compatible arguments for `{}`",
-                Type::FunctionLiteral(init_function).display(db),
+                Type::FunctionLiteral(method).display(db),
             ));
         }
+        return false;
     }
+
+    true
 }

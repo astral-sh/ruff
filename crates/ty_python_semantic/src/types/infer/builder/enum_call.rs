@@ -6,13 +6,15 @@ use crate::{
     Db, Program,
     semantic_index::definition::Definition,
     types::{
-        ClassLiteral, KnownClass, Type, TypeContext, UnionType,
+        ClassBase, ClassLiteral, ClassType, KnownClass, StaticClassLiteral, Type, TypeContext,
+        UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         constraints::ConstraintSetBuilder,
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
             TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
         },
+        enums::{enum_metadata, is_enum_class_by_inheritance},
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
@@ -107,21 +109,145 @@ enum SequenceEnumMemberForm {
     Pairs,
 }
 
-/// Find enum base class of the given type.
-pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
-    let ClassLiteral::Static(cls) = ty.as_class_literal()? else {
-        return None;
-    };
-    cls.known(db).filter(|k| {
-        matches!(
-            k,
-            KnownClass::Enum
-                | KnownClass::StrEnum
-                | KnownClass::IntEnum
-                | KnownClass::Flag
-                | KnownClass::IntFlag
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct EnumFunctionalCallBase<'db> {
+    class_type: ClassType<'db>,
+    enum_kind: KnownClass,
+    inherited_mixin_type: Option<Type<'db>>,
+}
+
+impl<'db> EnumFunctionalCallBase<'db> {
+    fn class_type(self) -> ClassType<'db> {
+        self.class_type
+    }
+
+    fn enum_kind(self) -> KnownClass {
+        self.enum_kind
+    }
+
+    fn inherited_mixin_type(self) -> Option<Type<'db>> {
+        self.inherited_mixin_type
+    }
+
+    fn name(self, db: &'db dyn Db) -> &'db Name {
+        self.class_type.class_literal(db).name(db)
+    }
+}
+
+fn enum_functional_call_kind<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<KnownClass> {
+    class
+        .iter_mro(db, None)
+        .filter_map(ClassBase::into_class)
+        .find_map(
+            |class_type| match class_type.class_literal(db).as_static()?.known(db) {
+                Some(
+                    kind @ (KnownClass::Enum
+                    | KnownClass::StrEnum
+                    | KnownClass::IntEnum
+                    | KnownClass::Flag
+                    | KnownClass::IntFlag),
+                ) => Some(kind),
+                _ => None,
+            },
         )
-    })
+}
+
+fn enum_functional_call_inherited_mixin_type<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+) -> Option<Type<'db>> {
+    match class.class_literal(db) {
+        ClassLiteral::DynamicEnum(enum_lit) => enum_lit.mixin_type(db).or_else(|| {
+            enum_functional_call_inherited_mixin_type(db, enum_lit.functional_base_class(db))
+        }),
+        ClassLiteral::Static(class) if class.known(db).is_none() => {
+            for base in class
+                .iter_mro(db, None)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+            {
+                let base_literal = base.class_literal(db);
+                if matches!(base_literal, ClassLiteral::DynamicEnum(_)) {
+                    return enum_functional_call_inherited_mixin_type(db, base);
+                }
+                if let Some(base_static) = base_literal.as_static()
+                    && is_enum_class_by_inheritance(db, base_static)
+                {
+                    return enum_functional_call_inherited_mixin_type(db, base);
+                }
+                if !base.is_object(db) {
+                    return Some(Type::from(base));
+                }
+            }
+            None
+        }
+        ClassLiteral::Static(..)
+        | ClassLiteral::Dynamic(..)
+        | ClassLiteral::DynamicNamedTuple(..)
+        | ClassLiteral::DynamicTypedDict(..) => None,
+    }
+}
+
+/// Find enum base class of the given type.
+pub(crate) fn enum_functional_call_base<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    arguments: &ast::Arguments,
+) -> Option<EnumFunctionalCallBase<'db>> {
+    let class_type = ty.to_class_type(db)?;
+    let class_literal = class_type.class_literal(db);
+    match class_literal {
+        ClassLiteral::Static(class) => {
+            if let Some(enum_kind) = class.known(db).filter(|known| {
+                matches!(
+                    known,
+                    KnownClass::Enum
+                        | KnownClass::StrEnum
+                        | KnownClass::IntEnum
+                        | KnownClass::Flag
+                        | KnownClass::IntFlag
+                )
+            }) {
+                return Some(EnumFunctionalCallBase {
+                    class_type,
+                    enum_kind,
+                    inherited_mixin_type: None,
+                });
+            }
+
+            let has_names_argument =
+                arguments.args.len() >= 2 || arguments.find_keyword("names").is_some();
+            if !is_enum_class_by_inheritance(db, class)
+                || !has_names_argument
+                || enum_metadata(db, class_literal).is_some()
+            {
+                return None;
+            }
+
+            Some(EnumFunctionalCallBase {
+                class_type,
+                enum_kind: enum_functional_call_kind(db, class).unwrap_or(KnownClass::Enum),
+                inherited_mixin_type: enum_functional_call_inherited_mixin_type(db, class_type),
+            })
+        }
+        ClassLiteral::DynamicEnum(enum_lit) => {
+            let has_names_argument =
+                arguments.args.len() >= 2 || arguments.find_keyword("names").is_some();
+            enum_metadata(db, class_literal)
+                .filter(|metadata| has_names_argument && metadata.members.is_empty())
+                .map(|_| EnumFunctionalCallBase {
+                    class_type,
+                    enum_kind: enum_lit.enum_base_class(db),
+                    inherited_mixin_type: enum_functional_call_inherited_mixin_type(db, class_type),
+                })
+        }
+        ClassLiteral::Dynamic(..)
+        | ClassLiteral::DynamicNamedTuple(..)
+        | ClassLiteral::DynamicTypedDict(..) => None,
+    }
 }
 
 fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersion) -> bool {
@@ -303,7 +429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
-        base_class: KnownClass,
+        base: EnumFunctionalCallBase<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let ast::Arguments {
@@ -313,7 +439,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             node_index: _,
         } = &call_expr.arguments;
 
-        let base_name = base_class.name(db);
+        let base_name = base.name(db);
         let python_version = Program::get(db).python_version(db);
 
         for kw in keywords {
@@ -373,9 +499,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
         });
-        let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
-            self.infer_enum_mixin_argument(&kw.value, base_class)
+        let (explicit_mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
+            self.infer_enum_mixin_argument(&kw.value, base)
         });
+        let effective_mixin_type = explicit_mixin_type.or(base.inherited_mixin_type());
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
@@ -396,19 +523,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let spec = self.infer_enum_spec(
             names_arg,
             start,
-            base_class,
-            mixin_type,
+            base.enum_kind(),
+            effective_mixin_type,
             has_too_many_positional || has_positional_keyword_conflict || !valid_mixin_type,
         );
 
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
         // instead of synthesizing a `DynamicEnumLiteral`.
-        let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
-            return SubclassOfType::try_from_type(db, base_class.to_class_literal(db));
+        let Some(name) = self.infer_enum_name_argument(name_arg, base) else {
+            return SubclassOfType::try_from_type(db, Type::from(base.class_type()));
         };
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
-        let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
+        let enum_lit = DynamicEnumLiteral::new(
+            db,
+            name,
+            anchor,
+            base.enum_kind(),
+            base.class_type(),
+            explicit_mixin_type,
+        );
         if let Err(error) = enum_lit.try_mro(db) {
             report_mro_error_kind(
                 &self.context,
@@ -425,10 +559,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_enum_name_argument(
         &mut self,
         name_arg: &ast::Expr,
-        base_class: KnownClass,
+        base: EnumFunctionalCallBase<'db>,
     ) -> Option<Name> {
         let db = self.db();
-        let base_name = base_class.name(db);
+        let base_name = base.name(db);
         let name_type = self.expression_type(name_arg);
 
         let Some(name_literal) = name_type.as_string_literal() else {
@@ -473,7 +607,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_enum_mixin_argument(
         &mut self,
         value: &ast::Expr,
-        base_class: KnownClass,
+        base: EnumFunctionalCallBase<'db>,
     ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
         let ty = self.expression_type(value);
@@ -491,9 +625,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let Some(mixin_class) = ty.to_class_type(db) else {
                 return (Some(ty), true);
             };
-            let Some(enum_base) = base_class.to_class_literal(db).to_class_type(db) else {
-                return (Some(ty), true);
-            };
+            let enum_base = base.class_type();
             let constraints = ConstraintSetBuilder::new();
             if !mixin_class.could_coexist_in_mro_with(db, enum_base, &constraints)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
@@ -501,7 +633,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 builder.into_diagnostic(format_args!(
                     "Class `{}` cannot be used as an enum mixin with `{}`",
                     mixin_class.name(db),
-                    base_class.name(db),
+                    base.name(db),
                 ));
                 return (None, false);
             }

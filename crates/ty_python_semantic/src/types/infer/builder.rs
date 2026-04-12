@@ -3116,10 +3116,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
                         self.infer_new_class_call(call_expr, Some(definition))
-                    } else if let Some(base_class) =
-                        enum_call::enum_functional_call_base(self.db(), callable_type)
-                        && let Some(ty) =
-                            self.infer_enum_call_expression(call_expr, Some(definition), base_class)
+                    } else if let Some(base_class) = enum_call::enum_functional_call_base(
+                        self.db(),
+                        callable_type,
+                        &call_expr.arguments,
+                    ) && let Some(ty) =
+                        self.infer_enum_call_expression(call_expr, Some(definition), base_class)
                     {
                         ty
                     } else {
@@ -6806,8 +6808,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Handle `Enum(name, members)`.
-        if let Some(base_class) = enum_call::enum_functional_call_base(self.db(), callable_type)
-            && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
+        if let Some(base_class) = enum_call::enum_functional_call_base(
+            self.db(),
+            callable_type,
+            &call_expression.arguments,
+        ) && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
         {
             return ty;
         }

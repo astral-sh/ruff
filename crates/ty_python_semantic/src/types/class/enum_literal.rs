@@ -14,6 +14,7 @@ use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
+use crate::types::subclass_of::SubclassOfType;
 
 /// Functional enum member specification captured from the call site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -50,7 +51,11 @@ pub struct DynamicEnumLiteral<'db> {
     pub name: Name,
     #[returns(ref)]
     pub anchor: DynamicEnumAnchor<'db>,
-    pub base_class: KnownClass,
+    /// The builtin enum family that controls auto-value behavior (`Enum`, `Flag`, etc.).
+    pub enum_base_class: KnownClass,
+    /// The actual enum base supplied to the functional call, which may be a custom empty enum
+    /// subclass rather than the builtin enum family.
+    pub functional_base_class: ClassType<'db>,
     pub mixin_type: Option<Type<'db>>,
 }
 
@@ -84,7 +89,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
         }
-        bases.push(self.base_class(db).to_class_literal(db));
+        bases.push(Type::from(self.functional_base_class(db)));
         bases.into_boxed_slice()
     }
 
@@ -117,9 +122,43 @@ impl<'db> DynamicEnumLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        KnownClass::EnumType.to_class_literal(db)
+        if self.try_mro(db).is_err() {
+            return SubclassOfType::subclass_of_unknown();
+        }
+
+        let original_bases = self.explicit_bases(db);
+        let mut bases = original_bases
+            .iter()
+            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None));
+
+        let Some(first_base) = bases.next() else {
+            return KnownClass::Type.to_class_literal(db);
+        };
+
+        let mut candidate = first_base.metaclass(db);
+        for base in bases {
+            let base_metaclass = base.metaclass(db);
+            let Some(candidate_class) = candidate.to_class_type(db) else {
+                continue;
+            };
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
+                continue;
+            };
+
+            if base_metaclass_class.is_subclass_of(db, candidate_class) {
+                candidate = base_metaclass;
+                continue;
+            }
+
+            if candidate_class.is_subclass_of(db, base_metaclass_class) {
+                continue;
+            }
+
+            return SubclassOfType::subclass_of_unknown();
+        }
+
+        candidate
     }
 
     #[salsa::tracked(
@@ -193,11 +232,9 @@ impl<'db> DynamicEnumLiteral<'db> {
             }
         }
         let result = self
-            .base_class(db)
-            .to_class_literal(db)
-            .as_class_literal()
-            .map(|cls| cls.class_member(db, name, MemberLookupPolicy::default()))
-            .unwrap_or_else(|| Place::Undefined.into());
+            .functional_base_class(db)
+            .class_literal(db)
+            .class_member(db, name, MemberLookupPolicy::default());
 
         // When members are unknown (e.g. `Enum("E", some_var)`), any name could
         // still be a member. Only fall back to `Unknown` after exhausting the
@@ -217,10 +254,8 @@ impl<'db> DynamicEnumLiteral<'db> {
                 return result;
             }
         }
-        let result = self
-            .base_class(db)
-            .to_instance(db)
-            .instance_member(db, name);
+        let functional_base = self.functional_base_class(db);
+        let result = Type::instance(db, functional_base).instance_member(db, name);
 
         self.with_unknown_member_fallback(db, result)
     }

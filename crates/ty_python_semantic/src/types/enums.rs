@@ -8,8 +8,8 @@ use crate::{
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     semantic_index::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map},
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
+        ClassBase, ClassLiteral, ClassType, DynamicType, EnumLiteralType, KnownClass,
+        LiteralValueTypeKind, MemberLookupPolicy, StaticClassLiteral, Type, function::FunctionType,
         set_theoretic::builder::UnionBuilder,
     },
 };
@@ -25,7 +25,15 @@ pub(crate) struct EnumMetadata<'db> {
     /// The explicit `_value_` annotation type, if declared.
     pub(crate) value_annotation: Option<Type<'db>>,
 
-    /// The custom `__init__` function, if defined on this enum.
+    /// The custom `__new__` function, if defined on this enum or inherited from the effective
+    /// member-constructor provider (a non-enum mixin or enum base class).
+    ///
+    /// When present, member values are validated by synthesizing a call to `__new__` rather than
+    /// by simple type assignability.
+    pub(crate) new_function: Option<FunctionType<'db>>,
+
+    /// The custom `__init__` function, if defined on this enum or inherited from the effective
+    /// member-initializer provider (a non-enum mixin or enum base class).
     ///
     /// When present, member values are validated by synthesizing a call to
     /// `__init__` rather than by simple type assignability.
@@ -41,21 +49,22 @@ impl<'db> EnumMetadata<'db> {
             aliases: FxHashMap::default(),
             auto_members: FxHashSet::default(),
             value_annotation: None,
+            new_function: None,
             init_function: None,
         }
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
-    /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
-    /// then the inferred member value type.
+    /// Priority: explicit `_value_` annotation; then custom member constructors widen to `Any`;
+    /// otherwise use the inferred member value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.new_function.is_some() || self.init_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             self.members.get(member_name).copied()
@@ -75,7 +84,7 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__`, returns `Any`.
+    /// If a custom constructor exists without an explicit annotation, widens to `Any`.
     /// Otherwise, returns the union of all member value types.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.members.is_empty() {
@@ -83,7 +92,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some() {
+        } else if self.new_function.is_some() || self.init_function.is_some() {
             Some(Type::Dynamic(DynamicType::Any))
         } else {
             let union = self
@@ -179,6 +188,43 @@ fn try_register_alias<'db>(
     false
 }
 
+fn functional_base_member_metadata<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+) -> (
+    Option<Type<'db>>,
+    Option<FunctionType<'db>>,
+    Option<FunctionType<'db>>,
+) {
+    match class.class_literal(db) {
+        ClassLiteral::Static(base) if base.known(db).is_none() => (
+            custom_value_annotation(db, base.body_scope(db))
+                .or_else(|| inherited_value_annotation(db, base)),
+            custom_new(db, base.body_scope(db))
+                .or_else(|| inherited_mixin_new(db, base))
+                .or_else(|| inherited_new(db, base)),
+            custom_init(db, base.body_scope(db))
+                .or_else(|| inherited_mixin_init(db, base))
+                .or_else(|| inherited_init(db, base)),
+        ),
+        ClassLiteral::DynamicEnum(enum_lit) => {
+            enum_metadata(db, ClassLiteral::DynamicEnum(enum_lit))
+                .map(|metadata| {
+                    (
+                        metadata.value_annotation,
+                        metadata.new_function,
+                        metadata.init_function,
+                    )
+                })
+                .unwrap_or((None, None, None))
+        }
+        ClassLiteral::Static(..)
+        | ClassLiteral::Dynamic(..)
+        | ClassLiteral::DynamicNamedTuple(..)
+        | ClassLiteral::DynamicTypedDict(..) => (None, None, None),
+    }
+}
+
 /// List all members of an enum.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
@@ -214,12 +260,15 @@ pub(crate) fn enum_metadata<'db>(
                 }
                 members.insert(name.clone(), *ty);
             }
+            let (value_annotation, new_function, init_function) =
+                functional_base_member_metadata(db, enum_lit.functional_base_class(db));
             return Some(EnumMetadata {
                 members,
                 aliases,
                 auto_members: FxHashSet::default(),
-                value_annotation: None,
-                init_function: None,
+                value_annotation,
+                new_function,
+                init_function,
             });
         }
     };
@@ -430,14 +479,24 @@ pub(crate) fn enum_metadata<'db>(
     let value_annotation =
         custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
 
-    // Look up a custom `__init__`, falling back to parent enum classes.
-    let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
+    // Look up a custom `__new__`, following the same provider order as CPython enum creation:
+    // the class body first, then any non-enum mixin, then inherited enum bases.
+    let new_function = custom_new(db, scope_id)
+        .or_else(|| inherited_mixin_new(db, class))
+        .or_else(|| inherited_new(db, class));
+
+    // Look up a custom `__init__` on the class, then on any non-enum mixin, then on inherited
+    // enum bases.
+    let init_function = custom_init(db, scope_id)
+        .or_else(|| inherited_mixin_init(db, class))
+        .or_else(|| inherited_init(db, class));
 
     Some(EnumMetadata {
         members,
         aliases,
         auto_members,
         value_annotation,
+        new_function,
         init_function,
     })
 }
@@ -488,7 +547,79 @@ fn inherited_init<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
-    iter_parent_enum_classes(db, class).find_map(|base| custom_init(db, base.body_scope(db)))
+    iter_parent_enum_classes(db, class).find_map(|base| {
+        custom_init(db, base.body_scope(db))
+            .or_else(|| inherited_mixin_init(db, base))
+            .or_else(|| inherited_init(db, base))
+    })
+}
+
+/// Looks up an inherited custom `__new__` from parent enum classes in the MRO.
+fn inherited_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| {
+            custom_new(db, base.body_scope(db))
+                .or_else(|| inherited_mixin_new(db, base))
+                .or_else(|| inherited_new(db, base))
+        })
+}
+
+/// Looks up an inherited `__new__` on a non-enum mixin before the first enum base in the MRO.
+fn inherited_mixin_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    for base in class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+    {
+        let base_literal = base.class_literal(db);
+        if matches!(base_literal, ClassLiteral::DynamicEnum(_))
+            || base_literal
+                .as_static()
+                .is_some_and(|base| is_enum_class_by_inheritance(db, base))
+        {
+            break;
+        }
+        if base.known(db).is_none()
+            && let Some(function) = mixin_new(db, base)
+        {
+            return Some(function);
+        }
+    }
+    None
+}
+
+/// Looks up an inherited `__init__` on a non-enum mixin before the first enum base in the MRO.
+fn inherited_mixin_init<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    for base in class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+    {
+        let base_literal = base.class_literal(db);
+        if matches!(base_literal, ClassLiteral::DynamicEnum(_))
+            || base_literal
+                .as_static()
+                .is_some_and(|base| is_enum_class_by_inheritance(db, base))
+        {
+            break;
+        }
+        if base.known(db).is_none()
+            && let Some(function) = mixin_init(db, base)
+        {
+            return Some(function);
+        }
+    }
+    None
 }
 
 /// Returns the custom `__init__` function type if one is defined on the enum.
@@ -505,6 +636,38 @@ fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType
         Type::FunctionLiteral(f) => Some(f),
         _ => None,
     }
+}
+
+/// Returns the custom `__new__` function type if one is defined on the enum.
+fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
+    let new_symbol_id = place_table(db, scope).symbol_id("__new__")?;
+    let new_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(new_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match new_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
+}
+
+fn mixin_new<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Option<FunctionType<'db>> {
+    class
+        .class_member(db, "__new__", MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
+        .place
+        .ignore_possibly_undefined()
+        .and_then(Type::as_function_literal)
+}
+
+fn mixin_init<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Option<FunctionType<'db>> {
+    class
+        .class_member(db, "__init__", MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
+        .place
+        .ignore_possibly_undefined()
+        .and_then(Type::as_function_literal)
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(

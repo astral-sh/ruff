@@ -2,6 +2,7 @@ use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::enums;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
 use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
@@ -103,6 +104,19 @@ impl<'db> ConstructorBinding<'db> {
         ) -> bool {
             let constructor_kind = binding.constructor_kind();
             if constructor_kind.is_init() || binding.downstream_constructor().is_none() {
+                return false;
+            }
+
+            if matches!(constructor_kind, ConstructorCallableKind::MetaclassCall)
+                && let Some(class_literal) = binding.constructed_class_literal(db)
+                && (matches!(class_literal, ClassLiteral::DynamicEnum(_))
+                    || class_literal
+                        .as_static()
+                        .is_some_and(|class| enums::is_enum_class_by_inheritance(db, class)))
+            {
+                // Enum metaclass calls use `EnumMeta.__call__` for value lookup or the functional
+                // enum API, not ordinary instance construction, so a successful metaclass call
+                // must not cascade into `__new__` or `__init__`.
                 return false;
             }
 

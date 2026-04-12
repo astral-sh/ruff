@@ -4492,9 +4492,26 @@ impl<'db> Type<'db> {
                 binding
             })
         }
+        fn is_final_enum_value_lookup_overload<'db>(
+            db: &'db dyn Db,
+            overload: &Binding<'db>,
+        ) -> bool {
+            let Some((_, names_parameter)) =
+                overload.signature.parameters().keyword_by_name("names")
+            else {
+                return true;
+            };
+            names_parameter.annotated_type().is_none(db)
+                && names_parameter
+                    .default_type()
+                    .is_some_and(|default| default.is_none(db))
+        }
 
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
+        let uses_enum_value_lookup_only = matches!(class_literal, ClassLiteral::DynamicEnum(_))
+            || enum_metadata(db, class_literal)
+                .is_some_and(|metadata| !metadata.members.is_empty());
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
@@ -4539,14 +4556,19 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         }
 
-        // Temporary special-casing for all subclasses of `enum.Enum` until we support the
-        // functional syntax for creating enum classes. TODO we should ideally check e.g.
-        // `MyEnum(1)` to make sure `1` is a valid value for `MyEnum`.
-        if KnownClass::Enum
-            .to_class_literal(db)
-            .to_class_type(db)
-            .is_some_and(|enum_class| class.is_subclass_of(db, enum_class))
-        {
+        // Preserve the permissive fallback for the builtin enum factory classes themselves.
+        // Calls like `Enum("Color", ...)` are primarily handled by `infer_enum_call_expression`,
+        // and invalid fallback cases like `Enum()` should remain non-panicking.
+        if matches!(
+            known,
+            Some(
+                KnownClass::Enum
+                    | KnownClass::StrEnum
+                    | KnownClass::IntEnum
+                    | KnownClass::Flag
+                    | KnownClass::IntFlag
+            )
+        ) {
             return fallback_bindings();
         }
 
@@ -4702,6 +4724,15 @@ impl<'db> Type<'db> {
                     ConstructorCallableKind::MetaclassCall,
                 )
                 .with_constructed_instance_type(db, constructor_instance_ty);
+            if uses_enum_value_lookup_only {
+                // Final enums, including dynamic enums with unknown members, use `EnumMeta.__call__`
+                // only for value lookup. Filter out the functional-enum overload so calls like
+                // `Color("Color", "RED")` cannot incorrectly construct a new `type[Enum]`, while
+                // preserving version-specific value-lookup overloads like the Python 3.12+
+                // tuple-packing form `Pair("x", 1)`.
+                metaclass_bindings = metaclass_bindings
+                    .retain_overloads(|overload| is_final_enum_value_lookup_overload(db, overload));
+            }
             if let Some(downstream_bindings) = constructor_bindings.as_ref() {
                 // Preserve the full metaclass `__call__` signature and defer whether constructor
                 // downstream checks apply until the matched overload is known.
