@@ -1032,6 +1032,27 @@ class D:
         # No else: y may be unbound at runtime, but there is still an assignment path
 ```
 
+### Reachable `Final` declaration wins for diagnostics
+
+If an earlier `Final` declaration is statically unreachable, diagnostics should be attached to the
+later declaration that remains visible:
+
+```py
+from typing import Final
+
+if False:
+    UNREACHABLE_MODULE_FINAL: Final[int]
+else:
+    # error: [final-without-value] "`Final` symbol `UNREACHABLE_MODULE_FINAL` is not assigned a value"
+    UNREACHABLE_MODULE_FINAL: Final[str]
+
+class C:
+    if False:
+        x: Final[int]
+    else:
+        x: Final[str]  # error: [final-without-value] "`Final` symbol `x` is not assigned a value"
+```
+
 ### Assignment in non-`__init__` method
 
 Per the typing spec, a `Final` attribute declared in a class body without a value must be
