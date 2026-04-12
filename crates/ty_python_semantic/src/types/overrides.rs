@@ -210,28 +210,39 @@ fn check_class_declaration<'db>(
                 Type::NominalInstance(nominal_instance)
                     if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
             );
-            // `auto()` values are computed at runtime by the enum metaclass,
-            // so we can't validate them against `_value_`, `__new__`, or `__init__` at the type
-            // level.
             let is_auto = enum_info.auto_members.contains(&member.name);
-            let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
+            let skip_type_check = context.in_stub() && is_ellipsis;
 
             if !skip_type_check {
                 let expected_type = enum_info.value_annotation;
                 let has_custom_member_constructor =
                     enum_info.new_function.is_some() || enum_info.init_function.is_some();
 
-                if let Some(new_function) = enum_info.new_function {
-                    let new_is_compatible = check_enum_member_against_method(
-                        context,
-                        "__new__",
-                        new_function,
-                        Type::from(class),
-                        member_value_type,
-                        &member.name,
-                        *first_reachable_definition,
-                    );
-                    if new_is_compatible && let Some(init_function) = enum_info.init_function {
+                // `auto()` values are computed at runtime by the enum metaclass, so we can't
+                // validate them against `__new__` or `__init__` at the type level.
+                if !is_auto {
+                    if let Some(new_function) = enum_info.new_function {
+                        let new_is_compatible = check_enum_member_against_method(
+                            context,
+                            "__new__",
+                            new_function,
+                            Type::from(class),
+                            member_value_type,
+                            &member.name,
+                            *first_reachable_definition,
+                        );
+                        if new_is_compatible && let Some(init_function) = enum_info.init_function {
+                            check_enum_member_against_method(
+                                context,
+                                "__init__",
+                                init_function,
+                                instance_of_class,
+                                member_value_type,
+                                &member.name,
+                                *first_reachable_definition,
+                            );
+                        }
+                    } else if let Some(init_function) = enum_info.init_function {
                         check_enum_member_against_method(
                             context,
                             "__init__",
@@ -242,21 +253,12 @@ fn check_class_declaration<'db>(
                             *first_reachable_definition,
                         );
                     }
-                } else if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_method(
-                        context,
-                        "__init__",
-                        init_function,
-                        instance_of_class,
-                        member_value_type,
-                        &member.name,
-                        *first_reachable_definition,
-                    );
                 }
 
-                // Follow pyright/mypy here: once a custom member constructor exists, rely on the
-                // constructor signature check above rather than re-checking the raw enum literal
-                // against `_value_`.
+                // Follow pyright here: if a custom member constructor exists, rely on constructor
+                // validation rather than re-checking the raw enum literal against `_value_`.
+                // `auto()` members still participate in `_value_` checks when no constructor hook
+                // is present, which matters for custom `_generate_next_value_` annotations.
                 if let Some(expected_type) = expected_type
                     && !has_custom_member_constructor
                     && !member_value_type.is_assignable_to(db, expected_type)

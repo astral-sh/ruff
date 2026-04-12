@@ -297,6 +297,8 @@ pub(crate) fn enum_metadata<'db>(
     let ignored_names = enum_ignored_names(db, scope_id);
 
     let mut aliases = FxHashMap::default();
+    let custom_generate_next_value_return_ty =
+        custom_generate_next_value_return_type(db, class, scope_id);
 
     let members = use_def_map
         .all_end_of_scope_symbol_bindings()
@@ -349,52 +351,50 @@ pub(crate) fn enum_metadata<'db>(
                                 auto_counter += 1;
                                 auto_members.insert(name.clone());
 
+                                let auto_value_ty = if let Some(return_ty) =
+                                    custom_generate_next_value_return_ty
+                                {
+                                    return_ty
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
-                                let auto_value_ty =
-                                    if Type::ClassLiteral(ClassLiteral::Static(class))
-                                        .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
-                                    {
-                                        Type::string_literal(db, &name.to_lowercase())
-                                    } else {
-                                        let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
-                                            class
-                                                .iter_mro(db, None)
-                                                .skip(1)
-                                                .filter_map(ClassBase::into_class)
-                                                .filter(|class| {
-                                                    !Type::from(*class).is_subtype_of(
-                                                        db,
-                                                        KnownClass::Enum.to_subclass_of(db),
-                                                    )
-                                                })
-                                                .map(|class| class.known(db))
-                                                .filter(|class| {
-                                                    !matches!(class, Some(KnownClass::Object))
-                                                })
-                                                .collect();
+                                } else if Type::ClassLiteral(ClassLiteral::Static(class))
+                                    .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                {
+                                    Type::string_literal(db, &name.to_lowercase())
+                                } else {
+                                    let custom_mixins: SmallVec<[Option<KnownClass>; 1]> = class
+                                        .iter_mro(db, None)
+                                        .skip(1)
+                                        .filter_map(ClassBase::into_class)
+                                        .filter(|class| {
+                                            !Type::from(*class).is_subtype_of(
+                                                db,
+                                                KnownClass::Enum.to_subclass_of(db),
+                                            )
+                                        })
+                                        .map(|class| class.known(db))
+                                        .filter(|class| !matches!(class, Some(KnownClass::Object)))
+                                        .collect();
 
-                                        // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
-                                        // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
-                                        //
-                                        // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
-                                        // so we fall back to `Any` in those cases.
-                                        if matches!(
-                                            custom_mixins.as_slice(),
-                                            [] | [Some(KnownClass::Int)]
-                                        ) {
-                                            if prev_value_was_non_literal_int {
-                                                KnownClass::Int.to_instance(db)
-                                            } else if let Some(prev_bool_literal) =
-                                                prev_bool_literal
-                                            {
-                                                Type::int_literal(i64::from(prev_bool_literal) + 1)
-                                            } else {
-                                                Type::int_literal(auto_counter)
-                                            }
+                                    // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
+                                    // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
+                                    //
+                                    // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
+                                    // so we fall back to `Any` in those cases.
+                                    if matches!(
+                                        custom_mixins.as_slice(),
+                                        [] | [Some(KnownClass::Int)]
+                                    ) {
+                                        if prev_value_was_non_literal_int {
+                                            KnownClass::Int.to_instance(db)
+                                        } else if let Some(prev_bool_literal) = prev_bool_literal {
+                                            Type::int_literal(i64::from(prev_bool_literal) + 1)
                                         } else {
-                                            Type::any()
+                                            Type::int_literal(auto_counter)
                                         }
-                                    };
+                                    } else {
+                                        Type::any()
+                                    }
+                                };
                                 Some(auto_value_ty)
                             }
 
@@ -620,6 +620,49 @@ fn inherited_mixin_init<'db>(
         }
     }
     None
+}
+
+/// Returns the custom `_generate_next_value_` function if one is defined on the enum.
+fn custom_generate_next_value<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Option<FunctionType<'db>> {
+    let symbol_id = place_table(db, scope).symbol_id("_generate_next_value_")?;
+    let generate_next_value_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match generate_next_value_type {
+        Type::FunctionLiteral(function) if function.is_staticmethod(db) => Some(function),
+        _ => None,
+    }
+}
+
+/// Looks up an inherited custom `_generate_next_value_` from parent enum classes in the MRO.
+///
+/// Known stdlib enum classes are skipped here so the default enum behavior continues to use the
+/// more precise inference logic below instead of falling back to typeshed's broad annotations.
+fn inherited_generate_next_value<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| custom_generate_next_value(db, base.body_scope(db)))
+}
+
+fn custom_generate_next_value_return_type<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    scope: ScopeId<'db>,
+) -> Option<Type<'db>> {
+    custom_generate_next_value(db, scope)
+        .or_else(|| inherited_generate_next_value(db, class))
+        .map(|function| function.last_definition_raw_signature(db).return_ty)
+        .filter(|return_ty| !return_ty.is_unknown())
 }
 
 /// Returns the custom `__init__` function type if one is defined on the enum.

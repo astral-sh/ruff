@@ -1162,18 +1162,61 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
-`auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
-`_value_` annotations and custom `__new__` / `__init__` signatures:
+If a custom static `_generate_next_value_` has an explicit return annotation, that annotation is
+used for `auto()` values:
+
+```py
+from enum import Enum, IntEnum, auto
+
+class AutoName(Enum):
+    @staticmethod
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[object]) -> str:
+        return name
+
+class Ordinal(AutoName):
+    NORTH = auto()
+    SOUTH = auto()
+
+reveal_type(Ordinal.NORTH.value)  # revealed: str
+reveal_type(Ordinal.SOUTH.value)  # revealed: str
+
+class Broken(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[object]) -> str:
+        return name
+
+    NAME = auto()  # error: [invalid-assignment]
+
+reveal_type(Broken.NAME.value)  # revealed: int
+```
+
+We do not currently model class-body ordering for `_generate_next_value_`, so a later definition
+still affects earlier `auto()` members:
+
+```py
+class Late(Enum):
+    A = auto()
+
+    @staticmethod
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[object]) -> str:
+        return name
+
+reveal_type(Late.A.value)  # revealed: str
+```
+
+`auto()` values are computed at runtime by the enum metaclass, so we still skip validation against
+custom `__new__` / `__init__` signatures. `_value_` annotations are still checked against the
+inferred `auto()` value type when no custom member constructor is present:
 
 ```py
 from enum import Enum, auto
 
 class WithValue(Enum):
-    _value_: int
-    A = auto()
-    B = auto()
+    _value_: str
+    A = auto()  # error: [invalid-assignment]
+    B = auto()  # error: [invalid-assignment]
 
-reveal_type(WithValue.A.value)  # revealed: int
+reveal_type(WithValue.A.value)  # revealed: str
 
 class WithInit(Enum):
     def __init__(self, mass: float, radius: float):
