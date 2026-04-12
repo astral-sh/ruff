@@ -61,10 +61,15 @@ class Planet(Enum):
     MERCURY = (1, 3.303e23, 2.4397e6)
     VENUS = (2, 4.869e24, 6.0518e6)
 
+# TODO: this raises `ValueError` at runtime. For enums with multi-argument member definitions,
+# lookup still follows `EnumMeta.__call__` / `Enum.__new__` semantics rather than the apparent
+# `.value` shape implied by `__init__`.
 reveal_type(Planet(1))  # revealed: Planet
+reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
 
 class EmptyEnum(Enum): ...
 
+# TODO: these raise `TypeError` at runtime, but we do not yet emit diagnostics for them.
 reveal_type(EmptyEnum(foo=1))  # revealed: EmptyEnum
 reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
 
@@ -1396,18 +1401,16 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
-Open `EnumMeta`-based classes should still use normal metaclass call semantics until they are
-finalized with members:
+Open `EnumMeta`-based classes still reject ordinary calls until they are finalized with members:
 
 ```py
-from enum import Enum, EnumMeta
+from enum import EnumMeta
 
 class Meta(EnumMeta): ...
 class Empty(metaclass=Meta): ...
 
 # error: [too-many-positional-arguments]
 Empty(1)
-reveal_type(Empty("Dynamic", {"X": 1}))  # revealed: type[Enum]
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
@@ -1417,6 +1420,19 @@ In Python 3.11, the meta-type was renamed to `EnumType`.
 ```toml
 [environment]
 python-version = "3.11"
+```
+
+On Python 3.11+, open `EnumMeta`-based classes also accept the functional-enum calling convention,
+though the inferred result is still imprecise:
+
+```py
+from enum import EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# TODO: runtime MRO suggests this should be closer to `type[Empty]`.
+reveal_type(Empty("Dynamic", {"X": 1}))  # revealed: type[Enum]
 ```
 
 ```py
