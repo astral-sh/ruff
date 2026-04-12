@@ -58,12 +58,43 @@ class NoDefaultSpecificClass(SomeClass):
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
 ```
 
-## Descriptor-typed fields with defaults
+## Descriptor-typed fields
 
 A dataclass field whose declared type is a descriptor should still resolve through the descriptor
-protocol on instance access, even when the field has a default value.
+protocol correctly on instance access. Whether the descriptor protocol is involved depends on
+whether the descriptor object is present in the class namespace.
+
+Data descriptors should use their `__get__` return type on instances and preserve the descriptor
+type on class access:
+
+```py
+from dataclasses import dataclass
+from typing import Any, overload
+
+class Desc1:
+    @overload
+    def __get__(self, instance: None, owner: Any) -> "Desc1": ...
+    @overload
+    def __get__(self, instance: object, owner: Any) -> int: ...
+    def __get__(self, instance: object | None, owner: Any) -> "Desc1 | int":
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int) -> None:
+        raise NotImplementedError
+
+@dataclass
+class DC1:
+    y: Desc1 = Desc1()
+
+dc1 = DC1(3)
+reveal_type(dc1.y)  # revealed: int
+reveal_type(DC1.y)  # revealed: Desc1
+```
 
 `Desc2` has `__get__` but no `__set__`, making it a non-data descriptor.
+
+Without a class-body default, the descriptor object is not present in the class namespace, so the
+dataclass initializer stores the constructor argument directly on the instance:
 
 ```py
 from dataclasses import dataclass
@@ -83,17 +114,95 @@ class Desc2(Generic[T]):
 class DC2:
     x: Desc2[int]
     y: Desc2[str]
+
+dc2 = DC2(Desc2(), Desc2())
+
+# Without a class-body binding, the class has no descriptor attribute.
+# error: [unresolved-attribute]
+DC2.x
+
+# The synthesized `__init__` stores the constructor arguments as instance
+# attributes, so instance access sees the descriptor objects directly.
+reveal_type(dc2.x)  # revealed: Desc2[int]
+reveal_type(dc2.y)  # revealed: Desc2[str]
+```
+
+With a class-body default, class access still resolves through `__get__`, and instance access
+continues to be modeled as descriptor-backed access:
+
+```py
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Desc2(Generic[T]):
+    @overload
+    def __get__(self, instance: None, owner: Any) -> list[T]: ...
+    @overload
+    def __get__(self, instance: object, owner: Any) -> T: ...
+    def __get__(self, instance: object | None, owner: Any) -> list[T] | T:
+        raise NotImplementedError
+
+@dataclass
+class DC2Default:
     z: Desc2[str] = Desc2()
 
-dc2 = DC2(Desc2(), Desc2(), Desc2())
+reveal_type(DC2Default.z)  # revealed: list[str]
+reveal_type(DC2Default(Desc2()).z)  # revealed: str
+```
 
-# On the class, __get__(None, owner) is called, returning list[T].
-reveal_type(DC2.z)  # revealed: list[str]
+Annotation-only data descriptors also do not create class attributes, but the synthesized
+initializer still uses the descriptor's `__set__` value type for instance initialization:
 
-# On instances, __get__(instance, owner) is called, returning T.
-# The default value should not cause the declared descriptor type
-# to leak into the instance attribute type.
-reveal_type(dc2.z)  # revealed: str
+```py
+from dataclasses import dataclass
+from typing import Any, overload
+
+class Desc3:
+    @overload
+    def __get__(self, instance: None, owner: Any) -> "Desc3": ...
+    @overload
+    def __get__(self, instance: object, owner: Any) -> int: ...
+    def __get__(self, instance: object | None, owner: Any) -> "Desc3 | int":
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int) -> None:
+        raise NotImplementedError
+
+@dataclass
+class DC3:
+    x: Desc3
+
+# error: [unresolved-attribute]
+DC3.x
+
+reveal_type(DC3(3).x)  # revealed: int
+```
+
+Descriptors with `init=False` are not shadowed by the synthesized initializer, so instance access
+continues to resolve through the descriptor protocol:
+
+```py
+from dataclasses import dataclass, field
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Desc4(Generic[T]):
+    @overload
+    def __get__(self, instance: None, owner: Any) -> list[T]: ...
+    @overload
+    def __get__(self, instance: object, owner: Any) -> T: ...
+    def __get__(self, instance: object | None, owner: Any) -> list[T] | T:
+        raise NotImplementedError
+
+@dataclass
+class DC4:
+    x: Desc4[str] = field(default=Desc4(), init=False)
+
+reveal_type(DC4.x)  # revealed: list[str]
+reveal_type(DC4().x)  # revealed: str
 ```
 
 ## `default_factory`

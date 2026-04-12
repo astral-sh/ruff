@@ -1077,6 +1077,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+            CodeGeneratorKind::from_class(db, self.into(), specialization)
+            && self
+                .own_fields(db, specialization, field_policy)
+                .get(name)
+                .is_some_and(|field| {
+                    matches!(
+                        field.kind,
+                        FieldKind::Dataclass {
+                            default_ty: None,
+                            ..
+                        }
+                    )
+                })
+        {
+            // Annotation-only dataclass fields do not create class attributes at runtime.
+            // They are initialized through the synthesized `__init__` and exist only on
+            // instances unless a class-body default binds a value in the namespace.
+            return Member::unbound();
+        }
+
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
@@ -1863,6 +1884,47 @@ impl<'db> StaticClassLiteral<'db> {
         attributes
     }
 
+    fn own_dataclass_field(self, db: &'db dyn Db, name: &str) -> Option<Field<'db>> {
+        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return None;
+        }
+
+        self.own_fields(db, None, field_policy).get(name).cloned()
+    }
+
+    fn data_descriptor_set_value_type(
+        self,
+        db: &'db dyn Db,
+        descriptor_ty: Type<'db>,
+    ) -> Type<'db> {
+        let dunder_set = descriptor_ty.class_member(db, "__set__".into());
+        if let Place::Defined(DefinedPlace {
+            ty: dunder_set,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = dunder_set.place
+            && !dunder_set.is_dynamic()
+        {
+            return dunder_set.bindings(db).map_types(db, |binding| {
+                let mut value_types = UnionBuilder::new(db);
+                let mut has_value_type = false;
+                for overload in binding {
+                    if let Some(value_param) = overload.signature.parameters().get_positional(2) {
+                        value_types = value_types.add(value_param.annotated_type());
+                        has_value_type = true;
+                    } else if overload.signature.parameters().is_gradual() {
+                        value_types = value_types.add(Type::unknown());
+                        has_value_type = true;
+                    }
+                }
+                has_value_type.then(|| value_types.build())
+            });
+        }
+
+        Type::unknown()
+    }
+
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2313,23 +2375,34 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
-                        } else if self.is_own_dataclass_instance_field(db, name)
-                            && declared_ty
-                                .class_member(db, "__get__".into())
-                                .place
-                                .is_undefined()
+                        } else if let Some(field) = self.own_dataclass_field(db, name)
+                            && matches!(
+                                field.kind,
+                                FieldKind::Dataclass {
+                                    init_only: false,
+                                    ..
+                                }
+                            )
                         {
                             // For dataclass-like classes, declared fields are assigned
                             // by the synthesized `__init__`, so they are instance
                             // attributes even without an explicit `self.x = ...`
                             // assignment in a method body.
                             //
-                            // However, if the declared type is a descriptor (has
-                            // `__get__`), we return unbound so that the descriptor
-                            // protocol in `member_lookup_with_policy` can resolve
-                            // the attribute type through `__get__`.
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
+                            // This intentionally treats descriptor-typed dataclass
+                            // fields as descriptor-backed uniformly. It does not try
+                            // to model runtime shadowing from the synthesized
+                            // initializer for non-data descriptors.
+                            if !declared_ty
+                                .class_member(db, "__get__".into())
+                                .place
+                                .is_undefined()
+                            {
+                                Member::unbound()
+                            } else {
+                                Member {
+                                    inner: declared.with_qualifiers(qualifiers),
+                                }
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -2346,6 +2419,22 @@ impl<'db> StaticClassLiteral<'db> {
                         // instance attribute, and we trust the declared type, unless
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
+
+                        if let Some(field) = self.own_dataclass_field(db, name)
+                            && let FieldKind::Dataclass {
+                                init_only: false,
+                                init: true,
+                                ..
+                            } = field.kind
+                            && declared_ty.is_data_descriptor(db)
+                        {
+                            return Member {
+                                inner: Place::declared(
+                                    self.data_descriptor_set_value_type(db, declared_ty),
+                                )
+                                .with_qualifiers(qualifiers),
+                            };
+                        }
 
                         if declaredness == Definedness::AlwaysDefined {
                             Member {
@@ -2400,34 +2489,6 @@ impl<'db> StaticClassLiteral<'db> {
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
-    }
-
-    /// Returns `true` if `name` is a non-init-only field directly declared on this
-    /// dataclass (i.e., a field that corresponds to an instance attribute).
-    ///
-    /// This is used to decide whether a bare class-body annotation like `x: int`
-    /// should be treated as defining an instance attribute: dataclass fields are
-    /// implicitly assigned in `__init__`, so they behave as instance attributes
-    /// even though no explicit binding exists in the class body.
-    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
-            return false;
-        };
-        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
-            return false;
-        }
-
-        let fields = self.own_fields(db, None, field_policy);
-        let Some(field) = fields.get(name) else {
-            return false;
-        };
-        matches!(
-            field.kind,
-            FieldKind::Dataclass {
-                init_only: false,
-                ..
-            }
-        )
     }
 
     /// Returns the converter's input type (i.e., the type of its first positional parameter) for a
