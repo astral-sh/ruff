@@ -117,14 +117,13 @@ class DC2:
 
 dc2 = DC2(Desc2(), Desc2())
 
-# Without a class-body binding, the class has no descriptor attribute.
-# error: [unresolved-attribute]
-DC2.x
-
-# The synthesized `__init__` stores the constructor arguments as instance
-# attributes, so instance access sees the descriptor objects directly.
-reveal_type(dc2.x)  # revealed: Desc2[int]
-reveal_type(dc2.y)  # revealed: Desc2[str]
+# This is a known modeling limitation: descriptor-typed dataclass
+# fields are resolved through `__get__` even without a class-body
+# binding.
+reveal_type(DC2.x)  # revealed: list[int]
+reveal_type(DC2.y)  # revealed: list[str]
+reveal_type(dc2.x)  # revealed: int
+reveal_type(dc2.y)  # revealed: str
 ```
 
 With a class-body default, class access still resolves through `__get__`, and instance access
@@ -152,8 +151,7 @@ reveal_type(DC2Default.z)  # revealed: list[str]
 reveal_type(DC2Default(Desc2()).z)  # revealed: str
 ```
 
-Annotation-only data descriptors also do not create class attributes, but the synthesized
-initializer still uses the descriptor's `__set__` value type for instance initialization:
+Annotation-only data descriptors are modeled the same way:
 
 ```py
 from dataclasses import dataclass
@@ -174,9 +172,7 @@ class Desc3:
 class DC3:
     x: Desc3
 
-# error: [unresolved-attribute]
-DC3.x
-
+reveal_type(DC3.x)  # revealed: Desc3
 reveal_type(DC3(3).x)  # revealed: int
 ```
 

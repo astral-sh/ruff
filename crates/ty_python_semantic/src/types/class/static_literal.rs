@@ -1089,7 +1089,11 @@ impl<'db> StaticClassLiteral<'db> {
                             default_ty: None,
                             ..
                         }
-                    )
+                    ) && field
+                        .declared_ty
+                        .class_member(db, "__get__".into())
+                        .place
+                        .is_undefined()
                 })
         {
             // Annotation-only dataclass fields do not create class attributes at runtime.
@@ -1893,38 +1897,6 @@ impl<'db> StaticClassLiteral<'db> {
         self.own_fields(db, None, field_policy).get(name).cloned()
     }
 
-    fn data_descriptor_set_value_type(
-        self,
-        db: &'db dyn Db,
-        descriptor_ty: Type<'db>,
-    ) -> Type<'db> {
-        let dunder_set = descriptor_ty.class_member(db, "__set__".into());
-        if let Place::Defined(DefinedPlace {
-            ty: dunder_set,
-            definedness: Definedness::AlwaysDefined,
-            ..
-        }) = dunder_set.place
-            && !dunder_set.is_dynamic()
-        {
-            return dunder_set.bindings(db).map_types(db, |binding| {
-                let mut value_types = UnionBuilder::new(db);
-                let mut has_value_type = false;
-                for overload in binding {
-                    if let Some(value_param) = overload.signature.parameters().get_positional(2) {
-                        value_types = value_types.add(value_param.annotated_type());
-                        has_value_type = true;
-                    } else if overload.signature.parameters().is_gradual() {
-                        value_types = value_types.add(Type::unknown());
-                        has_value_type = true;
-                    }
-                }
-                has_value_type.then(|| value_types.build())
-            });
-        }
-
-        Type::unknown()
-    }
-
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2422,18 +2394,14 @@ impl<'db> StaticClassLiteral<'db> {
 
                         if let Some(field) = self.own_dataclass_field(db, name)
                             && let FieldKind::Dataclass {
-                                init_only: false,
-                                init: true,
-                                ..
+                                init_only: false, ..
                             } = field.kind
-                            && declared_ty.is_data_descriptor(db)
+                            && !declared_ty
+                                .class_member(db, "__get__".into())
+                                .place
+                                .is_undefined()
                         {
-                            return Member {
-                                inner: Place::declared(
-                                    self.data_descriptor_set_value_type(db, declared_ty),
-                                )
-                                .with_qualifiers(qualifiers),
-                            };
+                            return Member::unbound();
                         }
 
                         if declaredness == Definedness::AlwaysDefined {
