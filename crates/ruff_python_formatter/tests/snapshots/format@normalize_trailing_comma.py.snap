@@ -394,6 +394,28 @@ result = sum(
     (very_long_expression for very_long_expression in some_very_long_iterable_name)
 )
 
+# Nested call as argument, compact multi-line
+result = func(
+    this_function_actually(takes, two), parameters
+)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two), parameters
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two), parameters  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two), parameters
+    # end of args
+)
+
 # Mixed: some args fit, some don't
 result = func(short, another_short, a_third_short_one)
 result = func(
@@ -846,6 +868,29 @@ result = sum(
     (very_long_expression for very_long_expression in some_very_long_iterable_name)
 )
 
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
+)
+
 # Mixed: some args fit, some don't
 result = func(short, another_short, a_third_short_one)
 result = func(
@@ -1219,6 +1264,29 @@ result = sum((x for x in range(10)))
 # Parenthesized generator that wraps
 result = sum(
     (very_long_expression for very_long_expression in some_very_long_iterable_name)
+)
+
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
 )
 
 # Mixed: some args fit, some don't
@@ -1604,6 +1672,29 @@ result = sum((x for x in range(10)))
 # Parenthesized generator that wraps
 result = sum(
     (very_long_expression for very_long_expression in some_very_long_iterable_name),
+)
+
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
 )
 
 # Mixed: some args fit, some don't
