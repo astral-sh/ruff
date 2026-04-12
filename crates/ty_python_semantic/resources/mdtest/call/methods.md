@@ -568,11 +568,7 @@ class IncorrectArg(RequiresArg, not_arg="foo"):
 class NotCallableInitSubclass:
     __init_subclass__ = None
 
-# TODO: terrible diagnostic message and annotations,
-# we should at least add a subdiagnostic pointing to where
-# `__init_subclass__ = None` on the superclass
-#
-# error: [call-non-callable] "Object of type `None` is not callable"
+# error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition that may not be callable"
 class Bad(NotCallableInitSubclass):
     a = 1
     b = 2

@@ -1100,6 +1100,16 @@
             }
           ]
         },
+        "non-callable-init-subclass": {
+          "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
+          "description": "## What it does\nChecks for class definitions that will fail due to non-callable `__init_subclass__`\nmethods.\n\n## Why is this bad?\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt\nto subclass that class will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass Super:\n    __init_subclass__ = None\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "not-iterable": {
           "title": "detects iteration over an object that is not iterable",
           "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",
