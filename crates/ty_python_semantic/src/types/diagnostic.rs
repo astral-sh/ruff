@@ -91,6 +91,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
+    registry.register_lint(&MISMATCHED_TYPE_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -1456,6 +1457,37 @@ declare_lint! {
         summary: "detects invalid NewType definitions",
         status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for functional typing definitions whose declared name does not match
+    /// the variable they are assigned to.
+    ///
+    /// ## Why is this bad?
+    /// Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,
+    /// `TypedDict`, and `TypeAliasType` all take a name argument that is
+    /// normally expected to match the assigned variable. A mismatch is usually a
+    /// typo and makes later diagnostics harder to understand.
+    ///
+    /// ## Default level
+    /// This rule is a warning by default because ty can usually recover and
+    /// continue understanding the resulting type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType, TypeVar
+    /// from typing_extensions import TypedDict
+    ///
+    /// T = TypeVar("U")  # error: [mismatched-type-name]
+    /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
+    /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
+    /// ```
+    pub(crate) static MISMATCHED_TYPE_NAME = {
+        summary: "detects functional typing definitions whose declared name does not match the assigned variable",
+        status: LintStatus::stable("0.0.30"),
+        default_level: Level::Warn,
     }
 }
 
@@ -3329,6 +3361,31 @@ declare_lint! {
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
+}
+
+pub(crate) fn report_mismatched_type_name<'db>(
+    context: &InferContext<'db, '_>,
+    node: impl Ranged,
+    constructor: &str,
+    expected_name: &str,
+    actual_name: Option<&str>,
+    actual_name_ty: Type<'db>,
+) {
+    if let Some(builder) = context.report_lint(&MISMATCHED_TYPE_NAME, node) {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "The name passed to `{constructor}` must match the variable it is assigned to"
+        ));
+        if let Some(actual_name) = actual_name {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got \"{actual_name}\""
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got variable of type `{}`",
+                actual_name_ty.display(context.db())
+            ));
+        }
+    }
 }
 
 impl TypeCheckDiagnostics {

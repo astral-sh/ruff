@@ -8,6 +8,7 @@ use crate::{
         diagnostic::{
             INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_BOUND,
             INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+            report_mismatched_type_name,
         },
         infer::{
             InferenceFlags, TypeInferenceBuilder,
@@ -698,6 +699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut default = None;
         let mut name_param_ty = None;
+        let mut name_param_node = None;
 
         if arguments.args.len() > 1 {
             return error(
@@ -734,6 +736,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
+                    name_param_node = Some(&kwarg.value);
                     name_param_ty =
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
@@ -790,6 +793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         };
+        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -803,22 +807,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name_param != target_name {
-            return error(
-                &self.context,
-                format_args!(
-                    "The name of a `ParamSpec` (`{name_param}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
-            );
+            if let Some(name_param_node) = name_param_node {
+                report_mismatched_type_name(
+                    &self.context,
+                    name_param_node,
+                    "ParamSpec",
+                    target_name,
+                    Some(name_param),
+                    name_param_ty,
+                );
+            } else {
+                report_mismatched_type_name(
+                    &self.context,
+                    call_expr,
+                    "ParamSpec",
+                    target_name,
+                    Some(name_param),
+                    name_param_ty,
+                );
+            }
         }
 
         if default.is_some() {
             self.deferred.insert(definition);
         }
 
-        let identity =
-            TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::ParamSpec);
+        let identity = TypeVarIdentity::new(
+            db,
+            target_name.clone(),
+            Some(definition),
+            TypeVarKind::ParamSpec,
+        );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, None, default,
         )))
@@ -857,6 +876,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut covariant = false;
         let mut contravariant = false;
         let mut name_param_ty = None;
+        let mut name_param_node = None;
 
         if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
             return error(
@@ -885,6 +905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
+                    name_param_node = Some(&kwarg.value);
                     name_param_ty =
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
@@ -1007,6 +1028,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         };
+        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1020,14 +1042,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name_param != target_name {
-            return error(
-                &self.context,
-                format_args!(
-                    "The name of a `TypeVar` (`{name_param}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
-            );
+            if let Some(name_param_node) = name_param_node {
+                report_mismatched_type_name(
+                    &self.context,
+                    name_param_node,
+                    "TypeVar",
+                    target_name,
+                    Some(name_param),
+                    name_param_ty,
+                );
+            } else {
+                report_mismatched_type_name(
+                    &self.context,
+                    call_expr,
+                    "TypeVar",
+                    target_name,
+                    Some(name_param),
+                    name_param_ty,
+                );
+            }
         }
 
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
@@ -1059,7 +1092,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.insert(definition);
         }
 
-        let identity = TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::Legacy);
+        let identity = TypeVarIdentity::new(
+            db,
+            target_name.clone(),
+            Some(definition),
+            TypeVarKind::Legacy,
+        );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,

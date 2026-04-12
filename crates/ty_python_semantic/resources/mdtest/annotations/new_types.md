@@ -171,6 +171,25 @@ Foo = NewType(name, int)
 reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 ```
 
+## The assigned name should match the constructor name
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import NewType
+from ty_extensions import is_subtype_of
+
+# error: [mismatched-type-name]
+UserId = NewType("Id", int)
+reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
+reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
+
+Id = int
+# error: [mismatched-type-name]
+UsesExistingId = NewType("Id", "Id")
+UsesExistingId(1)
+```
+
 ## The base must be a class type or another newtype
 
 Other typing constructs like `Union` are not _generally_ allowed. (However, see the next section for

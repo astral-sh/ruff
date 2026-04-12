@@ -91,6 +91,7 @@ del alice.id
 Alternative functional syntax with a list of tuples:
 
 ```py
+# error: [mismatched-type-name]
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
@@ -104,6 +105,7 @@ reveal_type(alice2.name)  # revealed: str
 Functional syntax with a tuple of tuples:
 
 ```py
+# error: [mismatched-type-name]
 Person3 = NamedTuple("Person", (("id", int), ("name", str)))
 alice3 = Person3(1, "Alice")
 
@@ -114,6 +116,7 @@ reveal_type(alice3.name)  # revealed: str
 Functional syntax with a tuple of lists:
 
 ```py
+# error: [mismatched-type-name]
 Person4 = NamedTuple("Person", (["id", int], ["name", str]))
 alice4 = Person4(1, "Alice")
 
@@ -124,11 +127,28 @@ reveal_type(alice4.name)  # revealed: str
 Functional syntax with a list of lists:
 
 ```py
+# error: [mismatched-type-name]
 Person5 = NamedTuple("Person", [["id", int], ["name", str]])
 alice5 = Person5(1, "Alice")
 
 reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
+```
+
+### Name mismatch diagnostics
+
+<!-- snapshot-diagnostics -->
+
+The assigned variable name should match the `typename` argument:
+
+```py
+from typing import NamedTuple
+from ty_extensions import is_subtype_of
+
+# error: [mismatched-type-name]
+Mismatch = NamedTuple("WrongName", [("x", int)])
+reveal_type(Mismatch)  # revealed: <class 'WrongName'>
+reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
 ```
 
 ### Functional syntax with string annotations
@@ -268,6 +288,15 @@ Person = NamedTuple(name, [("id", int), ("name", str)])
 p = Person(1, "Alice")
 reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
+```
+
+Non-literal `str` names should not be treated as proven mismatches:
+
+```py
+from typing import NamedTuple
+
+def f(name: str) -> None:
+    Match = NamedTuple(name, [("value", int)])
 ```
 
 ### Functional syntax with tuple variable fields
@@ -526,30 +555,35 @@ import collections
 from ty_extensions import reveal_mro
 
 # String field names (space-separated)
+# error: [mismatched-type-name]
 Point1 = collections.namedtuple("Point", "x y")
 reveal_type(Point1)  # revealed: <class 'Point'>
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1)
 
 # String field names with multiple spaces
+# error: [mismatched-type-name]
 Point1a = collections.namedtuple("Point", "x       y")
 reveal_type(Point1a)  # revealed: <class 'Point'>
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1a)
 
 # String field names (comma-separated also works at runtime)
+# error: [mismatched-type-name]
 Point2 = collections.namedtuple("Point", "x, y")
 reveal_type(Point2)  # revealed: <class 'Point'>
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point2)
 
 # List of strings
+# error: [mismatched-type-name]
 Point3 = collections.namedtuple("Point", ["x", "y"])
 reveal_type(Point3)  # revealed: <class 'Point'>
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point3)
 
 # Tuple of strings
+# error: [mismatched-type-name]
 Point4 = collections.namedtuple("Point", ("x", "y"))
 reveal_type(Point4)  # revealed: <class 'Point'>
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
@@ -573,10 +607,12 @@ The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields
 from typing import NamedTuple
 
 # List of tuples
+# error: [mismatched-type-name]
 Person1 = NamedTuple("Person", [("name", str), ("age", int)])
 reveal_type(Person1)  # revealed: <class 'Person'>
 
 # Tuple of tuples
+# error: [mismatched-type-name]
 Person2 = NamedTuple("Person", (("name", str), ("age", int)))
 reveal_type(Person2)  # revealed: <class 'Person'>
 

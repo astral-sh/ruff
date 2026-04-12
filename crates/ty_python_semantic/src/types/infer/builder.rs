@@ -78,9 +78,9 @@ use crate::types::diagnostic::{
     report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
     report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
-    report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
-    report_possibly_unresolved_reference, report_unsupported_augmented_assignment,
-    report_unsupported_comparison,
+    report_match_pattern_against_typed_dict, report_mismatched_type_name,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -3268,13 +3268,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name != target_name {
-            return error(
+            report_mismatched_type_name(
                 &self.context,
-                format_args!(
-                    "The name of a `NewType` (`{name}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
+                &arguments.args[0],
+                "NewType",
+                target_name,
+                Some(name),
+                name_param_ty,
             );
         }
 
@@ -3516,13 +3516,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name != target_name {
-            return error(
+            report_mismatched_type_name(
                 &self.context,
-                format_args!(
-                    "The name of a `TypeAliasType` (`{name}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
+                &arguments.args[0],
+                "TypeAliasType",
+                target_name,
+                Some(name),
+                name_param_ty,
             );
         }
 

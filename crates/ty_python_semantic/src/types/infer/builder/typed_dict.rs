@@ -10,7 +10,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT,
+    UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
@@ -197,24 +197,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|literal| Name::new(literal.value(db)));
 
-        if let Some(definition) = definition
-            && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
-            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-        {
-            let mut diagnostic =
-                builder.into_diagnostic("TypedDict name must match the variable it is assigned to");
-            if let Some(name) = name.as_deref() {
-                diagnostic.set_primary_message(format_args!(
-                    "Expected \"{assigned_name}\", got \"{name}\""
-                ));
-            } else {
-                diagnostic.set_primary_message(format_args!(
-                    "Expected \"{assigned_name}\", got variable of type `{}`",
-                    name_type.display(db)
-                ));
-            }
-        } else if name.is_none()
+        if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
@@ -225,6 +208,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
+        } else if let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && Some(assigned_name.as_str()) != name.as_deref()
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                "TypedDict",
+                &assigned_name,
+                name.as_deref(),
+                name_type,
+            );
         }
 
         let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
