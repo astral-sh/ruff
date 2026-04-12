@@ -1099,6 +1099,41 @@ mod tests {
     }
 
     #[test]
+    fn hover_enum_constructor() {
+        let test = hover_test(
+            r#"
+        from enum import Enum
+
+        class Color(Enum):
+            RED = 1
+            BLUE = 2
+
+        x = Col<CURSOR>or(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        class Color(value: object)
+        ---------------------------------------------
+        ```python
+        class Color(value: object)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     BLUE = 2
+        7 |
+        8 | x = Color(1)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_typeddict_constructor() {
         let test = hover_test(
             r#"
