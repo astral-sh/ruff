@@ -52,7 +52,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
 37 | class NotCallableInitSubclass:
 38 |     __init_subclass__ = None
 39 | 
-40 | # TODO: this should be an error because `__init_subclass__` on the superclass is not callable
+40 | # error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition that may not be callable"
 41 | class Bad(NotCallableInitSubclass):
 42 |     a = 1
 43 |     b = 2
@@ -174,6 +174,25 @@ info: Function signature here
 14 |
 15 | class NoArg:
    |
+
+```
+
+```
+error[non-callable-init-subclass]: Invalid definition of class `Bad`
+  --> src/mdtest_snippet.py:38:5
+   |
+37 | class NotCallableInitSubclass:
+38 |     __init_subclass__ = None
+   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
+39 |
+40 | # error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition t…
+41 | class Bad(NotCallableInitSubclass):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
+42 |     a = 1
+43 |     b = 2
+   |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 
 ```
 
