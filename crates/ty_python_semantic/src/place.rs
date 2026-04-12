@@ -1702,14 +1702,13 @@ fn place_from_declarations_impl<'db>(
             return None;
         }
 
-        first_declaration.get_or_insert(declaration);
-
         let static_reachability =
             reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
         if static_reachability.is_always_false() {
             None
         } else {
+            first_declaration.get_or_insert(declaration);
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 
