@@ -807,25 +807,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name_param != target_name {
-            if let Some(name_param_node) = name_param_node {
-                report_mismatched_type_name(
-                    &self.context,
-                    name_param_node,
-                    "ParamSpec",
-                    target_name,
-                    Some(name_param),
-                    name_param_ty,
-                );
-            } else {
-                report_mismatched_type_name(
-                    &self.context,
-                    call_expr,
-                    "ParamSpec",
-                    target_name,
-                    Some(name_param),
-                    name_param_ty,
-                );
-            }
+            report_mismatched_type_name(
+                &self.context,
+                name_param_node
+                    .map(Ranged::range)
+                    .unwrap_or_else(|| call_expr.range()),
+                "ParamSpec",
+                target_name,
+                Some(name_param),
+                name_param_ty,
+            );
         }
 
         if default.is_some() {
@@ -1042,25 +1033,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name_param != target_name {
-            if let Some(name_param_node) = name_param_node {
-                report_mismatched_type_name(
-                    &self.context,
-                    name_param_node,
-                    "TypeVar",
-                    target_name,
-                    Some(name_param),
-                    name_param_ty,
-                );
-            } else {
-                report_mismatched_type_name(
-                    &self.context,
-                    call_expr,
-                    "TypeVar",
-                    target_name,
-                    Some(name_param),
-                    name_param_ty,
-                );
-            }
+            report_mismatched_type_name(
+                &self.context,
+                name_param_node
+                    .map(Ranged::range)
+                    .unwrap_or_else(|| call_expr.range()),
+                "TypeVar",
+                target_name,
+                Some(name_param),
+                name_param_ty,
+            );
         }
 
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we

@@ -91,8 +91,7 @@ del alice.id
 Alternative functional syntax with a list of tuples:
 
 ```py
-# error: [mismatched-type-name]
-Person2 = NamedTuple("Person", [("id", int), ("name", str)])
+Person2 = NamedTuple("Person2", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
 # error: [missing-argument]
@@ -105,8 +104,7 @@ reveal_type(alice2.name)  # revealed: str
 Functional syntax with a tuple of tuples:
 
 ```py
-# error: [mismatched-type-name]
-Person3 = NamedTuple("Person", (("id", int), ("name", str)))
+Person3 = NamedTuple("Person3", (("id", int), ("name", str)))
 alice3 = Person3(1, "Alice")
 
 reveal_type(alice3.id)  # revealed: int
@@ -116,8 +114,7 @@ reveal_type(alice3.name)  # revealed: str
 Functional syntax with a tuple of lists:
 
 ```py
-# error: [mismatched-type-name]
-Person4 = NamedTuple("Person", (["id", int], ["name", str]))
+Person4 = NamedTuple("Person4", (["id", int], ["name", str]))
 alice4 = Person4(1, "Alice")
 
 reveal_type(alice4.id)  # revealed: int
@@ -127,8 +124,7 @@ reveal_type(alice4.name)  # revealed: str
 Functional syntax with a list of lists:
 
 ```py
-# error: [mismatched-type-name]
-Person5 = NamedTuple("Person", [["id", int], ["name", str]])
+Person5 = NamedTuple("Person5", [["id", int], ["name", str]])
 alice5 = Person5(1, "Alice")
 
 reveal_type(alice5.id)  # revealed: int
@@ -555,38 +551,33 @@ import collections
 from ty_extensions import reveal_mro
 
 # String field names (space-separated)
-# error: [mismatched-type-name]
-Point1 = collections.namedtuple("Point", "x y")
-reveal_type(Point1)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point1 = collections.namedtuple("Point1", "x y")
+reveal_type(Point1)  # revealed: <class 'Point1'>
+# revealed: (<class 'Point1'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1)
 
 # String field names with multiple spaces
-# error: [mismatched-type-name]
-Point1a = collections.namedtuple("Point", "x       y")
-reveal_type(Point1a)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point1a = collections.namedtuple("Point1a", "x       y")
+reveal_type(Point1a)  # revealed: <class 'Point1a'>
+# revealed: (<class 'Point1a'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1a)
 
 # String field names (comma-separated also works at runtime)
-# error: [mismatched-type-name]
-Point2 = collections.namedtuple("Point", "x, y")
-reveal_type(Point2)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point2 = collections.namedtuple("Point2", "x, y")
+reveal_type(Point2)  # revealed: <class 'Point2'>
+# revealed: (<class 'Point2'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point2)
 
 # List of strings
-# error: [mismatched-type-name]
-Point3 = collections.namedtuple("Point", ["x", "y"])
-reveal_type(Point3)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point3 = collections.namedtuple("Point3", ["x", "y"])
+reveal_type(Point3)  # revealed: <class 'Point3'>
+# revealed: (<class 'Point3'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point3)
 
 # Tuple of strings
-# error: [mismatched-type-name]
-Point4 = collections.namedtuple("Point", ("x", "y"))
-reveal_type(Point4)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point4 = collections.namedtuple("Point4", ("x", "y"))
+reveal_type(Point4)  # revealed: <class 'Point4'>
+# revealed: (<class 'Point4'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point4)
 # Invalid: integer is not a valid typename
 # error: [invalid-argument-type]
@@ -607,14 +598,12 @@ The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields
 from typing import NamedTuple
 
 # List of tuples
-# error: [mismatched-type-name]
-Person1 = NamedTuple("Person", [("name", str), ("age", int)])
-reveal_type(Person1)  # revealed: <class 'Person'>
+Person1 = NamedTuple("Person1", [("name", str), ("age", int)])
+reveal_type(Person1)  # revealed: <class 'Person1'>
 
 # Tuple of tuples
-# error: [mismatched-type-name]
-Person2 = NamedTuple("Person", (("name", str), ("age", int)))
-reveal_type(Person2)  # revealed: <class 'Person'>
+Person2 = NamedTuple("Person2", (("name", str), ("age", int)))
+reveal_type(Person2)  # revealed: <class 'Person2'>
 
 # Invalid: integer is not a valid typename
 # error: [invalid-argument-type]
