@@ -1390,6 +1390,24 @@ Color = Enum("Color", names="RED GREEN BLUE")
 reveal_type(enum_members(Color))
 ```
 
+### Name mismatch diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```py
+from enum import Enum
+
+# error: [mismatched-type-name]
+Mismatch = Enum("WrongName", "A B")
+
+def f(name: str) -> None:
+    # error: [mismatched-type-name]
+    DynamicMismatch = Enum(name, "A B")
+
+name = "GoodMatch"
+GoodMatch = Enum(name, "A B")
+```
+
 ### List/tuple of tuples
 
 ```py
@@ -1626,6 +1644,7 @@ Non-literal names should still be recognized as creating an enum class.
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
+    # error: [mismatched-type-name]
     result = Enum(name.title(), "RED BLUE", module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result
