@@ -39,7 +39,7 @@ use crate::semantic_index::predicate::{
     PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
-use crate::semantic_index::reachability_constraints::{
+use crate::semantic_index::reachability_constraints_datastructures::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::scope::{

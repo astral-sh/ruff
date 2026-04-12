@@ -30,7 +30,6 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-pub(crate) use reachability_constraints::ReachabilityConstraints;
 
 pub mod ast_ids;
 mod builder;
@@ -41,7 +40,7 @@ pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
-mod reachability_constraints;
+pub(crate) mod reachability_constraints_datastructures;
 pub(crate) mod scope;
 pub(crate) mod symbol;
 mod use_def;
