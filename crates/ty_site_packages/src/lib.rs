@@ -175,13 +175,24 @@ fn settings_diagnostic_path_from_sys_prefix(
 
         let path = entry.into_path();
         if let Some(file_name) = path.file_name()
-            && (file_name.starts_with("python") || file_name.starts_with("pypy"))
+            && is_versioned_interpreter_path(file_name)
         {
             return Some(path);
         }
     }
 
     None
+}
+
+fn is_versioned_interpreter_path(file_name: &str) -> bool {
+    let Some(version) = file_name
+        .strip_prefix("python")
+        .or_else(|| file_name.strip_prefix("pypy"))
+    else {
+        return false;
+    };
+
+    !version.is_empty() && PythonVersion::from_str(version.trim_end_matches('t')).is_ok()
 }
 
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
@@ -2754,6 +2765,31 @@ mod tests {
                     None
                 )),
             }
+        );
+    }
+
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn settings_diagnostic_path_ignores_python_helper_scripts() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        let sys_prefix = SystemPathBuf::from("/python");
+        let bin_dir = sys_prefix.join("bin");
+        let interpreter = bin_dir.join("python3.16");
+
+        memory_fs.create_directory_all(&bin_dir).unwrap();
+        memory_fs
+            .write_file_all(bin_dir.join("python3.16-config"), "")
+            .unwrap();
+        memory_fs
+            .write_file_all(bin_dir.join("pythonw"), "")
+            .unwrap();
+        memory_fs.write_file_all(&interpreter, "").unwrap();
+
+        assert_eq!(
+            settings_diagnostic_path_from_sys_prefix(&sys_prefix, &system),
+            Some(interpreter)
         );
     }
 

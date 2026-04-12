@@ -1218,10 +1218,20 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
     success: true
     exit_code: 0
     ----- stdout -----
-    All checks passed!
+    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.
+     --> venv/pyvenv.cfg:2:16
+      |
+    2 | version_info = 3.16.0
+      |                ^^^^^^
+    3 | home = base/bin
+      |
+    info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
+    info: Set `python-version` explicitly to override the inferred version.
+    info: The version was inferred from your virtual environment metadata.
+    
+    Found 1 diagnostic
 
     ----- stderr -----
-    WARN Ignoring unsupported inferred Python version: 3.16
     ");
 
     Ok(())
