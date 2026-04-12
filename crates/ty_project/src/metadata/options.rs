@@ -265,13 +265,10 @@ impl Options {
                     return true;
                 }
 
-                diagnostics.push(unsupported_inferred_python_version_diagnostic(db, python_version));
-
-                tracing::warn!(
-                    "Ignoring unsupported inferred Python version `{}`; ty will use Python {} instead.",
-                    python_version.version,
-                    PythonVersion::latest_ty()
-                );
+                diagnostics.push(unsupported_inferred_python_version_diagnostic(
+                    db,
+                    python_version,
+                ));
 
                 false
             })
