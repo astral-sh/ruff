@@ -22,6 +22,74 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Constructor calls
+
+```py
+from enum import Enum, IntEnum
+
+class Number(Enum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(Number(1))  # revealed: Number
+reveal_type(Number(value=1))  # revealed: Number
+
+class MixedInt(IntEnum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(MixedInt(1))  # revealed: MixedInt
+
+class MixedStr(str, Enum):
+    RED = "red"
+    BLUE = "blue"
+
+reveal_type(MixedStr("red"))  # revealed: MixedStr
+
+class Maybe(Enum):
+    NONE = None
+    SOME = "some"
+
+reveal_type(Maybe(None))  # revealed: Maybe
+
+class Planet(Enum):
+    _value_: int
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    VENUS = (2, 4.869e24, 6.0518e6)
+
+reveal_type(Planet(1))  # revealed: Planet
+
+class EmptyEnum(Enum): ...
+
+reveal_type(EmptyEnum(foo=1))  # revealed: EmptyEnum
+reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
+
+Dynamic = Enum("Dynamic", {"RED": "red", "GREEN": "green"})
+
+reveal_type(Dynamic("red"))  # revealed: Dynamic
+```
+
+## Constructor calls on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class Triple(Enum):
+    XYZ = 1, 2, 3
+    OTHER = 4, 5, 6
+
+reveal_type(Triple(1, 2, 3))  # revealed: Triple
+```
+
 ## Enum members
 
 ### Basic
@@ -639,6 +707,23 @@ reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
 
 reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
 reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
+`auto()` still uses the preceding concrete value even when `1` and `True` compare equal:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+class IntThenTrue(Enum):
+    A = 1
+    B = True
+    C = auto()
+
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"]]
+reveal_type(enum_members(IntThenTrue))
+
+reveal_type(IntThenTrue.C.value)  # revealed: Literal[2]
 ```
 
 Functional enums also detect duplicate-value aliases in both dict and list-of-tuples forms:
@@ -1279,6 +1364,7 @@ class EnumWithEnumMetaMetaclass(metaclass=EnumMeta):
     YES = 1
 
 reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaMetaclass.NO]
+reveal_type(EnumWithEnumMetaMetaclass(0))  # revealed: EnumWithEnumMetaMetaclass
 
 class SubclassOfEnumMeta(EnumMeta): ...
 
@@ -1308,6 +1394,20 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     x.name
     reveal_type(x._value_)  # revealed: Any
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
+```
+
+Open `EnumMeta`-based classes should still use normal metaclass call semantics until they are
+finalized with members:
+
+```py
+from enum import Enum, EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# error: [too-many-positional-arguments]
+Empty(1)
+reveal_type(Empty("Dynamic", {"X": 1}))  # revealed: type[Enum]
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
