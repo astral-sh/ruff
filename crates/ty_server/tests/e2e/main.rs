@@ -28,6 +28,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod code_actions;
+mod code_lens;
 mod commands;
 mod completions;
 mod configuration;
