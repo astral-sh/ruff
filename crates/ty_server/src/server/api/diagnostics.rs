@@ -11,7 +11,9 @@ use ruff_diagnostics::Applicability;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
-use ty_python_semantic::types::ide_support::{unreachable_ranges, unused_bindings};
+use ty_python_semantic::types::ide_support::{
+    UnreachableKind, unreachable_ranges, unused_bindings,
+};
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -36,14 +38,19 @@ pub(super) struct UnnecessaryHint {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 enum UnnecessaryHintKind {
     UnusedBinding(Name),
-    UnreachableCode,
+    UnreachableCode(UnreachableKind),
 }
 
 impl UnnecessaryHintKind {
     fn message(&self) -> String {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
-            Self::UnreachableCode => "Code is unreachable".to_owned(),
+            Self::UnreachableCode(UnreachableKind::Unconditional) => {
+                "Code is unreachable".to_owned()
+            }
+            Self::UnreachableCode(UnreachableKind::CurrentAnalysis) => {
+                "Code is unreachable under the current analysis".to_owned()
+            }
         }
     }
 }
@@ -382,22 +389,26 @@ pub(super) fn collect_unnecessary_hints(db: &ProjectDatabase, file: File) -> Vec
         return Vec::new();
     }
 
+    let unreachable = unreachable_ranges(db, file);
+
     let mut hints = unused_bindings(db, file)
         .iter()
+        // Avoid a narrower unused-binding hint inside code that is already reported as unreachable.
+        .filter(|binding| {
+            !unreachable
+                .iter()
+                .any(|range| range.range.contains_range(binding.range))
+        })
         .map(|binding| UnnecessaryHint {
             range: binding.range,
             kind: UnnecessaryHintKind::UnusedBinding(binding.name.clone()),
         })
         .collect::<Vec<_>>();
 
-    hints.extend(
-        unreachable_ranges(db, file)
-            .iter()
-            .map(|range| UnnecessaryHint {
-                range: *range,
-                kind: UnnecessaryHintKind::UnreachableCode,
-            }),
-    );
+    hints.extend(unreachable.iter().map(|range| UnnecessaryHint {
+        range: range.range,
+        kind: UnnecessaryHintKind::UnreachableCode(range.kind),
+    }));
 
     hints.sort_unstable_by(|left, right| {
         (left.range.start(), left.range.end(), &left.kind).cmp(&(

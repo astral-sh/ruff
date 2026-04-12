@@ -94,6 +94,67 @@ def foo():
 }
 
 #[test]
+fn current_analysis_unreachable_code_has_unnecessary_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let ty_toml = SystemPath::new("ty.toml");
+    let foo_content = "\
+import sys
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+";
+    let ty_toml_content = "\
+[environment]
+python-version = \"3.10\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_file(ty_toml, ty_toml_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn unreachable_code_suppresses_unused_binding_hint() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo():
+    return 0
+    x = 1
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn workspace_reports_unused_binding_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -140,6 +201,42 @@ def foo():
             Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
         )?
         .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn workspace_reports_current_analysis_unreachable_code_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let ty_toml = SystemPath::new("ty.toml");
+    let foo_content = "\
+import sys
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+";
+    let ty_toml_content = "\
+[environment]
+python-version = \"3.10\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+        )?
+        .with_file(foo, foo_content)?
+        .with_file(ty_toml, ty_toml_content)?
         .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();

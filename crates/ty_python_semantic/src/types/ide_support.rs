@@ -28,7 +28,7 @@ mod unused_binding_support;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
-pub use unreachable_code::unreachable_ranges;
+pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 /// Get the primary definition kind for a name expression within a specific file.

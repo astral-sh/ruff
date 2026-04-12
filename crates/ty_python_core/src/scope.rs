@@ -3,6 +3,7 @@ use std::ops::Range;
 use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{Db, SemanticIndex, ast_node_ref::AstNodeRef, node_key::NodeKey, semantic_index};
 
@@ -380,6 +381,22 @@ impl NodeWithScopeKind {
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
         }
+    }
+
+    pub fn node_range(&self, parsed: &ParsedModuleRef) -> Option<TextRange> {
+        Some(match self {
+            Self::Module => return None,
+            Self::Class(node) | Self::ClassTypeParameters(node) => node.node(parsed).range(),
+            Self::Function(node) | Self::FunctionTypeParameters(node) => node.node(parsed).range(),
+            Self::TypeAlias(node) | Self::TypeAliasTypeParameters(node) => {
+                node.node(parsed).range()
+            }
+            Self::Lambda(node) => node.node(parsed).range(),
+            Self::ListComprehension(node) => node.node(parsed).range(),
+            Self::SetComprehension(node) => node.node(parsed).range(),
+            Self::DictComprehension(node) => node.node(parsed).range(),
+            Self::GeneratorExpression(node) => node.node(parsed).range(),
+        })
     }
 
     pub fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
