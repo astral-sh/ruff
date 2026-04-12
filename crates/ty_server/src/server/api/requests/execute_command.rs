@@ -26,11 +26,11 @@ impl RunTestArgs {
     pub(crate) fn new(
         cwd: &str,
         file_path: Option<&str>,
-        class_names: &[Name],
+        class_name: Option<&Name>,
         function_name: Option<&str>,
     ) -> Self {
         let mut test_target = file_path.unwrap_or_default().to_string();
-        for class_name in class_names {
+        if let Some(class_name) = class_name {
             if !test_target.is_empty() {
                 test_target.push_str("::");
             }
