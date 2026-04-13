@@ -803,6 +803,13 @@ fn is_update_inline_snapshots_enabled() -> bool {
     *is_enabled
 }
 
+fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
+    static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
+
+    INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
+}
+
 fn validate_inline_snapshot(
     db: &mut db::Db,
     test_file: &TestFile<'_>,
@@ -864,7 +871,8 @@ fn validate_inline_snapshot(
             continue;
         };
 
-        let actual = render_diagnostics(db, block_diagnostics);
+        let actual =
+            apply_snapshot_filters(&render_diagnostics(db, block_diagnostics)).into_owned();
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
