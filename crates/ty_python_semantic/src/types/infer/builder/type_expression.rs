@@ -1618,7 +1618,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::FunctoolsPartial(_) => {
+                KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::FunctoolsPartialCall(_) => {
                     self.infer_type_expression(&subscript.slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(

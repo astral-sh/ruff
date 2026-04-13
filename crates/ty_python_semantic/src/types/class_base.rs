@@ -195,7 +195,8 @@ impl<'db> ClassBase<'db> {
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
                 | KnownInstanceType::NewType(_)
-                | KnownInstanceType::FunctoolsPartial(_) => None,
+                | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::FunctoolsPartialCall(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
