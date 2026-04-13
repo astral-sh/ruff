@@ -24,8 +24,8 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, TypeVarInference,
-    walk_generic_context,
+    ApplySpecialization, GenericContext, InferableTypeVars, TypeVarInference, TypeVarSubstitution,
+    TypeVarSubstitutionProjection, walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
@@ -921,22 +921,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns this signature with the given specialization applied to parameters and return type.
-    pub(crate) fn apply_specialization(
-        &self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
-        let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
-        self.apply_type_mapping_impl(
-            db,
-            &type_mapping,
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        )
-    }
-
     /// Returns the callable signature produced by partially applying this signature.
     pub(crate) fn partially_apply(
         &self,
@@ -945,17 +929,26 @@ impl<'db> Signature<'db> {
         inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
     ) -> Self {
-        let signature_specialization =
-            self.partial_application_specialization(db, partial_application, inference);
-        let signature = signature_specialization.map_or_else(
+        let signature_substitution =
+            self.partial_application_substitution(db, partial_application, inference);
+        let signature = signature_substitution.as_ref().map_or_else(
             || self.clone(),
-            |specialization| self.apply_specialization(db, specialization),
+            |substitution| {
+                self.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(
+                        substitution,
+                    )),
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                )
+            },
         );
 
         let parameters = signature.parameters().as_slice();
-        let return_ty = signature_specialization.map_or_else(
+        let return_ty = signature_substitution.as_ref().map_or_else(
             || unspecialized_return_ty,
-            |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
+            |substitution| substitution.apply_to_type(db, unspecialized_return_ty),
         );
 
         let mut remaining = Vec::with_capacity(parameters.len());
@@ -1014,16 +1007,16 @@ impl<'db> Signature<'db> {
             .with_return_type(return_ty)
     }
 
-    /// Returns the specialization used for the callable signature exposed by a partial object.
+    /// Returns the open substitution used for the callable signature exposed by a partial object.
     ///
-    /// Surviving type variables that still appear in the reduced parameter list may need a more
-    /// specific specialization than the plain return-type view.
-    fn partial_application_specialization(
+    /// Surviving unsolved type variables are left out of the substitution, so they remain generic
+    /// in the reduced signature instead of being represented as identity mappings.
+    fn partial_application_substitution(
         &self,
         db: &'db dyn Db,
         partial_application: &PartialApplication<'db>,
         inference: Option<TypeVarInference<'db>>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<TypeVarSubstitution<'db>> {
         let inference = inference?;
         let generic_context = self
             .generic_context
@@ -1039,21 +1032,23 @@ impl<'db> Signature<'db> {
                     .any(|(_, parameter)| {
                         parameter
                             .annotated_type()
-                            .references_typevar(db, typevar.typevar(db).identity(db))
+                            .references_bound_typevar(db, *typevar)
                     })
             })
             .map(|typevar| typevar.identity(db))
             .collect();
 
-        if promoted_typevars.is_empty() {
-            return Some(inference.specialization(db));
-        }
+        let substitution = inference.substitution_with(db, |typevar, inferred| {
+            if promoted_typevars.contains(&typevar.identity(db)) {
+                inferred.map_or(TypeVarSubstitutionProjection::Unsolved, |ty| {
+                    TypeVarSubstitutionProjection::Substitute(ty.promote(db))
+                })
+            } else {
+                TypeVarSubstitutionProjection::Default
+            }
+        });
 
-        Some(inference.specialization_with(db, |typevar, inferred| {
-            promoted_typevars
-                .contains(&typevar.identity(db))
-                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db)))
-        }))
+        (!substitution.is_empty()).then_some(substitution)
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {

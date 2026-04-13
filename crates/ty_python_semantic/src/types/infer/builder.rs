@@ -39,7 +39,9 @@ use crate::place::{
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{
+    ArgumentInferenceRefinement, Binding, Bindings, CallArguments, CallError, CallErrorKind,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
@@ -5013,22 +5015,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the argument types using the narrowed type context.
-            speculative_builder.infer_all_argument_types(
-                ast_arguments.clone(),
-                argument_types,
-                infer_argument_ty,
-                bindings,
-                narrowed_tcx,
-            );
-
-            // Ensure the argument types match their annotated types.
-            if speculative_bindings
-                .check_types_impl(
-                    db,
-                    &constraints,
+            if speculative_builder
+                .infer_and_check_argument_types_with_refinement(
+                    ast_arguments.clone(),
                     argument_types,
+                    infer_argument_ty,
+                    &mut speculative_bindings,
                     narrowed_tcx,
-                    &self.dataclass_field_specifiers,
+                    &constraints,
                 )
                 .is_err()
             {
@@ -5049,13 +5043,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Successfully narrowed to an element of the union.
             self.extend(speculative_builder);
-            Some(bindings.check_types_impl(
-                db,
-                &constraints,
-                argument_types,
-                narrowed_tcx,
-                &self.dataclass_field_specifiers,
-            ))
+            *bindings = speculative_bindings;
+            Some(Ok(()))
         };
 
         // Prefer the declared type of generic classes or callables when narrowing.
@@ -5083,40 +5072,104 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
-        self.infer_all_argument_types(
+        self.infer_and_check_argument_types_with_refinement(
             ast_arguments,
             argument_types,
             infer_argument_ty,
             bindings,
             call_expression_tcx,
-        );
-
-        bindings.check_types_impl(
-            db,
             &constraints,
-            argument_types,
-            call_expression_tcx,
-            &self.dataclass_field_specifiers,
         )
     }
 
-    /// Infer the argument types for all bindings.
-    ///
-    /// Note that this method may infer the type of a given argument expression multiple times with
-    /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
-    /// behavior.
-    fn infer_all_argument_types<'bindings>(
+    /// Infers call argument types, optionally rerunning inference with refined bindings.
+    fn infer_and_check_argument_types_with_refinement(
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
-        arguments_types: &mut CallArguments<'_, 'db>,
+        argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
-        bindings: &'bindings Bindings<'db>,
+        bindings: &mut Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) {
-        fn add_overloads_from_binding<'a, 'db>(
-            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
-            binding: &'a CallableBinding<'db>,
-        ) {
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> Result<(), CallErrorKind> {
+        let db = self.db();
+        if !bindings.may_request_argument_inference_refinement(db) {
+            self.infer_all_argument_types(
+                ast_arguments,
+                argument_types,
+                infer_argument_ty,
+                bindings,
+                call_expression_tcx,
+                None,
+            );
+
+            return bindings.check_types_impl(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+            );
+        }
+
+        let original_argument_types = argument_types.clone();
+        let original_bindings = bindings.clone();
+
+        self.infer_all_argument_types(
+            ast_arguments.clone(),
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+            None,
+        );
+
+        let mut result = bindings.check_types_impl(
+            db,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            &self.dataclass_field_specifiers,
+        );
+
+        let Some(refinement_bindings) =
+            bindings.argument_inference_refinement_request(db, argument_types)
+        else {
+            return result;
+        };
+
+        *bindings = original_bindings;
+        *argument_types = original_argument_types;
+        let mut refinement_builder = self.speculate();
+        refinement_builder.infer_all_argument_types(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+            Some(&refinement_bindings),
+        );
+
+        result = bindings.check_types_impl(
+            db,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            &self.dataclass_field_specifiers,
+        );
+
+        self.extend(refinement_builder);
+
+        result
+    }
+
+    /// Collects the overloads that provide type context for argument inference.
+    fn argument_inference_overloads<'a>(
+        bindings: &'a Bindings<'db>,
+    ) -> Vec<ArgumentInferenceOverload<'a, 'db>> {
+        let mut overloads_with_binding = Vec::new();
+
+        bindings.visit_type_context_callables(&mut |binding| {
             match binding.matching_overload_index() {
                 MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
                     overloads_with_binding.extend(
@@ -5134,26 +5187,71 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+        });
+
+        overloads_with_binding
+    }
+
+    /// Returns the type-context inputs to use when inferring one call argument.
+    fn argument_inference_context<'a>(
+        argument_index: usize,
+        bindings: &'a Bindings<'db>,
+        root_overloads_with_binding: &'a [ArgumentInferenceOverload<'a, 'db>],
+        refinement_bindings: Option<&'a ArgumentInferenceRefinement<'db>>,
+        refinement_overloads_with_binding: Option<&'a [ArgumentInferenceOverload<'a, 'db>]>,
+    ) -> ArgumentInferenceContext<'a, 'db> {
+        if let Some(refinement_bindings) = refinement_bindings
+            && let Some(refined_argument_index) =
+                refinement_bindings.local_index_for_argument(argument_index)
+            && let Some(refinement_overloads_with_binding) = refinement_overloads_with_binding
+        {
+            return ArgumentInferenceContext {
+                overloads_with_binding: refinement_overloads_with_binding,
+                argument_index: refined_argument_index,
+                argument_form: refinement_bindings
+                    .bindings()
+                    .argument_forms()
+                    .get(refined_argument_index)
+                    .copied()
+                    .flatten(),
+            };
         }
 
+        ArgumentInferenceContext {
+            overloads_with_binding: root_overloads_with_binding,
+            argument_index,
+            argument_form: bindings
+                .argument_forms()
+                .get(argument_index)
+                .copied()
+                .flatten(),
+        }
+    }
+
+    /// Infer the argument types for all bindings.
+    ///
+    /// Note that this method may infer the type of a given argument expression multiple times with
+    /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
+    /// behavior.
+    fn infer_all_argument_types(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        arguments_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &Bindings<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        refinement_bindings: Option<&ArgumentInferenceRefinement<'db>>,
+    ) {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let iter = itertools::izip!(
-            0..,
-            arguments_types.iter_mut(),
-            bindings.argument_forms().iter().copied(),
-            ast_arguments
-        );
+        let root_overloads_with_binding = Self::argument_inference_overloads(bindings);
+        let refinement_overloads_with_binding = refinement_bindings
+            .map(ArgumentInferenceRefinement::bindings)
+            .map(Self::argument_inference_overloads);
 
-        let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
-
-        bindings.visit_type_context_callables(&mut |binding| {
-            add_overloads_from_binding(&mut overloads_with_binding, binding);
-        });
-
-        for (argument_index, (_, argument_types), argument_form, ast_argument) in iter {
+        for (argument_index, ast_argument) in ast_arguments.enumerate() {
             let ast_argument = match ast_argument {
                 // Splatted arguments are inferred before parameter matching to
                 // determine their length.
@@ -5166,8 +5264,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
             };
 
+            let context = Self::argument_inference_context(
+                argument_index,
+                bindings,
+                &root_overloads_with_binding,
+                refinement_bindings,
+                refinement_overloads_with_binding.as_deref(),
+            );
+
+            let Some(argument_types) = arguments_types.type_at_mut(argument_index) else {
+                continue;
+            };
+
             // Type-form arguments are inferred without type context, so we can infer the argument type directly.
-            if let Some(ParameterForm::Type) = argument_form {
+            if let Some(ParameterForm::Type) = context.argument_form {
                 argument_types.insert(
                     TypeContext::default(),
                     self.infer_type_expression(ast_argument),
@@ -5177,21 +5287,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Retrieve the parameter type context for the current argument in a given overload and its binding.
-            let parameter_tcx = |overload: &'bindings Binding<'db>,
-                                 binding: &CallableBinding<'db>| {
-                let argument_index = if binding.bound_type.is_some() {
-                    argument_index + 1
+            //
+            // Returns the annotated (unspecialized) parameter type (used for dedup and as the
+            // storage key in `CallArgumentTypes`) along with the type context to use for inference.
+            let parameter_tcx = |overload: &Binding<'db>,
+                                 binding: &CallableBinding<'db>|
+             -> Option<(Type<'db>, TypeContext<'db>)> {
+                let matched_argument_index = if binding.bound_type.is_some() {
+                    context.argument_index + 1
                 } else {
-                    argument_index
+                    context.argument_index
                 };
 
-                let argument_matches = &overload.argument_matches()[argument_index];
+                let argument_matches = overload.argument_matches().get(matched_argument_index)?;
                 let [parameter_index] = argument_matches.parameters.as_slice() else {
                     return None;
                 };
 
                 let parameter = &overload.signature.parameters()[*parameter_index];
-                let mut parameter_type = parameter.annotated_type();
+                let annotated_type = parameter.annotated_type();
+                let mut parameter_type = annotated_type;
 
                 // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
                 // use the upper bound as type context.
@@ -5199,7 +5314,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
                         typevar.typevar(db).bound_or_constraints(db)
                 {
-                    return Some((parameter, TypeContext::new(Some(bound))));
+                    return Some((annotated_type, TypeContext::new(Some(bound))));
                 }
 
                 // If this is a generic call, attempt to specialize the parameter type using the
@@ -5239,15 +5354,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
 
-                Some((parameter, TypeContext::new(Some(parameter_type))))
+                Some((annotated_type, TypeContext::new(Some(parameter_type))))
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
             // the unique parameter type annotation.
-            if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                if let Some((parameter, parameter_tcx)) = parameter_tcx(overload, binding) {
+            if let Ok((overload, binding)) =
+                context.overloads_with_binding.iter().copied().exactly_one()
+            {
+                if let Some((annotated_type, parameter_tcx)) = parameter_tcx(overload, binding) {
                     argument_types.insert(
-                        parameter.annotated_type(),
+                        annotated_type,
                         infer_argument_ty(self, (argument_index, ast_argument, parameter_tcx)),
                     );
                 } else {
@@ -5268,8 +5385,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
 
                 // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_types = overloads_with_binding
+                let parameter_types = context
+                    .overloads_with_binding
                     .iter()
+                    .copied()
                     .filter_map(|(overload, binding)| parameter_tcx(overload, binding));
 
                 let mut seen = FxHashSet::default();
@@ -5280,8 +5399,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // as inner expressions are repeatedly inferred with the same type context.
                 let teardown = self.setup_expression_cache();
 
-                for (parameter, parameter_tcx) in parameter_types {
-                    if !seen.insert(parameter.annotated_type()) {
+                for (annotated_type, parameter_tcx) in parameter_types {
+                    if !seen.insert(annotated_type) {
                         continue;
                     }
 
@@ -5294,7 +5413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (argument_index, ast_argument, parameter_tcx),
                     );
                     self.union_expected_types(&speculative_builder.expected_types);
-                    argument_types.insert(parameter.annotated_type(), inferred_ty);
+                    argument_types.insert(annotated_type, inferred_ty);
                 }
 
                 if teardown {
@@ -9596,6 +9715,14 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 /// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+type ArgumentInferenceOverload<'a, 'db> = (&'a Binding<'db>, &'a CallableBinding<'db>);
+
+/// Type-context inputs for inferring a single call argument.
+struct ArgumentInferenceContext<'a, 'db> {
+    overloads_with_binding: &'a [ArgumentInferenceOverload<'a, 'db>],
+    argument_index: usize,
+    argument_form: Option<ParameterForm>,
+}
 
 /// An iterator over arguments to a functional call.
 #[derive(Clone)]

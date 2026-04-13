@@ -50,6 +50,25 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn references_bound_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let typevar = if typevar.is_paramspec(db) {
+            typevar.without_paramspec_attr(db)
+        } else {
+            typevar
+        };
+        any_over_type(db, self, false, |ty| match ty {
+            Type::TypeVar(bound_typevar) if bound_typevar.is_paramspec(db) => bound_typevar
+                .without_paramspec_attr(db)
+                .is_same_typevar_as(db, typevar),
+            Type::TypeVar(bound_typevar) => bound_typevar.is_same_typevar_as(db, typevar),
+            _ => false,
+        })
+    }
+
     pub(crate) fn has_non_self_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(
             db,

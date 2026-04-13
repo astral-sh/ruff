@@ -241,6 +241,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .map(|item| (item.argument, &mut item.types))
     }
 
+    /// Returns the mutable type slot for the argument at `index`, if present.
+    pub(crate) fn type_at_mut(&mut self, index: usize) -> Option<&mut CallArgumentTypes<'db>> {
+        self.items.get_mut(index).map(|item| &mut item.types)
+    }
+
     /// Create a new [`CallArguments`] starting from the specified index.
     pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
@@ -248,10 +253,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
+    /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
+    ///
+    /// The resulting argument list preserves the order of `indices`.
+    pub(crate) fn select(&self, indices: &[usize]) -> Self {
+        Self {
+            items: indices
+                .iter()
+                .map(|index| self.items[*index].clone())
+                .collect(),
+        }
+    }
+
     /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
     /// concrete enough for partial-application analysis.
     pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
-        let bound_call_arguments = self.start_from(1);
+        let bound_argument_indices: Vec<_> = (1..self.len()).collect();
+        let bound_call_arguments = self.select(&bound_argument_indices);
 
         // We only handle variadics and keyword-maps that can be normalized to concrete argument
         // positions for overload matching.

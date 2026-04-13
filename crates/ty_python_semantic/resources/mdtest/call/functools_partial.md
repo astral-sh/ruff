@@ -532,6 +532,30 @@ bound = partial(invoke, flag=1, func=pre)
 reveal_type(bound(cfg="x"))  # revealed: int
 ```
 
+### ParamSpec decorator factory with recursive return type
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from functools import partial
+from typing import TypeVar
+from typing_extensions import ParamSpec
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+def decorator(
+    func: Callable[P, T] | None = None, *, flag: bool = True
+) -> Callable[[Callable[P, T]], Callable[P, T]] | Callable[P, T]:
+    if func is None:
+        return partial(decorator, flag=flag)  # error: [invalid-return-type]
+    return func
+```
+
 ### Overloaded stdlib callable narrowed by bound args
 
 `partial(reduce, mul)` should keep the narrowed return type from the bound reducer:
@@ -588,8 +612,7 @@ Distribution = Literal["sdist", "wheel", "editable"]
 def build(distributions: Sequence[Distribution]) -> None:
     pass
 
-p = partial(build, distributions=["wheel"])  # error: [invalid-argument-type]
-# TODO: should accept this keyword literal without a construction-time error.
+p = partial(build, distributions=["wheel"])
 reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
 reveal_type(p())  # revealed: None
 ```
@@ -1412,8 +1435,7 @@ class CallbackHost(Generic[T]):
     @classmethod
     def callback(cls, wself: ReferenceType["CallbackHost[Any]"], x: int) -> None: ...
     def __init__(self) -> None:
-        p = partial(self.callback, ref(self))  # error: [invalid-argument-type]
-        # TODO: should accept `ReferenceType[Self]` here and preserve the reduced signature.
+        p = partial(self.callback, ref(self))
         reveal_type(p)  # revealed: partial[(x: int) -> None]
 ```
 

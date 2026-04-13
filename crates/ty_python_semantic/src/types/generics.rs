@@ -852,10 +852,7 @@ impl<'db> GenericContext<'db> {
     /// [`specialize_partial`](Self::specialize_partial) if you might not have types for every
     /// typevar.)
     ///
-    /// The types you provide should not mention any of the typevars in this generic context;
-    /// otherwise, you will be left with a partial specialization. (Use
-    /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
-    /// in this generic context.)
+    /// The types you provide should not mention any of the typevars in this generic context.
     pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
     where
         T: Into<Cow<'t, [Type<'db>]>>,
@@ -865,65 +862,6 @@ impl<'db> GenericContext<'db> {
 
         assert_eq!(self.len(db), types.len());
         Specialization::new(db, self, types, None, None)
-    }
-
-    /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context.
-    ///
-    /// If any provided type is `None`, we will use the corresponding typevar's default type. You
-    /// are allowed to provide types that mention the typevars in this generic context.
-    pub(crate) fn specialize_recursive<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
-    where
-        I: IntoIterator<Item = Option<Type<'db>>>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        let types = self.fill_in_defaults(db, types);
-        self.specialize_from_types_recursive(db, types)
-    }
-
-    /// Builds a specialization and recursively resolves references between the chosen types.
-    fn specialize_from_types_recursive(
-        self,
-        db: &'db dyn Db,
-        mut types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
-        let len = types.len();
-        let variables = self.variables(db).collect_vec();
-        loop {
-            let mut any_changed = false;
-            for i in 0..len {
-                // Preserve identity mappings for unresolved type variables.
-                if types[i] == Type::TypeVar(variables[i]) {
-                    continue;
-                }
-
-                let specialization = ApplySpecialization::Partial {
-                    generic_context: self,
-                    types: &types,
-                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                    // check if the result is self-referential after we're done applying the
-                    // partial specialization. But when we apply a paramspec, we don't use the
-                    // callable that it maps to directly; we create a new callable that reuses
-                    // parts of it. That means we can't look for the previous type directly.
-                    // Instead we use this to skip specializing the type in itself in the first
-                    // place.
-                    skip: Some(i),
-                };
-                let updated = types[i].apply_type_mapping(
-                    db,
-                    &TypeMapping::ApplySpecialization(specialization),
-                    TypeContext::default(),
-                );
-                if updated != types[i] {
-                    types[i] = updated;
-                    any_changed = true;
-                }
-            }
-
-            if !any_changed {
-                return Specialization::new(db, self, types, None, None);
-            }
-        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -978,7 +916,6 @@ impl<'db> GenericContext<'db> {
             let specialization = ApplySpecialization::Partial {
                 generic_context: self,
                 types: &expanded[0..idx],
-                skip: None,
             };
             let default = default.apply_type_mapping(
                 db,
@@ -1646,12 +1583,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
+    Substitution(&'a TypeVarSubstitution<'db>),
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
-        /// An optional typevar to _not_ substitute when applying the specialization. We use this to
-        /// avoid recursively substituting a type inside of itself.
-        skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
@@ -1671,17 +1606,14 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::Specialization(specialization) => {
                 specialization.get(db, bound_typevar)
             }
+            ApplySpecialization::Substitution(substitution) => substitution.get(db, bound_typevar),
             ApplySpecialization::Partial {
                 generic_context,
                 types,
-                skip,
             } => {
                 let index = generic_context
                     .variables_inner(db)
                     .get_index_of(&bound_typevar.identity(db))?;
-                if skip.is_some_and(|skip| skip == index) {
-                    return Some(Type::Never);
-                }
                 types.get(index).copied()
             }
             ApplySpecialization::ReturnCallables(replacements) => {
@@ -1714,6 +1646,139 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         )
     }
+}
+
+/// An open substitution from type variables to types.
+///
+/// Unlike [`Specialization`], this does not fill defaults for every variable in a generic context.
+/// Unsolved variables are represented by absence from the map.
+#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+pub struct TypeVarSubstitution<'db> {
+    types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+}
+
+impl<'db> TypeVarSubstitution<'db> {
+    fn normalize_mapping(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> TypeVarSubstitutionMapping<'db> {
+        if ty.references_bound_typevar(db, bound_typevar) {
+            TypeVarSubstitutionMapping::Recursive
+        } else {
+            let ty = self.apply_to_type(db, ty);
+
+            // This is the usual occurs check for substitutions: neither open substitutions nor
+            // closed specializations can represent `T := F[T]` as a finite type.
+            if ty.references_bound_typevar(db, bound_typevar) {
+                TypeVarSubstitutionMapping::Recursive
+            } else {
+                TypeVarSubstitutionMapping::Acyclic(ty)
+            }
+        }
+    }
+
+    fn insert(
+        &mut self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> TypeVarSubstitutionInsertion {
+        match self.normalize_mapping(db, bound_typevar, ty) {
+            TypeVarSubstitutionMapping::Acyclic(ty) => {
+                let update = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                    bound_typevar,
+                    ty,
+                ));
+                for existing in self.types.values_mut() {
+                    *existing = existing.apply_type_mapping(db, &update, TypeContext::default());
+                }
+
+                self.types.insert(bound_typevar.identity(db), ty);
+                TypeVarSubstitutionInsertion::Inserted
+            }
+            TypeVarSubstitutionMapping::Recursive => TypeVarSubstitutionInsertion::Recursive,
+        }
+    }
+
+    fn default_type(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Type<'db> {
+        if typevar.is_paramspec(db) {
+            Type::paramspec_value_callable(db, Parameters::unknown())
+        } else {
+            Type::unknown()
+        }
+    }
+
+    fn default_or_fallback_type(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Type<'db> {
+        typevar.default_type(db).map_or_else(
+            || Self::default_type(db, typevar),
+            |default| self.apply_to_type(db, default),
+        )
+    }
+
+    pub(crate) fn get(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        self.types.get(&bound_typevar.identity(db)).copied()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.types.is_empty()
+    }
+
+    pub(crate) fn apply_to_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        ty.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(self)),
+            TypeContext::default(),
+        )
+    }
+
+    fn close_over(
+        mut self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Specialization<'db> {
+        for typevar in generic_context.variables(db) {
+            if self.get(db, typevar).is_none() {
+                let fallback = self.default_or_fallback_type(db, typevar);
+                self.insert(db, typevar, fallback);
+            }
+        }
+
+        let types = generic_context
+            .variables(db)
+            .map(|typevar| {
+                self.get(db, typevar)
+                    .unwrap_or_else(|| Self::default_type(db, typevar))
+            })
+            .collect_vec();
+
+        generic_context.specialize(db, types)
+    }
+}
+
+enum TypeVarSubstitutionMapping<'db> {
+    Acyclic(Type<'db>),
+    Recursive,
+}
+
+enum TypeVarSubstitutionInsertion {
+    Inserted,
+    Recursive,
+}
+
+pub(crate) enum TypeVarSubstitutionProjection<'db> {
+    Default,
+    Substitute(Type<'db>),
+    Unsolved,
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a
@@ -1760,13 +1825,44 @@ impl<'db> TypeVarInference<'db> {
         db: &'db dyn Db,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<Type<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
-        let types = self
+        let substitution = self.substitution_with(db, |typevar, inferred| {
+            choose(typevar, inferred).map_or(TypeVarSubstitutionProjection::Default, |ty| {
+                TypeVarSubstitutionProjection::Substitute(ty)
+            })
+        });
+
+        substitution.close_over(db, self.generic_context(db))
+    }
+
+    /// Project this inference result into an open substitution with explicit handling for each
+    /// type variable.
+    pub(crate) fn substitution_with(
+        self,
+        db: &'db dyn Db,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            Option<Type<'db>>,
+        ) -> TypeVarSubstitutionProjection<'db>,
+    ) -> TypeVarSubstitution<'db> {
+        let mut substitution = TypeVarSubstitution::default();
+
+        for (typevar, inferred) in self
             .generic_context(db)
             .variables(db)
             .zip(self.types(db).iter().copied())
-            .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
+        {
+            let ty = match choose(typevar, inferred) {
+                TypeVarSubstitutionProjection::Substitute(ty) => ty,
+                TypeVarSubstitutionProjection::Default => {
+                    inferred.unwrap_or_else(|| substitution.default_or_fallback_type(db, typevar))
+                }
+                TypeVarSubstitutionProjection::Unsolved => continue,
+            };
 
-        self.generic_context(db).specialize_recursive(db, types)
+            substitution.insert(db, typevar, ty);
+        }
+
+        substitution
     }
 }
 
@@ -1811,21 +1907,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let db = self.db;
-        let types =
-            generic_context
-                .variables_inner(db)
-                .iter()
-                .map(|(identity, variable)| match self.types.get_mut(identity) {
-                    Some(mapped_ty) => {
-                        let mapped_ty = mapped_ty.get_or_build(db);
-                        // The typevar was inferred — present both bounds as the inferred type.
-                        let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
-                        Some(chosen.unwrap_or(mapped_ty))
-                    }
-                    None => choose(*variable, None),
-                });
+        let mut substitution = TypeVarSubstitution::default();
 
-        generic_context.specialize_recursive(db, types)
+        for (identity, variable) in generic_context.variables_inner(db) {
+            let ty = match self.types.get_mut(identity) {
+                Some(mapped_ty) => {
+                    let mapped_ty = mapped_ty.get_or_build(db);
+                    // The typevar was inferred — present both bounds as the inferred type.
+                    choose(*variable, Some((mapped_ty, mapped_ty))).unwrap_or(mapped_ty)
+                }
+                None => {
+                    let Some(ty) = choose(*variable, None) else {
+                        continue;
+                    };
+                    ty
+                }
+            };
+
+            substitution.insert(db, *variable, ty);
+        }
+
+        substitution.close_over(db, generic_context)
     }
 
     /// Build raw type-variable inference, preserving which type variables were left unsolved.
@@ -1858,7 +1960,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) {
-        let identity = bound_typevar.identity(self.db);
+        let db = self.db;
+        let identity = bound_typevar.identity(db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
@@ -1867,11 +1970,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // specialization from the first occurrence.
                 // https://github.com/astral-sh/ty/issues/1778
                 // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
-                if bound_typevar.is_paramspec(self.db) {
+                if bound_typevar.is_paramspec(db) {
                     return;
                 }
 
-                entry.get_mut().add(self.db, ty);
+                entry.get_mut().add(db, ty);
             }
             Entry::Vacant(entry) => {
                 entry.insert(UnionAccumulator::new(ty));

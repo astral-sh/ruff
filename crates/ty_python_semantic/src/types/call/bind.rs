@@ -199,6 +199,7 @@ impl<'db> CallableItem<'db> {
         db: &'db dyn Db,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
+        argument_mapping: &ArgumentIndexMapping,
     ) -> Option<CallableType<'db>> {
         match self {
             CallableItem::Regular(binding) => CallableType::partially_apply(
@@ -207,6 +208,7 @@ impl<'db> CallableItem<'db> {
                     db,
                     partial_overload,
                     bound_call_arguments,
+                    argument_mapping,
                 )?,
             ),
             CallableItem::Constructor(_) => None,
@@ -342,6 +344,92 @@ impl<'db> BindingsElement<'db> {
     /// Returns true if any binding in this element is callable.
     fn is_callable(&self) -> bool {
         self.items.iter().any(CallableItem::is_callable)
+    }
+}
+
+/// Maps argument positions from a projected sub-call back to their original call-site positions.
+#[derive(Clone, Debug)]
+pub(crate) struct ArgumentIndexMapping {
+    /// The argument index in the original `CallArguments` for each projected argument.
+    argument_indices: Box<[usize]>,
+    /// The diagnostic argument index in the original AST call for each projected argument.
+    diagnostic_indices: Box<[Option<usize>]>,
+}
+
+impl ArgumentIndexMapping {
+    fn new(argument_indices: Vec<usize>, diagnostic_indices: Vec<Option<usize>>) -> Self {
+        debug_assert_eq!(argument_indices.len(), diagnostic_indices.len());
+        Self {
+            argument_indices: argument_indices.into_boxed_slice(),
+            diagnostic_indices: diagnostic_indices.into_boxed_slice(),
+        }
+    }
+
+    fn from_argument_indices(
+        arguments: &CallArguments<'_, '_>,
+        argument_indices: impl IntoIterator<Item = usize>,
+    ) -> Self {
+        let adjusted_indices = adjusted_argument_indices(arguments);
+        let argument_indices: Vec<_> = argument_indices.into_iter().collect();
+        let diagnostic_indices = argument_indices
+            .iter()
+            .map(|index| adjusted_indices[*index])
+            .collect();
+        Self::new(argument_indices, diagnostic_indices)
+    }
+
+    fn diagnostic_indices(&self) -> &[Option<usize>] {
+        &self.diagnostic_indices
+    }
+
+    fn local_index_for_argument(&self, argument_index: usize) -> Option<usize> {
+        self.argument_indices
+            .iter()
+            .position(|mapped_index| *mapped_index == argument_index)
+    }
+}
+
+fn adjusted_argument_indices(arguments: &CallArguments<'_, '_>) -> Vec<Option<usize>> {
+    let mut num_synthetic_args = 0;
+    arguments
+        .iter()
+        .enumerate()
+        .map(|(argument_index, (argument, _))| {
+            if matches!(argument, Argument::Synthetic) {
+                num_synthetic_args += 1;
+                None
+            } else {
+                Some(argument_index - num_synthetic_args)
+            }
+        })
+        .collect()
+}
+
+/// Refinement bindings to use for projected call arguments during a refinement pass.
+#[derive(Clone, Debug)]
+pub(crate) struct ArgumentInferenceRefinement<'db> {
+    bindings: Bindings<'db>,
+    argument_mapping: ArgumentIndexMapping,
+}
+
+impl<'db> ArgumentInferenceRefinement<'db> {
+    /// Creates refinement bindings for projected original call arguments.
+    fn new(bindings: Bindings<'db>, argument_mapping: ArgumentIndexMapping) -> Self {
+        Self {
+            bindings,
+            argument_mapping,
+        }
+    }
+
+    /// Returns the bindings to use during the refinement pass.
+    pub(crate) fn bindings(&self) -> &Bindings<'db> {
+        &self.bindings
+    }
+
+    /// Returns the refinement-local argument index for an original argument index.
+    pub(crate) fn local_index_for_argument(&self, argument_index: usize) -> Option<usize> {
+        self.argument_mapping
+            .local_index_for_argument(argument_index)
     }
 }
 
@@ -714,6 +802,37 @@ impl<'db> Bindings<'db> {
         })
     }
 
+    /// Returns `true` if this call shape may request a second argument-inference pass after the
+    /// initial binding result is known.
+    pub(crate) fn may_request_argument_inference_refinement(&self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.callable_type,
+            Type::ClassLiteral(class) if class.is_known(db, KnownClass::FunctoolsPartial)
+        ) && self.argument_forms().len() > 1
+    }
+
+    /// Returns an argument-inference refinement request derived from the current binding result.
+    pub(crate) fn argument_inference_refinement_request<'a>(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<ArgumentInferenceRefinement<'db>> {
+        if !self.may_request_argument_inference_refinement(db) {
+            return None;
+        }
+
+        let wrapped_callable_ty = call_arguments
+            .argument_types(0)
+            .and_then(CallArgumentTypes::get_default)?;
+        let (_, argument_mapping, refinement_bindings) =
+            Self::functools_partial_matched_bindings(db, wrapped_callable_ty, call_arguments)?;
+
+        Some(ArgumentInferenceRefinement::new(
+            refinement_bindings,
+            argument_mapping,
+        ))
+    }
+
     /// Maps each `CallableBinding` to a type and combines results while preserving
     /// the union-of-intersections structure:
     ///
@@ -776,10 +895,12 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
         call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>)> {
+    ) -> Option<(CallArguments<'a, 'db>, ArgumentIndexMapping, Bindings<'db>)> {
         // We can only infer bound-argument context from an actual callable.
         wrapped_callable_ty.try_upcast_to_callable(db)?;
 
+        let argument_mapping =
+            ArgumentIndexMapping::from_argument_indices(call_arguments, 1..call_arguments.len());
         let bound_call_arguments = call_arguments.functools_partial_bound_arguments(db)?;
 
         let mut partial_bindings = wrapped_callable_ty
@@ -793,7 +914,7 @@ impl<'db> Bindings<'db> {
                 downstream.clear_deferred_constructor_errors_for_partial_application();
             }
         }
-        Some((bound_call_arguments, partial_bindings))
+        Some((bound_call_arguments, argument_mapping, partial_bindings))
     }
 
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
@@ -807,11 +928,17 @@ impl<'db> Bindings<'db> {
         wrapped_callable_ty: Type<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
+        argument_mapping: &ArgumentIndexMapping,
     ) -> Type<'db> {
         if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
             return self.map_item_types(db, |partial_item| {
                 partial_item
-                    .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                    .functools_partial_callable(
+                        db,
+                        partial_overload,
+                        bound_call_arguments,
+                        argument_mapping,
+                    )
                     .map(|callable| {
                         callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
                     })
@@ -821,7 +948,12 @@ impl<'db> Bindings<'db> {
         let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
             .iter_callable_items()
             .filter_map(|partial_item| {
-                partial_item.functools_partial_callable(db, partial_overload, bound_call_arguments)
+                partial_item.functools_partial_callable(
+                    db,
+                    partial_overload,
+                    bound_call_arguments,
+                    argument_mapping,
+                )
             })
             .collect();
 
@@ -2832,6 +2964,7 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
+        argument_mapping: &ArgumentIndexMapping,
     ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
         if self.overloads().is_empty() {
             return None;
@@ -2847,7 +2980,9 @@ impl<'db> CallableBinding<'db> {
                 let source_errors = &self.overloads()[source_overload_index].errors;
                 for error in source_errors {
                     if error.is_relevant_for_partial_application() {
-                        let error = error.clone().maybe_apply_argument_index_offset(Some(1));
+                        let error = error.clone().maybe_remap_argument_indices(Some(
+                            argument_mapping.diagnostic_indices(),
+                        ));
                         if !partial_overload.errors.contains(&error) {
                             partial_overload.errors.push(error);
                         }
@@ -5566,7 +5701,7 @@ impl<'db> Binding<'db> {
         let fallback_return_type =
             KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
 
-        let (bound_call_arguments, partial_bindings) =
+        let (bound_call_arguments, argument_mapping, partial_bindings) =
             Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
@@ -5581,8 +5716,13 @@ impl<'db> Binding<'db> {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => *bindings,
         };
-        let new_return_type =
-            partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
+        let new_return_type = partial_bindings.functools_partial_type(
+            db,
+            func_ty,
+            self,
+            &bound_call_arguments,
+            &argument_mapping,
+        );
 
         Some(if new_return_type.is_never() {
             fallback_return_type
@@ -6159,13 +6299,26 @@ impl BindingError<'_> {
         self
     }
 
-    /// Applies the given offset to the argument indices in this error, if any.
+    /// Remaps any argument index in this error when a remapping table is available.
     ///
-    /// This is mainly used to adjust error argument indices for errors that were generated in a
-    /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
-    /// argument list rather than the original call's argument list. The `offset` should be the
-    /// number of arguments in the original call that were matched before the `ParamSpec` component.
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+    /// Each sub-call argument index is looked up in `argument_indices`; `None` means the error
+    /// should be reported on the whole call expression.
+    fn maybe_remap_argument_indices(mut self, argument_indices: Option<&[Option<usize>]>) -> Self {
+        if let Some(argument_indices) = argument_indices {
+            self.map_argument_indices(|argument_index| {
+                argument_index
+                    .and_then(|index| argument_indices.get(index).copied())
+                    .flatten()
+            });
+        }
+        self
+    }
+
+    fn map_argument_indices(&mut self, mut map: impl FnMut(Option<usize>) -> Option<usize>) {
+        let mut remap = |argument_index: &mut Option<usize>| {
+            *argument_index = map(*argument_index);
+        };
+
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
@@ -6173,18 +6326,14 @@ impl BindingError<'_> {
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
             | BindingError::SpecializationError { argument_index, .. } => {
-                if let Some(argument_index) = argument_index {
-                    *argument_index += offset;
-                }
+                remap(argument_index);
             }
 
             BindingError::TooManyPositionalArguments {
                 first_excess_argument_index,
                 ..
             } => {
-                if let Some(first_excess_argument_index) = first_excess_argument_index {
-                    *first_excess_argument_index += offset;
-                }
+                remap(first_excess_argument_index);
             }
 
             BindingError::CalledTopCallable(..)
@@ -6195,6 +6344,16 @@ impl BindingError<'_> {
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..) => {}
         }
+    }
+
+    /// Applies the given offset to the argument indices in this error, if any.
+    ///
+    /// This is mainly used to adjust error argument indices for errors that were generated in a
+    /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
+    /// argument list rather than the original call's argument list. The `offset` should be the
+    /// number of arguments in the original call that were matched before the `ParamSpec` component.
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+        self.map_argument_indices(|argument_index| argument_index.map(|index| index + offset));
     }
 }
 
