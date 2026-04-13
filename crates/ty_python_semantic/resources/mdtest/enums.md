@@ -61,9 +61,9 @@ class Planet(Enum):
     MERCURY = (1, 3.303e23, 2.4397e6)
     VENUS = (2, 4.869e24, 6.0518e6)
 
-# TODO: this raises `ValueError` at runtime. For enums with multi-argument member definitions,
-# lookup still follows `EnumMeta.__call__` / `Enum.__new__` semantics rather than the apparent
-# `.value` shape implied by `__init__`.
+# TODO: `Planet(1)` raises `ValueError` at runtime. `EnumType.__call__` accepts positional
+# arguments only, then forwards them to the enum's `__new__` / `__init__`, so multi-argument
+# enum members still require the full positional member payload (for example `Planet(1, ...)`).
 reveal_type(Planet(1))  # revealed: Planet
 reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
 
