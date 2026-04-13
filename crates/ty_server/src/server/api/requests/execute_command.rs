@@ -17,7 +17,7 @@ use ty_module_resolver::ModuleResolveMode;
 use ty_project::Db as _;
 use ty_python_core::program::Program;
 
-/// Serializable arguments for the `ty.runTest` command.
+/// Arguments for the `ty.runTest` command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RunTestArgs {
     cwd: String,
