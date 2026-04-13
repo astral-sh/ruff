@@ -7128,12 +7128,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let return_ty = bindings.return_type(db);
-        let callable_ty = self.expression_type(func);
-
-        let narrowed_argument_index = match callable_ty {
-            Type::FunctionLiteral(function) => usize::from(function.has_implicit_receiver(db)),
-            _ => 0,
-        };
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
@@ -7161,12 +7155,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         };
 
+        let narrowed_argument_index = || {
+            bindings
+                .single_element()
+                .and_then(|binding| {
+                    binding
+                        .signature_type
+                        .as_function_literal()
+                        .or_else(|| binding.callable_type.as_function_literal())
+                        .map(|function| {
+                            usize::from(
+                                function.has_implicit_receiver(db) && binding.bound_type.is_none(),
+                            )
+                        })
+                })
+                .unwrap_or(0)
+        };
+
         match return_ty {
-            Type::TypeIs(type_is) => match find_narrowed_place(narrowed_argument_index) {
+            Type::TypeIs(type_is) => match find_narrowed_place(narrowed_argument_index()) {
                 Some(place) => type_is.bind(db, scope, place),
                 None => return_ty,
             },
-            Type::TypeGuard(type_guard) => match find_narrowed_place(narrowed_argument_index) {
+            Type::TypeGuard(type_guard) => match find_narrowed_place(narrowed_argument_index()) {
                 Some(place) => type_guard.bind(db, scope, place),
                 None => return_ty,
             },

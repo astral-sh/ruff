@@ -669,9 +669,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        // Most narrowing calls narrow their first argument
-        if let Some(first_arg) = expr_call.arguments.args.first() {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
+        // Under the current narrowing semantics, we only ever use the first two positional
+        // arguments: argument 0 for most narrowing calls, and argument 1 for unbound
+        // TypeGuard/TypeIs methods (e.g. `C.f(C(), x)`).
+        // This set is only a conservative upper bound, so if later positional arguments ever
+        // become narrowable we can widen this scan again.
+        for argument in expr_call.arguments.args.iter().take(2) {
+            if let Some(place_expr) = PlaceExpr::try_from_expr(argument) {
                 if let Some(place) = self.places.place_id((&place_expr).into()) {
                     places.insert(place);
                 }

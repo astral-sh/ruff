@@ -280,11 +280,7 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns true if this overload has an implicit `self` or `cls` receiver parameter.
     pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
-        let file = self.file(db);
-        semantic_index(db, file)
-            .class_definition_of_method(self.body_scope(db).file_scope_id(db))
-            .is_some()
-            && !self.is_staticmethod(db)
+        self.body_scope(db).is_method_scope(db) && !self.is_staticmethod(db)
     }
 
     pub(crate) fn node<'ast>(
