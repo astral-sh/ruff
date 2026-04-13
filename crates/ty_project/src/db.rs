@@ -111,15 +111,20 @@ impl ProjectDatabase {
         )?;
         Program::from_settings(&db, program_settings);
 
-        db.project = Some(strategy.map_err(
-            Project::from_metadata(
-                &db,
-                project_metadata,
-                program_settings_diagnostics,
-                strategy,
-            ),
+        let (settings, mut settings_diagnostics) = strategy.map_err(
+            project_metadata
+                .options()
+                .to_settings(&db, project_metadata.root(), strategy),
             |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?);
+        )?;
+        settings_diagnostics.extend(program_settings_diagnostics);
+
+        db.project = Some(Project::from_metadata(
+            &db,
+            project_metadata,
+            settings,
+            settings_diagnostics,
+        ));
 
         Ok(db)
     }
@@ -634,8 +639,11 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project =
-                Project::from_metadata(&db, project, Vec::new(), &FallibleStrategy).unwrap();
+            let (settings, settings_diagnostics) = project
+                .options()
+                .to_settings(&db, project.root(), &FallibleStrategy)
+                .unwrap();
+            let project = Project::from_metadata(&db, project, settings, settings_diagnostics);
             db.project = Some(project);
             db
         }

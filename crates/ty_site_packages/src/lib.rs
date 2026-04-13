@@ -133,6 +133,8 @@ impl fmt::Display for SitePackagesPaths {
     }
 }
 
+/// Return a [`SystemPathBuf`] to use for anchoring settings diagnostics surfaced while analyzing
+/// the interpreter at the given `site-packages` directly.
 fn settings_diagnostic_path_from_site_packages_path(
     site_packages_path: &SystemPath,
     system: &dyn System,
@@ -141,6 +143,8 @@ fn settings_diagnostic_path_from_site_packages_path(
     settings_diagnostic_path_from_sys_prefix(sys_prefix, system)
 }
 
+/// Return a [`SystemPathBuf`] to use for anchoring settings diagnostics surfaced while analyzing
+/// the interpreter at the given `sys.prefix`.
 fn settings_diagnostic_path_from_sys_prefix(
     sys_prefix: &SystemPath,
     system: &dyn System,
@@ -184,6 +188,8 @@ fn settings_diagnostic_path_from_sys_prefix(
     None
 }
 
+/// Returns `true` if the file name appears to be that of a versioned interpreter
+/// (e.g., `python3.15`).
 fn is_versioned_interpreter_path(file_name: &str) -> bool {
     let Some(version) = file_name
         .strip_prefix("python")
@@ -2776,16 +2782,14 @@ mod tests {
 
         let sys_prefix = SystemPathBuf::from("/python");
         let bin_dir = sys_prefix.join("bin");
+        let config_helper = bin_dir.join("python3.16-config");
         let interpreter = bin_dir.join("python3.16");
+        let windowed_interpreter = bin_dir.join("pythonw");
 
         memory_fs.create_directory_all(&bin_dir).unwrap();
-        memory_fs
-            .write_file_all(bin_dir.join("python3.16-config"), "")
-            .unwrap();
-        memory_fs
-            .write_file_all(bin_dir.join("pythonw"), "")
-            .unwrap();
+        memory_fs.write_file_all(&config_helper, "").unwrap();
         memory_fs.write_file_all(&interpreter, "").unwrap();
+        memory_fs.write_file_all(&windowed_interpreter, "").unwrap();
 
         assert_eq!(
             settings_diagnostic_path_from_sys_prefix(&sys_prefix, &system),

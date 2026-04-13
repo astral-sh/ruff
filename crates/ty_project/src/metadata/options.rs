@@ -252,6 +252,7 @@ impl Options {
                 tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
             }).ok()
         });
+
         let python_version = options_python_version
             .or_else(|| {
                 python_environment
@@ -560,6 +561,7 @@ impl Options {
     }
 }
 
+/// Construct an [`OptionDiagnostic`] to indicate that the inferred Python version is unsupported.
 fn unsupported_inferred_python_version_diagnostic(
     db: &dyn Db,
     python_version: &PythonVersionWithSource,

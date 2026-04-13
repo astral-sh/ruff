@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
+use crate::metadata::options::OptionDiagnostic;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::tests::TestDb;
@@ -167,18 +167,12 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+    pub fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
-        program_settings_diagnostics: Vec<OptionDiagnostic>,
-        strategy: &Strategy,
-    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
-        let (settings, mut diagnostics) =
-            metadata
-                .options()
-                .to_settings(db, metadata.root(), strategy)?;
-        diagnostics.extend(program_settings_diagnostics);
-
+        settings: Settings,
+        diagnostics: Vec<OptionDiagnostic>,
+    ) -> Self {
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
@@ -187,7 +181,7 @@ impl Project {
 
         project.try_add_file_root(db);
 
-        Ok(project)
+        project
     }
 
     fn try_add_file_root(self, db: &dyn Db) {
@@ -243,36 +237,22 @@ impl Project {
         self,
         db: &mut dyn Db,
         metadata: ProjectMetadata,
-        program_settings_diagnostics: Vec<OptionDiagnostic>,
+        settings: Option<Settings>,
+        settings_diagnostics: Vec<OptionDiagnostic>,
     ) {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
 
         self.reload_files(db);
 
-        match metadata
-            .options()
-            .to_settings(db, metadata.root(), &FallibleStrategy)
+        if let Some(settings) = settings
+            && self.settings(db) != &settings
         {
-            Ok((settings, mut settings_diagnostics)) => {
-                settings_diagnostics.extend(program_settings_diagnostics);
+            self.set_settings(db).to(Box::new(settings));
+        }
 
-                if self.settings(db) != &settings {
-                    self.set_settings(db).to(Box::new(settings));
-                }
-
-                if self.settings_diagnostics(db) != settings_diagnostics {
-                    self.set_settings_diagnostics(db).to(settings_diagnostics);
-                }
-            }
-            Err(error) => {
-                tracing::warn!(
-                    "Keeping old project configuration because loading the new settings failed with: {error}"
-                );
-                let mut settings_diagnostics = vec![error.into_diagnostic()];
-                settings_diagnostics.extend(program_settings_diagnostics);
-                self.set_settings_diagnostics(db).to(settings_diagnostics);
-            }
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
 
         if !metadata_changed {
@@ -767,11 +747,24 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use ty_python_core::program::FallibleStrategy;
     use ty_python_semantic::types::check_types;
+
+    fn test_project_metadata() -> ProjectMetadata {
+        ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"))
+    }
+
+    fn settings_diagnostic_messages(project: crate::Project, db: &dyn Db) -> Vec<String> {
+        project
+            .check_settings(db)
+            .iter()
+            .map(|diagnostic| diagnostic.primary_message().to_string())
+            .collect()
+    }
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
+        let project = test_project_metadata();
         let mut db = TestDb::new(project);
         db.init_program().unwrap();
         let path = SystemPath::new("test.py");
@@ -816,14 +809,18 @@ mod tests {
 
     #[test]
     fn reload_updates_settings_diagnostics_when_metadata_is_unchanged() {
-        let project_metadata =
-            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
-        let mut db = TestDb::new(project_metadata);
+        let mut db = TestDb::new(test_project_metadata());
         let project = db.project();
+        let first_metadata = test_project_metadata();
+        let first_settings = first_metadata
+            .to_settings(&db, &FallibleStrategy)
+            .unwrap()
+            .0;
 
         project.reload(
             &mut db,
-            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/")),
+            first_metadata,
+            Some(first_settings),
             vec![OptionDiagnostic::new(
                 DiagnosticId::UnsupportedPythonVersion,
                 "first diagnostic".to_string(),
@@ -832,17 +829,20 @@ mod tests {
         );
 
         assert_eq!(
-            project
-                .check_settings(&db)
-                .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
-                .collect::<Vec<_>>(),
+            settings_diagnostic_messages(project, &db),
             vec!["first diagnostic".to_string()]
         );
 
+        let second_metadata = test_project_metadata();
+        let second_settings = second_metadata
+            .to_settings(&db, &FallibleStrategy)
+            .unwrap()
+            .0;
+
         project.reload(
             &mut db,
-            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/")),
+            second_metadata,
+            Some(second_settings),
             vec![OptionDiagnostic::new(
                 DiagnosticId::UnsupportedPythonVersion,
                 "second diagnostic".to_string(),
@@ -851,11 +851,7 @@ mod tests {
         );
 
         assert_eq!(
-            project
-                .check_settings(&db)
-                .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
-                .collect::<Vec<_>>(),
+            settings_diagnostic_messages(project, &db),
             vec!["second diagnostic".to_string()]
         );
     }
