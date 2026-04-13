@@ -45,10 +45,6 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
     imported_symbol, known_module_symbol,
 };
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::bind::ConstructorCallableKind;
@@ -72,10 +68,7 @@ use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
-pub(crate) use crate::types::narrow::{
-    NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
-    infer_narrowing_constraint,
-};
+pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -99,6 +92,10 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
+use ty_python_core::definition::Definition;
+use ty_python_core::place::ScopedPlaceId;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{Truthiness, imported_modules, place_table, semantic_index};
 
 mod bool;
 mod bound_super;
@@ -125,7 +122,7 @@ mod literal;
 mod member;
 mod method;
 mod mro;
-mod narrow;
+pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
@@ -1564,6 +1561,14 @@ impl<'db> Type<'db> {
     pub(crate) fn as_int_literal(self) -> Option<i64> {
         match self {
             Type::LiteralValue(literal) => literal.as_int(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_int_like_literal(self) -> Option<i64> {
+        match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => Some(value.as_i64()),
+            Some(LiteralValueTypeKind::Bool(value)) => Some(i64::from(value)),
             _ => None,
         }
     }
@@ -4196,10 +4201,6 @@ impl<'db> Type<'db> {
                 )
             }
 
-            KnownClass::Enum => {
-                Some(Binding::single(self, Signature::todo("functional `Enum` syntax")).into())
-            }
-
             KnownClass::Super => {
                 // ```py
                 // class super:
@@ -6367,6 +6368,14 @@ impl<'db> Type<'db> {
         let generic_context = GenericContext::from_typevar_instances(db, variables);
         self.apply_specialization(db, generic_context.default_specialization(db, None))
     }
+
+    pub(crate) fn from_truthiness(db: &'db dyn Db, truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::AlwaysTrue => Type::bool_literal(true),
+            Truthiness::AlwaysFalse => Type::bool_literal(false),
+            Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -7329,86 +7338,6 @@ impl<'db> AwaitError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub enum Truthiness {
-    /// For an object `x`, `bool(x)` will always return `True`
-    AlwaysTrue,
-    /// For an object `x`, `bool(x)` will always return `False`
-    AlwaysFalse,
-    /// For an object `x`, `bool(x)` could return either `True` or `False`
-    Ambiguous,
-}
-
-impl Truthiness {
-    pub(crate) const fn is_ambiguous(self) -> bool {
-        matches!(self, Truthiness::Ambiguous)
-    }
-
-    pub(crate) const fn is_always_false(self) -> bool {
-        matches!(self, Truthiness::AlwaysFalse)
-    }
-
-    pub(crate) const fn may_be_true(self) -> bool {
-        !self.is_always_false()
-    }
-
-    pub(crate) const fn is_always_true(self) -> bool {
-        matches!(self, Truthiness::AlwaysTrue)
-    }
-
-    pub(crate) const fn negate(self) -> Self {
-        match self {
-            Self::AlwaysTrue => Self::AlwaysFalse,
-            Self::AlwaysFalse => Self::AlwaysTrue,
-            Self::Ambiguous => Self::Ambiguous,
-        }
-    }
-
-    pub(crate) const fn negate_if(self, condition: bool) -> Self {
-        if condition { self.negate() } else { self }
-    }
-
-    pub(crate) fn or(self, other: Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other,
-            Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    pub(crate) fn or_else(self, other: impl Fn() -> Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other(),
-            Truthiness::Ambiguous => match other() {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    fn into_type(self, db: &dyn Db) -> Type<'_> {
-        match self {
-            Self::AlwaysTrue => Type::bool_literal(true),
-            Self::AlwaysFalse => Type::bool_literal(false),
-            Self::Ambiguous => KnownClass::Bool.to_instance(db),
-        }
-    }
-}
-
-impl From<bool> for Truthiness {
-    fn from(value: bool) -> Self {
-        if value {
-            Truthiness::AlwaysTrue
-        } else {
-            Truthiness::AlwaysFalse
-        }
-    }
-}
-
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
@@ -7489,7 +7418,7 @@ impl<'db> ModuleLiteralType<'db> {
     /// side-effect the user actually cares about, and the `z` component may not be a submodule.
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
-    /// the current file (i.e. [`crate::semantic_index::definition::ImportFromDefinitionNodeRef`]).
+    /// the current file (i.e. `ty_python_core::definition::ImportFromDefinitionNodeRef`).
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
@@ -7797,26 +7726,6 @@ pub(super) fn determine_upper_bound<'db>(
         .last()
         .unwrap_or_else(|| class_literal.unknown_specialization(db));
     Type::instance(db, upper_bound)
-}
-
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum EvaluationMode {
-    Sync,
-    Async,
-}
-
-impl EvaluationMode {
-    pub(crate) const fn from_is_async(is_async: bool) -> Self {
-        if is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
-    }
-
-    pub(crate) const fn is_async(self) -> bool {
-        matches!(self, EvaluationMode::Async)
-    }
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.

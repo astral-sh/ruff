@@ -5,9 +5,10 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::scope::ScopeId;
+use crate::semantic_index;
+
+pub use node_key::ExpressionNodeKey;
 
 /// AST ids for a single scope.
 ///
@@ -40,7 +41,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-/// Uniquely identifies a use of a name in a [`crate::semantic_index::FileScopeId`].
+/// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ScopedUseId;
@@ -123,7 +124,7 @@ pub(crate) mod node_key {
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
-    pub(crate) struct ExpressionNodeKey(NodeKey);
+    pub struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {

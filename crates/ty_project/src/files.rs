@@ -188,7 +188,8 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 /// A Mutable view of a project's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
-/// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
+/// The changes are written back when the mutable view is dropped or by calling
+/// [`Self::set_diagnostics`] manually.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     project: Project,

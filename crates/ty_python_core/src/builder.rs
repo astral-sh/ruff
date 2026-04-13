@@ -20,10 +20,12 @@ use ruff_python_parser::semantic_errors::{
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
+use crate::Db;
+use crate::HasTrackedScope;
+use crate::ast_ids::AstIdsBuilder;
+use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_node_ref::AstNodeRef;
-use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::{
+use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
@@ -31,34 +33,32 @@ use crate::semantic_index::definition::{
     ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
     MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
-use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::member::MemberExprBuilder;
-use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
-use crate::semantic_index::predicate::{
+use crate::expression::{Expression, ExpressionKind};
+use crate::member::MemberExprBuilder;
+use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
+use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
-use crate::semantic_index::re_exports::exported_names;
-use crate::semantic_index::reachability_constraints::{
+use crate::program::Program;
+use crate::re_exports::exported_names;
+use crate::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
-use crate::semantic_index::scope::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef,
+use crate::scope::{
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
+    ScopeLaziness,
 };
-use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
-use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
-use crate::semantic_index::use_def::{
+use crate::symbol::{ScopedSymbolId, Symbol};
+use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
+use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedDefinitionId,
     ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{
-    ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
-    get_loop_header,
+use crate::{
+    EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken, PossiblyNarrowedPlaces,
+    SemanticIndex, VisibleAncestorsIter, get_loop_header,
 };
-use crate::semantic_model::HasTrackedScope;
-use crate::types::{EvaluationMode, PossiblyNarrowedPlaces};
-use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
-use crate::{Db, Program};
 
 use super::place::PlaceExprRef;
 
@@ -1090,7 +1090,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // them, so there's no need to duplicate them.
         for place_id in loop_header_places {
             for live_binding in use_def.loop_back_bindings(*place_id) {
-                if live_binding.binding >= loop_min_definition_id {
+                if live_binding.binding() >= loop_min_definition_id {
                     loop_header.add_binding(*place_id, live_binding);
                 }
             }
@@ -1100,10 +1100,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             for live_binding in loop_header.bindings_for_place(*place_id) {
                 use_def
                     .reachability_constraints
-                    .mark_used(live_binding.reachability_constraint);
+                    .mark_used(live_binding.reachability_constraint());
                 use_def
                     .reachability_constraints
-                    .mark_used(live_binding.narrowing_constraint);
+                    .mark_used(live_binding.narrowing_constraint());
             }
         }
         // The `LoopHeader` needs to be visible to uses within the loop body that we've already
@@ -1204,8 +1204,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         predicate: &PredicateOrLiteral<'db>,
     ) -> PossiblyNarrowedPlaces {
-        use crate::types::PossiblyNarrowedPlacesBuilder;
-
         match predicate {
             PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
             PredicateOrLiteral::Predicate(pred) => {

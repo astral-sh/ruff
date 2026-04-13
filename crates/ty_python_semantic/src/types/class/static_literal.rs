@@ -15,15 +15,7 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
         place_from_bindings, place_from_declarations,
     },
-    semantic_index::{
-        attribute_assignments, attribute_declarations, attribute_scopes,
-        definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
-        place_table,
-        scope::{Scope, ScopeId},
-        semantic_index,
-        symbol::Symbol,
-        use_def_map,
-    },
+    reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
@@ -59,6 +51,15 @@ use crate::{
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
+};
+use ty_python_core::{
+    attribute_assignments, attribute_declarations, attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    place_table,
+    scope::{Scope, ScopeId},
+    semantic_index,
+    symbol::Symbol,
+    use_def_map,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -216,8 +217,9 @@ impl<'db> StaticClassLiteral<'db> {
                             return Some(ty);
                         }
                     }
-                    // Dynamic namedtuples and TypedDicts don't define their own ordering methods.
-                    ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {}
+                    ClassLiteral::DynamicNamedTuple(_)
+                    | ClassLiteral::DynamicTypedDict(_)
+                    | ClassLiteral::DynamicEnum(_) => {}
                 }
             }
         }
@@ -667,7 +669,9 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicTypedDict(_) => false,
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
@@ -2064,7 +2068,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.binding_reachability(db, &bind))
+                                .then(|| binding_reachability(db, class_map, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {

@@ -15,7 +15,6 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, place_from_bindings,
         place_from_declarations,
     },
-    semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
@@ -28,6 +27,7 @@ use crate::{
         todo_type,
     },
 };
+use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.

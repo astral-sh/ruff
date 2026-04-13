@@ -2,15 +2,15 @@ use std::fmt::Write;
 
 use crate::{
     Db,
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        scope::ScopeId,
-        semantic_index,
-    },
     types::{
         GenericContext, Type, definition_expression_type,
         display::qualified_name_components_from_scope, generics::Specialization, visitor,
     },
+};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    scope::ScopeId,
+    semantic_index,
 };
 
 use ruff_db::parsed::parsed_module;

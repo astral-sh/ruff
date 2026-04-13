@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
-use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
@@ -16,6 +15,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,

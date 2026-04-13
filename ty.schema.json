@@ -1070,6 +1070,16 @@
             }
           ]
         },
+        "mismatched-type-name": {
+          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
@@ -1093,6 +1103,16 @@
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-callable-init-subclass": {
+          "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
+          "description": "## What it does\nChecks for class definitions that will fail due to non-callable `__init_subclass__`\nmethods.\n\n## Why is this bad?\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt\nto subclass that class will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass Super:\n    __init_subclass__ = None\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
           "default": "error",
           "oneOf": [
             {

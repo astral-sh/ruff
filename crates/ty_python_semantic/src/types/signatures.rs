@@ -17,7 +17,6 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
-use crate::semantic_index::definition::Definition;
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -35,6 +34,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
+use ty_python_core::definition::Definition;
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
@@ -441,18 +441,6 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             parameters: Parameters::gradual_form(),
-            return_ty: signature_type,
-        }
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        let signature_type = todo_type!(reason);
-        Signature {
-            generic_context: None,
-            definition: None,
-            parameters: Parameters::todo(),
             return_ty: signature_type,
         }
     }

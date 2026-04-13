@@ -1,9 +1,9 @@
 use crate::{
     TypeQualifiers,
     place::{place_from_bindings, place_from_declarations},
-    semantic_index::SemanticIndex,
     types::{context::InferContext, diagnostic::FINAL_WITHOUT_VALUE},
 };
+use ty_python_core::SemanticIndex;
 
 /// Check for `Final`-qualified declarations in module/function scopes that are never
 /// assigned a value. Class body scopes are handled separately in

@@ -13,7 +13,7 @@ use std::ops::{Deref, DerefMut};
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) struct Member {
+pub struct Member {
     expression: MemberExpr,
     flags: MemberFlags,
 }
@@ -53,7 +53,7 @@ impl Member {
     }
 
     /// Is the place an instance attribute?
-    pub(crate) fn is_instance_attribute(&self) -> bool {
+    pub fn is_instance_attribute(&self) -> bool {
         let is_instance_attribute = self.flags.contains(MemberFlags::IS_INSTANCE_ATTRIBUTE);
         if is_instance_attribute {
             debug_assert!(self.is_instance_attribute_candidate());
@@ -105,7 +105,7 @@ impl Member {
     }
 
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
-    pub(crate) fn as_instance_attribute(&self) -> Option<&str> {
+    pub fn as_instance_attribute(&self) -> Option<&str> {
         if self.is_instance_attribute() {
             debug_assert!(self.as_instance_attribute_candidate().is_some());
             self.as_instance_attribute_candidate()

@@ -4,7 +4,6 @@ use smallvec::{SmallVec, smallvec_inline};
 use crate::{
     Db, FxOrderSet,
     place::Place,
-    semantic_index::definition::Definition,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
@@ -16,6 +15,7 @@ use crate::{
         visitor, walk_signature,
     },
 };
+use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
     /// Create a callable type with a single non-overloaded signature.
