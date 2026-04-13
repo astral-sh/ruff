@@ -2500,6 +2500,134 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn find_name_in_mro_with_policy_deferred(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        if let Some(fallback) = (*self).materialized_divergent_fallback() {
+            return fallback.find_name_in_mro_with_policy_deferred(db, name, policy);
+        }
+
+        match self {
+            Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.find_name_in_mro_with_policy_deferred(db, name, policy)
+                    // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
+                    // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
+                    // return type otherwise, and since `find_name_in_mro` is usually called via `class_member`, this is
+                    // not a problem.
+                    .unwrap_or_default()
+            })),
+            Type::Intersection(inter) => {
+                Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.find_name_in_mro_with_policy_deferred(db, name, policy)
+                        // Fall back to Unbound, similar to the union case (see above).
+                        .unwrap_or_default()
+                }))
+            }
+
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+
+            Type::ClassLiteral(class) if class.is_typed_dict(db) => {
+                Some(class.typed_dict_member(db, None, name, policy))
+            }
+
+            Type::ClassLiteral(class) => {
+                match (class.known(db), name) {
+                    (Some(KnownClass::FunctionType), "__get__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::FunctionTypeDunderGet,
+                        ))
+                        .into(),
+                    ),
+                    (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
+                        // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
+                        Some(Place::Undefined.into())
+                    }
+                    (Some(KnownClass::Property), "__get__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderGet,
+                        ))
+                        .into(),
+                    ),
+                    (Some(KnownClass::Property), "__set__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderSet,
+                        ))
+                        .into(),
+                    ),
+                    (Some(KnownClass::Property), "__delete__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderDelete,
+                        ))
+                        .into(),
+                    ),
+
+                    _ => Some(class.class_member_deferred(db, name, policy)),
+                }
+            }
+
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
+            }
+
+            Type::GenericAlias(alias) => {
+                Some(ClassType::from(*alias).class_member_deferred(db, name, policy))
+            }
+
+            Type::SubclassOf(subclass_of_ty) => {
+                subclass_of_ty.find_name_in_mro_with_policy_deferred(db, name, policy)
+            }
+
+            // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
+            // `BoundSuper` should look up the name in the MRO of `builtins.super`.
+            Type::BoundSuper(_) => KnownClass::Super
+                .to_class_literal(db)
+                .find_name_in_mro_with_policy_deferred(db, name, policy),
+
+            // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`,
+            // i.e. Type::NominalInstance(type). So looking up a name in the MRO of
+            // `Type::NominalInstance(type)` is equivalent to looking up the name in the
+            // MRO of the class `object`.
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                if policy.mro_no_object_fallback() {
+                    Some(Place::Undefined.into())
+                } else {
+                    KnownClass::Object
+                        .to_class_literal(db)
+                        .find_name_in_mro_with_policy_deferred(db, name, policy)
+                }
+            }
+
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .find_name_in_mro_with_policy_deferred(db, name, policy),
+
+            Type::FunctionLiteral(_)
+            | Type::Callable(_)
+            | Type::BoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::KnownBoundMethod(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::LiteralValue(_)
+            | Type::TypeVar(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => None,
+        }
+    }
+
     fn lookup_dunder_new(self, db: &'db dyn Db) -> Option<PlaceAndQualifiers<'db>> {
         #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
@@ -2576,6 +2704,62 @@ impl<'db> Type<'db> {
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                .expect(
+                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                ),
+        }
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn class_member_with_policy_deferred(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        tracing::trace!("class_member: {}.{}", self.display(db), name);
+        match self {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.class_member_with_policy_deferred(db, name.clone(), policy)
+            }),
+            Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.class_member_with_policy_deferred(db, name.clone(), policy)
+            }),
+            // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(_),
+                ..
+            }) => self.instance_member(db, &name),
+
+            // `type[Any]` (or `type[Unknown]`, etc.) has an unknown metaclass, but all
+            // metaclasses inherit from `type`. Check `type`'s class-level attributes
+            // first so that data descriptors like `__mro__` and `__bases__` resolve to
+            // their correct types instead of collapsing to `Any`/`Unknown`.
+            Type::SubclassOf(subclass_of) if subclass_of.is_dynamic() => {
+                let type_result = KnownClass::Type
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy_deferred(db, name.as_str(), policy)
+                    .expect("`find_name_in_mro` should return `Some` for a class literal");
+                if !type_result.place.is_undefined() {
+                    type_result
+                } else {
+                    self.to_meta_type(db)
+                        .find_name_in_mro_with_policy_deferred(db, name.as_str(), policy)
+                        .expect(
+                            "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                        )
+                }
+            }
+
+            _ => self
+                .to_meta_type(db)
+                .find_name_in_mro_with_policy_deferred(db, name.as_str(), policy)
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
@@ -3026,6 +3210,11 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let class_member = if policy == InstanceFallbackShadowsNonDataDescriptor::No {
+            self.class_member_with_policy_deferred(db, name.into(), member_policy)
+        } else {
+            self.class_member_with_policy(db, name.into(), member_policy)
+        };
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3034,7 +3223,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member_with_policy(db, name.into(), member_policy),
+            class_member,
             Some(self),
             self.to_meta_type(db),
         );
@@ -3047,9 +3236,9 @@ impl<'db> Type<'db> {
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Defined(_), _, Place::Undefined) => {
-                meta_attr.with_qualifiers(meta_attr_qualifiers)
-            }
+            (meta_attr @ Place::Defined(_), _, Place::Undefined) => meta_attr
+                .materialize_public_type(db)
+                .with_qualifiers(meta_attr_qualifiers),
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
@@ -3060,31 +3249,27 @@ impl<'db> Type<'db> {
                 }),
                 AttributeKind::DataDescriptor,
                 _,
-            ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
+            ) => meta_attr
+                .materialize_public_type(db)
+                .with_qualifiers(meta_attr_qualifiers),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
             // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
-                Place::Defined(DefinedPlace {
-                    ty: meta_attr_ty,
-                    origin: meta_origin,
-                    definedness: Definedness::PossiblyUndefined,
-                    ..
-                }),
+                Place::Defined(
+                    meta_attr_defined @ DefinedPlace {
+                        definedness: Definedness::PossiblyUndefined,
+                        ..
+                    },
+                ),
                 AttributeKind::DataDescriptor,
-                Place::Defined(DefinedPlace {
-                    ty: fallback_ty,
-                    origin: fallback_origin,
-                    definedness: fallback_boundness,
-                    public_type_policy: fallback_public_type_policy,
-                }),
-            ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
-                origin: meta_origin.merge(fallback_origin),
-                definedness: fallback_boundness,
-                public_type_policy: fallback_public_type_policy,
-            })
+                Place::Defined(fallback_defined),
+            ) => Place::Defined(meta_attr_defined.union_with_lower_precedence_fallback(
+                db,
+                fallback_defined,
+                fallback_defined.definedness,
+            ))
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -3110,25 +3295,18 @@ impl<'db> Type<'db> {
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
             // not completely shadow the non-data descriptor, so we build a union of the two.
             (
-                Place::Defined(DefinedPlace {
-                    ty: meta_attr_ty,
-                    origin: meta_origin,
-                    definedness: meta_attr_boundness,
-                    ..
-                }),
+                Place::Defined(meta_attr_defined),
                 AttributeKind::NormalOrNonDataDescriptor,
-                Place::Defined(DefinedPlace {
-                    ty: fallback_ty,
-                    origin: fallback_origin,
-                    definedness: fallback_boundness,
-                    public_type_policy: fallback_public_type_policy,
-                }),
-            ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
-                origin: meta_origin.merge(fallback_origin),
-                definedness: meta_attr_boundness.max(fallback_boundness),
-                public_type_policy: fallback_public_type_policy,
-            })
+                Place::Defined(fallback_defined),
+            ) => Place::Defined(
+                meta_attr_defined.union_with_lower_precedence_fallback(
+                    db,
+                    fallback_defined,
+                    meta_attr_defined
+                        .definedness
+                        .max(fallback_defined.definedness),
+                ),
+            )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
