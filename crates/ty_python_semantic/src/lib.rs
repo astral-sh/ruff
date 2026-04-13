@@ -9,7 +9,9 @@ use crate::suppression::{
     IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 pub use db::Db;
-pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
+pub use diagnostic::{
+    add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
+};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;

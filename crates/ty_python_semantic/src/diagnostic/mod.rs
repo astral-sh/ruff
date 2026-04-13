@@ -1,5 +1,6 @@
 use crate::{
-    Db, Program, PythonVersionWithSource, lint::lint_documentation_url, types::TypeCheckDiagnostics,
+    Db, Program, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
+    types::TypeCheckDiagnostics,
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
@@ -20,6 +21,24 @@ where
     find_best_suggestion(options, typo, HideUnderscoredSuggestions::Yes)
 }
 
+/// Return an annotation for the source from which ty inferred the Python version, when one exists.
+pub fn inferred_python_version_source_annotation(
+    db: &dyn Db,
+    source: &PythonVersionSource,
+) -> Option<Annotation> {
+    match source {
+        PythonVersionSource::ConfigFile(source) => source.span(db).map(Annotation::primary),
+        PythonVersionSource::PyvenvCfgFile(source) => source.span(db).map(Annotation::primary),
+        PythonVersionSource::InstallationDirectoryLayout { source, .. } => source
+            .as_ref()
+            .and_then(|source| source.span(db))
+            .map(Annotation::primary),
+        PythonVersionSource::Cli | PythonVersionSource::Editor | PythonVersionSource::Default => {
+            None
+        }
+    }
+}
+
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
 ///
 /// ty can infer the Python version from various sources, such as command-line arguments,
@@ -38,14 +57,13 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                 "Python {version} was assumed when {action} because it was specified on the command line",
             ));
         }
-        crate::PythonVersionSource::ConfigFile(source) => {
-            if let Some(span) = source.span(db) {
+        source @ crate::PythonVersionSource::ConfigFile(_) => {
+            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!("Python {version} was assumed when {action}"),
                 );
-                sub_diagnostic
-                    .annotate(Annotation::primary(span).message("Python version configuration"));
+                sub_diagnostic.annotate(annotation.message("Python version configuration"));
                 diagnostic.sub(sub_diagnostic);
             } else {
                 diagnostic.info(format_args!(
@@ -53,16 +71,15 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                 ));
             }
         }
-        crate::PythonVersionSource::PyvenvCfgFile(source) => {
-            if let Some(span) = source.span(db) {
+        source @ crate::PythonVersionSource::PyvenvCfgFile(_) => {
+            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "Python {version} was assumed when {action} because of your virtual environment"
                     ),
                 );
-                sub_diagnostic
-                    .annotate(Annotation::primary(span).message("Virtual environment metadata"));
+                sub_diagnostic.annotate(annotation.message("Virtual environment metadata"));
                 // TODO: it would also be nice to tell them how we resolved their virtual environment...
                 diagnostic.sub(sub_diagnostic);
             } else {
