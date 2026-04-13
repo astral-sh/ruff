@@ -4,7 +4,10 @@ use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
-use crate::{Db, SemanticIndex, ast_node_ref::AstNodeRef, node_key::NodeKey, semantic_index};
+use crate::{
+    Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, node_key::NodeKey,
+    semantic_index,
+};
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -39,6 +42,15 @@ impl<'db> ScopeId<'db> {
 
     pub fn scope(self, db: &dyn Db) -> &Scope {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
+    }
+
+    /// Returns the class definition for the enclosing class if this scope is a method body.
+    pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        semantic_index(db, self.file(db)).class_definition_of_method(self.file_scope_id(db))
+    }
+
+    pub fn is_method_scope(self, db: &'db dyn Db) -> bool {
+        self.class_definition_of_method(db).is_some()
     }
 
     pub fn name<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast str {
