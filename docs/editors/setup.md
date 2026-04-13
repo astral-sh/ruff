@@ -31,10 +31,10 @@ For more documentation on the Ruff extension, refer to the
 ## Neovim
 
 The Ruff language server can be setup in Neovim using the built-in LSP client either via
-[`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) (Neovim 0.11+) or the
+[`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>) (Neovim 0.11+) or the
 [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin (Neovim 0.10 and earlier).
 
-To setup using [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()), you can
+To setup using [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>), you can
 either use the [default configuration provided in
 `nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig/blob/master/lsp/ruff.lua) or configure
 the server without any external dependencies.
@@ -84,7 +84,7 @@ the server without any external dependencies.
         [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) has
         [deprecated](https://github.com/neovim/nvim-lspconfig/issues/3693) support for Neovim 0.10
         and earlier in favor of using
-        [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) instead.
+        [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>) instead.
 
     ```lua
     require('lspconfig').ruff.setup({
