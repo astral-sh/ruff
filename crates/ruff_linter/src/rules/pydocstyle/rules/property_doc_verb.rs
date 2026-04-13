@@ -55,9 +55,7 @@ impl Violation for PropertyDocstringStartsWithVerb {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PropertyDocstringStartsWithVerb { first_word } = self;
-        format!(
-            r#"Property docstring should not start with a verb ("{first_word}")"#
-        )
+        format!(r#"Property docstring should not start with a verb ("{first_word}")"#)
     }
 }
 
