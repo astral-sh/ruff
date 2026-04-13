@@ -918,6 +918,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
 
+        // For enums (including flags), equality with an enum member should narrow to the
+        // exact member value.
+        if rhs_ty.is_single_valued(self.db) && lhs_ty.is_enum(self.db) {
+            return Some(rhs_ty);
+        }
+
         // We can only narrow on equality checks against single-valued types.
         if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
             // The fully-general (and more efficient) approach here would be to introduce a

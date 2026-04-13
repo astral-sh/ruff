@@ -2496,6 +2496,99 @@ class MyEnum[T](MyEnumBase):
     A = 1
 ```
 
+## Flags
+
+### Basic Flag
+
+```py
+from enum import Flag
+from typing_extensions import Literal
+
+class Permissions(Flag):
+    READ = 1
+    WRITE = 2
+    EXECUTE = 4
+
+reveal_type(Permissions.READ)  # revealed: Literal[Permissions.READ]
+reveal_type(Permissions.READ | Permissions.WRITE)  # revealed: Permissions
+```
+
+### IntFlag
+
+`IntFlag` is a flag enum that also behaves like an `int`:
+
+```py
+from enum import IntFlag
+from typing_extensions import Literal
+
+class Status(IntFlag):
+    READY = 1
+    RUNNING = 2
+    STOPPED = 4
+
+reveal_type(Status.READY)  # revealed: Literal[Status.READY]
+reveal_type(Status.READY | Status.RUNNING)  # revealed: Status
+
+# IntFlag members can be used in arithmetic operations
+reveal_type(Status.READY + 1)  # revealed: int
+reveal_type(Status.READY == 1)  # revealed: bool
+```
+
+### Flag narrowing with if/else
+
+Flags cannot be narrowed to individual members in the `else` branch of a guard expression, because
+flag combinations can exist that don't match any single member:
+
+```py
+from enum import Flag
+from typing_extensions import assert_type, Literal
+
+class Perms(Flag):
+    READ = 1
+    WRITE = 2
+    EXECUTE = 4
+
+def check_perms(p: Perms) -> None:
+    if p is Perms.READ or p is Perms.WRITE:
+        # When matched as individual literals, type is narrowed to those literals
+        assert_type(p, Literal[Perms.READ, Perms.WRITE])
+    else:
+        # The type remains `Perms` in the else branch,
+        # not narrowed to a specific literal or remaining member
+        assert_type(p, Perms)
+```
+
+### Flag narrowing with match
+
+Pattern matching on flags works similarly; the wildcard case preserves the full flag type:
+
+```py
+from enum import Flag
+from typing_extensions import assert_type, Literal
+
+class Flags(Flag):
+    A = 1
+    B = 2
+    C = 4
+
+def test(f: Flags) -> None:
+    match f:
+        case Flags.A | Flags.B:
+            # Pattern matching on flags do narrow to specific literals
+            assert_type(f, Literal[Flags.A, Flags.B])
+        case Flags.A:
+            assert_type(f, Literal[Flags.A])
+        case _ if f & (Flags.A | Flags.B) == (Flags.A | Flags.B):
+             assert_type(f, Flags)
+        case Flags.B:
+            assert_type(f, Literal[Flags.B])
+        case Flags.C:
+            assert_type(f, Literal[Flags.C])
+        case _:
+            # The wildcard also preserves the full flag type
+            assert_type(f, Flags)
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>

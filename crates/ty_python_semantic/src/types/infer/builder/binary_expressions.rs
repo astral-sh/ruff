@@ -819,6 +819,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Some(result)
                     }
 
+                    (
+                        LiteralValueTypeKind::Enum(left_enum),
+                        LiteralValueTypeKind::Enum(right_enum),
+                        ast::Operator::BitOr,
+                    ) if left_enum.enum_class(db) == right_enum.enum_class(db) => {
+                        // Bitewise OR between flag enum members yields the enum type (not a union of literals).
+                        if let Some(metadata) =
+                            crate::types::enums::enum_metadata(db, left_enum.enum_class(db))
+                        {
+                            if metadata.is_flag_subclass {
+                                return Some(left_enum.enum_class_instance(db));
+                            }
+                        }
+                        None
+                    }
+
                     _ => Type::try_call_bin_op(db, left_ty, op, right_ty)
                         .map(|outcome| outcome.return_type(db))
                         .ok(),
