@@ -80,16 +80,6 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
     Arc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
-/// Returns the set of modules that are imported anywhere in `file`.
-///
-/// This set only considers `import` statements, not `from...import` statements.
-/// See [`ModuleLiteralType::available_submodule_attributes`] for discussion
-/// of why this analysis is intentionally limited.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
-    semantic_index(db, file).imported_modules.clone()
-}
-
 /// Returns the use-def map for a specific `scope`.
 ///
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
@@ -190,51 +180,6 @@ impl get_size2::GetSize for LoopToken<'_> {}
 #[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
 pub fn get_loop_header<'db>(_db: &'db dyn Db, _loop_token: LoopToken<'db>) -> LoopHeader {
     panic!("should always be set by specify()");
-}
-
-/// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
-/// the one given for a specific class body scope.
-///
-/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
-/// introduces a direct dependency on that file's AST.
-pub fn attribute_assignments<'db, 's>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    name: &'s str,
-) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
-
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
-    })
-}
-
-/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
-/// the one given for a specific class body scope.
-///
-/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
-/// introduces a direct dependency on that file's AST.
-pub fn attribute_declarations<'db, 's>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    name: &'s str,
-) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
-
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
-        Some((
-            use_def.reachable_member_declarations(member),
-            function_scope_id,
-        ))
-    })
 }
 
 /// Returns all attribute assignments as scope IDs for a specific class body scope.
@@ -374,6 +319,15 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
         &self.use_def_maps[scope_id]
+    }
+
+    /// Returns the set of modules that are imported anywhere in this file.
+    ///
+    /// This set only considers `import` statements, not `from...import` statements.
+    /// See `ModuleLiteralType::available_submodule_attributes` for discussion
+    /// of why this analysis is intentionally limited.
+    pub fn imported_modules(&self) -> &FxHashSet<ModuleName> {
+        &self.imported_modules
     }
 
     #[track_caller]
