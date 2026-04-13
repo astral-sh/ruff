@@ -44,17 +44,22 @@ the server without any external dependencies.
     The following configuration needs to be stored in `nvim/lsp/ruff.lua` or `nvim/after/lsp/ruff.lua`:
 
     ```lua
-    vim.lsp.config('ruff', {
+    ---@type vim.lsp.Config  
+    return {
       cmd = { 'ruff', 'server' },
       filetypes = { 'python' },
-      root_dir = vim.fs.dirname(vim.fs.find({ 'pyproject.toml', '.git' }, { upward = true })[1]),
+      root_markers = { 'pyproject.toml', 'ruff.toml', '.ruff.toml', '.git' },
       init_options = {
         settings = {
           -- Ruff language server settings go here
         }
       }
-    })
+    }
+    ```
 
+    And, then enable the server by including the following in your `init.lua`:
+
+    ```lua
     vim.lsp.enable('ruff')
     ```
 
