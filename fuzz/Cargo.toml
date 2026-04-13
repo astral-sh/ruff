@@ -37,7 +37,7 @@ salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "2f687a17ceea8ec7
     "salsa_unstable",
     "inventory",
 ] }
-similar = { version = "2.5.0" }
+similar = { version = "3.0.0" }
 tracing = { version = "0.1.40" }
 
 # Prevent this from interfering with workspaces
