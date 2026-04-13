@@ -29,6 +29,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 14 | 
 15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
 16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
+17 | def _(flag: bool):
+18 |     class HasMroEntries:
+19 |         def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+20 |             return ()
+21 | 
+22 |     class NoMroEntries: ...
+23 | 
+24 |     base = HasMroEntries() if flag else NoMroEntries()
+25 | 
+26 |     class Foo(base): ...  # error: [invalid-base]
 ```
 
 # Diagnostics
@@ -71,6 +81,7 @@ error[invalid-base]: Invalid class base with type `Bad1`
 15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
    |               ^^^^^^
 16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
+17 | def _(flag: bool):
    |
 info: Definition of class `BadSub1` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
@@ -86,9 +97,26 @@ error[invalid-base]: Invalid class base with type `Bad2`
 15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
 16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
    |               ^^^^^^
+17 | def _(flag: bool):
+18 |     class HasMroEntries:
    |
 info: Definition of class `BadSub2` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `Bad2` has an `__mro_entries__` method, but it does not return a tuple of types
+
+```
+
+```
+error[invalid-base]: Invalid class base with type `HasMroEntries | NoMroEntries`
+  --> src/mdtest_snippet.py:26:15
+   |
+24 |     base = HasMroEntries() if flag else NoMroEntries()
+25 |
+26 |     class Foo(base): ...  # error: [invalid-base]
+   |               ^^^^
+   |
+info: Definition of class `Foo` will raise `TypeError` at runtime
+info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
+info: Type `HasMroEntries | NoMroEntries` may have an `__mro_entries__` attribute, but it may be missing
 
 ```

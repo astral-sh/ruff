@@ -457,6 +457,22 @@ class BadSub1(Bad1()): ...  # error: [invalid-base]
 class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
+For a union base where one member lacks `__mro_entries__`, `invalid-base` is emitted with a vague
+"may be missing" message that does not identify the problematic union member:
+
+```py
+def _(flag: bool):
+    class HasMroEntries:
+        def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+            return ()
+
+    class NoMroEntries: ...
+
+    base = HasMroEntries() if flag else NoMroEntries()
+
+    class Foo(base): ...  # error: [invalid-base]
+```
+
 ## `__bases__` lists with duplicate bases
 
 <!-- snapshot-diagnostics -->

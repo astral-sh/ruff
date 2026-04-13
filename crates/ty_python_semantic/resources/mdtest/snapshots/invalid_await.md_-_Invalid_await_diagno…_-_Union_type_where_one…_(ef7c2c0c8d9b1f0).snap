@@ -1,0 +1,47 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Union type where one member lacks `__await__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Awaitable:
+2 |     def __await__(self):
+3 |         yield
+4 | 
+5 | class NotAwaitable: ...
+6 | 
+7 | async def _(flag: bool) -> None:
+8 |     x = Awaitable() if flag else NotAwaitable()
+9 |     await x  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `Awaitable | NotAwaitable` is not awaitable
+ --> src/mdtest_snippet.py:9:11
+  |
+7 | async def _(flag: bool) -> None:
+8 |     x = Awaitable() if flag else NotAwaitable()
+9 |     await x  # error: [invalid-await]
+  |           ^
+  |
+ ::: src/mdtest_snippet.py:2:9
+  |
+1 | class Awaitable:
+2 |     def __await__(self):
+  |         --------------- method defined here
+3 |         yield
+  |
+info: `__await__` may be missing
+
+```

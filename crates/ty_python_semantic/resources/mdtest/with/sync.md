@@ -142,6 +142,8 @@ with Manager():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def _(flag: bool):
     class Manager1:
