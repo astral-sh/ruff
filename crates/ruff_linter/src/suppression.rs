@@ -25,7 +25,7 @@ use crate::rules::ruff::rules::{
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
-use crate::{Locator, Violation};
+use crate::{Locator, Violation, warn_user_once};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
@@ -341,19 +341,15 @@ impl Suppressions {
                 } else {
                     group.disabled_codes.push(code_str);
                 }
-            } else if let SuppressionComments::Single(
-                comment @ SuppressionComment {
-                    action: SuppressionAction::Disable,
-                    ..
-                },
-            ) = &suppression.comments
+            } else if let SuppressionComments::Single(SuppressionComment {
+                action: SuppressionAction::Disable,
+                range,
+                ..
+            }) = &suppression.comments
             {
                 // UnmatchedSuppressionComment
-                if unmatched_ranges.insert(comment.range) {
-                    context.report_diagnostic_if_enabled(
-                        UnmatchedSuppressionComment {},
-                        comment.range,
-                    );
+                if unmatched_ranges.insert(range) {
+                    context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, *range);
                 }
             }
         }
@@ -552,8 +548,11 @@ impl<'a> SuppressionsBuilder<'a> {
                             comments: SuppressionComments::Single(suppression.clone()),
                         });
                     }
+                } else {
+                    warn_user_once!(
+                        "#ruff:ignore comment found but not active, enable preview mode"
+                    );
                 }
-                // TODO: drop a warning if preview mode disabled, or silently ignore suppression?
                 suppressions.next();
                 continue;
             }
@@ -839,7 +838,7 @@ impl<'a> SuppressionsBuilder<'a> {
         let mut start = range.start();
         let mut end = range.end();
 
-        // Look forward for the next newline. If there is any non-trivia tokens, then this comment
+        // Look forward for the next newline. If there are any non-trivia tokens, then this comment
         // is not on the last line of the statement or header.
         for next_token in after {
             match next_token.kind() {
