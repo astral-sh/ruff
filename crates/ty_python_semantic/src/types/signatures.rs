@@ -3023,6 +3023,19 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    /// Returns this parameter without a default value.
+    pub(crate) fn without_default_type(mut self) -> Self {
+        match &mut self.kind {
+            ParameterKind::PositionalOnly { default_type, .. }
+            | ParameterKind::PositionalOrKeyword { default_type, .. }
+            | ParameterKind::KeywordOnly { default_type, .. } => *default_type = None,
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                panic!("cannot remove default value from variadic parameter")
+            }
+        }
+        self
+    }
+
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
