@@ -52,8 +52,9 @@ use crate::{
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
+use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    attribute_assignments, attribute_declarations, attribute_scopes,
+    attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
