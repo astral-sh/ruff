@@ -160,69 +160,64 @@ fn parse_xcom_pull_template(s: &str) -> Option<String> {
     }
     eat_whitespace(&mut cursor);
 
-    // Parse xcom_pull arguments. Keywords can appear in either order:
+    // Parse xcom_pull arguments. We accept:
     //   xcom_pull('task_1')
     //   xcom_pull(task_ids='task_1', key='return_value')
     //   xcom_pull(key='return_value', task_ids='task_1')
-    let task_id = if let Some(identifier) = parse_identifier(&mut cursor) {
-        match identifier {
-            "task_ids" | "task_id" => {
-                eat_whitespace(&mut cursor);
-                if !cursor.eat_char('=') {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                let task_id = parse_task_id_value(&mut cursor)?;
-                if cursor.eat_char(',') {
-                    eat_whitespace(&mut cursor);
-                    parse_key_return_value(&mut cursor)?;
-                    eat_whitespace(&mut cursor);
-                }
-                task_id
-            }
-            "key" => {
-                // `key='return_value'` before `task_ids` — keyword form only,
-                // since positional arguments after keyword arguments are invalid.
-                eat_whitespace(&mut cursor);
-                if !cursor.eat_char('=') {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                if parse_quoted_string(&mut cursor)? != "return_value" {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                if !cursor.eat_char(',') {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                let kw = parse_identifier(&mut cursor)?;
-                if kw != "task_ids" && kw != "task_id" {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                if !cursor.eat_char('=') {
-                    return None;
-                }
-                eat_whitespace(&mut cursor);
-                parse_task_id_value(&mut cursor)?
-            }
-            _ => return None,
+    let mut task_id = None;
+    let mut saw_keyword = false;
+    let mut saw_key = false;
+
+    loop {
+        if cursor.eat_char(')') {
+            break;
         }
-    } else {
-        // Positional argument (no keyword).
-        let task_id = parse_task_id_value(&mut cursor)?;
+
+        if let Some(identifier) = parse_identifier(&mut cursor) {
+            saw_keyword = true;
+
+            eat_whitespace(&mut cursor);
+            if !cursor.eat_char('=') {
+                return None;
+            }
+            eat_whitespace(&mut cursor);
+
+            match identifier {
+                "task_ids" | "task_id" => {
+                    if task_id.is_some() {
+                        return None;
+                    }
+                    task_id = Some(parse_task_id_value(&mut cursor)?);
+                }
+                "key" => {
+                    if saw_key || parse_quoted_string(&mut cursor)? != "return_value" {
+                        return None;
+                    }
+                    saw_key = true;
+                }
+                _ => return None,
+            }
+        } else {
+            // Positional arguments must come before any keyword arguments.
+            if saw_keyword || task_id.is_some() {
+                return None;
+            }
+            task_id = Some(parse_task_id_value(&mut cursor)?);
+        }
+
+        eat_whitespace(&mut cursor);
         if cursor.eat_char(',') {
             eat_whitespace(&mut cursor);
-            parse_key_return_value(&mut cursor)?;
-            eat_whitespace(&mut cursor);
+            continue;
         }
-        task_id
-    };
-
-    if !cursor.eat_char(')') {
+        if cursor.eat_char(')') {
+            break;
+        }
         return None;
     }
+
+    let task_id = task_id?;
+
     eat_whitespace(&mut cursor);
 
     if !cursor.eat_char2('}', '}') {
@@ -306,24 +301,6 @@ fn parse_task_id_value<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
     }
 
     Some(task_id)
-}
-
-/// If the cursor starts with `key='return_value'` (or `key="return_value"`),
-/// consume it. Returns `None` if `key=` is present but the value is not
-/// `return_value`.
-fn parse_key_return_value(cursor: &mut Cursor) -> Option<()> {
-    if parse_identifier(cursor)? != "key" {
-        return None;
-    }
-    eat_whitespace(cursor);
-    if !cursor.eat_char('=') {
-        return None;
-    }
-    eat_whitespace(cursor);
-    if parse_quoted_string(cursor)? != "return_value" {
-        return None;
-    }
-    Some(())
 }
 
 #[cfg(test)]
