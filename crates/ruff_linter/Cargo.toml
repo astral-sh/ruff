@@ -72,8 +72,13 @@ unicode_names2 = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+ruff_test = { workspace = true }
+ty_static = { workspace = true }
+
+camino = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+datatest-stable = { workspace = true }
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
 tempfile = { workspace = true }
 test-case = { workspace = true }
@@ -83,6 +88,11 @@ default = []
 schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
+testing = []
+
+[[test]]
+name = "mdtest"
+harness = false
 
 [lints]
 workspace = true

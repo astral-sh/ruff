@@ -3180,9 +3180,11 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "bitflags 2.11.0",
+ "camino",
  "clap",
  "colored 3.1.1",
  "compact_str",
+ "datatest-stable",
  "fern",
  "glob",
  "globset",
@@ -3215,6 +3217,7 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_python_trivia",
  "ruff_source_file",
+ "ruff_test",
  "ruff_text_size",
  "rustc-hash",
  "schemars",
@@ -3228,6 +3231,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
+ "ty_static",
  "typed-arena",
  "unicode-normalization",
  "unicode-width",
@@ -3536,6 +3540,31 @@ dependencies = [
  "memchr",
  "ruff_text_size",
  "serde",
+]
+
+[[package]]
+name = "ruff_test"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "colored 3.1.1",
+ "insta",
+ "mdtest",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_python_ast",
+ "ruff_source_file",
+ "ruff_workspace",
+ "rustc-hash",
+ "salsa",
+ "serde",
+ "tracing",
+ "ty_module_resolver",
+ "ty_python_core",
+ "ty_python_semantic",
+ "ty_static",
+ "ty_vendored",
 ]
 
 [[package]]
