@@ -12,6 +12,7 @@ license.workspace = true
 
 [lib]
 doctest = false
+test = false
 
 [dependencies]
 mdtest = { workspace = true }
