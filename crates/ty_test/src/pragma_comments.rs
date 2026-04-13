@@ -184,7 +184,7 @@ impl<'s> Iterator for PragmaCommentsIter<'_, 's> {
     }
 }
 
-/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
+/// An [`UnparsedPragmaComment`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
 struct PragmaCommentWithRange<'a>(UnparsedPragmaComment<'a>, TextRange);
 
@@ -215,7 +215,7 @@ pub(crate) struct LinePragmaComments<'a> {
     /// it's the next non-assertion line.
     pub(crate) line_number: OneIndexed,
 
-    /// The comments referring to this line.
+    /// The assertions referring to this line.
     pub(crate) assertions: AssertionVec<'a>,
 
     /// The number of snapshot comments on this line.
@@ -245,9 +245,9 @@ impl<'a> UnparsedPragmaComment<'a> {
 
 /// A single assertion comment.
 ///
-/// This type represents an *attempted* assertion comment, but not necessarily a *valid* assertion comment.
+/// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
 /// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
-/// in the event of an invalid comment.
+/// in the event of an invalid assertion.
 #[derive(Debug)]
 pub(crate) enum UnparsedAssertion<'a> {
     /// A `# revealed:` assertion.

@@ -92,10 +92,6 @@ pub fn run(
             &test,
         );
 
-        if let Ok((_, edits)) = &result {
-            markdown_edits.extend(edits.iter().cloned());
-        }
-
         let inconsistencies = if result
             .as_ref()
             .is_ok_and(|(outcome, _)| outcome.has_been_skipped())
@@ -112,44 +108,45 @@ pub fn run(
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = result {
-            let md_index = LineIndex::from_source_text(source);
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
 
-            for test_failures in failures {
-                for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = relative_fixture_path.as_str();
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
-                    let source_map = EmbeddedFileSourceMap::new(
-                        &md_index,
-                        test_failures.backtick_offsets.clone(),
-                    );
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
 
-                    let absolute_line_number =
-                        match source_map.to_absolute_line_number(relative_line_number) {
-                            Ok(line_number) => line_number,
-                            Err(last_line_number) => {
-                                output_format.write_error(
-                                    &mut assertion,
-                                    file,
-                                    last_line_number,
-                                    &Failure::new(
-                                        "Found a trailing assertion comment \
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
                                         (e.g., `# revealed:` or `# error:`) \
                                         not followed by any statement.",
-                                    ),
-                                );
+                                        ),
+                                    );
 
-                                continue;
-                            }
-                        };
+                                    continue;
+                                }
+                            };
 
-                    for failure in failures {
-                        output_format.write_error(
-                            &mut assertion,
-                            file,
-                            absolute_line_number,
-                            failure,
-                        );
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
                     }
                 }
             }
@@ -349,7 +346,7 @@ fn run_test(
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
-    let test_files: Vec<TestFile<'_>> = test
+    let test_files: Vec<_> = test
         .files()
         .filter_map(|embedded| {
             if embedded.lang == "ignore" {
@@ -555,15 +552,10 @@ fn run_test(
             // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
             // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(
-                    diagnostics
-                        .iter()
-                        .filter(|diagnostic| {
-                            diagnostic.id() != DiagnosticId::RevealedType
-                                && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                        })
-                        .cloned(),
-                );
+                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
+                    diagnostic.id() != DiagnosticId::RevealedType
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                }));
             }
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
@@ -806,17 +798,9 @@ fn render_diagnostics(db: &mut Db, diagnostics: &[Diagnostic]) -> String {
 }
 
 fn is_update_inline_snapshots_enabled() -> bool {
-    #[cfg(test)]
-    if let Some(is_enabled) = snapshot_update_mode_override() {
-        return is_enabled;
-    }
-
-    std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some()
-}
-
-#[cfg(test)]
-fn snapshot_update_mode_override() -> Option<bool> {
-    None
+    let is_enabled: std::sync::LazyLock<_> =
+        std::sync::LazyLock::new(|| std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some());
+    *is_enabled
 }
 
 fn validate_inline_snapshot(

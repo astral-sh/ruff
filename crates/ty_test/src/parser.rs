@@ -935,25 +935,35 @@ impl<'s> Parser<'s> {
         offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
         let Some(file) = self.files.last_mut() else {
+            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
+
             bail!(
-                "Inline diagnostics block must follow a checkable Python file in the same section."
+                "Inline diagnostics block at line {backtick_start} must follow a checkable Python file in the same section."
             );
         };
 
         if !file.is_checkable() {
+            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
+
             bail!(
-                "Inline diagnostics block must follow a checkable Python file block in the same section but it follows a {} block.",
+                "Inline diagnostics block at line {backtick_start} must follow a checkable Python file block in the same section but it follows a `{}` block.",
                 file.lang
             );
         }
 
         let code_block = file.code_blocks.last_mut().unwrap();
 
-        anyhow::ensure!(
-            code_block.inline_snapshot_block.as_ref().is_none(),
-            "File `{}` has more than one inline diagnostics block.",
-            file.relative_path(),
-        );
+        if let Some(existing_block) = &code_block.inline_snapshot_block {
+            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
+            let existing_start = self
+                .source
+                .count_lines(TextRange::up_to(existing_block.range.start()));
+
+            bail!(
+                "File `{}` has more than one inline diagnostics block: first at line {existing_start} and another at line {backtick_start}.",
+                file.relative_path(),
+            );
+        }
 
         code_block.inline_snapshot_block = Some(InlineSnapshotBlock {
             expected: code,

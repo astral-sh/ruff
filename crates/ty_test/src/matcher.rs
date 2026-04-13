@@ -136,8 +136,7 @@ pub(super) fn match_file(
                     Ordering::Less => {
                         // We have pragmas on an earlier line than diagnostics; report these
                         // pragmas as all unmatched, and advance the assertions iterator.
-
-                        failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
+                        failures.push(pragmas.line_number, unmatched_pragmas(pragmas));
                         current_pragmas = line_pragmas.next();
                     }
                     Ordering::Greater => {
@@ -151,13 +150,7 @@ pub(super) fn match_file(
             (Some(pragmas), None) => {
                 // We've exhausted diagnostics but still have pragmas; report these pragmas
                 // as unmatched and advance the pragmas iterator.
-                let mut errors = unmatched(&pragmas.assertions);
-
-                if pragmas.snapshot_pragmas > 0 {
-                    errors.push(Failure::new("unmatched snapshot comment:".red()));
-                }
-
-                failures.push(pragmas.line_number, errors);
+                failures.push(pragmas.line_number, unmatched_pragmas(pragmas));
                 current_pragmas = line_pragmas.next();
             }
             (None, Some(diagnostics)) => {
@@ -182,6 +175,15 @@ trait Unmatched {
     fn unmatched(&self) -> Failure;
 }
 
+fn unmatched_pragmas(pragmas: &LinePragmaComments) -> Vec<Failure> {
+    let mut errors = unmatched(&pragmas.assertions);
+
+    if pragmas.snapshot_pragmas > 0 {
+        errors.push(Failure::new("unmatched snapshot comment.".red()));
+    }
+
+    errors
+}
 fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<Failure> {
     unmatched.iter().map(Unmatched::unmatched).collect()
 }
