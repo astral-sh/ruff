@@ -174,9 +174,14 @@ impl Workspace {
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
+        let (settings, mut settings_diagnostics) = project
+            .to_settings(&self.db, &FallibleStrategy)
+            .map_err(into_error)?;
+        settings_diagnostics.extend(program_settings_diagnostics);
+
         self.db
             .project()
-            .reload(&mut self.db, project, program_settings_diagnostics);
+            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
 
         Ok(())
     }

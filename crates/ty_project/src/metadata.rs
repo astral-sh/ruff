@@ -8,9 +8,10 @@ use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::Db;
-use crate::metadata::options::OptionDiagnostic;
 use crate::metadata::options::ProjectOptionsOverrides;
+use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
+use crate::metadata::settings::Settings;
 use crate::metadata::value::ValueSource;
 pub use options::Options;
 use options::TyTomlError;
@@ -290,6 +291,14 @@ impl ProjectMetadata {
     ) -> Result<(ProgramSettings, Vec<OptionDiagnostic>), Strategy::Error<anyhow::Error>> {
         self.options
             .to_program_settings(db, self.root(), self.name(), system, vendored, strategy)
+    }
+
+    pub fn to_settings<Strategy: MisconfigurationStrategy>(
+        &self,
+        db: &dyn Db,
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
+        self.options.to_settings(db, self.root(), strategy)
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {

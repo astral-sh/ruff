@@ -284,8 +284,23 @@ impl ProjectDatabase {
                         }
                     };
 
+                    let (settings, mut settings_diagnostics) = match metadata.options().to_settings(
+                        self,
+                        metadata.root(),
+                        &FallibleStrategy,
+                    ) {
+                        Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                        Err(error) => {
+                            tracing::warn!(
+                                "Keeping old project configuration because loading the new settings failed with: {error}"
+                            );
+                            (None, vec![error.into_diagnostic()])
+                        }
+                    };
+                    settings_diagnostics.extend(program_settings_diagnostics);
+
                     tracing::debug!("Reloading project after structural change");
-                    project.reload(self, metadata, program_settings_diagnostics);
+                    project.reload(self, metadata, settings, settings_diagnostics);
                 }
                 Err(error) => {
                     tracing::error!(

@@ -211,7 +211,7 @@ reveal_type(sys.version_info[:2])
         .build()
         .wait_until_workspaces_are_initialized();
 
-    // The unsupported version inferred from the selected environment now surfaces as a
+    // The unsupported version inferred from the selected environment surfaces as a
     // settings diagnostic on the environment's `pyvenv.cfg`.
     server.collect_publish_diagnostic_notifications(1);
 
