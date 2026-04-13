@@ -1,14 +1,11 @@
 use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::files::File;
-use ty_module_resolver::Db as ModuleResolverDb;
+use ty_python_core::Db as SemanticIndexDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: ModuleResolverDb {
-    /// Returns `true` if the file should be checked.
-    fn should_check_file(&self, file: File) -> bool;
-
+pub trait Db: SemanticIndexDb {
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
@@ -22,27 +19,24 @@ pub trait Db: ModuleResolverDb {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::*;
+
     use std::sync::{Arc, Mutex};
 
-    use crate::program::Program;
-    use crate::{
-        AnalysisSettings, FallibleStrategy, ProgramSettings, PythonPlatform, PythonVersionSource,
-        PythonVersionWithSource, default_lint_registry,
-    };
-    use ty_module_resolver::SearchPathSettings;
-
-    use super::Db;
-    use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
+    use ty_python_core::platform::PythonPlatform;
+
+    use crate::default_lint_registry;
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::{File, Files};
+    use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::Db as ModuleResolverDb;
-    use ty_module_resolver::SearchPaths;
+    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -125,11 +119,14 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {
+    impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: File) -> bool {
             !file.path(self).is_vendored_path()
         }
+    }
 
+    #[salsa::db]
+    impl Db for TestDb {
         fn rule_selection(&self, _file: File) -> &RuleSelection {
             &self.rule_selection
         }

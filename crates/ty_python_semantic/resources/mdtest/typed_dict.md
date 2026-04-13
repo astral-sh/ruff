@@ -2848,14 +2848,15 @@ TypedDict()
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 TypedDict("Foo")
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+# error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
+reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:

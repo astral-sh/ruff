@@ -46,10 +46,6 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
     imported_symbol, known_module_symbol,
 };
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::bind::ConstructorCallableKind;
@@ -73,10 +69,7 @@ use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, UnionTypeInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
-pub(crate) use crate::types::narrow::{
-    NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
-    infer_narrowing_constraint,
-};
+pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -100,6 +93,10 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
+use ty_python_core::definition::Definition;
+use ty_python_core::place::ScopedPlaceId;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{Truthiness, imported_modules, place_table, semantic_index};
 
 mod bool;
 mod bound_super;
@@ -126,7 +123,7 @@ mod literal;
 mod member;
 mod method;
 mod mro;
-mod narrow;
+pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
@@ -545,6 +542,7 @@ pub(crate) use todo_type;
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
     pub setter: Option<Type<'db>>,
+    pub deleter: Option<Type<'db>>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -557,6 +555,9 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
     if let Some(setter) = property.setter(db) {
         visitor.visit_type(db, setter);
+    }
+    if let Some(deleter) = property.deleter(db) {
+        visitor.visit_type(db, deleter);
     }
 }
 
@@ -577,7 +578,10 @@ impl<'db> PropertyInstanceType<'db> {
         let setter = self
             .setter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        Self::new(db, getter, setter)
+        let deleter = self
+            .deleter(db)
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        Self::new(db, getter, setter, deleter)
     }
 
     fn recursive_type_normalized_impl(
@@ -602,7 +606,15 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(Self::new(db, getter, setter))
+        let deleter = match self.deleter(db) {
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) => Some(
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
+        Some(Self::new(db, getter, setter, deleter))
     }
 
     fn find_legacy_typevars_impl(
@@ -616,6 +628,9 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
         if let Some(ty) = self.setter(db) {
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        }
+        if let Some(ty) = self.deleter(db) {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
@@ -1552,6 +1567,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn as_int_like_literal(self) -> Option<i64> {
+        match self.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Int(value)) => Some(value.as_i64()),
+            Some(LiteralValueTypeKind::Bool(value)) => Some(i64::from(value)),
+            _ => None,
+        }
+    }
+
     pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::LiteralValue(literal) => literal.as_enum(),
@@ -1902,11 +1925,16 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
+    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+        self.promote_singletons_impl(db)
+    }
+
     /// Recursively promote singleton types (like `None`, `EllipsisType`) to
-    /// `T | Unknown` within type parameters, without recursing into unions.
+    /// `T | Unknown` within nominal type parameters, without recursing into unions.
     /// Used for collection literal inference so that `[None]` is inferred as
     /// `list[None | Unknown]` rather than `list[None]`.
-    pub(crate) fn promote_singletons(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote_singletons_recursively(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly),
@@ -1919,6 +1947,16 @@ impl<'db> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            _ => self,
+        }
+    }
+
+    /// Like [`Type::promote_singletons_recursively`], but does not recurse into nested types.
+    fn promote_singletons_impl(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::NominalInstance(instance) if instance.is_singleton(db) => {
+                UnionType::from_two_elements(db, self, Type::unknown())
+            }
             _ => self,
         }
     }
@@ -2398,6 +2436,12 @@ impl<'db> Type<'db> {
                         ))
                         .into(),
                     ),
+                    (Some(KnownClass::Property), "__delete__") => Some(
+                        Place::bound(Type::WrapperDescriptor(
+                            WrapperDescriptorKind::PropertyDunderDelete,
+                        ))
+                        .into(),
+                    ),
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
@@ -2792,7 +2836,7 @@ impl<'db> Type<'db> {
                     ty,
                     origin,
                     definedness,
-                    widening,
+                    public_type_policy,
                 }),
             qualifiers,
         } = attribute
@@ -2804,7 +2848,7 @@ impl<'db> Type<'db> {
                     ty: fallback,
                     origin,
                     definedness,
-                    widening,
+                    public_type_policy,
                 })
                 .with_qualifiers(qualifiers),
                 instance,
@@ -2836,7 +2880,7 @@ impl<'db> Type<'db> {
                         ty: Type::Union(union),
                         origin,
                         definedness: boundness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers,
             } => (
@@ -2848,7 +2892,7 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             definedness: boundness,
-                            widening,
+                            public_type_policy,
                         })
                     })
                     .with_qualifiers(qualifiers),
@@ -2869,7 +2913,7 @@ impl<'db> Type<'db> {
                         ty: Type::Intersection(intersection),
                         origin,
                         definedness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers,
             } => (
@@ -2884,7 +2928,7 @@ impl<'db> Type<'db> {
                                     .map_or(*elem, |(ty, _)| ty),
                                 origin,
                                 definedness,
-                                widening,
+                                public_type_policy,
                             })
                         })
                         .with_qualifiers(qualifiers)
@@ -2899,7 +2943,7 @@ impl<'db> Type<'db> {
                         ty: attribute_ty,
                         origin,
                         definedness: boundness,
-                        widening,
+                        public_type_policy,
                     }),
                 qualifiers: _,
             } => {
@@ -2911,7 +2955,7 @@ impl<'db> Type<'db> {
                             ty: return_ty,
                             origin,
                             definedness: boundness,
-                            widening,
+                            public_type_policy,
                         })
                         .into(),
                         attribute_kind,
@@ -3040,13 +3084,13 @@ impl<'db> Type<'db> {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
+                    public_type_policy: fallback_public_type_policy,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
-                widening: fallback_widening,
+                public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -3084,13 +3128,13 @@ impl<'db> Type<'db> {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
+                    public_type_policy: fallback_public_type_policy,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
-                widening: fallback_widening,
+                public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -3163,6 +3207,10 @@ impl<'db> Type<'db> {
             .into(),
             Type::PropertyInstance(property) if name == "__set__" => Place::bound(
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
+            )
+            .into(),
+            Type::PropertyInstance(property) if name == "__delete__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)),
             )
             .into(),
 
@@ -3247,6 +3295,14 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::ClassLiteral(class)
+                if name == "__delete__" && class.is_known(db, KnownClass::Property) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::PropertyDunderDelete,
+                ))
+                .into()
+            }
             Type::BoundMethod(bound_method) => match name_str {
                 "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                 "__func__" => Place::bound(Type::FunctionLiteral(bound_method.function(db))).into(),
@@ -3303,6 +3359,9 @@ impl<'db> Type<'db> {
             }
             Type::PropertyInstance(property) if name == "fset" => {
                 Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
+            }
+            Type::PropertyInstance(property) if name == "fdel" => {
+                Place::bound(property.deleter(db).unwrap_or(Type::none(db))).into()
             }
 
             Type::LiteralValue(literal)
@@ -3605,22 +3664,10 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
-    /// If this type is a `ParamSpec` type variable, or a union of a `ParamSpec` with `Unknown`,
-    /// returns the `ParamSpec` type variable. Otherwise, returns `None`.
-    ///
-    /// `ParamSpec` type variables can appear as `P | Unknown` because of how they are inferred.
-    /// See the comment in `match_variadic` in `bind.rs` for details.
+    /// If this type is a `ParamSpec` type variable, returns it. Otherwise, returns `None`.
     fn as_paramspec_typevar(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::TypeVar(tv) if tv.is_paramspec(db) => Some(self),
-            Type::Union(union) => match union.elements(db) {
-                [paramspec @ Type::TypeVar(tv), other] | [other, paramspec @ Type::TypeVar(tv)]
-                    if tv.is_paramspec(db) && other.is_unknown() =>
-                {
-                    Some(*paramspec)
-                }
-                _ => None,
-            },
             _ => None,
         }
     }
@@ -4154,10 +4201,6 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::new(Parameters::empty(), Type::object()))
                         .into(),
                 )
-            }
-
-            KnownClass::Enum => {
-                Some(Binding::single(self, Signature::todo("functional `Enum` syntax")).into())
             }
 
             KnownClass::Super => {
@@ -5545,7 +5588,7 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // `SingletonsOnly` promotion only recurses into `NominalInstance` types (tuples
+        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
             type_mapping,
@@ -5597,7 +5640,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
                 if instance.is_singleton(db) {
-                    UnionType::from_two_elements(db, self, Type::unknown())
+                    self.promote_singletons_impl(db)
                 } else {
                     instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
@@ -5644,6 +5687,11 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
+                    property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
@@ -5892,7 +5940,8 @@ impl<'db> Type<'db> {
 
             Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(property)
-                | KnownBoundMethodType::PropertyDunderSet(property),
+                | KnownBoundMethodType::PropertyDunderSet(property)
+                | KnownBoundMethodType::PropertyDunderDelete(property),
             ) => {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -6188,8 +6237,9 @@ impl<'db> Type<'db> {
 
             Self::PropertyInstance(property) => property
                 .getter(db)
-                .and_then(|getter|getter.definition(db))
-                .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
+                .and_then(|getter| getter.definition(db))
+                .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+                .or_else(|| property.deleter(db).and_then(|deleter| deleter.definition(db))),
 
             Self::LiteralValue(_)
             // TODO: For enum literals, it would be even better to jump to the definition of the specific member
@@ -6320,6 +6370,14 @@ impl<'db> Type<'db> {
         let generic_context = GenericContext::from_typevar_instances(db, variables);
         self.apply_specialization(db, generic_context.default_specialization(db, None))
     }
+
+    pub(crate) fn from_truthiness(db: &'db dyn Db, truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::AlwaysTrue => Type::bool_literal(true),
+            Truthiness::AlwaysFalse => Type::bool_literal(false),
+            Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -6391,6 +6449,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .getter(db)
                 .iter()
                 .chain(&property_instance_type.setter(db))
+                .chain(&property_instance_type.deleter(db))
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
@@ -6444,7 +6503,8 @@ impl PromotionMode {
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
-    /// Singleton promotion is shallow: it doesn't recurse
+    /// Singleton-only promotion recursively descends through nominal instances
+    /// without recursing into unions or non-nominal types.
     SingletonsOnly,
 }
 
@@ -7280,86 +7340,6 @@ impl<'db> AwaitError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub enum Truthiness {
-    /// For an object `x`, `bool(x)` will always return `True`
-    AlwaysTrue,
-    /// For an object `x`, `bool(x)` will always return `False`
-    AlwaysFalse,
-    /// For an object `x`, `bool(x)` could return either `True` or `False`
-    Ambiguous,
-}
-
-impl Truthiness {
-    pub(crate) const fn is_ambiguous(self) -> bool {
-        matches!(self, Truthiness::Ambiguous)
-    }
-
-    pub(crate) const fn is_always_false(self) -> bool {
-        matches!(self, Truthiness::AlwaysFalse)
-    }
-
-    pub(crate) const fn may_be_true(self) -> bool {
-        !self.is_always_false()
-    }
-
-    pub(crate) const fn is_always_true(self) -> bool {
-        matches!(self, Truthiness::AlwaysTrue)
-    }
-
-    pub(crate) const fn negate(self) -> Self {
-        match self {
-            Self::AlwaysTrue => Self::AlwaysFalse,
-            Self::AlwaysFalse => Self::AlwaysTrue,
-            Self::Ambiguous => Self::Ambiguous,
-        }
-    }
-
-    pub(crate) const fn negate_if(self, condition: bool) -> Self {
-        if condition { self.negate() } else { self }
-    }
-
-    pub(crate) fn or(self, other: Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other,
-            Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    pub(crate) fn or_else(self, other: impl Fn() -> Self) -> Self {
-        match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other(),
-            Truthiness::Ambiguous => match other() {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
-        }
-    }
-
-    fn into_type(self, db: &dyn Db) -> Type<'_> {
-        match self {
-            Self::AlwaysTrue => Type::bool_literal(true),
-            Self::AlwaysFalse => Type::bool_literal(false),
-            Self::Ambiguous => KnownClass::Bool.to_instance(db),
-        }
-    }
-}
-
-impl From<bool> for Truthiness {
-    fn from(value: bool) -> Self {
-        if value {
-            Truthiness::AlwaysTrue
-        } else {
-            Truthiness::AlwaysFalse
-        }
-    }
-}
-
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
@@ -7440,7 +7420,7 @@ impl<'db> ModuleLiteralType<'db> {
     /// side-effect the user actually cares about, and the `z` component may not be a submodule.
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
-    /// the current file (i.e. [`crate::semantic_index::definition::ImportFromDefinitionNodeRef`]).
+    /// the current file (i.e. `ty_python_core::definition::ImportFromDefinitionNodeRef`).
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
@@ -7748,26 +7728,6 @@ pub(super) fn determine_upper_bound<'db>(
         .last()
         .unwrap_or_else(|| class_literal.unknown_specialization(db));
     Type::instance(db, upper_bound)
-}
-
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum EvaluationMode {
-    Sync,
-    Async,
-}
-
-impl EvaluationMode {
-    pub(crate) const fn from_is_async(is_async: bool) -> Self {
-        if is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
-    }
-
-    pub(crate) const fn is_async(self) -> bool {
-        matches!(self, EvaluationMode::Async)
-    }
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.

@@ -1,5 +1,4 @@
-use crate::Db;
-use crate::python_platform::PythonPlatform;
+use crate::{Db, platform::PythonPlatform};
 
 use ruff_db::system::SystemPath;
 use ruff_python_ast::PythonVersion;

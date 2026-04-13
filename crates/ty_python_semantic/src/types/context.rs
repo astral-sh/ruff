@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
@@ -13,14 +13,15 @@ use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::reachability::is_range_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::{
     Db,
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
+use ty_python_core::scope::ScopeId;
+use ty_python_core::semantic_index;
 
 /// Context for inferring the types of a single file.
 ///
@@ -202,7 +203,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     fn is_range_reachable(&self, range: TextRange) -> bool {
         let index = semantic_index(self.db, self.file);
         let scope_id = self.scope.file_scope_id(self.db);
-        index.is_range_reachable(self.db, scope_id, range)
+        is_range_reachable(self.db, index, scope_id, range)
     }
 
     /// Are we currently inferring types in a stub file?
@@ -354,26 +355,22 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         if self.ctx.db().verbose() {
-            diag.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                match self.source {
-                    LintSource::Default => {
-                        format!("rule `{}` is enabled by default", diag.id())
-                    }
-                    LintSource::Cli => {
-                        format!("rule `{}` was selected on the command line", diag.id())
-                    }
-                    LintSource::File => {
-                        format!(
-                            "rule `{}` was selected in the configuration file",
-                            diag.id()
-                        )
-                    }
-                    LintSource::Editor => {
-                        format!("rule `{}` was selected in the editor settings", diag.id())
-                    }
-                },
-            ));
+            let rule = diag.id();
+
+            diag.info(match self.source {
+                LintSource::Default => {
+                    format!("rule `{rule}` is enabled by default")
+                }
+                LintSource::Cli => {
+                    format!("rule `{rule}` was selected on the command line")
+                }
+                LintSource::File => {
+                    format!("rule `{rule}` was selected in the configuration file")
+                }
+                LintSource::Editor => {
+                    format!("rule `{rule}` was selected in the editor settings")
+                }
+            });
         }
 
         self.ctx.diagnostics.borrow_mut().push(diag);

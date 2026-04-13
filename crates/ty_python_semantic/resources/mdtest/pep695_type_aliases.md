@@ -316,10 +316,12 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 #### Name does not match variable
 
 ```py
+from typing import Union
 from typing_extensions import TypeAliasType
 
-# error: [invalid-type-alias-type] "The name of a `TypeAliasType` (`WrongName`) must match the name of the variable it is assigned to (`IntOrStr`)"
-IntOrStr = TypeAliasType("WrongName", int | str)
+# error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
+IntOrStr = TypeAliasType("WrongName", Union[int, str])
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 ```
 
 #### Not a simple variable assignment

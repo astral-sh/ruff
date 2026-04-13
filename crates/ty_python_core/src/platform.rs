@@ -61,7 +61,7 @@ impl Combine for PythonPlatform {
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::PythonPlatform;
+    use super::PythonPlatform;
     use ruff_db::RustDoc;
     use schemars::{JsonSchema, Schema, SchemaGenerator};
     use serde_json::Value;

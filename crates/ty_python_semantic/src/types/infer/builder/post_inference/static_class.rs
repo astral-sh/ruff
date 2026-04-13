@@ -13,14 +13,11 @@ use crate::{
     TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
-    semantic_index::{
-        SemanticIndex, attribute_assignments, definition::DefinitionKind, scope::ScopeId,
-    },
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
         StaticClassLiteral, Type,
-        call::{Argument, CallError, CallErrorKind},
+        call::Argument,
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
         definition_expression_type,
@@ -37,7 +34,8 @@ use crate::{
             report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
-            report_shadowed_type_variable, report_unsupported_base,
+            report_shadowed_type_variable,
+            report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
         },
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
@@ -50,6 +48,9 @@ use crate::{
         typevar::TypeVarInstance,
         visitor::find_over_type,
     },
+};
+use ty_python_core::{
+    SemanticIndex, attribute_assignments, definition::DefinitionKind, scope::ScopeId,
 };
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
@@ -745,10 +746,10 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             if let Some(init_subclass) = init_subclass_type {
                 let call_args = call_args.with_self(Some(Type::from(class)));
-                if let Err(CallError(CallErrorKind::BindingError, bindings)) =
-                    init_subclass.try_call(db, &call_args)
-                {
-                    bindings.report_diagnostics(context, class_node.into());
+                if let Err(call_error) = init_subclass.try_call(db, &call_args) {
+                    report_subclass_of_class_with_non_callable_init_subclass(
+                        context, call_error, class, class_node,
+                    );
                 }
             }
         }

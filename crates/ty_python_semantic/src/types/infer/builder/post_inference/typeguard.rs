@@ -1,9 +1,7 @@
 use ruff_python_ast as ast;
 
-use crate::{
-    semantic_index::SemanticIndex,
-    types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION},
-};
+use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION};
+use ty_python_core::SemanticIndex;
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is

@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, EvaluationMode, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -13,6 +13,7 @@ use crate::{
 };
 use ruff_python_ast as ast;
 use std::borrow::Cow;
+use ty_python_core::EvaluationMode;
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///

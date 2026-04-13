@@ -12,18 +12,10 @@ use std::cell::RefCell;
 use crate::{
     Db, FxIndexMap, FxIndexSet, Program, TypeQualifiers,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
         place_from_bindings, place_from_declarations,
     },
-    semantic_index::{
-        attribute_assignments, attribute_declarations, attribute_scopes,
-        definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
-        place_table,
-        scope::{Scope, ScopeId},
-        semantic_index,
-        symbol::Symbol,
-        use_def_map,
-    },
+    reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
@@ -59,6 +51,15 @@ use crate::{
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
+};
+use ty_python_core::{
+    attribute_assignments, attribute_declarations, attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    place_table,
+    scope::{Scope, ScopeId},
+    semantic_index,
+    symbol::Symbol,
+    use_def_map,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -216,8 +217,9 @@ impl<'db> StaticClassLiteral<'db> {
                             return Some(ty);
                         }
                     }
-                    // Dynamic namedtuples and TypedDicts don't define their own ordering methods.
-                    ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {}
+                    ClassLiteral::DynamicNamedTuple(_)
+                    | ClassLiteral::DynamicTypedDict(_)
+                    | ClassLiteral::DynamicEnum(_) => {}
                 }
             }
         }
@@ -667,7 +669,9 @@ impl<'db> StaticClassLiteral<'db> {
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) | ClassLiteral::DynamicTypedDict(_) => false,
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
@@ -1069,7 +1073,7 @@ impl<'db> StaticClassLiteral<'db> {
                     field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
         }
@@ -1117,7 +1121,7 @@ impl<'db> StaticClassLiteral<'db> {
         if member
             .inner
             .place
-            .unwidened_type()
+            .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
             && CodeGeneratorKind::from_static_class(db, self, None)
                 .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
@@ -1128,7 +1132,7 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.unwidened_type() {
+        if let Some(ty) = member.inner.place.raw_type() {
             if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
                 if is_enum_class_by_inheritance(db, self) {
                     return Member::definitely_declared(value_ty);
@@ -1920,9 +1924,8 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of `Unknown` with the inferred types of all bindings of
-        // that attribute. We include `Unknown` in that union to account for the fact that the
-        // attribute might be externally modified.
+        // any method, we build a union of the raw types inferred from all bindings of that
+        // attribute, then apply public-type promotion to the final union.
         let mut union_of_inferred_types = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
@@ -2030,10 +2033,6 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if !qualifiers.contains(TypeQualifiers::FINAL) {
-            union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
-        }
-
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
@@ -2069,7 +2068,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.binding_reachability(db, &bind))
+                                .then(|| binding_reachability(db, class_map, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
@@ -2092,106 +2091,85 @@ impl<'db> StaticClassLiteral<'db> {
                     is_attribute_bound = true;
                 }
 
-                match binding.kind(db) {
+                let inferred_ty = match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
                         // Annotated assignments were handled above. This branch is not
                         // unreachable (because of the `continue` above), but there is
                         // nothing to do here.
+                        None
                     }
-                    DefinitionKind::Assignment(assign) => {
-                        match assign.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     .., self.name, .. = <value>
-                                //     (.., self.name, ..) = <value>
-                                //     [.., self.name, ..] = <value>
+                    DefinitionKind::Assignment(assign) => match assign.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     .., self.name, .. = <value>
+                            //     (.., self.name, ..) = <value>
+                            //     [.., self.name, ..] = <value>
 
-                                let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty = unpacked.expression_type(assign.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an un-annotated attribute assignment of the form:
-                                //
-                                //     self.name = <value>
-
-                                let inferred_ty = infer_expression_type(
-                                    db,
-                                    index.expression(assign.value(&module)),
-                                    TypeContext::default(),
-                                );
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(assign.target(&module)))
                         }
-                    }
-                    DefinitionKind::For(for_stmt) => {
-                        match for_stmt.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     for .., self.name, .. in <iterable>:
+                        TargetKind::Single => {
+                            // We found an un-annotated attribute assignment of the form:
+                            //
+                            //     self.name = <value>
 
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(for_stmt.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     for self.name in <iterable>:
-
-                                let iterable_ty = infer_expression_type(
-                                    db,
-                                    index.expression(for_stmt.iterable(&module)),
-                                    TypeContext::default(),
-                                );
-                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
+                            Some(infer_expression_type(
+                                db,
+                                index.expression(assign.value(&module)),
+                                TypeContext::default(),
+                            ))
                         }
-                    }
-                    DefinitionKind::WithItem(with_item) => {
-                        match with_item.target_kind() {
-                            TargetKind::Sequence(_, unpack) => {
-                                // We found an unpacking assignment like:
-                                //
-                                //     with <context_manager> as .., self.name, ..:
+                    },
+                    DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     for .., self.name, .. in <iterable>:
 
-                                let unpacked = infer_unpack_types(db, unpack);
-                                let inferred_ty =
-                                    unpacked.expression_type(with_item.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
-                            TargetKind::Single => {
-                                // We found an attribute assignment like:
-                                //
-                                //     with <context_manager> as self.name:
-
-                                let context_ty = infer_expression_type(
-                                    db,
-                                    index.expression(with_item.context_expr(&module)),
-                                    TypeContext::default(),
-                                );
-                                let inferred_ty = if with_item.is_async() {
-                                    context_ty.aenter(db)
-                                } else {
-                                    context_ty.enter(db)
-                                };
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                            }
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(for_stmt.target(&module)))
                         }
-                    }
+                        TargetKind::Single => {
+                            // We found an attribute assignment like:
+                            //
+                            //     for self.name in <iterable>:
+
+                            let iterable_ty = infer_expression_type(
+                                db,
+                                index.expression(for_stmt.iterable(&module)),
+                                TypeContext::default(),
+                            );
+                            // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                            Some(iterable_ty.iterate(db).homogeneous_element_type(db))
+                        }
+                    },
+                    DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
+                        TargetKind::Sequence(_, unpack) => {
+                            // We found an unpacking assignment like:
+                            //
+                            //     with <context_manager> as .., self.name, ..:
+
+                            let unpacked = infer_unpack_types(db, unpack);
+                            Some(unpacked.expression_type(with_item.target(&module)))
+                        }
+                        TargetKind::Single => {
+                            // We found an attribute assignment like:
+                            //
+                            //     with <context_manager> as self.name:
+
+                            let context_ty = infer_expression_type(
+                                db,
+                                index.expression(with_item.context_expr(&module)),
+                                TypeContext::default(),
+                            );
+                            Some(if with_item.is_async() {
+                                context_ty.aenter(db)
+                            } else {
+                                context_ty.enter(db)
+                            })
+                        }
+                    },
                     DefinitionKind::Comprehension(comprehension) => {
                         match comprehension.target_kind() {
                             TargetKind::Sequence(_, unpack) => {
@@ -2200,11 +2178,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
-
-                                let inferred_ty =
-                                    unpacked.expression_type(comprehension.target(&module));
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                Some(unpacked.expression_type(comprehension.target(&module)))
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
@@ -2217,27 +2191,36 @@ impl<'db> StaticClassLiteral<'db> {
                                     TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty =
-                                    iterable_ty.iterate(db).homogeneous_element_type(db);
-
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                Some(iterable_ty.iterate(db).homogeneous_element_type(db))
                             }
                         }
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
                         // TODO:
+                        None
                     }
                     DefinitionKind::NamedExpression(_) => {
                         // A named expression whose target is an attribute is syntactically prohibited
+                        None
                     }
-                    _ => {}
+                    _ => None,
+                };
+
+                if let Some(inferred_ty) = inferred_ty {
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
         }
 
         Member {
             inner: if is_attribute_bound {
-                Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
+                Place::bound(
+                    union_of_inferred_types
+                        .build()
+                        .promote(db)
+                        .promote_singletons(db),
+                )
+                .with_qualifiers(qualifiers)
             } else {
                 Place::Undefined.with_qualifiers(qualifiers)
             },
@@ -2326,7 +2309,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
+                                        public_type_policy: PublicTypePolicy::Raw,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -2389,7 +2372,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
+                                        public_type_policy: PublicTypePolicy::Raw,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }

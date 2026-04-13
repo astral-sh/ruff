@@ -6,18 +6,18 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening},
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        semantic_index,
-    },
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type, tuple::Tuple, variance::VarianceInferable,
-        visitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
+        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        variance::VarianceInferable, visitor,
     },
+};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    semantic_index,
 };
 
 impl<'db> Type<'db> {
@@ -631,10 +631,7 @@ impl<'db> TypeVarInstance<'db> {
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
-        child
-            .node()
-            .generic_context(db, index)?
-            .binds_typevar(db, self)
+        GenericContext::of_node(db, child.node(), index)?.binds_typevar(db, self)
     }
 }
 
@@ -1294,7 +1291,7 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,

@@ -18,7 +18,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf};
-use ruff_python_ast::PythonVersion;
+use ty_project::metadata::python_version::SupportedPythonVersion;
 
 /// Configuration for a real-world project to benchmark
 #[derive(Debug, Clone)]
@@ -37,7 +37,7 @@ pub struct RealWorldProject<'a> {
     /// Maps to uv's `exclude-newer`.
     pub max_dep_date: &'a str,
     /// Python version to use
-    pub python_version: PythonVersion,
+    pub python_version: SupportedPythonVersion,
 }
 
 impl<'a> RealWorldProject<'a> {
@@ -259,7 +259,7 @@ pub fn install_dependencies_to_cache(
     name: &str,
     dependencies: &[&str],
     venv_path: &PathBuf,
-    python_version: PythonVersion,
+    python_version: SupportedPythonVersion,
     max_dep_date: &str,
 ) -> Result<()> {
     // Check if uv is available

@@ -1,21 +1,19 @@
-use crate::{
-    semantic_index::{definition::Definition, scope::NodeWithScopeRef},
-    types::{
-        CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-        StaticClassLiteral, Type, TypeContext,
-        call::CallError,
-        function::KnownFunction,
-        infer::{
-            TypeInferenceBuilder,
-            builder::{DeclaredAndInferredType, DeferredExpressionState},
-        },
-        infer_definition_types,
-        signatures::ParameterForm,
-        special_form::TypeQualifier,
+use crate::types::{
+    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, Type, TypeContext,
+    call::CallError,
+    function::KnownFunction,
+    infer::{
+        TypeInferenceBuilder,
+        builder::{DeclaredAndInferredType, DeferredExpressionState},
     },
+    infer_definition_types,
+    signatures::ParameterForm,
+    special_form::TypeQualifier,
 };
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {

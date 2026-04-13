@@ -19,9 +19,6 @@ use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -39,6 +36,9 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::semantic_index;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -1085,9 +1085,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         "property",
                         Type::PropertyInstance(property),
                         property
-                            .getter(self.db)
+                            .setter(self.db)
                             .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.db)),
+                            .map(|setter| &**setter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderDelete(property) => (
+                        KnownClass::Property,
+                        "__delete__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .deleter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|deleter| &**deleter.name(self.db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
                         KnownClass::Property,
@@ -1152,6 +1162,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     WrapperDescriptorKind::PropertyDunderSet => {
                         ("__set__", "property", KnownClass::Property)
+                    }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        ("__delete__", "property", KnownClass::Property)
                     }
                 };
                 f.write_char('<')?;

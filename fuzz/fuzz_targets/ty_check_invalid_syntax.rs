@@ -16,11 +16,13 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
-    PythonVersionWithSource, default_lint_registry, lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, default_lint_registry,
+    lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -91,11 +93,14 @@ impl ModuleResolverDb for TestDb {
 }
 
 #[salsa::db]
-impl SemanticDb for TestDb {
+impl ty_python_core::Db for TestDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
+}
 
+#[salsa::db]
+impl SemanticDb for TestDb {
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }

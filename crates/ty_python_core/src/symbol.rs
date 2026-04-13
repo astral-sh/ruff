@@ -13,7 +13,7 @@ pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct Symbol {
+pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
 }
@@ -45,39 +45,39 @@ bitflags! {
 impl get_size2::GetSize for SymbolFlags {}
 
 impl Symbol {
-    pub(crate) const fn new(name: Name) -> Self {
+    pub const fn new(name: Name) -> Self {
         Self {
             name,
             flags: SymbolFlags::empty(),
         }
     }
 
-    pub(crate) fn name(&self) -> &Name {
+    pub fn name(&self) -> &Name {
         &self.name
     }
 
     /// Is the symbol used in its containing scope?
-    pub(crate) fn is_used(&self) -> bool {
+    pub fn is_used(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_USED)
     }
 
     /// Is the symbol given a value in its containing scope?
-    pub(crate) const fn is_bound(&self) -> bool {
+    pub const fn is_bound(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_BOUND)
     }
 
     /// Is the symbol declared in its containing scope?
-    pub(crate) fn is_declared(&self) -> bool {
+    pub fn is_declared(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_DECLARED)
     }
 
     /// Is the symbol `global` its containing scope?
-    pub(crate) fn is_global(&self) -> bool {
+    pub fn is_global(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_GLOBAL)
     }
 
     /// Is the symbol `nonlocal` its containing scope?
-    pub(crate) fn is_nonlocal(&self) -> bool {
+    pub fn is_nonlocal(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
     }
 
@@ -109,15 +109,15 @@ impl Symbol {
     /// In cases like this, the resolution isn't known until runtime, and in fact it varies from
     /// one use to the next. The semantic index alone can't resolve this, and instead it's a
     /// special case in type inference (see `infer_place_load`).
-    pub(crate) fn is_local(&self) -> bool {
+    pub fn is_local(&self) -> bool {
         !self.is_global() && !self.is_nonlocal() && (self.is_bound() || self.is_declared())
     }
 
-    pub(crate) const fn is_reassigned(&self) -> bool {
+    pub const fn is_reassigned(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }
 
-    pub(crate) fn is_parameter(&self) -> bool {
+    pub fn is_parameter(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_PARAMETER)
     }
 

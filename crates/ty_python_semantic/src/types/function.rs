@@ -60,10 +60,6 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
-use crate::semantic_index::ast_ids::HasScopedUseId;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
@@ -93,6 +89,10 @@ use crate::types::{
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -2207,9 +2207,10 @@ impl KnownFunction {
                 if let Type::ClassLiteral(class) = second_argument
                     && self == KnownFunction::IsInstance
                 {
-                    overload.set_return_type(
-                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                    );
+                    overload.set_return_type(Type::from_truthiness(
+                        db,
+                        is_instance_truthiness(db, *first_arg, *class),
+                    ));
                 }
             }
 

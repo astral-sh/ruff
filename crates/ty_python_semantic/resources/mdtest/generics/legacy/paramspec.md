@@ -51,12 +51,17 @@ reveal_type(tuple_with_typevar[1])  # revealed: ParamSpec
 ### `ParamSpec` parameter must match variable name
 
 ```py
-from typing import ParamSpec
+from typing import Callable, Generic, ParamSpec
 
 P1 = ParamSpec("P1")
 
-# error: [invalid-paramspec]
+# error: [mismatched-type-name]
 P2 = ParamSpec("P3")
+
+class Wrapper(Generic[P2]): ...
+
+def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
+    return f
 ```
 
 ### Accepts only a single `name` argument

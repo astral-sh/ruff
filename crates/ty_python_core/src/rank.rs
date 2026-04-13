@@ -24,7 +24,7 @@ use get_size2::GetSize;
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
 #[derive(Clone, Debug, Eq, PartialEq, GetSize)]
-pub(crate) struct RankBitBox {
+pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
     bits: BitBox<Chunk, Msb0>,
     chunk_ranks: Box<[u32]>,
@@ -58,13 +58,13 @@ impl RankBitBox {
     }
 
     #[inline]
-    pub(crate) fn get_bit(&self, index: usize) -> Option<bool> {
+    pub fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
     }
 
     /// Returns the number of bits _before_ (and not including) the given index that are set.
     #[inline]
-    pub(crate) fn rank(&self, index: usize) -> u32 {
+    pub fn rank(&self, index: usize) -> u32 {
         let chunk_index = index / CHUNK_SIZE;
         let index_within_chunk = index % CHUNK_SIZE;
         let chunk_rank = self.chunk_ranks[chunk_index];

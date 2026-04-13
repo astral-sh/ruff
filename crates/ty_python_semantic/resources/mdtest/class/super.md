@@ -548,7 +548,7 @@ def f(flag: bool):
 
     reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
 
-    reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
     # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"

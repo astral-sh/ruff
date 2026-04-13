@@ -19,6 +19,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
+use ty_python_core::ast_ids::HasScopedUseId;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
@@ -27,7 +28,6 @@ use super::{
     infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
-use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
@@ -35,23 +35,7 @@ use crate::place::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
-use crate::semantic_index::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
-};
-use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
-use crate::semantic_index::scope::{
-    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
-};
-use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
-use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
-};
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -69,17 +53,18 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_set_call,
-    report_call_to_abstract_method, report_cannot_pop_required_field_on_typed_dict,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_class_match_pattern, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
-    report_invalid_key_on_typed_dict, report_invalid_type_checking_constant,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
-    report_match_pattern_against_typed_dict, report_possibly_missing_attribute,
-    report_possibly_unresolved_reference, report_unsupported_augmented_assignment,
-    report_unsupported_comparison,
+    report_match_pattern_against_typed_dict, report_mismatched_type_name,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -89,6 +74,7 @@ use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_type
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
+use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::CallableSignature;
@@ -99,22 +85,38 @@ use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType, DynamicType,
-    EvaluationMode, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, binding_type, infer_complete_scope_types,
-    infer_scope_types, todo_type,
+    InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, binding_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
-use crate::unpack::UnpackPosition;
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use ty_python_core::ExpressionNodeKey;
+use ty_python_core::ast_ids::ScopedUseId;
+use ty_python_core::definition::{
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
+    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
+};
+use ty_python_core::expression::{Expression, ExpressionKind};
+use ty_python_core::narrowing_constraints::ConstraintKey;
+use ty_python_core::node_key::NodeKey;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
+use ty_python_core::symbol::{ScopedSymbolId, Symbol};
+use ty_python_core::{
+    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
+    place_table, unpack::UnpackPosition,
+};
 
 mod annotation_expression;
 mod binary_expressions;
 mod class;
 mod dict;
 mod dynamic_class;
+mod enum_call;
 mod final_attribute;
 mod function;
 mod imports;
@@ -800,7 +802,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_key_assignment_definition(
                     dict_key_assignment.key(self.module()),
                     dict_key_assignment.value(self.module()),
-                    dict_key_assignment.assignment,
+                    dict_key_assignment.assignment(),
                     definition,
                 );
             }
@@ -2717,6 +2719,188 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn validate_attribute_deletion(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.db();
+
+        match object_ty {
+            Type::Union(union) => {
+                for element_ty in union.elements(db) {
+                    if !self.validate_attribute_deletion(
+                        target,
+                        *element_ty,
+                        attribute,
+                        emit_diagnostics,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+
+            Type::Intersection(intersection) => {
+                if intersection.positive(db).iter().any(|element_ty| {
+                    self.validate_attribute_deletion(target, *element_ty, attribute, false)
+                }) {
+                    true
+                } else {
+                    if emit_diagnostics && let Some(element_ty) = intersection.positive(db).first()
+                    {
+                        self.validate_attribute_deletion(target, *element_ty, attribute, true);
+                    }
+                    false
+                }
+            }
+
+            // Type aliases need their own arm so aliased unions and intersections reuse the
+            // specialized handling above. `NewType` instances don't: dunder lookup and attribute
+            // fallback already delegate through the concrete base type when needed.
+            Type::TypeAlias(alias) => self.validate_attribute_deletion(
+                target,
+                alias.value_type(db),
+                attribute,
+                emit_diagnostics,
+            ),
+
+            Type::NominalInstance(..)
+            | Type::ProtocolInstance(_)
+            | Type::LiteralValue(..)
+            | Type::SpecialForm(..)
+            | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
+            | Type::SubclassOf(..)
+            | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
+            | Type::FunctionLiteral(..)
+            | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::TypeVar(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => {
+                let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__delattr__",
+                    &mut CallArguments::positional([Type::string_literal(db, attribute)]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+
+                let returns_never = match &delattr_dunder_call_result {
+                    Ok(result) => result.return_type(db).is_never(),
+                    Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
+                };
+                if returns_never {
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot delete attribute `{attribute}` on type `{}` \
+                             whose `__delattr__` method returns `Never`/`NoReturn`",
+                            object_ty.display(db),
+                        ));
+                    }
+                    return false;
+                }
+
+                match delattr_dunder_call_result {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => {
+                        if self.validate_final_attribute_deletion(
+                            target,
+                            object_ty,
+                            attribute,
+                            emit_diagnostics,
+                        ) {
+                            return false;
+                        }
+                        return true;
+                    }
+                    Err(CallDunderError::CallError(kind, _bindings)) => {
+                        if emit_diagnostics {
+                            report_bad_dunder_delattr_call(
+                                &self.context,
+                                attribute,
+                                object_ty,
+                                target,
+                                kind == CallErrorKind::BindingError,
+                            );
+                        }
+                        return false;
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {}
+                }
+
+                if self.validate_final_attribute_deletion(
+                    target,
+                    object_ty,
+                    attribute,
+                    emit_diagnostics,
+                ) {
+                    return false;
+                }
+
+                if let Some(PlaceAndQualifiers {
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: attr_ty,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }),
+                    ..
+                }) = self
+                    .assignment_attribute_members(object_ty, attribute)
+                    .map(|(meta_attr, _)| meta_attr)
+                {
+                    let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
+                    let delete_dunder_call_result = attr_ty.try_call_dunder(
+                        db,
+                        "__delete__",
+                        CallArguments::positional([object_ty]),
+                        TypeContext::default(),
+                    );
+
+                    match delete_dunder_call_result {
+                        Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                        Err(CallDunderError::CallError(kind, bindings)) => {
+                            if emit_diagnostics {
+                                let failure = CallError(kind, bindings);
+                                report_bad_dunder_delete_call(
+                                    &self.context,
+                                    &failure,
+                                    attribute,
+                                    object_ty,
+                                    target,
+                                );
+                            }
+                            return false;
+                        }
+                        Err(CallDunderError::MethodNotAvailable) => {}
+                    }
+                }
+
+                true
+            }
+
+            Type::Dynamic(..)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::ModuleLiteral(..)
+            | Type::BoundSuper(..) => true,
+        }
+    }
+
     fn assignment_attribute_members(
         &self,
         object_ty: Type<'db>,
@@ -2932,6 +3116,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
                         self.infer_new_class_call(call_expr, Some(definition))
+                    } else if let Some(base_class) =
+                        enum_call::enum_functional_call_base(self.db(), callable_type)
+                        && let Some(ty) =
+                            self.infer_enum_call_expression(call_expr, Some(definition), base_class)
+                    {
+                        ty
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3078,13 +3268,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name != target_name {
-            return error(
+            report_mismatched_type_name(
                 &self.context,
-                format_args!(
-                    "The name of a `NewType` (`{name}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
+                &arguments.args[0],
+                "NewType",
+                target_name,
+                Some(name),
+                name_param_ty,
             );
         }
 
@@ -3326,13 +3516,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if name != target_name {
-            return error(
+            report_mismatched_type_name(
                 &self.context,
-                format_args!(
-                    "The name of a `TypeAliasType` (`{name}`) must match \
-                    the name of the variable it is assigned to (`{target_name}`)"
-                ),
-                target,
+                &arguments.args[0],
+                "TypeAliasType",
+                target_name,
+                Some(name),
+                name_param_ty,
             );
         }
 
@@ -5831,7 +6021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Promote singleton types to `T | Unknown` in inferred type parameters,
                     // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
                     if elt_tcx_constraints.is_empty() {
-                        return Some(lower.promote_singletons(self.db()));
+                        return Some(lower.promote_singletons_recursively(self.db()));
                     }
                     None
                 })
@@ -6615,6 +6805,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
+        // Handle `Enum(name, members)`.
+        if let Some(base_class) = enum_call::enum_functional_call_base(self.db(), callable_type)
+            && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
+        {
+            return ty;
+        }
+
         if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
             return self.infer_typeddict_call_expression(call_expression, None);
         }
@@ -7172,8 +7369,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // reveal_type(c.x)  # revealed: int
                 // ```
                 ApplicableConstraints::ConstrainedBindings(bindings) => {
-                    let reachability_constraints = bindings.reachability_constraints;
-                    let predicates = bindings.predicates;
+                    let reachability_constraints = bindings.reachability_constraints();
+                    let predicates = bindings.predicates();
                     let mut union = UnionBuilder::new(db);
                     for binding in bindings {
                         let static_reachability = reachability_constraints.evaluate(
@@ -8115,7 +8312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
             value,
-            attr: _,
+            attr,
             range: _,
             node_index: _,
             ctx,
@@ -8129,6 +8326,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ExprContext::Del => {
                 self.infer_attribute_load(attribute);
+                self.validate_attribute_deletion(
+                    attribute,
+                    self.expression_type(value),
+                    attr.as_str(),
+                    true,
+                );
                 Type::Never
             }
             ExprContext::Invalid => {
@@ -8227,14 +8430,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
-            (ast::UnaryOp::Not, ty) => ty
-                .try_bool(self.db())
-                .unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, unary);
-                    err.fallback_truthiness()
-                })
-                .negate()
-                .into_type(self.db()),
+            (ast::UnaryOp::Not, ty) => Type::from_truthiness(
+                self.db(),
+                ty.try_bool(self.db())
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, unary);
+                        err.fallback_truthiness()
+                    })
+                    .negate(),
+            ),
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new

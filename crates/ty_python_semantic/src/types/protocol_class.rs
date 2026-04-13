@@ -15,7 +15,6 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, place_from_bindings,
         place_from_declarations,
     },
-    semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
@@ -28,6 +27,7 @@ use crate::{
         todo_type,
     },
 };
+use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -217,7 +217,7 @@ impl<'db> ProtocolInterface<'db> {
                     ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
                 (
                     Name::new(name),
                     ProtocolMemberData {
@@ -555,7 +555,12 @@ impl<'db> ProtocolMemberKind<'db> {
                     (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
                     (None, _) => None,
                 };
-                Self::Property(PropertyInstanceType::new(db, getter, setter))
+                let deleter = match (curr.deleter(db), prev.deleter(db)) {
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
+                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (None, _) => None,
+                };
+                Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))
             }
             (Self::Other(curr), Self::Other(prev)) => {
                 Self::Other(curr.cycle_normalized(db, *prev, cycle))

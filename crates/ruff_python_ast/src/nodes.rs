@@ -3421,6 +3421,13 @@ impl<'a> ArgOrKeyword<'a> {
             _ => None,
         }
     }
+
+    pub const fn as_keyword(self) -> Option<&'a Keyword> {
+        match self {
+            ArgOrKeyword::Keyword(keyword) => Some(keyword),
+            ArgOrKeyword::Arg(_) => None,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {

@@ -8,7 +8,6 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db,
-    semantic_index::definition::Definition,
     types::{
         ClassType, StaticClassLiteral, Type, TypedDictType,
         class::CodeGeneratorKind,
@@ -17,6 +16,7 @@ use crate::{
         typed_dict::TypedDictField,
     },
 };
+use ty_python_core::definition::Definition;
 
 pub(super) fn validate_typed_dict_class<'db>(
     context: &InferContext<'db, '_>,

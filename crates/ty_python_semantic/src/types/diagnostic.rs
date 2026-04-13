@@ -8,10 +8,7 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::{DefinedPlace, Place};
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_map};
+use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
@@ -46,6 +43,9 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::{PlaceTable, ScopedPlaceId};
+use ty_python_core::{SemanticIndex, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -91,6 +91,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
+    registry.register_lint(&MISMATCHED_TYPE_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -111,6 +112,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
+    registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
@@ -1337,6 +1339,32 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for class definitions that will fail due to non-callable `__init_subclass__`
+    /// methods.
+    ///
+    /// ## Why is this bad?
+    /// If a class defines a non-callable `__init_subclass__` method/attribute, any attempt
+    /// to subclass that class will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class Super:
+    ///     __init_subclass__ = None
+    ///
+    /// class Sub(Super): ...  # error: [non-callable-init-subclass]
+    /// ```
+    ///
+    /// ## References
+    /// - [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)
+    pub(crate) static NON_CALLABLE_INIT_SUBCLASS = {
+        summary: "detects class definitions that will fail due to non-callable `__init_subclass__`",
+        status: LintStatus::stable("0.0.30"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for the creation of invalid legacy `TypeVar`s
     ///
     /// ## Why is this bad?
@@ -1429,6 +1457,37 @@ declare_lint! {
         summary: "detects invalid NewType definitions",
         status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for functional typing definitions whose declared name does not match
+    /// the variable they are assigned to.
+    ///
+    /// ## Why is this bad?
+    /// Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,
+    /// `TypedDict`, and `TypeAliasType` all take a name argument that is
+    /// normally expected to match the assigned variable. A mismatch is usually a
+    /// typo and makes later diagnostics harder to understand.
+    ///
+    /// ## Default level
+    /// This rule is a warning by default because ty can usually recover and
+    /// continue understanding the resulting type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType, TypeVar
+    /// from typing_extensions import TypedDict
+    ///
+    /// T = TypeVar("U")  # error: [mismatched-type-name]
+    /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
+    /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
+    /// ```
+    pub(crate) static MISMATCHED_TYPE_NAME = {
+        summary: "detects functional typing definitions whose declared name does not match the assigned variable",
+        status: LintStatus::stable("0.0.30"),
+        default_level: Level::Warn,
     }
 }
 
@@ -3304,6 +3363,31 @@ pub struct TypeCheckDiagnostics {
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
+pub(crate) fn report_mismatched_type_name<'db>(
+    context: &InferContext<'db, '_>,
+    node: impl Ranged,
+    constructor: &str,
+    expected_name: &str,
+    actual_name: Option<&str>,
+    actual_name_ty: Type<'db>,
+) {
+    if let Some(builder) = context.report_lint(&MISMATCHED_TYPE_NAME, node) {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "The name passed to `{constructor}` must match the variable it is assigned to"
+        ));
+        if let Some(actual_name) = actual_name {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got \"{actual_name}\""
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got variable of type `{}`",
+                actual_name_ty.display(context.db())
+            ));
+        }
+    }
+}
+
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.push(diagnostic);
@@ -3751,6 +3835,71 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             `{attribute}` on type `{}` with custom `__set__` method",
             object_type.display(db)
         ));
+    }
+}
+
+pub(super) fn report_bad_dunder_delete_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_delete_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    if let Some(property) = dunder_delete_failure.as_attempt_to_delete_property_with_no_deleter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot delete read-only property `{attribute}` on object of type `{object_type}`",
+        ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no deleter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted deletion of `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Invalid deletion of data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__delete__` method",
+            object_type.display(db)
+        ));
+    }
+}
+
+pub(super) fn report_bad_dunder_delattr_call(
+    context: &InferContext<'_, '_>,
+    attribute: &str,
+    object_type: Type,
+    target: &ast::ExprAttribute,
+    binding_error: bool,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method",
+        object_type.display(db),
+    ));
+    if binding_error {
+        diagnostic.info(format_args!(
+            "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
+            object_type.display(db)
+        ));
+        diagnostic.info(
+            "Expected a signature at least as permissive as \
+            `def __delattr__(self, name: str, /) -> None`",
+        );
     }
 }
 
@@ -5650,8 +5799,8 @@ pub(super) fn report_overridden_final_method<'db>(
     diagnostic.sub(sub);
 
     // It's tempting to autofix properties as well,
-    // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
-    // and we don't model property deleters at all right now.
+    // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
+    // and we don't yet track those definitions precisely enough to offer a safe fix.
     //
     // We also only provide autofixes if the subclass member is a function definition (not an
     // assignment like `method = some_function`). If it's an assignment, the function type
@@ -6274,5 +6423,107 @@ pub(super) fn report_invalid_concatenate_last_arg<'db>(
             "Got `{}`",
             last_arg_type.display(context.db())
         ));
+    }
+}
+
+pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
+    context: &InferContext<'db, '_>,
+    call_error: CallError<'db>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+) {
+    let db = context.db();
+    let CallError(err_kind, bindings) = call_error;
+
+    match err_kind {
+        CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable => {
+            let Some(builder) =
+                context.report_lint(&NON_CALLABLE_INIT_SUBCLASS, class.header_range(db))
+            else {
+                return;
+            };
+            let class_name = class.name(db);
+            let mut diagnostic =
+                builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
+
+            let class_and_def = class
+                .iter_mro(db, None)
+                .filter_map(|base| base.into_class()?.class_literal(db).as_static())
+                .find_map(|class| {
+                    let scope = class.body_scope(db);
+                    let place_table = place_table(db, scope);
+                    let symbol = place_table.symbol_id("__init_subclass__")?;
+                    let use_def = use_def_map(db, scope);
+                    let bindings = use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
+                    let place_with_def = place_from_bindings(db, bindings);
+                    if place_with_def.place.is_undefined() {
+                        return None;
+                    }
+                    Some((class, place_with_def.first_definition?))
+                });
+
+            if let Some((superclass, definition)) = class_and_def {
+                let superclass_name = superclass.name(db);
+                diagnostic.set_primary_message(format_args!(
+                    "Superclass `{superclass_name}` cannot be subclassed",
+                ));
+                let definition_module = parsed_module(db, definition.file(db));
+                let mut annotation = Annotation::secondary(Span::from(
+                    definition.focus_range(db, &definition_module.load(db)),
+                ));
+                if err_kind == CallErrorKind::NotCallable {
+                    diagnostic.set_concise_message(format_args!(
+                        "Class `{superclass_name}` cannot be subclassed due \
+                        to a non-callable `__init_subclass__` definition"
+                    ));
+                    annotation = annotation.message(format_args!(
+                        "`{superclass_name}.__init_subclass__` has type `{}`, \
+                        which is not callable",
+                        bindings.callable_type().display(db)
+                    ));
+                } else {
+                    diagnostic.set_concise_message(format_args!(
+                        "Class `{superclass_name}` cannot be subclassed due \
+                        to an `__init_subclass__` definition that may not be callable"
+                    ));
+                    annotation = annotation.message(format_args!(
+                        "`{superclass_name}.__init_subclass__` has type `{}`, \
+                        which may not be callable",
+                        bindings.callable_type().display(db)
+                    ));
+                }
+                diagnostic.annotate(annotation);
+            } else if err_kind == CallErrorKind::NotCallable {
+                diagnostic.set_primary_message(
+                    "`class` statement will fail because `__init_subclass__` \
+                    on a superclass is not callable",
+                );
+                diagnostic.set_concise_message(format_args!(
+                    "Creation of class `{class_name}` will fail due to a non-callable \
+                    `__init_subclass__` definition on a superclass",
+                ));
+            } else {
+                diagnostic.set_primary_message(
+                    "`class` statement may fail because `__init_subclass__` \
+                    on a superclass may not be callable",
+                );
+                diagnostic.set_concise_message(format_args!(
+                    "Creation of class `{class_name}` may fail due to an \
+                    `__init_subclass__` definition on a superclass that may \
+                    not be callable",
+                ));
+            }
+            diagnostic.info(
+                "`__init_subclass__` on a superclass is implicitly called \
+                during creation of a class object",
+            );
+            diagnostic.info(
+                "See https://docs.python.org/3/reference/datamodel.html\
+                #customizing-class-creation",
+            );
+        }
+        CallErrorKind::BindingError => {
+            bindings.report_diagnostics(context, class_node.into());
+        }
     }
 }

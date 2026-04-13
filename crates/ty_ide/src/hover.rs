@@ -3586,8 +3586,8 @@ def function():
 
         // See the comment in the `hover_augmented_assignment` test above. The same
         // reasoning applies here.
-        assert_snapshot!(test.hover(), @r#"
-        Unknown | Literal[1]
+        assert_snapshot!(test.hover(), @r###"
+        int
         ---------------------------------------------
         This is the docs for this value
 
@@ -3595,7 +3595,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Unknown | Literal[1]
+        int
         ```
         ---
         This is the docs for this value<HB>
@@ -3613,7 +3613,7 @@ def function():
            |   source
         10 | """Other docs???
            |
-        "#);
+        "###);
     }
 
     #[test]
