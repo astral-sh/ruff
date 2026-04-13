@@ -30,17 +30,35 @@ For more documentation on the Ruff extension, refer to the
 
 ## Neovim
 
-Neovim 0.11+ requires no external dependencies to
-configure the Ruff Language Server. The [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig)
-plugin can still be used to provide a [default configuration](https://github.com/neovim/nvim-lspconfig/blob/master/lsp/ruff.lua).
+The Ruff language server can be setup in Neovim using the built-in LSP client either via
+[`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) (Neovim 0.11+) or the
+[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin (Neovim 0.10 and earlier).
 
-If using Neovim < 0.11, the [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin
-can be used to configure the Ruff Language Server.
+To setup using [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()), you can
+either use the [default configuration provided in
+`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig/blob/master/lsp/ruff.lua) or configure
+the server without any external dependencies.
 
-To set it up, install the [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin
-and add the following to your `init.lua`:
+=== "Neovim 0.11+ (without external dependencies)"
 
-=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()))"
+    The following configuration needs to be stored in `nvim/lsp/ruff.lua` or `nvim/after/lsp/ruff.lua`:
+
+    ```lua
+    vim.lsp.config('ruff', {
+      cmd = { 'ruff', 'server' },
+      filetypes = { 'python' },
+      root_dir = vim.fs.dirname(vim.fs.find({ 'pyproject.toml', '.git' }, { upward = true })[1]),
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
+
+    vim.lsp.enable('ruff')
+    ```
+
+=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) and [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
 
     ```lua
     vim.lsp.config('ruff', {
@@ -55,6 +73,13 @@ and add the following to your `init.lua`:
     ```
 
 === "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
+
+    !!! note
+
+        [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) has
+        [deprecated](https://github.com/neovim/nvim-lspconfig/issues/3693) support for Neovim 0.10
+        and earlier in favor of using
+        [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) instead.
 
     ```lua
     require('lspconfig').ruff.setup({
