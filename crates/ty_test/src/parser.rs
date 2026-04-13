@@ -214,7 +214,7 @@ struct EmbeddedFileId;
 /// Holds information about the start and the end of a code block in a Markdown file.
 ///
 /// The start is the offset of the first triple-backtick in the code block, and the end is the
-/// offset of the (start of the) closing triple-backtick.
+/// offset immediately after the closing triple-backtick.
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct BacktickOffsets(TextRange);
 
@@ -229,8 +229,14 @@ pub(crate) struct InlineSnapshotBlock<'s> {
     /// The expected snapshot content.
     pub(crate) expected: &'s str,
 
-    /// The range of the inline snapshot block (from start to end backticks)
-    pub(crate) range: TextRange,
+    /// The range of the inline snapshot block, including both fences.
+    pub(crate) range: BacktickOffsets,
+}
+
+impl Ranged for InlineSnapshotBlock<'_> {
+    fn range(&self) -> TextRange {
+        self.range.0
+    }
 }
 
 /// Holds information about the position and length of all code blocks that are part of
@@ -379,14 +385,16 @@ impl EmbeddedFile<'_> {
             return;
         }
 
-        self.code_blocks.push(CodeBlock {
-            backticks: backtick_offsets,
-            inline_snapshot_block: None,
-        });
-
         let existing_code = self.code.to_mut();
         existing_code.push('\n');
+        let start_offset = existing_code.text_len();
         existing_code.push_str(new_code);
+
+        self.code_blocks.push(CodeBlock {
+            backticks: backtick_offsets,
+            embedded_start_offset: start_offset,
+            inline_snapshot_block: None,
+        });
     }
 
     pub(crate) fn relative_path(&self) -> &str {
@@ -412,13 +420,22 @@ impl EmbeddedFile<'_> {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CodeBlock<'s> {
+    /// The offsets of the code block's code fences in the markdown source.
     backticks: BacktickOffsets,
+    /// The offset in the concatenated file source at which this code block starts.
+    embedded_start_offset: TextSize,
+
+    /// The code block's associated inline snapshot block (where inline snapshots are stored).
     inline_snapshot_block: Option<InlineSnapshotBlock<'s>>,
 }
 
 impl<'s> CodeBlock<'s> {
     pub(crate) fn backtick_offsets(&self) -> BacktickOffsets {
         self.backticks
+    }
+
+    pub(crate) fn embedded_start_offset(&self) -> TextSize {
+        self.embedded_start_offset
     }
 
     pub(crate) fn inline_snapshot_block(&self) -> Option<&InlineSnapshotBlock<'s>> {
@@ -673,7 +690,7 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            let backtick_offset_end = self.cursor.offset() - "```".text_len();
+                            let backtick_offset_end = self.cursor.offset();
 
                             self.process_code_block(
                                 lang,
@@ -846,6 +863,7 @@ impl<'s> Parser<'s> {
                     code: Cow::Borrowed(code),
                     code_blocks: vec![CodeBlock {
                         backticks: backtick_offsets,
+                        embedded_start_offset: TextSize::new(0),
                         inline_snapshot_block: None,
                     }],
                 });
@@ -939,7 +957,7 @@ impl<'s> Parser<'s> {
 
         code_block.inline_snapshot_block = Some(InlineSnapshotBlock {
             expected: code,
-            range: offsets.range(),
+            range: offsets,
         });
 
         Ok(())

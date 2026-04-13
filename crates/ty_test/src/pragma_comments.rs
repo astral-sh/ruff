@@ -40,31 +40,40 @@ use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
-use std::ops::Deref;
 use std::str::FromStr;
 
 /// Test pragma comments a single embedded file.
 #[derive(Debug)]
-pub(crate) struct InlineFileAssertions<'s> {
-    assertions: Vec<LineAssertions<'s>>,
+pub(crate) struct TestPragmaComments<'s> {
+    by_line: Vec<LinePragmaComments<'s>>,
 }
 
-impl<'s> InlineFileAssertions<'s> {
+impl<'s> TestPragmaComments<'s> {
     pub(crate) fn from_file(
         source: &'s str,
         parsed: &ParsedModuleRef,
         file_index: &LineIndex,
     ) -> Self {
-        let mut assertions = Vec::new();
-        let mut file_assertions = UnparsedAssertionIter {
+        let mut pragmas_by_line = Vec::new();
+        let mut pragma_comments = PragmaCommentsIter {
             tokens: parsed.tokens().iter(),
             source,
         }
         .peekable();
 
-        while let Some(ranged_assertion) = file_assertions.next() {
+        while let Some(ranged_pragma) = pragma_comments.next() {
             let mut collector = AssertionVec::new();
-            let mut line_number = file_index.line_index(ranged_assertion.start());
+            let mut line_number = file_index.line_index(ranged_pragma.start());
+            let mut snapshots = 0usize;
+
+            let mut push_pragma = |comment: UnparsedPragmaComment<'s>| match comment {
+                UnparsedPragmaComment::Snapshot => {
+                    snapshots += 1;
+                }
+                UnparsedPragmaComment::Assertion(assertion) => {
+                    collector.push(assertion);
+                }
+            };
 
             // Collect all own-line comments on consecutive lines; these all apply to the same line of
             // code. For example:
@@ -75,74 +84,90 @@ impl<'s> InlineFileAssertions<'s> {
             // reveal_type(x)
             // ```
             //
-            if CommentRanges::is_own_line(ranged_assertion.start(), source) {
-                collector.push(ranged_assertion.into());
+            if CommentRanges::is_own_line(ranged_pragma.start(), source) {
+                push_pragma(ranged_pragma.into_comment());
                 let mut only_own_line = true;
-                while let Some(ranged_assertion) = file_assertions.peek() {
+
+                while let Some(ranged_pragma) = pragma_comments.next_if(|next_pragma| {
                     let next_line_number = line_number.saturating_add(1);
-                    if file_index.line_index(ranged_assertion.start()) == next_line_number {
-                        if !CommentRanges::is_own_line(ranged_assertion.start(), source) {
-                            only_own_line = false;
-                        }
+
+                    if file_index.line_index(next_pragma.start()) == next_line_number {
                         line_number = next_line_number;
-                        collector.push(file_assertions.next().unwrap().into());
-                        // If we see an end-of-line comment, it has to be the end of the stack,
-                        // otherwise we'd botch this case, attributing all three errors to the `bar`
-                        // line:
-                        //
-                        // ```py
-                        // # error:
-                        // foo  # error:
-                        // bar  # error:
-                        // ```
-                        //
-                        if !only_own_line {
-                            break;
-                        }
+                        true
                     } else {
+                        false
+                    }
+                }) {
+                    if !CommentRanges::is_own_line(ranged_pragma.start(), source) {
+                        only_own_line = false;
+                    }
+
+                    push_pragma(ranged_pragma.into_comment());
+
+                    // If we see an end-of-line comment, it has to be the end of the stack,
+                    // otherwise we'd botch this case, attributing all three errors to the `bar`
+                    // line:
+                    //
+                    // ```py
+                    // # error:
+                    // foo  # error:
+                    // bar  # error:
+                    // ```
+                    //
+                    if !only_own_line {
                         break;
                     }
                 }
+
                 if only_own_line {
                     // The collected comments apply to the _next_ line in the code.
                     line_number = line_number.saturating_add(1);
                 }
             } else {
                 // We have a line-trailing comment; it applies to its own line, and is not grouped.
-                collector.push(ranged_assertion.into());
+                push_pragma(ranged_pragma.into_comment());
             }
 
-            assertions.push(LineAssertions {
+            pragmas_by_line.push(LinePragmaComments {
                 line_number,
                 assertions: collector,
+                snapshot_pragmas: snapshots,
             });
         }
 
-        Self { assertions }
-    }
-
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, LineAssertions<'s>> {
-        self.assertions.iter()
+        Self {
+            by_line: pragmas_by_line,
+        }
     }
 }
 
-impl<'a, 's> IntoIterator for &'a InlineFileAssertions<'s> {
-    type Item = &'a LineAssertions<'s>;
+impl<'a, 's> IntoIterator for &'a TestPragmaComments<'s> {
+    type Item = &'a LinePragmaComments<'s>;
 
-    type IntoIter = std::slice::Iter<'a, LineAssertions<'s>>;
+    type IntoIter = std::slice::Iter<'a, LinePragmaComments<'s>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.assertions.iter()
+        self.by_line.iter()
     }
 }
 
-struct UnparsedAssertionIter<'a, 's> {
+impl<'s> IntoIterator for TestPragmaComments<'s> {
+    type Item = LinePragmaComments<'s>;
+
+    type IntoIter = std::vec::IntoIter<LinePragmaComments<'s>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.by_line.into_iter()
+    }
+}
+
+struct PragmaCommentsIter<'a, 's> {
     source: &'s str,
     tokens: std::slice::Iter<'a, Token>,
 }
 
-impl<'s> Iterator for UnparsedAssertionIter<'_, 's> {
-    type Item = AssertionWithRange<'s>;
+impl<'s> Iterator for PragmaCommentsIter<'_, 's> {
+    type Item = PragmaCommentWithRange<'s>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -152,8 +177,8 @@ impl<'s> Iterator for UnparsedAssertionIter<'_, 's> {
             }
 
             let comment_text = &self.source[token.range()];
-            if let Some(assertion) = UnparsedAssertion::from_comment(comment_text) {
-                return Some(AssertionWithRange(assertion, token.range()));
+            if let Some(pragma) = UnparsedPragmaComment::from_comment(comment_text) {
+                return Some(PragmaCommentWithRange(pragma, token.range()));
             }
         }
     }
@@ -161,25 +186,17 @@ impl<'s> Iterator for UnparsedAssertionIter<'_, 's> {
 
 /// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
-struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
+struct PragmaCommentWithRange<'a>(UnparsedPragmaComment<'a>, TextRange);
 
-impl<'a> Deref for AssertionWithRange<'a> {
-    type Target = UnparsedAssertion<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl<'a> PragmaCommentWithRange<'a> {
+    fn into_comment(self) -> UnparsedPragmaComment<'a> {
+        self.0
     }
 }
 
-impl Ranged for AssertionWithRange<'_> {
+impl Ranged for PragmaCommentWithRange<'_> {
     fn range(&self) -> TextRange {
         self.1
-    }
-}
-
-impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
-    fn from(value: AssertionWithRange<'a>) -> Self {
-        value.0
     }
 }
 
@@ -199,36 +216,18 @@ pub(crate) struct LinePragmaComments<'a> {
     pub(crate) line_number: OneIndexed,
 
     /// The comments referring to this line.
-    pub(crate) comments: PragmaCommentVec<'a>,
+    pub(crate) assertions: AssertionVec<'a>,
+
+    /// The number of snapshot comments on this line.
+    pub(crate) snapshot_pragmas: usize,
 }
 
-impl<'a> Deref for LinePragmaComments<'a> {
-    type Target = [UnparsedPragmaComment<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.comments
-    }
-}
-
-/// A single pargma comment comment.
-///
-/// This type represents an *attempted* pragma comment, but not necessarily a *valid* pragma comment.
-/// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
-/// in the event of an invalid comment.
 #[derive(Debug)]
 pub(crate) enum UnparsedPragmaComment<'a> {
     /// A `# snapshot` pragma comment.
     Snapshot,
 
     Assertion(UnparsedAssertion<'a>),
-}
-
-#[derive(Debug)]
-pub(crate) enum UnparsedAssertion<'a> {
-    /// A `# revealed:` assertion.
-    Revealed(&'a str),
-    /// An `# error:` assertion.
-    Error(&'a str),
 }
 
 impl<'a> UnparsedPragmaComment<'a> {
@@ -242,30 +241,28 @@ impl<'a> UnparsedPragmaComment<'a> {
 
         UnparsedAssertion::from_comment(comment).map(Self::Assertion)
     }
-
-    pub(crate) const fn as_assertion(&self) -> Option<&UnparsedAssertion<'a>> {
-        match self {
-            Self::Assertion(assertion) => Some(assertion),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn into_snapshot(&self) -> Option<&UnparsedAssertion<'a>> {
-        match self {
-            Self::Assertion(assertion) => Some(assertion),
-            _ => None,
-        }
-    }
 }
 
-impl std::fmt::Display for UnparsedPragmaComment<'_> {
+/// A single assertion comment.
+///
+/// This type represents an *attempted* assertion comment, but not necessarily a *valid* assertion comment.
+/// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
+/// in the event of an invalid comment.
+#[derive(Debug)]
+pub(crate) enum UnparsedAssertion<'a> {
+    /// A `# revealed:` assertion.
+    Revealed(&'a str),
+    /// An `# error:` assertion.
+    Error(&'a str),
+}
+
+impl std::fmt::Display for UnparsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Snapshot => f.write_str("snapshot"),
-            Self::Assertion(UnparsedAssertion::Revealed(expected_type)) => {
+            Self::Revealed(expected_type) => {
                 write!(f, "revealed: {expected_type}")
             }
-            Self::Assertion(UnparsedAssertion::Error(assertion)) => write!(f, "error: {assertion}"),
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
         }
     }
 }
@@ -531,7 +528,7 @@ mod tests {
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
-    fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
+    fn get_assertions(source: &str) -> TestPragmaComments<'_> {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
@@ -546,11 +543,11 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);
-        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
+        TestPragmaComments::from_file(source, &parsed, &line_index(&db, file))
     }
 
-    fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {
-        assertions.assertions
+    fn into_vec(assertions: TestPragmaComments<'_>) -> Vec<LinePragmaComments<'_>> {
+        assertions.by_line
     }
 
     #[test]
@@ -568,7 +565,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -590,7 +587,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -613,7 +610,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -637,7 +634,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [assert1, assert2] = &line.comments[..] else {
+        let [assert1, assert2] = &line.assertions[..] else {
             panic!("expected two assertions");
         };
 
@@ -661,7 +658,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert1, assert2] = &line.comments[..] else {
+        let [assert1, assert2] = &line.assertions[..] else {
             panic!("expected two assertions");
         };
 
@@ -687,7 +684,7 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [UnparsedPragmaComment::Error(error1)] = &line1.comments[..] else {
+        let [UnparsedAssertion::Error(error1)] = &line1.assertions[..] else {
             panic!("expected one error assertion");
         };
 
@@ -695,7 +692,7 @@ mod tests {
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
 
-        let [UnparsedPragmaComment::Error(error2)] = &line2.comments[..] else {
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
 
@@ -723,9 +720,9 @@ mod tests {
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
         let [
-            UnparsedPragmaComment::Error(error1),
-            UnparsedPragmaComment::Revealed(expected_ty),
-        ] = &line1.comments[..]
+            UnparsedAssertion::Error(error1),
+            UnparsedAssertion::Revealed(expected_ty),
+        ] = &line1.assertions[..]
         else {
             panic!("expected one error assertion and one Revealed assertion");
         };
@@ -735,7 +732,7 @@ mod tests {
         assert_eq!(error1.rule, Some("invalid-assignment"));
         assert_eq!(expected_ty.trim(), "str");
 
-        let [UnparsedPragmaComment::Error(error2)] = &line2.comments[..] else {
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
 
@@ -759,7 +756,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -781,7 +778,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -804,7 +801,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -830,7 +827,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 
@@ -853,7 +850,7 @@ mod tests {
 
         assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
-        let [assert] = &line.comments[..] else {
+        let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
         };
 

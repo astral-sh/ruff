@@ -13,22 +13,22 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
+use smallvec::SmallVec;
 
-use crate::assertion::{
-    FilePragmaComments, LinePragmaComments, ParsedAssertion, UnparsedAssertion,
-    UnparsedPragmaComment,
-};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
+use crate::pragma_comments::{
+    LinePragmaComments, ParsedAssertion, TestPragmaComments, UnparsedAssertion,
+};
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
-    failures: Vec<String>,
+    failures: Vec<Failure>,
     lines: Vec<LineFailures>,
 }
 
 impl FailuresByLine {
-    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -37,7 +37,7 @@ impl FailuresByLine {
         })
     }
 
-    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<Failure>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
@@ -51,6 +51,38 @@ impl FailuresByLine {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct Failure {
+    message: String,
+    /// Optional diff that is shown alongside the error message.
+    /// The tuple represents the (expected, actual) values for the diff.
+    diff: Option<(String, String)>,
+}
+
+impl Failure {
+    pub(super) fn new(message: impl std::fmt::Display) -> Self {
+        Self {
+            message: message.to_string(),
+            diff: None,
+        }
+    }
+
+    pub(super) fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub(super) fn diff(&self) -> Option<(&str, &str)> {
+        self.diff
+            .as_ref()
+            .map(|(expected, actual)| (expected.as_str(), actual.as_str()))
+    }
+
+    pub(super) fn with_diff(mut self, expected: String, actual: String) -> Self {
+        self.diff = Some((expected, actual));
+        self
+    }
+}
+
 #[derive(Debug)]
 struct LineFailures {
     line_number: OneIndexed,
@@ -60,39 +92,26 @@ struct LineFailures {
 pub(super) fn match_file(
     db: &Db,
     file: File,
-    pragmas: &FilePragmaComments,
     diagnostics: &[Diagnostic],
-) -> Result<(), FailuresByLine> {
+) -> Result<Vec<Diagnostic>, FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let source = source_text(db, file);
-    let file_index = line_index(db, file);
     let parsed = parsed_module(db, file).load(db);
-    let assertions = InlineFileAssertions::from_file(&source, &parsed, &file_index);
+    let pragmas = TestPragmaComments::from_file(&source, &parsed, &line_index(db, file));
 
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
 
-    // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
-    let mut line_assertions = assertions.iter().filter_map(|line_assertions| {
-        let assertions = line_assertions
-            .assertions
-            .into_iter()
-            .filter(|assertion| !assertion.is_snapshot())
-            .collect::<smallvec::SmallVec<[UnparsedAssertion<'_>; 1]>>();
-
-        (!assertions.is_empty()).then_some(crate::assertion::LineAssertions {
-            line_number: line_assertions.line_number,
-            assertions,
-        })
-    });
     let mut line_diagnostics = diagnostics.iter_lines();
 
+    // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
     let mut line_pragmas = pragmas.into_iter();
     let mut current_pragmas = line_pragmas.next();
     let mut current_diagnostics = line_diagnostics.next();
 
     let matcher = Matcher::from_file(db, file);
     let mut failures = FailuresByLine::default();
+    let mut snapshot_diagnostics: Vec<Diagnostic> = Vec::new();
 
     loop {
         match (&current_pragmas, &current_diagnostics) {
@@ -102,18 +121,23 @@ pub(super) fn match_file(
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
                         // iterators.
-                        matcher
-                            .match_line(diagnostics, pragmas)
-                            .unwrap_or_else(|messages| {
+                        match matcher.match_line(diagnostics, pragmas) {
+                            Ok(inline_diagnostics) => {
+                                snapshot_diagnostics.extend(inline_diagnostics);
+                            }
+                            Err(messages) => {
                                 failures.push(pragmas.line_number, messages);
-                            });
+                            }
+                        }
+
                         current_pragmas = line_pragmas.next();
                         current_diagnostics = line_diagnostics.next();
                     }
                     Ordering::Less => {
                         // We have pragmas on an earlier line than diagnostics; report these
                         // pragmas as all unmatched, and advance the assertions iterator.
-                        failures.push(pragmas.line_number, unmatched(pragmas));
+
+                        failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
                         current_pragmas = line_pragmas.next();
                     }
                     Ordering::Greater => {
@@ -124,10 +148,16 @@ pub(super) fn match_file(
                     }
                 }
             }
-            (Some(assertions), None) => {
+            (Some(pragmas), None) => {
                 // We've exhausted diagnostics but still have pragmas; report these pragmas
                 // as unmatched and advance the pragmas iterator.
-                failures.push(assertions.line_number, unmatched(assertions));
+                let mut errors = unmatched(&pragmas.assertions);
+
+                if pragmas.snapshot_pragmas > 0 {
+                    errors.push(Failure::new("unmatched snapshot comment:".red()));
+                }
+
+                failures.push(pragmas.line_number, errors);
                 current_pragmas = line_pragmas.next();
             }
             (None, Some(diagnostics)) => {
@@ -142,22 +172,22 @@ pub(super) fn match_file(
     }
 
     if failures.is_empty() {
-        Ok(())
+        Ok(snapshot_diagnostics)
     } else {
         Err(failures)
     }
 }
 
 trait Unmatched {
-    fn unmatched(&self) -> String;
+    fn unmatched(&self) -> Failure;
 }
 
-fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
+fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<Failure> {
     unmatched.iter().map(Unmatched::unmatched).collect()
 }
 
 trait UnmatchedWithColumn {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String;
+    fn unmatched_with_column(&self, column: OneIndexed) -> Failure;
 }
 
 // This is necessary since we only parse assertions lazily,
@@ -167,34 +197,34 @@ trait UnmatchedWithColumn {
 // TODO: the lazy parsing means that we sometimes won't report malformed assertions as
 // being invalid if we detect that they'll be unmatched before parsing them.
 // That's perhaps not the best user experience.
-impl Unmatched for UnparsedPragmaComment<'_> {
-    fn unmatched(&self) -> String {
-        format!("{} {self}", "unmatched assertion:".red())
+impl Unmatched for UnparsedAssertion<'_> {
+    fn unmatched(&self) -> Failure {
+        Failure::new(format_args!("{} {self}", "unmatched assertion:".red()))
     }
 }
 
 impl Unmatched for ParsedAssertion<'_> {
-    fn unmatched(&self) -> String {
-        format!("{} {self}", "unmatched assertion:".red())
+    fn unmatched(&self) -> Failure {
+        Failure::new(format_args!("{} {self}", "unmatched assertion:".red()))
     }
 }
 
 fn maybe_add_undefined_reveal_clarification(
     diagnostic: &Diagnostic,
     original: std::fmt::Arguments,
-) -> String {
+) -> Failure {
     if diagnostic.id().is_lint_named("undefined-reveal") {
-        format!(
+        Failure::new(format_args!(
             "{} add a `# revealed` assertion on this line (original diagnostic: {original})",
             "used built-in `reveal_type`:".yellow()
-        )
+        ))
     } else {
-        format!("{} {original}", "unexpected error:".red())
+        Failure::new(format_args!("{} {original}", "unexpected error:".red()))
     }
 }
 
 impl Unmatched for &Diagnostic {
-    fn unmatched(&self) -> String {
+    fn unmatched(&self) -> Failure {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(
@@ -207,7 +237,7 @@ impl Unmatched for &Diagnostic {
 }
 
 impl UnmatchedWithColumn for &Diagnostic {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+    fn unmatched_with_column(&self, column: OneIndexed) -> Failure {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(
@@ -289,41 +319,57 @@ impl Matcher {
     }
 
     /// Check a slice of [`Diagnostic`]s against a slice of
-    /// [`UnparsedPragma`]s.
+    /// [`UnparsedAssertion`]s.
     ///
     /// Return vector of [`Unmatched`] for any unmatched diagnostics or
     /// assertions.
     fn match_line<'a, 'b>(
         &self,
         diagnostics: &'a [&'a Diagnostic],
-        pragmas: &'a [UnparsedPragmaComment<'b>],
-    ) -> Result<(), Vec<String>>
+        pragmas: &LinePragmaComments,
+    ) -> Result<SmallVec<[Diagnostic; 2]>, Vec<Failure>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
         let mut unmatched = diagnostics.to_vec();
-        for pragma in pragmas {
-            let Some(assertion) = pragma.as_assertion() else {
-                continue;
-            };
-
+        let mut snapshot_diagnostics: SmallVec<[Diagnostic; 2]> = SmallVec::new();
+        for assertion in &pragmas.assertions {
             match assertion.parse() {
-                Ok(assertion) => {
-                    if !self.matches(&assertion, &mut unmatched) {
+                Ok(assertion) => match self.matches(&assertion, &mut unmatched) {
+                    None => {
                         failures.push(assertion.unmatched());
                     }
-                }
+                    Some(diagnostic) => {
+                        if pragmas.snapshot_pragmas > 0 {
+                            snapshot_diagnostics.push(diagnostic);
+                        }
+                    }
+                },
                 Err(error) => {
-                    failures.push(format!("{} {}", "invalid assertion:".red(), error));
+                    failures.push(Failure::new(format_args!(
+                        "{} {}",
+                        "invalid assertion:".red(),
+                        error
+                    )));
                 }
             }
         }
+
+        if pragmas.snapshot_pragmas > 1 {
+            failures.push(Failure::new(format_args!(
+                "{} {}",
+                "unnecessary `# snapshot` comment:".red(),
+                "line has multiple `# snapshot` comments"
+            )));
+        }
+
         for diagnostic in unmatched {
             failures.push(diagnostic.unmatched_with_column(self.column(diagnostic)));
         }
+
         if failures.is_empty() {
-            Ok(())
+            Ok(snapshot_diagnostics)
         } else {
             Err(failures)
         }
@@ -343,15 +389,19 @@ impl Matcher {
 
     /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
     ///
-    /// If so, return `true` and remove the matched diagnostics from `unmatched`. Otherwise, return
-    /// `false`.
+    /// If so, return `Some` and remove the matched diagnostics from `unmatched`. Otherwise, return
+    /// `None`.
     ///
     /// An `Error` assertion can only match one diagnostic; even if it could match more than one,
     /// we short-circuit after the first match.
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&Diagnostic>) -> bool {
+    fn matches(
+        &self,
+        assertion: &ParsedAssertion,
+        unmatched: &mut Vec<&Diagnostic>,
+    ) -> Option<Diagnostic> {
         match assertion {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
@@ -366,12 +416,7 @@ impl Matcher {
                     });
                     lint_name_matches && column_matches && message_matches
                 });
-                if let Some(position) = position {
-                    unmatched.swap_remove(position);
-                    true
-                } else {
-                    false
-                }
+                position.map(|position| unmatched.swap_remove(position).clone())
             }
             ParsedAssertion::Revealed(expected_type) => {
                 let expected_type = discard_todo_metadata(expected_type);
@@ -411,28 +456,32 @@ impl Matcher {
                     false
                 };
 
+                // Try to match against any reveal-type diagnostic.
+                // If the `undefined-reveal` diagnostic is present, we also match against it.
                 let mut matched_revealed_type = None;
-                let mut matched_undefined_reveal = None;
-                for (index, diagnostic) in unmatched.iter().enumerate() {
+                let mut matched_undefined_reveal = false;
+                let mut i = 0;
+
+                while i < unmatched.len() {
+                    let diagnostic = &unmatched[i];
+
                     if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
-                        matched_revealed_type = Some(index);
-                    } else if matched_undefined_reveal.is_none()
+                        matched_revealed_type = Some(unmatched.swap_remove(i).clone());
+                    } else if !matched_undefined_reveal
                         && diagnostic.id().is_lint_named("undefined-reveal")
                     {
-                        matched_undefined_reveal = Some(index);
+                        unmatched.swap_remove(i);
+                        matched_undefined_reveal = true;
+                    } else {
+                        i += 1;
                     }
-                    if matched_revealed_type.is_some() && matched_undefined_reveal.is_some() {
+
+                    if matched_revealed_type.is_some() && matched_undefined_reveal {
                         break;
                     }
                 }
-                let mut idx = 0;
-                unmatched.retain(|_| {
-                    let retain =
-                        Some(idx) != matched_revealed_type && Some(idx) != matched_undefined_reveal;
-                    idx += 1;
-                    retain
-                });
-                matched_revealed_type.is_some()
+
+                matched_revealed_type
             }
         }
     }
@@ -490,7 +539,7 @@ mod tests {
     fn get_result(
         source: &str,
         expected_diagnostics: Vec<ExpectedDiagnostic>,
-    ) -> Result<(), FailuresByLine> {
+    ) -> Result<Vec<Diagnostic>, FailuresByLine> {
         colored::control::set_override(false);
 
         let mut db = crate::db::Db::setup();
@@ -514,7 +563,7 @@ mod tests {
         super::match_file(&db, file, &diagnostics)
     }
 
-    fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {
+    fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {
         let Err(failures) = result else {
             panic!("expected a failure");
         };
@@ -530,13 +579,20 @@ mod tests {
             .collect();
         let failures: Vec<(OneIndexed, Vec<String>)> = failures
             .iter()
-            .map(|(idx, msgs)| (idx, msgs.to_vec()))
+            .map(|(idx, msgs)| {
+                (
+                    idx,
+                    msgs.iter()
+                        .map(|failure| failure.message().to_string())
+                        .collect(),
+                )
+            })
             .collect();
 
         assert_eq!(failures, expected);
     }
 
-    fn assert_ok(result: &Result<(), FailuresByLine>) {
+    fn assert_ok(result: &Result<Vec<Diagnostic>, FailuresByLine>) {
         assert!(result.is_ok(), "{result:?}");
     }
 
