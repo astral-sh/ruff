@@ -21,6 +21,46 @@ help: Remove unnecessary assignment
 8 | # Can be refactored false positives
 note: This is an unsafe fix and may change runtime behavior
 
+RET504 [*] Unnecessary assignment to `formatted` before `return` statement
+  --> RET504.py:23:12
+   |
+21 |     # clean up after any blank components
+22 |     formatted = formatted.replace("()", "").replace("  ", " ").strip()
+23 |     return formatted
+   |            ^^^^^^^^^
+   |
+help: Remove unnecessary assignment
+19 | def x():
+20 |     formatted = _USER_AGENT_FORMATTER.format(format_string, **values)
+21 |     # clean up after any blank components
+   -     formatted = formatted.replace("()", "").replace("  ", " ").strip()
+   -     return formatted
+22 +     return formatted.replace("()", "").replace("  ", " ").strip()
+23 |
+24 |
+25 | # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `queryset` before `return` statement
+   --> RET504.py:246:12
+    |
+244 |     queryset = Model.filter(a=1)
+245 |     queryset = queryset.filter(c=3)
+246 |     return queryset
+    |            ^^^^^^^^
+    |
+help: Remove unnecessary assignment
+242 |
+243 | def get_queryset():
+244 |     queryset = Model.filter(a=1)
+    -     queryset = queryset.filter(c=3)
+    -     return queryset
+245 +     return queryset.filter(c=3)
+246 |
+247 |
+248 | def get_queryset():
+note: This is an unsafe fix and may change runtime behavior
+
 RET504 [*] Unnecessary assignment to `queryset` before `return` statement
    --> RET504.py:251:12
     |
@@ -39,6 +79,26 @@ help: Remove unnecessary assignment
 251 |
 252 |
 253 | # Function arguments
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `val` before `return` statement
+   --> RET504.py:269:12
+    |
+267 |         return val
+268 |     val = 1
+269 |     return val  # RET504
+    |            ^^^
+    |
+help: Remove unnecessary assignment
+265 | def str_to_bool(val):
+266 |     if isinstance(val, bool):
+267 |         return val
+    -     val = 1
+    -     return val  # RET504
+268 +     return 1
+269 |
+270 |
+271 | def str_to_bool(val):
 note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `x` before `return` statement
@@ -161,6 +221,26 @@ help: Remove unnecessary assignment
 367 | # contextlib suppress in with statement
 note: This is an unsafe fix and may change runtime behavior
 
+RET504 [*] Unnecessary assignment to `y` before `return` statement
+   --> RET504.py:400:12
+    |
+398 |         x = 1
+399 |     y = y + 2
+400 |     return y  # RET504
+    |            ^
+    |
+help: Remove unnecessary assignment
+396 |     x = 2
+397 |     with contextlib.suppress(Exception):
+398 |         x = 1
+    -     y = y + 2
+    -     return y  # RET504
+399 +     return y + 2
+400 |
+401 |
+402 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
 RET504 [*] Unnecessary assignment to `services` before `return` statement
    --> RET504.py:423:16
     |
@@ -227,24 +307,90 @@ help: Remove unnecessary assignment
 465 | # Variable used in finally — no RET504
 note: This is an unsafe fix and may change runtime behavior
 
-RET504 [*] Unnecessary assignment to `x` before `return` statement
-   --> RET504.py:490:16
+RET504 [*] Unnecessary assignment to `result` before `return` statement
+   --> RET504.py:484:16
     |
-488 |     try:
-489 |         x = foo()
-490 |         return x
-    |                ^
-491 |     finally:
-492 |         log("done")
+482 |     try:
+483 |         result = compute()
+484 |         return result
+    |                ^^^^^^
+485 |     except Exception as e:
+486 |         log(result)
     |
 help: Remove unnecessary assignment
-486 | # Variable NOT used in finally — RET504 should still fire
-487 | def f():
-488 |     try:
+480 | def f():
+481 |     result = None
+482 |     try:
+    -         result = compute()
+    -         return result
+483 +         return compute()
+484 |     except Exception as e:
+485 |         log(result)
+486 |
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `result` before `return` statement
+   --> RET504.py:496:16
+    |
+494 |         entry = lookup()
+495 |         result = to_dict(entry)
+496 |         return result
+    |                ^^^^^^
+497 |
+498 | # Variable NOT used in finally — RET504 should still fire
+    |
+help: Remove unnecessary assignment
+492 |         entry = fetch()
+493 |     except AlreadyExists:
+494 |         entry = lookup()
+    -         result = to_dict(entry)
+    -         return result
+495 +         return to_dict(entry)
+496 |
+497 | # Variable NOT used in finally — RET504 should still fire
+498 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:502:16
+    |
+500 |     try:
+501 |         x = foo()
+502 |         return x
+    |                ^
+503 |     finally:
+504 |         log("done")
+    |
+help: Remove unnecessary assignment
+498 | # Variable NOT used in finally — RET504 should still fire
+499 | def f():
+500 |     try:
     -         x = foo()
     -         return x
-489 +         return foo()
-490 |     finally:
-491 |         log("done")
-492 |
+501 +         return foo()
+502 |     finally:
+503 |         log("done")
+504 |
+note: This is an unsafe fix and may change runtime behavior
+
+RET504 [*] Unnecessary assignment to `x` before `return` statement
+   --> RET504.py:522:16
+    |
+520 |     try:
+521 |         x = foo()
+522 |         return x
+    |                ^
+523 |     finally:
+524 |         x = "done"
+    |
+help: Remove unnecessary assignment
+518 | # Write-only in finally — RET504 should still fire
+519 | def f():
+520 |     try:
+    -         x = foo()
+    -         return x
+521 +         return foo()
+522 |     finally:
+523 |         x = "done"
+524 |
 note: This is an unsafe fix and may change runtime behavior

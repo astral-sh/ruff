@@ -474,7 +474,9 @@ def f():
     finally:
         log(out)
 
-# Variable used in except handler — no RET504
+# Variable read in except handler alone — RET504 fires (the except is an
+# alternative path: if it runs, the assignment never completed, so removing
+# the assignment can't change what the handler observes).
 def f():
     result = None
     try:
@@ -482,6 +484,16 @@ def f():
         return result
     except Exception as e:
         log(result)
+
+# Return inside an except handler — RET504 fires. The `return result` is
+# not itself "observation" of the assignment; finalbody is empty.
+def f():
+    try:
+        entry = fetch()
+    except AlreadyExists:
+        entry = lookup()
+        result = to_dict(entry)
+        return result
 
 # Variable NOT used in finally — RET504 should still fire
 def f():
@@ -502,3 +514,21 @@ def f():
             pass
     finally:
         log(x)
+
+# Write-only in finally — RET504 should still fire
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        x = "done"
+
+# Closure in finally captures the name — conservative: no RET504
+def f():
+    try:
+        x = foo()
+        return x
+    finally:
+        def _cleanup():
+            log(x)
+        _cleanup()
