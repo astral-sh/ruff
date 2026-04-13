@@ -25,7 +25,6 @@ use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;

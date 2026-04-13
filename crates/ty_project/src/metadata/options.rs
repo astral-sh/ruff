@@ -40,6 +40,7 @@ use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -590,14 +591,14 @@ fn unsupported_inferred_python_version_diagnostic(
     ));
 
     diagnostic = match &python_version.source {
-        PythonVersionSource::ConfigFile(source) => diagnostic
-            .with_annotation(source.span(db).map(Annotation::primary))
+        source @ PythonVersionSource::ConfigFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
             .sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 "The version was inferred from a configuration file.",
             )),
-        PythonVersionSource::PyvenvCfgFile(source) => diagnostic
-            .with_annotation(source.span(db).map(Annotation::primary))
+        source @ PythonVersionSource::PyvenvCfgFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
             .sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 "The version was inferred from your virtual environment metadata.",
@@ -606,7 +607,13 @@ fn unsupported_inferred_python_version_diagnostic(
             site_packages_parent_dir,
             source,
         } => diagnostic
-            .with_annotation(source.as_ref().and_then(|source| source.span(db)).map(Annotation::primary))
+            .with_annotation(inferred_python_version_source_annotation(
+                db,
+                &PythonVersionSource::InstallationDirectoryLayout {
+                    site_packages_parent_dir: site_packages_parent_dir.clone(),
+                    source: source.clone(),
+                },
+            ))
             .sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 format!(
