@@ -1,3 +1,5 @@
+use ruff_db::system::{SystemPath, SystemPathBuf};
+
 use super::options::DiagnosticMode;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::options::ProjectOptionsOverrides;
@@ -33,6 +35,10 @@ pub(crate) struct WorkspaceSettings {
     pub(super) inlay_hints: InlayHintSettings,
     pub(super) completions: CompletionSettings,
     pub(super) overrides: Option<ProjectOptionsOverrides>,
+
+    /// The path to the Python executable from the editor (e.g., VS Code Python extension).
+    /// Used for constructing test runner commands in code lenses.
+    pub(super) python_executable: Option<SystemPathBuf>,
 }
 
 impl WorkspaceSettings {
@@ -50,5 +56,9 @@ impl WorkspaceSettings {
 
     pub(crate) fn completions(&self) -> &CompletionSettings {
         &self.completions
+    }
+
+    pub(crate) fn python_executable(&self) -> Option<&SystemPath> {
+        self.python_executable.as_deref()
     }
 }

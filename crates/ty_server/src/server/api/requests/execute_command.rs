@@ -7,6 +7,7 @@ use crate::session::Session;
 use crate::session::client::Client;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use ruff_db::system::SystemPath;
 use ruff_python_ast::name::Name;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -28,6 +29,7 @@ impl RunTestArgs {
         file_path: Option<&str>,
         class_name: Option<&Name>,
         function_name: Option<&str>,
+        python_executable: Option<&SystemPath>,
     ) -> Self {
         let mut test_target = file_path.unwrap_or_default().to_string();
         if let Some(class_name) = class_name {
@@ -42,11 +44,22 @@ impl RunTestArgs {
             }
             test_target.push_str(func);
         }
-        // TODO: Decide what command to use. This is tricky because we don't have python executable.
+
+        let (program, prefix_args) = if let Some(executable) = python_executable {
+            (executable.to_string(), vec!["-m".to_string()])
+        } else {
+            // Fall back to `uv run` when no Python executable is available.
+            ("uv".to_string(), vec!["run".to_string()])
+        };
+
+        let mut args = prefix_args;
+        args.push("pytest".to_string());
+        args.push(test_target.clone());
+
         Self {
             cwd: cwd.to_string(),
-            program: "uv".to_string(),
-            args: vec!["run".to_string(), "pytest".to_string(), test_target.clone()],
+            program,
+            args,
             test_target,
         }
     }
