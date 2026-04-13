@@ -2,7 +2,7 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
-use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
+use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
@@ -12,16 +12,16 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place_table;
-use crate::semantic_index::scope::FileScopeId;
-use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::Symbol;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
     Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::place_table;
+use ty_python_core::scope::FileScopeId;
+use ty_python_core::semantic_index;
+use ty_python_core::symbol::Symbol;
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -674,20 +674,6 @@ impl HasType for ast::ExceptHandlerExceptHandler {
         Some(binding_type(model.db, definition))
     }
 }
-
-/// Implemented by types for which the semantic index tracks their scope.
-pub(crate) trait HasTrackedScope: HasNodeIndex {}
-
-impl HasTrackedScope for ast::Expr {}
-
-impl HasTrackedScope for ast::ExprRef<'_> {}
-impl HasTrackedScope for &ast::ExprRef<'_> {}
-
-// We never explicitly register the scope of an `Identifier`.
-// However, `ExpressionsScopeMap` stores the text ranges of each scope.
-// That allows us to look up the identifier's scope for as long as it's
-// inside an expression (because the ranges overlap).
-impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {

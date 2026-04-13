@@ -10,9 +10,10 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
 };
+use ty_python_core::Truthiness;
 
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
@@ -913,8 +914,10 @@ fn infer_membership_test_comparison<'db>(
             });
 
             match op {
-                MembershipTestCompareOperator::In => truthiness.into_type(db),
-                MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
+                MembershipTestCompareOperator::In => Type::from_truthiness(db, truthiness),
+                MembershipTestCompareOperator::NotIn => {
+                    Type::from_truthiness(db, truthiness.negate())
+                }
             }
         })
         .ok_or_else(|| UnsupportedComparisonError {

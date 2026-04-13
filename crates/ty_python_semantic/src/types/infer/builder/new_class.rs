@@ -1,4 +1,3 @@
-use crate::semantic_index::definition::Definition;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
     dynamic_class_bases_argument,
@@ -13,6 +12,7 @@ use crate::types::infer::builder::{
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
+use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `types.new_class(name, bases, kwds, exec_body)` call.

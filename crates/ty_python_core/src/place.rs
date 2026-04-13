@@ -1,9 +1,13 @@
-use crate::semantic_index::member::{
+use crate::expression::Expression;
+use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
     ScopedMemberId,
 };
-use crate::semantic_index::scope::FileScopeId;
-use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use crate::predicate::{PatternPredicate, PatternPredicateKind};
+use crate::scope::FileScopeId;
+use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use crate::{Db, PossiblyNarrowedPlaces};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
@@ -12,7 +16,7 @@ use std::iter::FusedIterator;
 
 /// An expression that can be the target of a `Definition`.
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
-pub(crate) enum PlaceExpr {
+pub enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
 
@@ -24,7 +28,7 @@ impl PlaceExpr {
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
-    pub(crate) fn from_expr_name(name: &ast::ExprName) -> Self {
+    pub fn from_expr_name(name: &ast::ExprName) -> Self {
         PlaceExpr::Symbol(Symbol::new(name.id.clone()))
     }
 
@@ -36,7 +40,7 @@ impl PlaceExpr {
     /// * name: `x`
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
-    pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
+    pub fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
         let expr = expr.into();
 
         // For named expressions (walrus operator), extract the target.
@@ -74,14 +78,14 @@ impl std::fmt::Display for PlaceExpr {
 ///
 /// Needed so that we can iterate over all places without cloning them.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
-pub(crate) enum PlaceExprRef<'a> {
+pub enum PlaceExprRef<'a> {
     Symbol(&'a Symbol),
     Member(&'a Member),
 }
 
 impl<'a> PlaceExprRef<'a> {
     /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
-    pub(crate) const fn as_symbol(self) -> Option<&'a Symbol> {
+    pub const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
             Some(symbol)
         } else {
@@ -90,25 +94,25 @@ impl<'a> PlaceExprRef<'a> {
     }
 
     /// Returns `true` if the reference is a `Symbol`, otherwise `false`.
-    pub(crate) const fn is_symbol(self) -> bool {
+    pub const fn is_symbol(self) -> bool {
         matches!(self, PlaceExprRef::Symbol(_))
     }
 
-    pub(crate) fn is_declared(self) -> bool {
+    pub fn is_declared(self) -> bool {
         match self {
             Self::Symbol(symbol) => symbol.is_declared(),
             Self::Member(member) => member.is_declared(),
         }
     }
 
-    pub(crate) const fn is_bound(self) -> bool {
+    pub const fn is_bound(self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
             PlaceExprRef::Member(member) => member.is_bound(),
         }
     }
 
-    pub(crate) fn num_member_segments(self) -> usize {
+    pub fn num_member_segments(self) -> usize {
         match self {
             PlaceExprRef::Symbol(_) => 0,
             PlaceExprRef::Member(member) => member.expression().num_segments(),
@@ -154,7 +158,7 @@ pub enum ScopedPlaceId {
 }
 
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct PlaceTable {
+pub struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
 }
@@ -163,10 +167,7 @@ impl PlaceTable {
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
     ///
     /// Note, this iterator may skip some parents if they are not defined in the current scope.
-    pub(crate) fn parents<'a>(
-        &'a self,
-        place_expr: impl Into<PlaceExprRef<'a>>,
-    ) -> ParentPlaceIter<'a> {
+    pub fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
         match place_expr.into() {
             PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
             PlaceExprRef::Member(member) => {
@@ -176,12 +177,12 @@ impl PlaceTable {
     }
 
     /// Iterator over all symbols in this scope.
-    pub(crate) fn symbols(&self) -> std::slice::Iter<'_, Symbol> {
+    pub fn symbols(&self) -> std::slice::Iter<'_, Symbol> {
         self.symbols.iter()
     }
 
     /// Iterator over all members in this scope.
-    pub(crate) fn members(&self) -> std::slice::Iter<'_, Member> {
+    pub fn members(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()
     }
 
@@ -190,14 +191,14 @@ impl PlaceTable {
     /// ## Panics
     /// If the symbol ID is not found in the table.
     #[track_caller]
-    pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+    pub fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
         self.symbols.symbol(id)
     }
 
     /// Looks up a symbol by its name and returns a reference to it, if it exists.
     ///
     /// This should only be used in diagnostics and tests.
-    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
+    pub fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         self.symbols.symbol_id(name).map(|id| self.symbol(id))
     }
 
@@ -206,20 +207,17 @@ impl PlaceTable {
     /// ## Panics
     /// If the member ID is not found in the table.
     #[track_caller]
-    pub(crate) fn member(&self, id: ScopedMemberId) -> &Member {
+    pub fn member(&self, id: ScopedMemberId) -> &Member {
         self.members.member(id)
     }
 
     /// Returns the [`ScopedSymbolId`] of the place named `name`.
-    pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+    pub fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.symbols.symbol_id(name)
     }
 
     /// Returns the [`ScopedPlaceId`] of the place expression.
-    pub(crate) fn place_id<'e>(
-        &self,
-        place_expr: impl Into<PlaceExprRef<'e>>,
-    ) -> Option<ScopedPlaceId> {
+    pub fn place_id<'e>(&self, place_expr: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
         let place_expr = place_expr.into();
 
         match place_expr {
@@ -235,23 +233,20 @@ impl PlaceTable {
     /// ## Panics
     /// If the place ID is not found in the table.
     #[track_caller]
-    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
+    pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
             ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
             ScopedPlaceId::Member(member) => self.member(member).into(),
         }
     }
 
-    pub(crate) fn member_id_by_instance_attribute_name(
-        &self,
-        name: &str,
-    ) -> Option<ScopedMemberId> {
+    pub fn member_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
         self.members.place_id_by_instance_attribute_name(name)
     }
 }
 
 #[derive(Default)]
-pub(crate) struct PlaceTableBuilder {
+pub struct PlaceTableBuilder {
     symbols: SymbolTableBuilder,
     member: MemberTableBuilder,
 
@@ -261,7 +256,7 @@ pub(crate) struct PlaceTableBuilder {
 
 impl PlaceTableBuilder {
     /// Looks up a place ID by its expression.
-    pub(crate) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
+    pub fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
@@ -294,7 +289,7 @@ impl PlaceTableBuilder {
     }
 
     #[track_caller]
-    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
+    pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
             ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
             ScopedPlaceId::Member(id) => PlaceExprRef::Member(self.member.member(id)),
@@ -308,18 +303,18 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
+    pub fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
         self.symbols
             .iter()
             .map(Into::into)
             .chain(self.member.iter().map(PlaceExprRef::Member))
     }
 
-    pub(crate) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.symbols.iter()
     }
 
-    pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
+    pub fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
@@ -330,7 +325,7 @@ impl PlaceTableBuilder {
         (id, is_new)
     }
 
-    pub(crate) fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
+    pub fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
@@ -394,7 +389,7 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(crate) fn finish(self) -> PlaceTable {
+    pub fn finish(self) -> PlaceTable {
         PlaceTable {
             symbols: self.symbols.build(),
             members: self.member.build(),
@@ -483,7 +478,7 @@ impl From<FilePlaceId> for ScopedPlaceId {
     }
 }
 
-pub(crate) struct ParentPlaceIter<'a> {
+pub struct ParentPlaceIter<'a> {
     state: Option<ParentPlaceIterState<'a>>,
 }
 
@@ -574,3 +569,206 @@ impl Iterator for ParentPlaceIter<'_> {
 }
 
 impl FusedIterator for ParentPlaceIter<'_> {}
+
+/// Builder for computing the conservative set of places that could possibly be narrowed.
+///
+/// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
+/// *could* be narrowed, without performing type inference to determine the actual constraints.
+pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
+    db: &'db dyn Db,
+    places: &'a PlaceTableBuilder,
+}
+
+impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
+    pub(crate) fn new(db: &'db dyn Db, places: &'a PlaceTableBuilder) -> Self {
+        Self { db, places }
+    }
+
+    /// Compute possibly narrowed places for an expression predicate.
+    pub(crate) fn expression(self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+        self.expression_node(expr)
+    }
+
+    /// Compute possibly narrowed places for a pattern predicate.
+    pub(crate) fn pattern(
+        self,
+        pattern: PatternPredicate<'db>,
+        module: &ParsedModuleRef,
+    ) -> PossiblyNarrowedPlaces {
+        self.pattern_kind(pattern.kind(self.db), pattern.subject(self.db), module)
+    }
+
+    fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+        match expr {
+            // Simple expressions that directly narrow a place
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                self.simple_expr(expr)
+            }
+            // Compare expressions can narrow places on either side
+            ast::Expr::Compare(expr_compare) => self.expr_compare(expr_compare),
+            // Call expressions (isinstance, issubclass, hasattr, TypeGuard, len, bool, etc.)
+            ast::Expr::Call(expr_call) => self.expr_call(expr_call),
+            // Unary not just delegates to its operand
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
+                self.expression_node(&unary_op.operand)
+            }
+            // Boolean operations combine places from all sub-expressions
+            ast::Expr::BoolOp(bool_op) => self.expr_bool_op(bool_op),
+            // Conditional expressions combine places from all branches and the test.
+            ast::Expr::If(expr_if) => self.expr_if(expr_if),
+            // Named expressions narrow both the target and the value
+            ast::Expr::Named(expr_named) => {
+                let mut places = self.simple_expr(&expr_named.target);
+                places.extend(self.expression_node(&expr_named.value));
+                places
+            }
+            _ => PossiblyNarrowedPlaces::default(),
+        }
+    }
+
+    /// Simple expressions that directly narrow a single place.
+    fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
+            if let Some(place) = self.places.place_id((&place_expr).into()) {
+                places.insert(place);
+            }
+        }
+        places
+    }
+
+    /// Compare expressions can narrow places on either side of the comparison,
+    /// and can also narrow subscript bases (for `TypedDict` and tuple narrowing).
+    fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
+        // The left side can be narrowed
+        self.add_narrowing_target(&expr_compare.left, &mut places);
+
+        // Each comparator can also be narrowed
+        for comparator in &expr_compare.comparators {
+            self.add_narrowing_target(comparator, &mut places);
+        }
+
+        // For subscript expressions on either side, the subscript base can also be narrowed.
+        // (TypedDict and tuple discriminated union narrowing.)
+        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+            if let ast::Expr::Subscript(subscript) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
+        }
+
+        places
+    }
+
+    /// Call expressions can narrow their first argument (isinstance, issubclass, hasattr, len)
+    /// or narrow based on TypeGuard/TypeIs return types.
+    fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
+        // Most narrowing calls narrow their first argument
+        if let Some(first_arg) = expr_call.arguments.args.first() {
+            if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                    places.insert(place);
+                }
+            }
+        }
+
+        // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
+        if let Some(first_arg) = expr_call.arguments.args.first() {
+            if expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty() {
+                places.extend(self.expression_node(first_arg));
+            }
+        }
+
+        places
+    }
+
+    /// Boolean operations combine places from all sub-expressions.
+    fn expr_bool_op(&self, bool_op: &ast::ExprBoolOp) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+        for value in &bool_op.values {
+            places.extend(self.expression_node(value));
+        }
+        places
+    }
+
+    fn expr_if(&self, expr_if: &ast::ExprIf) -> PossiblyNarrowedPlaces {
+        let mut places = self.expression_node(&expr_if.test);
+        places.extend(self.expression_node(&expr_if.body));
+        places.extend(self.expression_node(&expr_if.orelse));
+        places
+    }
+
+    /// Helper to add a potential narrowing target expression to the set.
+    fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+        match expr {
+            ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::Named(_) => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if let Some(place) = self.places.place_id((&place_expr).into()) {
+                        places.insert(place);
+                    }
+                }
+            }
+            // type(x) is Y can narrow x
+            ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
+                if let Some(first_arg) = call.arguments.args.first() {
+                    if let Some(place_expr) = PlaceExpr::try_from_expr(first_arg) {
+                        if let Some(place) = self.places.place_id((&place_expr).into()) {
+                            places.insert(place);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Pattern predicates narrow the match subject.
+    fn pattern_kind(
+        &self,
+        kind: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+        module: &ParsedModuleRef,
+    ) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
+        // The match subject can always be narrowed by a pattern
+        let subject_node = subject.node_ref(self.db).node(module);
+        if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
+            if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
+                places.insert(place);
+            }
+        }
+
+        // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
+        if let ast::Expr::Subscript(subscript) = subject_node {
+            if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                    places.insert(place);
+                }
+            }
+        }
+
+        // Handle Or patterns by recursing into each alternative
+        if let PatternPredicateKind::Or(predicates) = kind {
+            for predicate in predicates {
+                places.extend(self.pattern_kind(predicate, subject, module));
+            }
+        }
+
+        // Handle As patterns by recursing into the inner pattern
+        if let PatternPredicateKind::As(Some(inner), _) = kind {
+            places.extend(self.pattern_kind(inner, subject, module));
+        }
+
+        places
+    }
+}

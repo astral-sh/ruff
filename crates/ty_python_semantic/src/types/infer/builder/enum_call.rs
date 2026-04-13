@@ -2,9 +2,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use rustc_hash::FxHashSet;
 
+use ty_python_core::definition::Definition;
+
 use crate::{
     Db, Program,
-    semantic_index::definition::Definition,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},

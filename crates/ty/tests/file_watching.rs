@@ -16,7 +16,7 @@ use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::PythonPlatform;
+use ty_python_core::platform::PythonPlatform;
 
 struct TestCase {
     db: ProjectDatabase,

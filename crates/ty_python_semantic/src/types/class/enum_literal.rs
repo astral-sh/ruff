@@ -6,14 +6,14 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
 use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 /// Functional enum member specification captured from the call site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]

@@ -52,16 +52,16 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members,
+    DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
+use ty_python_core::EvaluationMode;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -2343,7 +2343,9 @@ impl<'db> Bindings<'db> {
 
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
-                            [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
+                            [Some(arg)] => {
+                                overload.set_return_type(Type::from_truthiness(db, arg.bool(db)));
+                            }
                             [None] => overload.set_return_type(Type::bool_literal(false)),
                             _ => {}
                         },

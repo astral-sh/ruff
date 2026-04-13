@@ -19,9 +19,6 @@ use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::semantic_index;
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -39,6 +36,9 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::semantic_index;
 
 /// A named item that can be either a class or a type alias.
 ///

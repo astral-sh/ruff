@@ -22,12 +22,12 @@ use super::{
     definition_expression_type, visitor,
 };
 use crate::Db;
-use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use ty_python_core::definition::Definition;
 
 bitflags! {
     /// Used for `TypedDict` class parameters.

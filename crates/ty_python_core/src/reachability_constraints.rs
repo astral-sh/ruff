@@ -7,8 +7,8 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
+use crate::predicate::ScopedPredicateId;
 use crate::rank::RankBitBox;
-use crate::semantic_index::predicate::ScopedPredicateId;
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -30,7 +30,7 @@ use crate::semantic_index::predicate::ScopedPredicateId;
 /// reachability constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct ScopedReachabilityConstraintId(u32);
+pub struct ScopedReachabilityConstraintId(u32);
 
 impl std::fmt::Debug for ScopedReachabilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,7 +59,7 @@ impl std::fmt::Debug for ScopedReachabilityConstraintId {
 // arena Vec, with the constraint ID providing an index into the arena.
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct InteriorNode {
+pub struct InteriorNode {
     /// A "variable" that is evaluated as part of a TDD ternary function. For reachability
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
@@ -70,41 +70,41 @@ pub(crate) struct InteriorNode {
 }
 
 impl InteriorNode {
-    pub(crate) const fn atom(self) -> ScopedPredicateId {
+    pub const fn atom(self) -> ScopedPredicateId {
         self.atom
     }
 
-    pub(crate) const fn if_true(self) -> ScopedReachabilityConstraintId {
+    pub const fn if_true(self) -> ScopedReachabilityConstraintId {
         self.if_true
     }
 
-    pub(crate) const fn if_ambiguous(self) -> ScopedReachabilityConstraintId {
+    pub const fn if_ambiguous(self) -> ScopedReachabilityConstraintId {
         self.if_ambiguous
     }
 
-    pub(crate) const fn if_false(self) -> ScopedReachabilityConstraintId {
+    pub const fn if_false(self) -> ScopedReachabilityConstraintId {
         self.if_false
     }
 }
 
 impl ScopedReachabilityConstraintId {
     /// A special ID that is used for an "always true" / "always visible" constraint.
-    pub(crate) const ALWAYS_TRUE: ScopedReachabilityConstraintId =
+    pub const ALWAYS_TRUE: ScopedReachabilityConstraintId =
         ScopedReachabilityConstraintId(0xffff_ffff);
 
     /// A special ID that is used for an ambiguous constraint.
-    pub(crate) const AMBIGUOUS: ScopedReachabilityConstraintId =
+    pub const AMBIGUOUS: ScopedReachabilityConstraintId =
         ScopedReachabilityConstraintId(0xffff_fffe);
 
     /// A special ID that is used for an "always false" / "never visible" constraint.
-    pub(crate) const ALWAYS_FALSE: ScopedReachabilityConstraintId =
+    pub const ALWAYS_FALSE: ScopedReachabilityConstraintId =
         ScopedReachabilityConstraintId(0xffff_fffd);
 
-    pub(crate) fn is_terminal(self) -> bool {
+    pub fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
 
-    pub(crate) fn as_u32(self) -> u32 {
+    pub fn as_u32(self) -> u32 {
         self.0
     }
 }
@@ -138,7 +138,7 @@ const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct ReachabilityConstraints {
+pub struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
     used_interiors: Box<[InteriorNode]>,
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
@@ -149,7 +149,7 @@ pub(crate) struct ReachabilityConstraints {
 
 impl ReachabilityConstraints {
     /// Look up an interior node by its constraint ID.
-    pub(crate) fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
+    pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.as_u32() as usize;
         debug_assert!(
@@ -160,17 +160,17 @@ impl ReachabilityConstraints {
         self.used_interiors()[index]
     }
 
-    pub(crate) fn used_interiors(&self) -> &[InteriorNode] {
+    pub fn used_interiors(&self) -> &[InteriorNode] {
         &self.used_interiors
     }
 
-    pub(crate) fn used_indices(&self) -> &RankBitBox {
+    pub fn used_indices(&self) -> &RankBitBox {
         &self.used_indices
     }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct ReachabilityConstraintsBuilder {
+pub struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
     interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,

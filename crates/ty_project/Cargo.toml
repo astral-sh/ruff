@@ -28,6 +28,7 @@ ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_static = { workspace = true }
+ty_python_core = { workspace = true, features = ["schemars"] }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
@@ -68,6 +69,7 @@ schemars = [
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
     "ty_python_semantic/schemars",
+    "ty_python_core/schemars",
 ]
 zstd = ["ty_vendored/zstd"]
 junit = ["ruff_db/junit"]

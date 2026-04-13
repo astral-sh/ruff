@@ -12,8 +12,8 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::ResolvedDefinition;
-use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,

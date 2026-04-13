@@ -10,8 +10,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
 use crate::types::callable::CallableTypeKind;
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
@@ -26,6 +24,8 @@ use crate::types::{
     determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 pub(super) fn synthesize_typed_dict_method<'db>(
     db: &'db dyn Db,

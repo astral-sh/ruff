@@ -1,4 +1,4 @@
-use crate::semantic_index::use_def::FlowSnapshot;
+use crate::use_def::FlowSnapshot;
 
 use super::SemanticIndexBuilder;
 
