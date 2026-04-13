@@ -1,6 +1,12 @@
 use ruff_python_ast::{Expr, ExprStringLiteral};
 use ruff_python_semantic::{ScopeId, Snapshot};
 
+#[derive(Debug)]
+pub(crate) struct DeferredLambda {
+    pub(crate) snapshot: Snapshot,
+    pub(crate) in_comprehension_iterable: bool,
+}
+
 /// A collection of AST nodes that are deferred for later visitation. Used to, e.g., store
 /// functions, whose bodies shouldn't be visited until all module-level definitions have been
 /// visited.
@@ -10,7 +16,7 @@ pub(crate) struct Visit<'a> {
     pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
-    pub(crate) lambdas: Vec<Snapshot>,
+    pub(crate) lambdas: Vec<DeferredLambda>,
     /// N.B. This field should always be empty unless it's a stub file
     pub(crate) class_bases: Vec<(&'a Expr, Snapshot)>,
 }

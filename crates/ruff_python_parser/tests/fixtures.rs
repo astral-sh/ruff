@@ -536,16 +536,42 @@ enum Scope {
     Class,
 }
 
-struct SemanticSyntaxCheckerVisitor<'a> {
+/// Returns `true` if `target` binds `name`, including through nested unpacking.
+fn target_binds_name(target: &ast::Expr, name: &str) -> bool {
+    match target {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id.as_str() == name,
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().any(|elt| target_binds_name(elt, name))
+        }
+        ast::Expr::Starred(ast::ExprStarred { value, .. }) => target_binds_name(value, name),
+        _ => false,
+    }
+}
+
+/// Returns the generators for `expr` if it is a comprehension expression.
+fn comprehension_generators(expr: &ast::Expr) -> Option<&[ast::Comprehension]> {
+    match expr {
+        ast::Expr::ListComp(ast::ExprListComp { generators, .. })
+        | ast::Expr::SetComp(ast::ExprSetComp { generators, .. })
+        | ast::Expr::Generator(ast::ExprGenerator { generators, .. }) => Some(generators),
+        ast::Expr::DictComp(ast::ExprDictComp { generators, .. }) => Some(generators),
+        _ => None,
+    }
+}
+
+struct SemanticSyntaxCheckerVisitor<'a, 'ast> {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
     python_version: PythonVersion,
     source: &'a str,
     scopes: Vec<Scope>,
+    exprs: Vec<&'ast ast::Expr>,
+    comprehension_iterable_nesting: u32,
     in_try: bool,
 }
 
-impl<'a> SemanticSyntaxCheckerVisitor<'a> {
+impl<'a, 'ast> SemanticSyntaxCheckerVisitor<'a, 'ast> {
     fn new(source: &'a str) -> Self {
         Self {
             checker: SemanticSyntaxChecker::new(),
@@ -553,6 +579,8 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             python_version: PythonVersion::default(),
             source,
             scopes: vec![Scope::Module],
+            exprs: Vec::new(),
+            comprehension_iterable_nesting: 0,
             in_try: false,
         }
     }
@@ -572,9 +600,38 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
         f(&mut checker, self);
         self.checker = checker;
     }
+
+    /// Runs `visit` while treating the current expression as a comprehension iterable.
+    fn with_comprehension_iterable_context(&mut self, visit: impl FnOnce(&mut Self)) {
+        self.comprehension_iterable_nesting += 1;
+        visit(self);
+        self.comprehension_iterable_nesting -= 1;
+    }
+
+    /// Visits `generators` and `visit_outer_expr` within a comprehension scope.
+    fn with_comprehension_scope(
+        &mut self,
+        generators: &'ast [ast::Comprehension],
+        visit_outer_expr: impl FnOnce(&mut Self),
+    ) {
+        self.scopes.push(Scope::Comprehension {
+            is_async: generators.iter().any(|generator| generator.is_async),
+        });
+        for comprehension in generators {
+            self.with_comprehension_iterable_context(|visitor| {
+                visitor.visit_expr(&comprehension.iter);
+            });
+            ast::visitor::walk_expr(self, &comprehension.target);
+            for if_expr in &comprehension.ifs {
+                self.visit_expr(if_expr);
+            }
+        }
+        visit_outer_expr(self);
+        self.scopes.pop().unwrap();
+    }
 }
 
-impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
+impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         false
     }
@@ -634,6 +691,27 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         false
     }
 
+    fn in_comprehension_iterable(&self) -> bool {
+        self.comprehension_iterable_nesting > 0
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        if !matches!(self.scopes.last(), Some(Scope::Comprehension { .. })) {
+            return false;
+        }
+
+        self.scopes
+            .iter()
+            .rev()
+            .skip(1)
+            .find_map(|scope| match scope {
+                Scope::Comprehension { .. } => None,
+                Scope::Class => Some(true),
+                Scope::Module | Scope::Function { .. } => Some(false),
+            })
+            .unwrap_or(false)
+    }
+
     fn in_module_scope(&self) -> bool {
         self.scopes.len() == 1
     }
@@ -665,10 +743,33 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn is_bound_parameter(&self, _name: &str) -> bool {
         false
     }
+
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool {
+        let Some(target) = named.target.as_name_expr() else {
+            return false;
+        };
+
+        for expr in self.exprs.iter().rev().copied() {
+            match expr {
+                ast::Expr::Lambda(_) => break,
+                _ => {
+                    if comprehension_generators(expr).is_some_and(|generators| {
+                        generators.iter().any(|comprehension| {
+                            target_binds_name(&comprehension.target, target.id.as_str())
+                        })
+                    }) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
 }
 
-impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+impl<'ast> Visitor<'ast> for SemanticSyntaxCheckerVisitor<'_, 'ast> {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
@@ -709,8 +810,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &ast::Expr) {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        self.exprs.push(expr);
         match expr {
             ast::Expr::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });
@@ -726,14 +828,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
             | ast::Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
             }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
-                });
-                self.visit_expr(elt);
-                self.scopes.pop().unwrap();
+                self.with_comprehension_scope(generators, |visitor| visitor.visit_expr(elt));
             }
             ast::Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -741,19 +836,15 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 generators,
                 ..
             }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
+                self.with_comprehension_scope(generators, |visitor| {
+                    visitor.visit_expr(key);
+                    visitor.visit_expr(value);
                 });
-                self.visit_expr(key);
-                self.visit_expr(value);
-                self.scopes.pop().unwrap();
             }
             _ => {
                 ast::visitor::walk_expr(self, expr);
             }
         }
+        self.exprs.pop().unwrap();
     }
 }

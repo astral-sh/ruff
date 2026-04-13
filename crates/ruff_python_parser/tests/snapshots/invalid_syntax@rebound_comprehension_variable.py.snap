@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/rebound_comprehension
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..342,
+        range: 0..373,
         body: [
             Expr(
                 StmtExpr {
@@ -525,11 +525,11 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 186..233,
+                    range: 186..216,
                     value: ListComp(
                         ExprListComp {
                             node_index: NodeIndex(None),
-                            range: 186..233,
+                            range: 186..216,
                             elt: Named(
                                 ExprNamed {
                                     node_index: NodeIndex(None),
@@ -542,65 +542,74 @@ Module(
                                             ctx: Store,
                                         },
                                     ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
+                                    value: Name(
+                                        ExprName {
                                             node_index: NodeIndex(None),
                                             range: 193..194,
-                                            value: Int(
-                                                0,
-                                            ),
+                                            id: Name("b"),
+                                            ctx: Load,
                                         },
                                     ),
                                 },
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 196..214,
+                                    range: 196..215,
                                     node_index: NodeIndex(None),
-                                    target: Name(
-                                        ExprName {
+                                    target: Tuple(
+                                        ExprTuple {
                                             node_index: NodeIndex(None),
-                                            range: 200..201,
-                                            id: Name("b"),
+                                            range: 200..206,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 201..202,
+                                                        id: Name("a"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 204..205,
+                                                        id: Name("b"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
                                             ctx: Store,
+                                            parenthesized: true,
                                         },
                                     ),
-                                    iter: Call(
-                                        ExprCall {
+                                    iter: Name(
+                                        ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 205..214,
-                                            func: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 205..210,
-                                                    id: Name("range"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            arguments: Arguments {
-                                                range: 211..214,
-                                                node_index: NodeIndex(None),
-                                                args: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 212..213,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                keywords: [],
-                                            },
+                                            range: 210..215,
+                                            id: Name("pairs"),
+                                            ctx: Load,
                                         },
                                     ),
                                     ifs: [],
                                     is_async: false,
                                 },
-                                Comprehension {
-                                    range: 215..232,
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 217..264,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 217..264,
+                            elt: Named(
+                                ExprNamed {
                                     node_index: NodeIndex(None),
+                                    range: 219..225,
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -609,68 +618,10 @@ Module(
                                             ctx: Store,
                                         },
                                     ),
-                                    iter: Call(
-                                        ExprCall {
-                                            node_index: NodeIndex(None),
-                                            range: 224..232,
-                                            func: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 224..229,
-                                                    id: Name("range"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            arguments: Arguments {
-                                                range: 229..232,
-                                                node_index: NodeIndex(None),
-                                                args: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 230..231,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                keywords: [],
-                                            },
-                                        },
-                                    ),
-                                    ifs: [],
-                                    is_async: false,
-                                },
-                            ],
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 234..281,
-                    value: ListComp(
-                        ExprListComp {
-                            node_index: NodeIndex(None),
-                            range: 234..281,
-                            elt: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 236..242,
-                                    target: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 236..237,
-                                            id: Name("a"),
-                                            ctx: Store,
-                                        },
-                                    ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
-                                            range: 241..242,
+                                            range: 224..225,
                                             value: Int(
                                                 0,
                                             ),
@@ -680,36 +631,36 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 244..262,
+                                    range: 227..245,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 248..249,
-                                            id: Name("a"),
+                                            range: 231..232,
+                                            id: Name("b"),
                                             ctx: Store,
                                         },
                                     ),
                                     iter: Call(
                                         ExprCall {
                                             node_index: NodeIndex(None),
-                                            range: 253..262,
+                                            range: 236..245,
                                             func: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 253..258,
+                                                    range: 236..241,
                                                     id: Name("range"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 259..262,
+                                                range: 242..245,
                                                 node_index: NodeIndex(None),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 260..261,
+                                                            range: 243..244,
                                                             value: Int(
                                                                 0,
                                                             ),
@@ -724,36 +675,36 @@ Module(
                                     is_async: false,
                                 },
                                 Comprehension {
-                                    range: 263..280,
+                                    range: 246..263,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 267..268,
-                                            id: Name("b"),
+                                            range: 250..251,
+                                            id: Name("a"),
                                             ctx: Store,
                                         },
                                     ),
                                     iter: Call(
                                         ExprCall {
                                             node_index: NodeIndex(None),
-                                            range: 272..280,
+                                            range: 255..263,
                                             func: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 272..277,
+                                                    range: 255..260,
                                                     id: Name("range"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 277..280,
+                                                range: 260..263,
                                                 node_index: NodeIndex(None),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 278..279,
+                                                            range: 261..262,
                                                             value: Int(
                                                                 0,
                                                             ),
@@ -775,24 +726,149 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 282..341,
+                    range: 265..312,
                     value: ListComp(
                         ExprListComp {
                             node_index: NodeIndex(None),
-                            range: 282..341,
+                            range: 265..312,
+                            elt: Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 267..273,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 267..268,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 272..273,
+                                            value: Int(
+                                                0,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 275..293,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 279..280,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            node_index: NodeIndex(None),
+                                            range: 284..293,
+                                            func: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 284..289,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 290..293,
+                                                node_index: NodeIndex(None),
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 291..292,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                                Comprehension {
+                                    range: 294..311,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 298..299,
+                                            id: Name("b"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            node_index: NodeIndex(None),
+                                            range: 303..311,
+                                            func: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 303..308,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 308..311,
+                                                node_index: NodeIndex(None),
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 309..310,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 313..372,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 313..372,
                             elt: Tuple(
                                 ExprTuple {
                                     node_index: NodeIndex(None),
-                                    range: 283..303,
+                                    range: 314..334,
                                     elts: [
                                         Named(
                                             ExprNamed {
                                                 node_index: NodeIndex(None),
-                                                range: 285..291,
+                                                range: 316..322,
                                                 target: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
-                                                        range: 285..286,
+                                                        range: 316..317,
                                                         id: Name("a"),
                                                         ctx: Store,
                                                     },
@@ -800,7 +876,7 @@ Module(
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
-                                                        range: 290..291,
+                                                        range: 321..322,
                                                         value: Int(
                                                             0,
                                                         ),
@@ -811,11 +887,11 @@ Module(
                                         Named(
                                             ExprNamed {
                                                 node_index: NodeIndex(None),
-                                                range: 295..301,
+                                                range: 326..332,
                                                 target: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
-                                                        range: 295..296,
+                                                        range: 326..327,
                                                         id: Name("b"),
                                                         ctx: Store,
                                                     },
@@ -823,7 +899,7 @@ Module(
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
-                                                        range: 300..301,
+                                                        range: 331..332,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -838,12 +914,12 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 304..322,
+                                    range: 335..353,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 308..309,
+                                            range: 339..340,
                                             id: Name("a"),
                                             ctx: Store,
                                         },
@@ -851,23 +927,23 @@ Module(
                                     iter: Call(
                                         ExprCall {
                                             node_index: NodeIndex(None),
-                                            range: 313..322,
+                                            range: 344..353,
                                             func: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 313..318,
+                                                    range: 344..349,
                                                     id: Name("range"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 319..322,
+                                                range: 350..353,
                                                 node_index: NodeIndex(None),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 320..321,
+                                                            range: 351..352,
                                                             value: Int(
                                                                 0,
                                                             ),
@@ -882,12 +958,12 @@ Module(
                                     is_async: false,
                                 },
                                 Comprehension {
-                                    range: 323..340,
+                                    range: 354..371,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 327..328,
+                                            range: 358..359,
                                             id: Name("b"),
                                             ctx: Store,
                                         },
@@ -895,23 +971,23 @@ Module(
                                     iter: Call(
                                         ExprCall {
                                             node_index: NodeIndex(None),
-                                            range: 332..340,
+                                            range: 363..371,
                                             func: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 332..337,
+                                                    range: 363..368,
                                                     id: Name("range"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 337..340,
+                                                range: 368..371,
                                                 node_index: NodeIndex(None),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 338..339,
+                                                            range: 369..370,
                                                             value: Int(
                                                                 0,
                                                             ),
@@ -938,7 +1014,7 @@ Module(
 
   |
 1 | [(a := 0) for a in range(0)]
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
+  |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
 2 | {(a := 0) for a in range(0)}
 3 | {(a := 0): val for a in range(0)}
   |
@@ -947,7 +1023,7 @@ Module(
   |
 1 | [(a := 0) for a in range(0)]
 2 | {(a := 0) for a in range(0)}
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
+  |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
 3 | {(a := 0): val for a in range(0)}
 4 | {key: (a := 0) for a in range(0)}
   |
@@ -957,7 +1033,7 @@ Module(
 1 | [(a := 0) for a in range(0)]
 2 | {(a := 0) for a in range(0)}
 3 | {(a := 0): val for a in range(0)}
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
+  |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
 4 | {key: (a := 0) for a in range(0)}
 5 | ((a := 0) for a in range(0))
   |
@@ -967,7 +1043,7 @@ Module(
 2 | {(a := 0) for a in range(0)}
 3 | {(a := 0): val for a in range(0)}
 4 | {key: (a := 0) for a in range(0)}
-  |        ^ Syntax Error: assignment expression cannot rebind comprehension variable
+  |        ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
 5 | ((a := 0) for a in range(0))
 6 | [[(a := 0)] for a in range(0)]
   |
@@ -977,9 +1053,9 @@ Module(
 3 | {(a := 0): val for a in range(0)}
 4 | {key: (a := 0) for a in range(0)}
 5 | ((a := 0) for a in range(0))
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
+  |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
 6 | [[(a := 0)] for a in range(0)]
-7 | [(a := 0) for b in range (0) for a in range(0)]
+7 | [(a := b) for (a, b) in pairs]
   |
 
 
@@ -987,42 +1063,52 @@ Module(
 4 | {key: (a := 0) for a in range(0)}
 5 | ((a := 0) for a in range(0))
 6 | [[(a := 0)] for a in range(0)]
-  |    ^ Syntax Error: assignment expression cannot rebind comprehension variable
-7 | [(a := 0) for b in range (0) for a in range(0)]
-8 | [(a := 0) for a in range (0) for b in range(0)]
+  |    ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+7 | [(a := b) for (a, b) in pairs]
+8 | [(a := 0) for b in range (0) for a in range(0)]
   |
 
 
   |
 5 | ((a := 0) for a in range(0))
 6 | [[(a := 0)] for a in range(0)]
-7 | [(a := 0) for b in range (0) for a in range(0)]
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
-8 | [(a := 0) for a in range (0) for b in range(0)]
-9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+7 | [(a := b) for (a, b) in pairs]
+  |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+8 | [(a := 0) for b in range (0) for a in range(0)]
+9 | [(a := 0) for a in range (0) for b in range(0)]
   |
 
 
-  |
-6 | [[(a := 0)] for a in range(0)]
-7 | [(a := 0) for b in range (0) for a in range(0)]
-8 | [(a := 0) for a in range (0) for b in range(0)]
-  |   ^ Syntax Error: assignment expression cannot rebind comprehension variable
-9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-  |
+   |
+ 6 | [[(a := 0)] for a in range(0)]
+ 7 | [(a := b) for (a, b) in pairs]
+ 8 | [(a := 0) for b in range (0) for a in range(0)]
+   |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+ 9 | [(a := 0) for a in range (0) for b in range(0)]
+10 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+   |
 
 
-  |
-7 | [(a := 0) for b in range (0) for a in range(0)]
-8 | [(a := 0) for a in range (0) for b in range(0)]
-9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-  |    ^ Syntax Error: assignment expression cannot rebind comprehension variable
-  |
+   |
+ 7 | [(a := b) for (a, b) in pairs]
+ 8 | [(a := 0) for b in range (0) for a in range(0)]
+ 9 | [(a := 0) for a in range (0) for b in range(0)]
+   |   ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+10 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+   |
 
 
-  |
-7 | [(a := 0) for b in range (0) for a in range(0)]
-8 | [(a := 0) for a in range (0) for b in range(0)]
-9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-  |              ^ Syntax Error: assignment expression cannot rebind comprehension variable
-  |
+   |
+ 8 | [(a := 0) for b in range (0) for a in range(0)]
+ 9 | [(a := 0) for a in range (0) for b in range(0)]
+10 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+   |    ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+   |
+
+
+   |
+ 8 | [(a := 0) for b in range (0) for a in range(0)]
+ 9 | [(a := 0) for a in range (0) for b in range(0)]
+10 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+   |              ^^^^^^ Syntax Error: assignment expression cannot rebind comprehension variable
+   |

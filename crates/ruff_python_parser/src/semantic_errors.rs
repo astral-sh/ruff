@@ -865,13 +865,8 @@ impl SemanticSyntaxChecker {
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
-            Expr::ListComp(ast::ExprListComp {
-                elt, generators, ..
-            })
-            | Expr::SetComp(ast::ExprSetComp {
-                elt, generators, ..
-            }) => {
-                Self::check_generator_expr(elt, generators, ctx);
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. }) => {
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -881,14 +876,7 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                ..
-            }) => {
-                Self::check_generator_expr(key, generators, ctx);
-                Self::check_generator_expr(value, generators, ctx);
+            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -898,12 +886,52 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => {
-                Self::check_generator_expr(elt, generators, ctx);
+            Expr::Generator(ast::ExprGenerator { generators: _, .. }) => {
                 // Note that `await_outside_async_function` is not called here because generators
                 // are evaluated lazily. See the note in the function for more details.
+            }
+            Expr::Named(node) => {
+                if ctx.python_version() >= PythonVersion::PY38 && node.target.is_name_expr() {
+                    // test_err named_expression_in_comprehension_context
+                    // class C:
+                    //     [(x := y) for y in range(3)]
+                    // [x for x in (y := [1])]
+                    // [x for x in [(y := 1) for y in range(1)]]
+                    // class D:
+                    //     [x for x in [(y := 1) for y in range(1)]]
+
+                    // test_err rebound_comprehension_variable
+                    // [(a := 0) for a in range(0)]
+                    // {(a := 0) for a in range(0)}
+                    // {(a := 0): val for a in range(0)}
+                    // {key: (a := 0) for a in range(0)}
+                    // ((a := 0) for a in range(0))
+                    // [[(a := 0)] for a in range(0)]
+                    // [(a := b) for (a, b) in pairs]
+                    // [(a := 0) for b in range (0) for a in range(0)]
+                    // [(a := 0) for a in range (0) for b in range(0)]
+                    // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+
+                    // test_ok non_rebound_comprehension_variable
+                    // [a := 0 for x in range(0)]
+                    // [(lambda: (x := y))() for (x, y) in pairs]
+                    // class C:
+                    //     [(lambda: (x := y))() for y in range(3)]
+
+                    // Match CPython's precedence:
+                    // iterable context > rebinding a comprehension variable > class body.
+                    let kind = if ctx.in_comprehension_iterable() {
+                        SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+                    } else if ctx.rebinds_comprehension_variable(node) {
+                        SemanticSyntaxErrorKind::ReboundComprehensionVariable
+                    } else if ctx.in_class_body_comprehension() {
+                        SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension
+                    } else {
+                        return;
+                    };
+
+                    Self::add_error(ctx, kind, node.range);
+                }
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -1090,46 +1118,6 @@ impl SemanticSyntaxChecker {
         );
     }
 
-    /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
-    /// variable in `generators`.
-    fn check_generator_expr<Ctx: SemanticSyntaxContext>(
-        expr: &Expr,
-        comprehensions: &[ast::Comprehension],
-        ctx: &Ctx,
-    ) {
-        let rebound_variables = {
-            let mut visitor = ReboundComprehensionVisitor {
-                comprehensions,
-                rebound_variables: Vec::new(),
-            };
-            visitor.visit_expr(expr);
-            visitor.rebound_variables
-        };
-
-        // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
-        // and the name expr being rebound
-        for range in rebound_variables {
-            // test_err rebound_comprehension_variable
-            // [(a := 0) for a in range(0)]
-            // {(a := 0) for a in range(0)}
-            // {(a := 0): val for a in range(0)}
-            // {key: (a := 0) for a in range(0)}
-            // ((a := 0) for a in range(0))
-            // [[(a := 0)] for a in range(0)]
-            // [(a := 0) for b in range (0) for a in range(0)]
-            // [(a := 0) for a in range (0) for b in range(0)]
-            // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-
-            // test_ok non_rebound_comprehension_variable
-            // [a := 0 for x in range(0)]
-            Self::add_error(
-                ctx,
-                SemanticSyntaxErrorKind::ReboundComprehensionVariable,
-                range,
-            );
-        }
-    }
-
     fn async_comprehension_in_sync_comprehension<Ctx: SemanticSyntaxContext>(
         ctx: &Ctx,
         generators: &[ast::Comprehension],
@@ -1223,6 +1211,12 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable => f.write_str(
+                "assignment expression cannot be used in a comprehension iterable expression",
+            ),
+            SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension => f.write_str(
+                "assignment expression within a comprehension cannot be used in a class body",
+            ),
             SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 f.write_str("assignment expression cannot rebind comprehension variable")
             }
@@ -1397,6 +1391,27 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
     LateFutureImport,
+
+    /// Represents the use of an assignment expression within a comprehension iterable clause.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// [x for x in (y := range(3))]
+    /// [x for x in [z for z in range(3) if (y := z)]]
+    /// ```
+    NamedExpressionInComprehensionIterable,
+
+    /// Represents the use of an assignment expression within a comprehension nested directly or
+    /// indirectly in a class body.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// class C:
+    ///     [(x := y) for y in range(3)]
+    /// ```
+    NamedExpressionInClassBodyComprehension,
 
     /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
     /// a generator expression.
@@ -1872,30 +1887,6 @@ pub enum WriteToDebugKind {
     Delete(PythonVersion),
 }
 
-/// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
-/// a comprehension or generator expression.
-struct ReboundComprehensionVisitor<'a> {
-    comprehensions: &'a [ast::Comprehension],
-    rebound_variables: Vec<TextRange>,
-}
-
-impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
-    fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
-            if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
-                if self.comprehensions.iter().any(|comp| {
-                    comp.target
-                        .as_name_expr()
-                        .is_some_and(|name| name.id == *id)
-                }) {
-                    self.rebound_variables.push(*range);
-                }
-            }
-        }
-        walk_expr(self, expr);
-    }
-}
-
 #[derive(Default)]
 struct ReturnVisitor {
     return_range: Option<TextRange>,
@@ -2338,6 +2329,13 @@ pub trait SemanticSyntaxContext {
     /// used together.
     fn in_sync_comprehension(&self) -> bool;
 
+    /// Returns `true` if the visitor is currently in a comprehension iterable expression.
+    fn in_comprehension_iterable(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently in a comprehension nested directly inside a
+    /// class body.
+    fn in_class_body_comprehension(&self) -> bool;
+
     /// Returns `true` if the visitor is at the top-level module scope.
     fn in_module_scope(&self) -> bool;
 
@@ -2360,6 +2358,9 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if `name` is a bound parameter in the current function or lambda scope.
     fn is_bound_parameter(&self, name: &str) -> bool;
+
+    /// Returns `true` if `named` rebinds an iteration variable from an enclosing comprehension.
+    fn rebinds_comprehension_variable(&self, named: &ast::ExprNamed) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

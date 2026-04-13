@@ -1007,6 +1007,7 @@ mod tests {
         PythonVersion::PY310
     )]
     #[test_case(Path::new("rebound_comprehension.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("named_expression_comprehension.py"), PythonVersion::PY310)]
     #[test_case(Path::new("duplicate_type_parameter.py"), PythonVersion::PY312)]
     #[test_case(Path::new("multiple_case_assignment.py"), PythonVersion::PY310)]
     #[test_case(Path::new("duplicate_match_key.py"), PythonVersion::PY310)]

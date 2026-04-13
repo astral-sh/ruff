@@ -184,6 +184,78 @@ Walrus operators cannot rebind variables already in use as iterators:
 {y := 5 for y in range(10)}
 ```
 
+## Walrus in invalid comprehension contexts
+
+```py
+class C:
+    # error: [invalid-syntax] "assignment expression within a comprehension cannot be used in a class body"
+    [(x := y) for y in range(3)]
+    # error: [unresolved-reference]
+    reveal_type(x)  # revealed: Unknown
+
+class D:
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(x := x + 1) for x in range(3)]
+
+pairs = [(1, 2)]
+
+class E:
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(x := y) for (x, y) in pairs]
+    # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+    [(lambda x=(x := y): x) for (x, y) in pairs]
+
+[(lambda: (x := y))() for (x, y) in pairs]  # ok
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[(lambda x=(x := y): x) for (x, y) in pairs]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[b for b in range(1) if (a := 0) for a in range(1)]
+
+[(a := 1) for x in range(3) if (a := 2)]  # ok
+
+def returns_list() -> list[int]:
+    return [1, 2, 3]
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in (y := returns_list())]
+reveal_type(y)  # revealed: list[int]
+
+# error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+[x for x in [(y := 1) for y in range(1)]]
+
+class F:
+    # error: [invalid-syntax] "assignment expression cannot be used in a comprehension iterable expression"
+    [x for x in [(y := 1) for y in range(1)]]
+
+class G:
+    [(lambda: (x := y))() for y in range(3)]  # ok
+```
+
+## Walrus syntax before Python 3.8
+
+On Python 3.7, walrus syntax is itself unsupported, so we should not emit follow-on
+comprehension-context diagnostics for the same expression.
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+def f():
+    return [1, 2, 3]
+
+result = [
+    x
+    for x in (
+        y  # error: [invalid-syntax] "Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)"
+        := f()
+    )
+]
+```
+
 ## Multiple case assignments
 
 Variable names in pattern matching must be unique within a single pattern:

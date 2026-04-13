@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: assignment expression cannot rebind comprehension variable
+ --> resources/test/fixtures/semantic_errors/named_expression_comprehension.py:5:7
+  |
+4 | class C:
+5 |     [(x := y) for (x, y) in pairs]
+  |       ^^^^^^
+6 |     [(lambda x=(x := y): x) for (x, y) in pairs]
+  |
+
+invalid-syntax: assignment expression cannot rebind comprehension variable
+ --> resources/test/fixtures/semantic_errors/named_expression_comprehension.py:6:17
+  |
+4 | class C:
+5 |     [(x := y) for (x, y) in pairs]
+6 |     [(lambda x=(x := y): x) for (x, y) in pairs]
+  |                 ^^^^^^
+7 |
+8 | [x for x in (lambda: (y := [1]))()]
+  |
+
+invalid-syntax: assignment expression cannot be used in a comprehension iterable expression
+ --> resources/test/fixtures/semantic_errors/named_expression_comprehension.py:8:23
+  |
+6 |     [(lambda x=(x := y): x) for (x, y) in pairs]
+7 |
+8 | [x for x in (lambda: (y := [1]))()]
+  |                       ^^^^^^^^
+9 | [x for x in range(1) for y in (lambda: (z := [1]))()]
+  |
+
+invalid-syntax: assignment expression cannot be used in a comprehension iterable expression
+  --> resources/test/fixtures/semantic_errors/named_expression_comprehension.py:9:41
+   |
+ 8 | [x for x in (lambda: (y := [1]))()]
+ 9 | [x for x in range(1) for y in (lambda: (z := [1]))()]
+   |                                         ^^^^^^^^
+10 |
+11 | [(lambda: (x := y))() for (x, y) in pairs]
+   |
+
+invalid-syntax: assignment expression cannot rebind comprehension variable
+  --> resources/test/fixtures/semantic_errors/named_expression_comprehension.py:12:13
+   |
+11 | [(lambda: (x := y))() for (x, y) in pairs]
+12 | [(lambda x=(x := y): x) for (x, y) in pairs]
+   |             ^^^^^^
+   |

@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 
 use crate::semantic_index::place::PlaceExpr;
@@ -23,6 +24,28 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.add_place_from_target(&for_stmt.target);
     collector.visit_body(&for_stmt.body);
     collector.bound_places
+}
+
+/// Returns the names bound by `target`, including through nested unpacking.
+pub(super) fn target_symbol_names(target: &ast::Expr) -> Vec<Name> {
+    let mut collector = LoopBindingsVisitor::default();
+    collector.add_place_from_target(target);
+    collector
+        .bound_places
+        .into_iter()
+        .filter_map(|place| match place {
+            PlaceExpr::Symbol(symbol) => Some(symbol.name().clone()),
+            PlaceExpr::Member(_) => None,
+        })
+        .collect()
+}
+
+/// Returns `true` if `target` binds `name`, including through nested unpacking.
+#[cfg(test)]
+pub(super) fn target_binds_name(target: &ast::Expr, name: &str) -> bool {
+    target_symbol_names(target)
+        .into_iter()
+        .any(|bound_name| bound_name.as_str() == name)
 }
 
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
@@ -279,6 +302,20 @@ mod tests {
                 PlaceExpr::Member(member) => member.to_string(),
             })
             .collect()
+    }
+
+    #[test]
+    fn test_target_binds_name_with_nested_unpacking() {
+        let parsed = parse_module("for (x, (y, *z)) in items:\n    pass\n").expect("valid Python");
+        let stmt = &parsed.suite()[0];
+        let ast::Stmt::For(for_stmt) = stmt else {
+            panic!("Expected a for statement");
+        };
+
+        assert!(target_binds_name(&for_stmt.target, "x"));
+        assert!(target_binds_name(&for_stmt.target, "y"));
+        assert!(target_binds_name(&for_stmt.target, "z"));
+        assert!(!target_binds_name(&for_stmt.target, "items"));
     }
 
     #[test]
