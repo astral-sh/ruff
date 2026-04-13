@@ -64,11 +64,24 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling(item);
 
-        write!(
-            f,
-            [parenthesized("(", &group(&all_arguments), ")")
-                .with_dangling_comments(dangling_comments)]
-        )
+        // With `Force`, skip the inner group so pattern arguments go directly
+        // from single-line to one-per-line with trailing comma:
+        // ```python
+        // case Point2D(
+        //     x,
+        //     y,
+        // ):
+        // ```
+        let inner = format_with(|f: &mut PyFormatter| {
+            if f.options().magic_trailing_comma().is_force() {
+                all_arguments.fmt(f)
+            } else {
+                group(&all_arguments).fmt(f)
+            }
+        });
+        parenthesized("(", &inner, ")")
+            .with_dangling_comments(dangling_comments)
+            .fmt(f)
     }
 }
 

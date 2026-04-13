@@ -227,7 +227,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             } else {
                 write!(f, [if_group_breaks(&token(","))])?;
 
-                if f.options().magic_trailing_comma().is_respect()
+                if !f.options().magic_trailing_comma().is_ignore()
                     && has_trailing_comma(item, last_node, f.context().source())
                 {
                     // Make the magic trailing comma expand the group
@@ -263,13 +263,38 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
+            //
+            // With the inner group (default), compact multi-line is possible:
+            // ```python
+            // def foo(
+            //     first_param, second_param, third_param, fourth_param
+            // ):
+            // ```
+            //
+            // With `Force`, the inner group is skipped so parameters go directly
+            // to one-per-line with a trailing comma:
+            // ```python
+            // def foo(
+            //     first_param,
+            //     second_param,
+            //     third_param,
+            //     fourth_param,
+            // ):
+            // ```
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+            let inner = format_with(|f: &mut PyFormatter| {
+                if f.options().magic_trailing_comma().is_force() {
+                    format_inner.fmt(f)
+                } else {
+                    group(&format_inner).fmt(f)
+                }
+            });
             write!(
                 f,
                 [
                     token("("),
                     dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&group(&format_inner)),
+                    soft_block_indent(&inner),
                     token(")")
                 ]
             )

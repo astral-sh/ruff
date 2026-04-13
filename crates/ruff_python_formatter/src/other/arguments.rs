@@ -3,6 +3,7 @@ use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringFlags, StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::builders::TrailingComma;
 use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
@@ -36,7 +37,30 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
-            let mut joiner = f.join_comma_separated(range.end());
+
+            // An unparenthesized generator as sole argument cannot have a trailing
+            // comma. Override the Force default of `OneOrMore` back to `MoreThanOne`
+            // to prevent emitting an invalid comma:
+            // ```python
+            // # SyntaxError — cannot add trailing comma
+            // sum(x for x in y,)
+            //
+            // # OK — parenthesized generator, trailing comma is on the outer call
+            // sum(
+            //     (x for x in y),
+            // )
+            // ```
+            let is_unparenthesized_sole_generator = matches!(
+                (args.as_ref(), keywords.as_ref()),
+                ([Expr::Generator(generator)], []) if !generator.parenthesized
+            );
+            let mut joiner = if is_unparenthesized_sole_generator {
+                f.join_comma_separated(range.end())
+                    .with_trailing_comma(TrailingComma::MoreThanOne)
+            } else {
+                f.join_comma_separated(range.end())
+            };
+
             match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
@@ -88,29 +112,43 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling(item);
 
-        write!(
-            f,
-            [
-                // The outer group is for things like:
-                // ```python
-                // get_collection(
-                //     hey_this_is_a_very_long_call,
-                //     it_has_funny_attributes_asdf_asdf,
-                //     too_long_for_the_line,
-                //     really=True,
-                // )
-                // ```
-                // The inner group is for things like:
-                // ```python
-                // get_collection(
-                //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
-                // )
-                // ```
-                parenthesized("(", &group(&all_arguments), ")")
-                    .with_hugging(is_arguments_huggable(item, f.context()))
-                    .with_dangling_comments(dangling_comments)
-            ]
-        )
+        // The outer group (from `parenthesized`) produces one-per-line layout:
+        // ```python
+        // get_collection(
+        //     hey_this_is_a_very_long_call,
+        //     it_has_funny_attributes_asdf_asdf,
+        //     too_long_for_the_line,
+        //     really=True,
+        // )
+        // ```
+        // The inner group enables the compact multi-line layout:
+        // ```python
+        // get_collection(
+        //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
+        // )
+        // ```
+        // With `Force`, the inner group is omitted so hanging multi-line
+        // expressions go directly to one-per-line. The trailing comma added
+        // by `if_group_breaks` then forces one-per-line expansion:
+        // ```python
+        // get_collection(
+        //     hey_this_is_a_very_long_call,
+        //     it_has_funny_attributes_asdf_asdf,
+        //     really=True,
+        // )
+        // ```
+        let is_huggable = is_arguments_huggable(item, f.context());
+        let inner = format_with(|f: &mut PyFormatter| {
+            if f.options().magic_trailing_comma().is_force() {
+                all_arguments.fmt(f)
+            } else {
+                group(&all_arguments).fmt(f)
+            }
+        });
+        parenthesized("(", &inner, ")")
+            .with_hugging(is_huggable)
+            .with_dangling_comments(dangling_comments)
+            .fmt(f)
     }
 }
 
@@ -194,6 +232,28 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
     }
 
     let options = context.options();
+
+    // With `Force`, disable hugging entirely — hugging skips the outer group,
+    // which prevents `if_group_breaks` from adding a trailing comma when the
+    // expression wraps:
+    // ```python
+    // # Without this fix, hugging would produce (no trailing comma on outer call):
+    // func([
+    //     1,
+    //     2,
+    // ])
+    //
+    // # With hugging disabled, Force produces:
+    // func(
+    //     [
+    //         1,
+    //         2,
+    //     ],
+    // )
+    // ```
+    if options.magic_trailing_comma().is_force() {
+        return false;
+    }
 
     // If the expression has a trailing comma, then we can't hug it.
     if options.magic_trailing_comma().is_respect()

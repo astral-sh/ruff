@@ -1613,6 +1613,17 @@
             }
           ]
         },
+        "magic-trailing-comma": {
+          "description": "How the formatter handles trailing commas in parenthesized expressions\n(function calls, function definitions, collection literals, imports, etc.).\n\n* `respect` (default): Existing trailing commas are treated as \"magic\" — the\n  formatter uses them as a signal to keep expressions expanded.\n\n* `ignore`: Existing trailing commas are not used as expansion signals. The\n  formatter may collapse expressions to a single line even if a trailing comma\n  is present. Equivalent to `skip-magic-trailing-comma = true`.\n\n* `force`: Like `respect`, trailing commas are used as expansion signals.\n  Additionally, the formatter adds trailing commas to all multi-line expressions.\n  This makes the formatter compatible with `COM812` in a single pass —\n  no trailing comma violations on the formatted output.\n\nThis option can be used alongside `skip-magic-trailing-comma` as long as the\nvalues are consistent. If both are set to conflicting values, an error is raised.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MagicTrailingComma"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "nested-string-quote-style": {
           "description": "Controls the quote style for nested strings inside interpolated string expressions.\n\n- `alternating` (default): Use alternating quotes.\n- `preferred`: Use the configured [`quote-style`](#format_quote-style).\n\n```python\nf\"{data['key']}\"  # alternating (default)\nf\"{data[\"key\"]}\"  # preferred\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
           "anyOf": [
@@ -2650,6 +2661,14 @@
         }
       },
       "additionalProperties": false
+    },
+    "MagicTrailingComma": {
+      "type": "string",
+      "enum": [
+        "respect",
+        "ignore",
+        "force"
+      ]
     },
     "McCabeOptions": {
       "description": "Options for the `mccabe` plugin.",

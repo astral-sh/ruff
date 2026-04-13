@@ -133,12 +133,38 @@ pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     fn new(f: &'fmt mut PyFormatter<'ast, 'buf>, sequence_end: TextSize) -> Self {
+        // With `MagicTrailingComma::Force`, default to `OneOrMore` so that every
+        // hanging multi-line expression gets a trailing comma — including single-entry
+        // sequences. The comma is only added when the group breaks (i.e., content hangs
+        // on a new indented line after the opening bracket); single-line expressions
+        // are unaffected:
+        // ```python
+        // # Single-line — no comma added
+        // func(arg)
+        //
+        // # Hanging multi-line — comma added (even single-entry)
+        // func(
+        //     arg,  # comment
+        // )
+        // ```
+        // This ensures `COM812` has zero violations on force-formatted output.
+        // Callers that cannot accept a single-entry trailing comma must explicitly
+        // override with `TrailingComma::MoreThanOne`:
+        // ```python
+        // # Unparenthesized generator — trailing comma would be SyntaxError
+        // sum(x for x in y)
+        // ```
+        let trailing_comma = if f.options().magic_trailing_comma().is_force() {
+            TrailingComma::OneOrMore
+        } else {
+            TrailingComma::default()
+        };
         Self {
             fmt: f,
             result: Ok(()),
             entries: Entries::None,
             sequence_end,
-            trailing_comma: TrailingComma::default(),
+            trailing_comma,
         }
     }
 

@@ -437,8 +437,29 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`bad-quotes-docstring`](rules/bad-quotes-docstring.md) (`Q002`)
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
 - [`unnecessary-escaped-quote`](rules/unnecessary-escaped-quote.md) (`Q004`)
-- [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
+- [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`) — compatible when using `magic-trailing-comma = "force"`
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
+
+!!! tip "Using `COM812` with the formatter"
+    `COM812` can be used alongside the formatter by setting
+    [`magic-trailing-comma = "force"`](settings.md#format_magic-trailing-comma)
+    in your `[format]` configuration. In this mode, the formatter adds
+    trailing commas to all multi-line expressions, so that `COM812` and the
+    formatter converge to the same output in a single pass.
+
+    ```toml
+    [tool.ruff.format]
+    magic-trailing-comma = "force"
+
+    [tool.ruff.lint]
+    extend-select = ["COM812"]
+    ```
+
+    Without this setting (the default `"respect"` mode), the formatter and `COM812`
+    can oscillate: the formatter produces multi-line output without a trailing comma,
+    `COM812` adds it, and the formatter then re-expands — requiring multiple passes
+    to converge.
+
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`
 
 While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the

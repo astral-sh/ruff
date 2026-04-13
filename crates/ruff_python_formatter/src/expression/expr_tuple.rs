@@ -188,7 +188,28 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .entries(elts.iter().formatted())
                         .finish()
                 }
-                TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
+                // `TupleParentheses::Preserve` is used by subscript expressions
+                // (`arr[a, b, c]`). With `Force`, skip the inner group so
+                // broken subscript tuples expand one item per line:
+                // ```python
+                // arr[
+                //     first_index,
+                //     second_index,
+                //     third_index,
+                //     fourth_index,
+                // ]
+                // ```
+                TupleParentheses::Preserve => {
+                    let inner = format_with(|f: &mut PyFormatter| {
+                        let seq = ExprSequence::new(item);
+                        if f.options().magic_trailing_comma().is_force() {
+                            seq.fmt(f)
+                        } else {
+                            group(&seq).fmt(f)
+                        }
+                    });
+                    inner.fmt(f)
+                }
                 TupleParentheses::NeverPreserve => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }

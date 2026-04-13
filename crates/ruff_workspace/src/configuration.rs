@@ -179,6 +179,19 @@ impl Configuration {
         )
         .context("failed to resolve `per-file-target-version` table")?;
 
+        let magic_trailing_comma = format
+            .magic_trailing_comma
+            .unwrap_or(format_defaults.magic_trailing_comma);
+        if magic_trailing_comma.is_force()
+            && format_preview == ruff_python_formatter::PreviewMode::Disabled
+        {
+            return Err(anyhow!(
+                "`format.magic-trailing-comma = \"force\"` requires \
+                 preview mode to be enabled. Set `preview = true` or \
+                 `format.preview = true` to use this option."
+            ));
+        }
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
@@ -201,9 +214,7 @@ impl Configuration {
             nested_string_quote_style: format
                 .nested_string_quote_style
                 .unwrap_or(format_defaults.nested_string_quote_style),
-            magic_trailing_comma: format
-                .magic_trailing_comma
-                .unwrap_or(format_defaults.magic_trailing_comma),
+            magic_trailing_comma,
             docstring_code_format: format
                 .docstring_code_format
                 .unwrap_or(format_defaults.docstring_code_format),
@@ -1280,13 +1291,46 @@ impl FormatConfiguration {
             indent_style: options.indent_style,
             quote_style: options.quote_style,
             nested_string_quote_style: options.nested_string_quote_style,
-            magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
-                if skip {
+            // Resolve `magic-trailing-comma` and `skip-magic-trailing-comma`:
+            // ```toml
+            // # OK — consistent
+            // magic-trailing-comma = "respect"
+            // skip-magic-trailing-comma = false
+            //
+            // # OK — compatible (force implies respect)
+            // magic-trailing-comma = "force"
+            // skip-magic-trailing-comma = false
+            //
+            // # Error — conflicting
+            // magic-trailing-comma = "force"
+            // skip-magic-trailing-comma = true
+            // ```
+            magic_trailing_comma: match (
+                options.magic_trailing_comma,
+                options.skip_magic_trailing_comma,
+            ) {
+                (None, None) => None,
+                (None, Some(skip)) => Some(if skip {
                     MagicTrailingComma::Ignore
                 } else {
                     MagicTrailingComma::Respect
+                }),
+                (Some(mtc), None) => Some(mtc),
+                // Consistent: respect + skip=false, ignore + skip=true
+                (Some(MagicTrailingComma::Respect), Some(false))
+                | (Some(MagicTrailingComma::Ignore), Some(true)) => {
+                    Some(options.magic_trailing_comma.unwrap())
                 }
-            }),
+                // Compatible: force + skip=false (both respect trailing commas)
+                (Some(MagicTrailingComma::Force), Some(false)) => Some(MagicTrailingComma::Force),
+                // Conflicting values
+                (Some(_), Some(_)) => {
+                    return Err(anyhow!(
+                        "The values of `magic-trailing-comma` and \
+                         `skip-magic-trailing-comma` are conflicting."
+                    ));
+                }
+            },
             line_ending: options.line_ending,
             docstring_code_format: options.docstring_code_format.map(|yes| {
                 if yes {
