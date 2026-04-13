@@ -699,6 +699,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Place::Undefined.into(),
                             InstanceFallbackShadowsNonDataDescriptor::No,
                             MemberLookupPolicy::default(),
+                            false,
                         )
                         .place
                     else {

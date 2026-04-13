@@ -885,7 +885,7 @@ impl<'db> BoundSuperType<'db> {
         attribute: PlaceAndQualifiers<'db>,
     ) -> Option<PlaceAndQualifiers<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db)?;
-        Some(Type::try_call_dunder_get_on_attribute(db, attribute, instance, owner).0)
+        Some(Type::try_call_dunder_get_on_attribute(db, attribute, instance, owner, false).0)
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the

@@ -77,8 +77,8 @@ pub(crate) use crate::types::narrow::{
     infer_narrowing_constraint,
 };
 use crate::types::newtype::NewType;
+use crate::types::signatures::{CallableSignature, ParameterForm, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
-use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 use crate::types::type_alias::TypeAliasType;
@@ -2590,6 +2590,233 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn member_lookup_variants_for_typevar(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        match bound_typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                let Type::Union(union) = bound.resolve_type_alias(db) else {
+                    return None;
+                };
+
+                Some(UnionType::from_elements(
+                    db,
+                    union.elements(db).iter().copied(),
+                ))
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints))
+                if constraints.elements(db).len() > 1 =>
+            {
+                Some(UnionType::from_elements(
+                    db,
+                    constraints.elements(db).iter().copied(),
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    fn narrowed_typevar_member_lookup_target(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::TypeVar(bound_typevar) => {
+                Self::member_lookup_variants_for_typevar(db, bound_typevar)
+            }
+            Type::Intersection(intersection) => {
+                let positives = intersection.positive(db);
+                let negatives = intersection.negative(db);
+
+                let (selected_index, narrowed_variants) =
+                    positives.iter().enumerate().find_map(|(index, positive)| {
+                        positive
+                            .narrowed_typevar_member_lookup_target(db)
+                            .map(|variants| (index, variants))
+                    })?;
+
+                let other_positives = positives
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, positive)| (index != selected_index).then_some(*positive))
+                    .collect::<Vec<_>>();
+
+                let narrow_variant = |variant: Type<'db>| {
+                    let mut builder = IntersectionBuilder::new(db).add_positive(variant);
+                    for positive in &other_positives {
+                        builder = builder.add_positive(*positive);
+                    }
+                    for negative in negatives {
+                        builder = builder.add_negative(*negative);
+                    }
+                    builder.build()
+                };
+
+                let is_impossible_variant = |narrowed: Type<'db>| match narrowed {
+                    Type::Intersection(narrowed_intersection) => narrowed_intersection
+                        .with_expanded_typevars_and_newtypes(db)
+                        .is_never(),
+                    _ => narrowed.is_never(),
+                };
+
+                let narrowed = match narrowed_variants {
+                    Type::Union(union) => UnionType::from_elements(
+                        db,
+                        union.elements(db).iter().filter_map(|variant| {
+                            let narrowed = narrow_variant(*variant);
+                            (!is_impossible_variant(narrowed)).then_some(narrowed)
+                        }),
+                    ),
+                    variant => narrow_variant(variant),
+                };
+
+                if narrowed == self {
+                    None
+                } else {
+                    Some(narrowed)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn has_narrowed_typevar_receiver_identity(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::TypeVar(typevar) => {
+                !typevar.typevar(db).is_self(db)
+                    && Self::member_lookup_variants_for_typevar(db, typevar).is_some()
+            }
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|positive| match positive {
+                        Type::TypeVar(typevar) => {
+                            !typevar.typevar(db).is_self(db)
+                                && Self::member_lookup_variants_for_typevar(db, *typevar).is_some()
+                        }
+                        Type::SubclassOf(subclass_of) => {
+                            subclass_of.into_type_var().is_some_and(|typevar| {
+                                !typevar.typevar(db).is_self(db)
+                                    && Self::member_lookup_variants_for_typevar(db, typevar)
+                                        .is_some()
+                            })
+                        }
+                        _ => false,
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    fn rewrite_function_for_narrowed_receiver(
+        function: FunctionType<'db>,
+        db: &'db dyn Db,
+        new_receiver_type: Type<'db>,
+    ) -> Option<FunctionType<'db>> {
+        let new_receiver_type = if function.is_classmethod(db) {
+            match new_receiver_type {
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    new_receiver_type
+                }
+                _ => SubclassOfType::try_from_instance(db, new_receiver_type)
+                    .unwrap_or(new_receiver_type),
+            }
+        } else {
+            new_receiver_type
+        };
+
+        let rewritten_function = function.rebind_implicit_receiver(db, new_receiver_type);
+        (rewritten_function != function).then_some(rewritten_function)
+    }
+
+    fn with_narrowed_lookup_receiver_identity(
+        self,
+        db: &'db dyn Db,
+        narrowed_target: Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::TypeVar(_) => match narrowed_target {
+                Type::Union(union) => UnionType::from_elements(
+                    db,
+                    union
+                        .elements(db)
+                        .iter()
+                        .map(|variant| IntersectionType::from_two_elements(db, self, *variant)),
+                ),
+                variant => IntersectionType::from_two_elements(db, self, variant),
+            },
+            _ => narrowed_target,
+        }
+    }
+
+    fn rebind_narrowed_method_receiver(
+        self,
+        db: &'db dyn Db,
+        new_receiver_type: Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(function) => {
+                Self::rewrite_function_for_narrowed_receiver(function, db, new_receiver_type)
+                    .map(Type::FunctionLiteral)
+                    .unwrap_or(self)
+            }
+            Type::Callable(callable) => {
+                Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(callable.signatures(db).iter().map(
+                        |signature| signature.rebind_implicit_receiver(db, new_receiver_type),
+                    )),
+                    callable.kind(db),
+                ))
+            }
+            Type::BoundMethod(bound_method) => {
+                if bound_method
+                    .receiver_type(db)
+                    .has_narrowed_typevar_receiver_identity(db)
+                    && bound_method.receiver_type(db) != new_receiver_type
+                {
+                    // Preserve the existing call-binding receiver once it has already been
+                    // narrowed; only the exposed `__self__` should change when we thread the
+                    // original receiver identity back onto the bound method object.
+                    Type::BoundMethod(BoundMethodType::new(
+                        // Keep the existing function-level receiver specialization; this method
+                        // only swaps which object is exposed through `__self__`.
+                        db,
+                        bound_method.function(db),
+                        new_receiver_type,
+                        bound_method.receiver_type(db),
+                    ))
+                } else {
+                    let function = Self::rewrite_function_for_narrowed_receiver(
+                        bound_method.function(db),
+                        db,
+                        new_receiver_type,
+                    )
+                    .unwrap_or(bound_method.function(db));
+                    Type::BoundMethod(BoundMethodType::new(
+                        db,
+                        function,
+                        new_receiver_type,
+                        new_receiver_type,
+                    ))
+                }
+            }
+            Type::Union(union) => UnionType::from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.rebind_narrowed_method_receiver(db, new_receiver_type)),
+            ),
+            Type::Intersection(intersection) => intersection.map_positive(db, |positive| {
+                positive.rebind_narrowed_method_receiver(db, new_receiver_type)
+            }),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .rebind_narrowed_method_receiver(db, new_receiver_type),
+            _ => self,
+        }
+    }
+
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
     /// For instance-like types, this goes through the classes MRO and discovers attribute assignments
     /// in methods, as well as class-body declarations that we consider to be evidence for the presence
@@ -2727,6 +2954,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
+        allow_narrowed_receiver_rebinding: bool,
     ) -> Option<(Type<'db>, AttributeKind)> {
         tracing::trace!(
             "try_call_dunder_get: {}, {}, {}",
@@ -2735,7 +2963,12 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_call_dunder_get(db, instance, owner);
+            return fallback.try_call_dunder_get(
+                db,
+                instance,
+                owner,
+                allow_narrowed_receiver_rebinding,
+            );
         }
 
         match self {
@@ -2781,9 +3014,40 @@ impl<'db> Type<'db> {
                 // unbound function). This incorrectly matches when the instance is actually
                 // an instance of `None`
                 return Some((
-                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
+                    Type::BoundMethod(BoundMethodType::new(
+                        db,
+                        function,
+                        instance.unwrap(),
+                        instance.unwrap(),
+                    )),
                     AttributeKind::NormalOrNonDataDescriptor,
                 ));
+            }
+            Type::FunctionLiteral(function)
+                if instance.is_some()
+                    && allow_narrowed_receiver_rebinding
+                    && !function.is_staticmethod(db)
+                    && !function.is_classmethod(db) =>
+            {
+                let self_type = instance.unwrap();
+                if let Some(self_typevar) = self_type.as_typevar()
+                    && !self_typevar.typevar(db).is_self(db)
+                    && Self::member_lookup_variants_for_typevar(db, self_typevar).is_some()
+                {
+                    if let Some(rewritten_function) =
+                        Self::rewrite_function_for_narrowed_receiver(function, db, self_type)
+                    {
+                        return Some((
+                            Type::BoundMethod(BoundMethodType::new(
+                                db,
+                                rewritten_function,
+                                self_type,
+                                self_type,
+                            )),
+                            AttributeKind::NormalOrNonDataDescriptor,
+                        ));
+                    }
+                }
             }
             _ => {}
         }
@@ -2830,6 +3094,7 @@ impl<'db> Type<'db> {
         attribute: PlaceAndQualifiers<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
+        allow_narrowed_receiver_rebinding: bool,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
         if let PlaceAndQualifiers {
             place:
@@ -2854,6 +3119,7 @@ impl<'db> Type<'db> {
                 .with_qualifiers(qualifiers),
                 instance,
                 owner,
+                allow_narrowed_receiver_rebinding,
             );
         }
 
@@ -2889,7 +3155,12 @@ impl<'db> Type<'db> {
                     .map_with_boundness(db, |elem| {
                         Place::Defined(DefinedPlace {
                             ty: elem
-                                .try_call_dunder_get(db, instance, owner)
+                                .try_call_dunder_get(
+                                    db,
+                                    instance,
+                                    owner,
+                                    allow_narrowed_receiver_rebinding,
+                                )
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             definedness: boundness,
@@ -2899,7 +3170,7 @@ impl<'db> Type<'db> {
                     .with_qualifiers(qualifiers),
                 // TODO: avoid the duplication here:
                 if union.elements(db).iter().all(|elem| {
-                    elem.try_call_dunder_get(db, instance, owner)
+                    elem.try_call_dunder_get(db, instance, owner, allow_narrowed_receiver_rebinding)
                         .is_some_and(|(_, kind)| kind.is_data())
                 }) {
                     AttributeKind::DataDescriptor
@@ -2925,7 +3196,12 @@ impl<'db> Type<'db> {
                         .map_with_boundness(db, |elem| {
                             Place::Defined(DefinedPlace {
                                 ty: elem
-                                    .try_call_dunder_get(db, instance, owner)
+                                    .try_call_dunder_get(
+                                        db,
+                                        instance,
+                                        owner,
+                                        allow_narrowed_receiver_rebinding,
+                                    )
                                     .map_or(*elem, |(ty, _)| ty),
                                 origin,
                                 definedness,
@@ -2948,9 +3224,12 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers: _,
             } => {
-                if let Some((return_ty, attribute_kind)) =
-                    attribute_ty.try_call_dunder_get(db, instance, owner)
-                {
+                if let Some((return_ty, attribute_kind)) = attribute_ty.try_call_dunder_get(
+                    db,
+                    instance,
+                    owner,
+                    allow_narrowed_receiver_rebinding,
+                ) {
                     (
                         Place::Defined(DefinedPlace {
                             ty: return_ty,
@@ -3033,6 +3312,7 @@ impl<'db> Type<'db> {
         fallback: PlaceAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
+        allow_narrowed_receiver_rebinding: bool,
     ) -> PlaceAndQualifiers<'db> {
         let (
             PlaceAndQualifiers {
@@ -3045,6 +3325,7 @@ impl<'db> Type<'db> {
             self.class_member_with_policy(db, name.into(), member_policy),
             Some(self),
             self.to_meta_type(db),
+            allow_narrowed_receiver_rebinding,
         );
 
         let PlaceAndQualifiers {
@@ -3171,6 +3452,16 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        self.member_lookup_with_policy_impl(db, name, policy, true)
+    }
+
+    fn member_lookup_with_policy_impl(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+        allow_narrowed_receiver_rebinding: bool,
+    ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.member_lookup_with_policy(db, name, policy);
@@ -3180,17 +3471,53 @@ impl<'db> Type<'db> {
             return Place::bound(self.dunder_class(db)).into();
         }
 
+        if let Some(target) = self.narrowed_typevar_member_lookup_target(db) {
+            let lookup_target = self.with_narrowed_lookup_receiver_identity(db, target);
+            let result = lookup_target.member_lookup_with_policy_impl(
+                db,
+                name,
+                policy,
+                allow_narrowed_receiver_rebinding,
+            );
+
+            if allow_narrowed_receiver_rebinding && self.has_narrowed_typevar_receiver_identity(db)
+            {
+                return result.map_type(|ty| ty.rebind_narrowed_method_receiver(db, self));
+            }
+
+            return result;
+        }
+
         let name_str = name.as_str();
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.member_lookup_with_policy(db, name_str.into(), policy)
+                elem.member_lookup_with_policy_impl(
+                    db,
+                    name_str.into(),
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                )
             }),
 
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy(db, name_str.into(), policy)
-                }),
+            Type::Intersection(intersection) => {
+                let result = intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.member_lookup_with_policy_impl(
+                        db,
+                        name_str.into(),
+                        policy,
+                        allow_narrowed_receiver_rebinding,
+                    )
+                });
+
+                if allow_narrowed_receiver_rebinding
+                    && self.has_narrowed_typevar_receiver_identity(db)
+                {
+                    result.map_type(|ty| ty.rebind_narrowed_method_receiver(db, self))
+                } else {
+                    result
+                }
+            }
 
             Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
@@ -3310,25 +3637,50 @@ impl<'db> Type<'db> {
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
-                        .member_lookup_with_policy(db, name.clone(), policy)
+                        .member_lookup_with_policy_impl(
+                            db,
+                            name.clone(),
+                            policy,
+                            allow_narrowed_receiver_rebinding,
+                        )
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy(db, name, policy)
+                                .member_lookup_with_policy_impl(
+                                    db,
+                                    name,
+                                    policy,
+                                    allow_narrowed_receiver_rebinding,
+                                )
                         })
                 }
             },
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy_impl(
+                    db,
+                    name,
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                ),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy_impl(
+                    db,
+                    name,
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                ),
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy_impl(
+                    db,
+                    name,
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                ),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                 Place::bound(self).into()
@@ -3336,11 +3688,20 @@ impl<'db> Type<'db> {
 
             Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy_impl(
+                    db,
+                    name,
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                ),
 
-            Type::Callable(_) | Type::DataclassTransformer(_) => {
-                Type::object().member_lookup_with_policy(db, name, policy)
-            }
+            Type::Callable(_) | Type::DataclassTransformer(_) => Type::object()
+                .member_lookup_with_policy_impl(
+                    db,
+                    name,
+                    policy,
+                    allow_narrowed_receiver_rebinding,
+                ),
 
             Type::NominalInstance(instance)
                 if matches!(name.as_str(), "major" | "minor")
@@ -3407,12 +3768,20 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(new_type_instance) if self.as_union_like(db).is_some() => {
                 new_type_instance
                     .concrete_base_type(db)
-                    .member_lookup_with_policy(db, name, policy)
+                    .member_lookup_with_policy_impl(
+                        db,
+                        name,
+                        policy,
+                        allow_narrowed_receiver_rebinding,
+                    )
             }
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::TypeAlias(alias) => alias.value_type(db).member_lookup_with_policy_impl(
+                db,
+                name,
+                policy,
+                allow_narrowed_receiver_rebinding,
+            ),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -3420,8 +3789,8 @@ impl<'db> Type<'db> {
                 Place::Undefined.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
                 policy,
+                allow_narrowed_receiver_rebinding,
             ),
-
             Type::LiteralValue(literal)
                 if literal.as_enum().is_some()
                     && matches!(name_str, "name" | "_name_" | "value" | "_value_") =>
@@ -3520,6 +3889,7 @@ impl<'db> Type<'db> {
                     fallback,
                     InstanceFallbackShadowsNonDataDescriptor::No,
                     policy,
+                    allow_narrowed_receiver_rebinding,
                 );
 
                 if result.is_class_var() && self.is_typed_dict() {
@@ -3561,11 +3931,32 @@ impl<'db> Type<'db> {
                 let self_instance = self
                     .to_instance(db)
                     .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
-                let class_attr_plain =
-                    class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+                let narrowed_receiver = allow_narrowed_receiver_rebinding
+                    .then(|| self_instance.as_typevar())
+                    .flatten()
+                    .filter(|typevar| {
+                        !typevar.typevar(db).is_self(db)
+                            && Self::member_lookup_variants_for_typevar(db, *typevar).is_some()
+                            && name_str != "__new__"
+                    })
+                    .map(|_| self_instance);
+                let class_attr_plain = class_attr_plain.map_type(|ty| {
+                    let ty = ty.bind_self_typevars(db, self_instance);
+                    if let Some(new_receiver_type) = narrowed_receiver {
+                        ty.rebind_narrowed_method_receiver(db, new_receiver_type)
+                    } else {
+                        ty
+                    }
+                });
 
-                let class_attr_fallback =
-                    Self::try_call_dunder_get_on_attribute(db, class_attr_plain, None, self).0;
+                let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
+                    db,
+                    class_attr_plain,
+                    None,
+                    self,
+                    allow_narrowed_receiver_rebinding,
+                )
+                .0;
 
                 let result = self.invoke_descriptor_protocol(
                     db,
@@ -3573,6 +3964,7 @@ impl<'db> Type<'db> {
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
                     policy,
+                    allow_narrowed_receiver_rebinding,
                 );
 
                 // A class is an instance of its metaclass. If attribute lookup on the class
@@ -3776,9 +4168,10 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
-                    .into()
+                let binding =
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(bound_method.receiver_type(db));
+                binding.into()
             }
 
             Type::KnownBoundMethod(method) => {
@@ -5629,6 +6022,7 @@ impl<'db> Type<'db> {
                 db,
                 method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                method.receiver_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)) => {
@@ -5919,6 +6313,12 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(method) => {
                 method.self_instance(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+                method.receiver_type(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
                     typevars,

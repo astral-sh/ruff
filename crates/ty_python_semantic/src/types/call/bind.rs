@@ -11,6 +11,7 @@
 mod constructor;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -50,6 +51,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
@@ -1056,7 +1058,7 @@ impl<'db> Bindings<'db> {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(db, function, *owner),
+                                        BoundMethodType::new(db, function, *owner, *owner),
                                     ));
                                 }
                                 [Some(instance), None] => {
@@ -1064,6 +1066,7 @@ impl<'db> Bindings<'db> {
                                         BoundMethodType::new(
                                             db,
                                             function,
+                                            instance.to_meta_type(db),
                                             instance.to_meta_type(db),
                                         ),
                                     ));
@@ -1077,7 +1080,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::FunctionLiteral(function));
                             } else {
                                 overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
-                                    db, function, *first,
+                                    db, function, *first, *first,
                                 )));
                             }
                         }
@@ -1091,7 +1094,7 @@ impl<'db> Bindings<'db> {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *owner),
+                                            BoundMethodType::new(db, *function, *owner, *owner),
                                         ));
                                     }
 
@@ -1100,6 +1103,7 @@ impl<'db> Bindings<'db> {
                                             BoundMethodType::new(
                                                 db,
                                                 *function,
+                                                instance.to_meta_type(db),
                                                 instance.to_meta_type(db),
                                             ),
                                         ));
@@ -1116,7 +1120,9 @@ impl<'db> Bindings<'db> {
                                     }
                                     [_, Some(instance), _] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *instance),
+                                            BoundMethodType::new(
+                                                db, *function, *instance, *instance,
+                                            ),
                                         ));
                                     }
 
@@ -2544,7 +2550,16 @@ impl<'db> CallableBinding<'db> {
             return;
         };
         for overload in &mut self.overloads {
+            let had_implicit_receiver = overload
+                .signature
+                .parameters()
+                .as_slice()
+                .first()
+                .is_some_and(Parameter::is_implicit_receiver);
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
+            if had_implicit_receiver {
+                overload.signature = overload.signature.clone().prune_unused_generic_context(db);
+            }
         }
     }
 
@@ -4455,16 +4470,79 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
+        #[derive(Default)]
+        struct CollectMentionedTypeVars<'db> {
+            typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectMentionedTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let identity = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db).identity(db)
+                } else {
+                    bound_typevar.identity(db)
+                };
+                self.typevars.borrow_mut().insert(identity);
+                walk_type_with_recursion_guard(
+                    db,
+                    Type::TypeVar(bound_typevar),
+                    self,
+                    &self.recursion_guard,
+                );
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
         let mut assignable_to_declared_type = true;
+        let declared_type_mentions_generic_context =
+            |declared_type: Type<'db>, generic_context: GenericContext<'db>| {
+                let mentioned = CollectMentionedTypeVars::default();
+                mentioned.visit_type(self.db, declared_type);
+
+                generic_context.variables(self.db).any(|bound_typevar| {
+                    mentioned
+                        .typevars
+                        .borrow()
+                        .contains(&if bound_typevar.is_paramspec(self.db) {
+                            bound_typevar
+                                .without_paramspec_attr(self.db)
+                                .identity(self.db)
+                        } else {
+                            bound_typevar.identity(self.db)
+                        })
+                })
+            };
 
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_types) in
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
                 let declared_type = parameters[parameter_index].annotated_type();
+                if matches!(self.signature_type, Type::BoundMethod(_))
+                    && !matches!(argument, Argument::Synthetic)
+                {
+                    let Some(generic_context) = self.signature.generic_context else {
+                        continue;
+                    };
+                    if !declared_type_mentions_generic_context(declared_type, generic_context) {
+                        continue;
+                    }
+                }
                 let argument_type = argument_types.get_for_declared_type(declared_type);
 
                 let specialization_result = builder.infer_map(

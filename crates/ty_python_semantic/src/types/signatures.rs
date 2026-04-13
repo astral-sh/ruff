@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::cell::RefCell;
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
@@ -27,6 +28,7 @@ use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
@@ -650,9 +652,8 @@ impl<'db> Signature<'db> {
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
         if let Some(first_parameter) = self.parameters.value.first_mut()
-            && first_parameter.is_positional()
+            && first_parameter.is_implicit_receiver()
             && first_parameter.annotated_type.is_unknown()
-            && first_parameter.inferred_annotation
             && let Some(self_type) = self_type()
         {
             first_parameter.annotated_type = self_type;
@@ -718,6 +719,7 @@ impl<'db> Signature<'db> {
             );
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
+
         Self {
             generic_context: self
                 .generic_context
@@ -726,6 +728,113 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
+    }
+
+    /// Replace the leading implicit receiver annotation with a narrower receiver type.
+    ///
+    /// This is used for method lookup on narrowed typevars, where the runtime receiver is still
+    /// "the same" typevar occurrence but one union arm has narrowed its upper bound.
+    pub(crate) fn rebind_implicit_receiver(
+        &self,
+        db: &'db dyn Db,
+        new_receiver_type: Type<'db>,
+    ) -> Self {
+        let Some(first_parameter) = self.parameters.value.first() else {
+            return self.clone();
+        };
+
+        if !first_parameter.is_implicit_receiver()
+            || first_parameter
+                .annotated_type()
+                .is_equivalent_to(db, new_receiver_type)
+        {
+            return self.clone();
+        }
+
+        let mut parameters = self.parameters.value.clone();
+        parameters[0].annotated_type = new_receiver_type;
+
+        Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            parameters: Parameters::new(db, parameters),
+            return_ty: self.return_ty,
+        }
+    }
+
+    fn prune_unused_generic_context_impl(self, db: &'db dyn Db) -> Self {
+        #[derive(Default)]
+        struct CollectUsedTypeVars<'db> {
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectUsedTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let bound_typevar = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db)
+                } else {
+                    bound_typevar
+                };
+                self.typevars.borrow_mut().insert(bound_typevar);
+                walk_type_with_recursion_guard(
+                    db,
+                    Type::TypeVar(bound_typevar),
+                    self,
+                    &self.recursion_guard,
+                );
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let Some(generic_context) = self.generic_context else {
+            return self;
+        };
+
+        let used_typevars = CollectUsedTypeVars::default();
+        for (index, parameter) in self.parameters.as_slice().iter().enumerate() {
+            if index == 0 && parameter.is_implicit_receiver() {
+                continue;
+            }
+
+            used_typevars.visit_type(db, parameter.annotated_type());
+            if let Some(default_ty) = parameter.default_type() {
+                used_typevars.visit_type(db, default_ty);
+            }
+        }
+        used_typevars.visit_type(db, self.return_ty);
+
+        let remaining = generic_context
+            .variables(db)
+            .filter(|bound_typevar| {
+                used_typevars
+                    .typevars
+                    .borrow()
+                    .iter()
+                    .any(|used_typevar| used_typevar.is_same_typevar_as(db, *bound_typevar))
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            generic_context: (!remaining.is_empty())
+                .then(|| GenericContext::from_typevar_instances(db, remaining)),
+            ..self
+        }
+    }
+
+    pub(crate) fn prune_unused_generic_context(self, db: &'db dyn Db) -> Self {
+        self.prune_unused_generic_context_impl(db)
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
@@ -2886,8 +2995,9 @@ pub(crate) struct Parameter<'db> {
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
     /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
-    /// field is only used to decide whether to display the annotated type; it has no effect on the
-    /// type semantics of the parameter.
+    /// field is primarily used to decide whether to display the annotated type; some method-binding
+    /// logic also uses it to distinguish implicit receiver annotations from explicit `self`
+    /// annotations.
     pub(crate) inferred_annotation: bool,
 
     /// Variadic parameters can have starred annotations, e.g.
@@ -3204,6 +3314,10 @@ impl<'db> Parameter<'db> {
     /// Whether or not the type of this parameter should be displayed.
     pub(crate) fn should_annotation_be_displayed(&self) -> bool {
         !self.inferred_annotation
+    }
+
+    pub(crate) fn is_implicit_receiver(&self) -> bool {
+        self.is_positional() && self.inferred_annotation
     }
 
     /// Name of the parameter (if it has one).

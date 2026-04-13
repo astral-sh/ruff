@@ -666,6 +666,274 @@ def g(b: B[T]):
     return f(b.x)  # Fine
 ```
 
+## Calling shared methods on union-bounded TypeVars
+
+Calling a method that exists on all members of a union upper bound should be valid.
+
+```py
+from typing import TypeVar
+
+class A:
+    def call_me(self) -> int:
+        return 1
+
+class B:
+    def call_me(self) -> None:
+        return None
+
+TUnionBound = TypeVar("TUnionBound", bound=A | B)
+
+def call_shared_method(x: TUnionBound) -> None:
+    reveal_type(x.call_me())  # revealed: int | None
+    reveal_type(type(x).call_me(x))  # revealed: int | None
+    reveal_type(x.call_me.__self__)  # revealed: TUnionBound@call_shared_method
+    reveal_type(x.call_me.__func__)  # revealed: (def call_me(self) -> int) | (def call_me(self) -> None)
+```
+
+Shared inherited methods should also stay callable when iterating a generic container of a bounded
+type variable:
+
+```py
+from typing import Generic, Iterator, TypeVar
+
+class Rule:
+    def apply_value(self) -> None:
+        pass
+
+    def reset_parameters(self) -> None:
+        pass
+
+class Replace(Rule):
+    pass
+
+class Add(Rule):
+    pass
+
+class RuleIUH(Rule):
+    def reset_parameters(self) -> None:
+        pass
+
+class ReplaceIUH(RuleIUH):
+    def apply_value(self) -> None:
+        pass
+
+TypeRule = TypeVar("TypeRule", bound=Replace | Add | ReplaceIUH)
+
+class CalibrationInterface(Generic[TypeRule]):
+    def __iter__(self) -> Iterator[TypeRule]:
+        raise NotImplementedError
+
+    def apply_values(self) -> None:
+        for rule in self:
+            rule.apply_value()
+
+    def reset_parameters(self) -> None:
+        for rule in self:
+            rule.reset_parameters()
+```
+
+If the method is not shared by all upper-bound variants, we still diagnose it:
+
+```py
+class C:
+    def call_me(self) -> int:
+        return 1
+
+class D:
+    pass
+
+TPartiallyBound = TypeVar("TPartiallyBound", bound=C | D)
+
+def call_missing_method(x: TPartiallyBound) -> None:
+    x.call_me()  # error: [possibly-missing-attribute]
+```
+
+Explicit `self`-typed overloads should still be enforced for union-bounded type variables:
+
+```py
+from typing import TypeVar, overload
+
+class BaseRequest:
+    @overload
+    def payload(self: "JsonRequest") -> dict[str, object]: ...
+    @overload
+    def payload(self: "BinaryRequest") -> bytes: ...
+    def payload(self):
+        raise NotImplementedError
+
+class JsonRequest(BaseRequest):
+    pass
+
+class BinaryRequest(BaseRequest):
+    pass
+
+class StreamingRequest(BaseRequest):
+    pass
+
+TRequest = TypeVar("TRequest", bound=JsonRequest | StreamingRequest)
+
+def call_payload(request: TRequest) -> None:
+    # error: [no-matching-overload]
+    request.payload()
+```
+
+Constrained `TypeVar`s should keep the same overload behavior:
+
+```py
+from typing import TypeVar
+
+TConstrainedRequest = TypeVar("TConstrainedRequest", JsonRequest, StreamingRequest)
+
+def call_payload_constrained(request: TConstrainedRequest) -> None:
+    # error: [no-matching-overload]
+    request.payload()
+```
+
+Narrowing away an impossible union arm should also make plain member lookup succeed on the remaining
+bound variant:
+
+```py
+from typing import Any, TypeVar
+
+TMaybeList = TypeVar("TMaybeList", bound=list[Any] | None)
+
+def append_value(x: TMaybeList) -> TMaybeList:
+    if x is None:
+        return x
+
+    x.append(1)
+    return x
+```
+
+Method calls on union-bounded type variables should stay assignable to the original type variable
+when each bound arm returns the same receiver occurrence:
+
+```py
+from typing import TypeVar
+from typing_extensions import Self
+
+class MaybeA:
+    def maybe(self) -> "Self | None":
+        return self
+
+class MaybeB:
+    def maybe(self) -> "Self | None":
+        return self
+
+TMaybeReturn = TypeVar("TMaybeReturn", bound=MaybeA | MaybeB)
+
+def preserve_method_return_identity(x: TMaybeReturn) -> TMaybeReturn | None:
+    return x.maybe()
+```
+
+Nominal returns that only mention the selected bound arm should not be treated as
+receiver-correlated:
+
+```py
+from typing import TypeVar
+
+class FreshA:
+    def maybe(self) -> "FreshA | None":
+        return FreshA()
+
+class FreshB:
+    def maybe(self) -> "FreshB | None":
+        return FreshB()
+
+TFreshReturn = TypeVar("TFreshReturn", bound=FreshA | FreshB)
+
+def reject_nominal_return_correlation(x: TFreshReturn) -> TFreshReturn | None:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `TFreshReturn@reject_nominal_return_correlation | None`, found `FreshA | None | FreshB`"
+    return x.maybe()
+```
+
+Calling `cls.__new__(cls)` through `self.__class__` should stay valid for ordinary bounded typevars.
+This should not trigger the union/constrained receiver-rebinding path.
+
+```py
+from typing import TypeVar
+
+class BaseModel: ...
+
+Model = TypeVar("Model", bound=BaseModel)
+
+def clone(self: Model) -> Model:
+    cls = self.__class__
+    return cls.__new__(cls)
+```
+
+Method calls on narrowed constrained TypeVars should preserve the original typevar identity when the
+method returns the narrowed receiver arm:
+
+```py
+from typing import TypeVar
+from typing_extensions import Self
+
+class Prefix:
+    def normalize(self) -> Self:
+        return self
+
+class Suffix:
+    def normalize(self) -> Self:
+        return self
+
+TConstrainedText = TypeVar("TConstrainedText", Prefix, Suffix)
+
+def apply_values(template: TConstrainedText) -> TConstrainedText:
+    if isinstance(template, Prefix):
+        template = template.normalize()
+        return template
+    return template
+```
+
+Bound helper methods on generic classes should stay callable when the outer `self` annotation is an
+ordinary bounded typevar:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+TypeDevices = TypeVar("TypeDevices", bound="Devices[Any]")
+
+class Devices(Generic[TypeDevices]):
+    def __compare(self, other: object, func: Callable[[Any, Any], bool]) -> bool:
+        return True
+
+    def __lt__(self: TypeDevices, other: TypeDevices) -> bool:
+        return self.__compare(other, lambda a, b: True)
+```
+
+## Known limitations
+
+Mixed branch joins do not yet preserve the original constrained typevar when only one branch uses a
+method call:
+
+```py
+from typing import TypeVar
+
+class PeriodIndex:
+    def asfreq(self, *, freq: object) -> "PeriodIndex":
+        return PeriodIndex()
+
+class DatetimeIndex: ...
+class TimedeltaIndex: ...
+
+FreqIndexT = TypeVar("FreqIndexT", PeriodIndex, DatetimeIndex, TimedeltaIndex)
+
+def asfreq_compat(index: FreqIndexT, freq: object) -> FreqIndexT:
+    if isinstance(index, PeriodIndex):
+        new_index = index.asfreq(freq=freq)
+    elif isinstance(index, DatetimeIndex):
+        new_index = DatetimeIndex()
+    elif isinstance(index, TimedeltaIndex):
+        new_index = TimedeltaIndex()
+    else:
+        raise TypeError(type(index))
+
+    # TODO: This should not be an error.
+    # error: [invalid-return-type] "Return type does not match returned value: expected `FreqIndexT@asfreq_compat`, found `PeriodIndex | DatetimeIndex | TimedeltaIndex`"
+    return new_index
+```
+
 ## Constrained TypeVar in a union
 
 This is a regression test for an issue that surfaced in the primer report of an early version of

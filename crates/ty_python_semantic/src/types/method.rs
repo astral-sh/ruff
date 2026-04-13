@@ -24,6 +24,12 @@ pub struct BoundMethodType<'db> {
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
     pub(super) self_instance: Type<'db>,
+    /// The receiver type used when binding the implicit `self` or `cls` parameter for calls.
+    ///
+    /// This is usually identical to `self_instance`, but narrowed receiver rebinding can preserve
+    /// a more specific same-occurrence receiver here while exposing the original object through
+    /// `__self__`.
+    pub(super) receiver_type: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -36,6 +42,7 @@ pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 ) {
     visitor.visit_function_type(db, method.function(db));
     visitor.visit_type(db, method.self_instance(db));
+    visitor.visit_type(db, method.receiver_type(db));
 }
 
 fn into_callable_type_cycle_initial<'db>(
@@ -52,19 +59,17 @@ impl<'db> BoundMethodType<'db> {
     /// This is normally the bound-instance type (the type of `self` or `cls`), but if the bound method is
     /// a `@classmethod`, then it should be an instance of that bound-instance type.
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut self_instance = self.self_instance(db);
+        let mut self_instance = self.receiver_type(db);
         if self.function(db).is_classmethod(db) {
             self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
         }
         self_instance
     }
 
-    pub(crate) fn map_self_type(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> Self {
-        Self::new(db, self.function(db), f(self.self_instance(db)))
+    pub(crate) fn map_self_type(self, db: &'db dyn Db, f: impl Fn(Type<'db>) -> Type<'db>) -> Self {
+        let self_instance = f(self.self_instance(db));
+        let receiver_type = f(self.receiver_type(db));
+        Self::new(db, self.function(db), self_instance, receiver_type)
     }
 
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -97,6 +102,8 @@ impl<'db> BoundMethodType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.self_instance(db)
                 .recursive_type_normalized_impl(db, div, true)?,
+            self.receiver_type(db)
+                .recursive_type_normalized_impl(db, div, true)?,
         ))
     }
 }
@@ -114,7 +121,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // bound self parameter, are contravariant.)
         self.check_function_pair(db, source.function(db), target.function(db))
             .and(db, self.constraints, || {
-                self.check_type_pair(db, target.self_instance(db), source.self_instance(db))
+                self.check_type_pair(db, target.receiver_type(db), source.receiver_type(db))
             })
     }
 }
