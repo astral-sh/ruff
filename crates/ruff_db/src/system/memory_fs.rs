@@ -459,19 +459,15 @@ fn not_found() -> std::io::Error {
 }
 
 fn is_a_directory() -> std::io::Error {
-    // Note: Rust returns `ErrorKind::IsADirectory` for this error but this is a nightly only variant :(.
-    //   So we have to use other for now.
-    std::io::Error::other("Is a directory")
+    std::io::Error::from(std::io::ErrorKind::IsADirectory)
 }
 
 fn not_a_directory() -> std::io::Error {
-    // Note: Rust returns `ErrorKind::NotADirectory` for this error but this is a nightly only variant :(.
-    //   So we have to use `Other` for now.
-    std::io::Error::other("Not a directory")
+    std::io::Error::from(std::io::ErrorKind::NotADirectory)
 }
 
 fn directory_not_empty() -> std::io::Error {
-    std::io::Error::other("directory not empty")
+    std::io::Error::from(std::io::ErrorKind::DirectoryNotEmpty)
 }
 
 fn invalid_utf8() -> std::io::Error {
@@ -820,7 +816,7 @@ mod tests {
         let error = fs
             .create_directory_all(SystemPath::new("a/b.py/c"))
             .unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -842,7 +838,7 @@ mod tests {
             .write_file_all(SystemPath::new("a/b.py/c"), "content")
             .unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -877,7 +873,7 @@ mod tests {
 
         let error = fs.read_to_string(SystemPath::new("a")).unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -901,7 +897,7 @@ mod tests {
 
         let error = fs.write_file(SystemPath::new("a"), "content").unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -959,7 +955,7 @@ mod tests {
         fs.create_directory_all("a")?;
 
         let error = fs.remove_file("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -984,7 +980,7 @@ mod tests {
         let fs = with_files(["a/a.py"]);
 
         let error = fs.remove_directory("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::DirectoryNotEmpty);
     }
 
     #[test]
@@ -1014,7 +1010,7 @@ mod tests {
         let fs = with_files(["a"]);
 
         let error = fs.remove_directory("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -1048,8 +1044,7 @@ mod tests {
         let Err(error) = fs.read_directory("a.py") else {
             panic!("Expected this to fail");
         };
-        assert_eq!(error.kind(), std::io::ErrorKind::Other);
-        assert!(error.to_string().contains("Not a directory"));
+        assert_eq!(error.kind(), std::io::ErrorKind::NotADirectory);
     }
 
     #[test]
