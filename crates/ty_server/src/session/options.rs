@@ -261,9 +261,20 @@ impl WorkspaceOptions {
             .map(Box::new);
         let mut fallback_environment = EnvironmentOptions::default();
 
+        let mut python_executable = None;
+
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
+            #[allow(deprecated)]
+            let executable_path = active_environment
+                .executable
+                .uri
+                .as_ref()
+                .and_then(|uri| uri.to_file_path().ok())
+                .and_then(|path| SystemPathBuf::from_path_buf(path).ok());
+            python_executable = executable_path;
+
             fallback_environment.python = Some(RelativePathBuf::python_extension(
                 active_environment.executable.sys_prefix,
             ));
@@ -312,6 +323,7 @@ impl WorkspaceOptions {
             configuration_file,
             override_options,
             fallback_options,
+            python_executable,
         }
     }
 }

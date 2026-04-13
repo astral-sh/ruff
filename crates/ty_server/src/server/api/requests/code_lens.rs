@@ -63,6 +63,7 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
                             Some(&file_path),
                             class_name.as_ref(),
                             function_name.as_deref(),
+                            snapshot.workspace_settings().python_executable(),
                         );
                         serde_json::to_value(&run_test_args).ok()?
                     }
