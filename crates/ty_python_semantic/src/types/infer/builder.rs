@@ -704,7 +704,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &self.context,
                             ty,
                             function.node(self.module()),
-                            self.index,
                         );
                     }
                     DefinitionKind::Class(class_node) => {
@@ -7129,8 +7128,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let return_ty = bindings.return_type(db);
+        let callable_ty = self.expression_type(func);
 
-        let find_narrowed_place = || match arguments.args.first() {
+        let narrowed_argument_index = match callable_ty {
+            Type::FunctionLiteral(function) => usize::from(function.has_implicit_receiver(db)),
+            _ => 0,
+        };
+
+        let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
                 // This branch looks extraneous, especially in the face of `missing-arguments`.
                 // However, that lint won't be able to catch this:
@@ -7157,11 +7162,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match return_ty {
-            Type::TypeIs(type_is) => match find_narrowed_place() {
+            Type::TypeIs(type_is) => match find_narrowed_place(narrowed_argument_index) {
                 Some(place) => type_is.bind(db, scope, place),
                 None => return_ty,
             },
-            Type::TypeGuard(type_guard) => match find_narrowed_place() {
+            Type::TypeGuard(type_guard) => match find_narrowed_place(narrowed_argument_index) {
                 Some(place) => type_guard.bind(db, scope, place),
                 None => return_ty,
             },
