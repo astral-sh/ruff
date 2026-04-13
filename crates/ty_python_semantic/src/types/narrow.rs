@@ -7,6 +7,7 @@ use crate::semantic_index::predicate::{
     PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::semantic_index;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
@@ -635,7 +636,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            ast::Expr::Name(_) => {
+                let file = expression.file(self.db);
+                let index = semantic_index(self.db, file);
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
+                    let aliased_constraints =
+                        self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
+                    Self::merge_optional_constraints_and(constraints, aliased_constraints)
+                } else {
+                    constraints
+                }
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.evaluate_simple_expr(expression_node, is_positive)
             }
             ast::Expr::Compare(expr_compare) => {
