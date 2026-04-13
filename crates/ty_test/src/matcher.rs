@@ -10,6 +10,7 @@ use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
@@ -60,11 +61,15 @@ pub(super) fn match_file(
 ) -> Result<(), FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
-    let assertions = InlineFileAssertions::from_file(db, file);
+    let source = source_text(db, file);
+    let file_index = line_index(db, file);
+    let parsed = parsed_module(db, file).load(db);
+    let assertions = InlineFileAssertions::from_file(&source, &parsed, &file_index);
+
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
 
     // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
-    let mut line_assertions = assertions.into_iter();
+    let mut line_assertions = assertions.iter();
     let mut line_diagnostics = diagnostics.iter_lines();
 
     let mut current_assertions = line_assertions.next();
