@@ -14,8 +14,8 @@ use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    ruff: Option<Options>,
+pub struct Tools {
+    pub ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -32,9 +32,9 @@ pub struct Pyproject {
 
 #[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct ScriptMetadata {
-    tool: Option<Tools>,
+    pub tool: Option<Tools>,
     #[serde(alias = "requires-python", alias = "requires_python")]
-    requires_python: Option<VersionSpecifiers>,
+    pub requires_python: Option<VersionSpecifiers>,
 }
 
 impl Pyproject {
@@ -83,7 +83,7 @@ fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
 }
 
 /// Parse PEP 723 script metadata
-pub fn parse_script_metadata(contents: &str) -> Result<Options> {
+pub fn parse_script_metadata(contents: &str) -> Result<ScriptMetadata> {
     // Parse the TOML document once into a spanned representation so we can:
     // - Inspect `required-version` without triggering strict deserialization errors.
     // - Deserialize with precise spans (line/column and excerpt) on errors.
@@ -101,13 +101,7 @@ pub fn parse_script_metadata(contents: &str) -> Result<Options> {
             err
         })
         .with_context(|| "Failed to parse inline metadata")?;
-    let mut ruff = metadata.tool.and_then(|tool| tool.ruff).unwrap_or_default();
-    if ruff.target_version.is_none() {
-        if let Some(requires_python) = metadata.requires_python {
-            ruff.target_version = get_minimum_supported_version(&requires_python);
-        }
-    }
-    Ok(ruff)
+    Ok(metadata)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -271,7 +265,9 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+pub fn get_minimum_supported_version(
+    requires_version: &VersionSpecifiers,
+) -> Option<PythonVersion> {
     /// Truncate a version to its major and minor components.
     fn major_minor(version: &Version) -> Option<Version> {
         let major = version.release().first()?;
