@@ -1,22 +1,21 @@
-use crate::config::Log;
-use crate::db::Db;
-use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
-use config::SystemKind;
-use parser as test_parser;
+pub use mdtest::OutputFormat;
+use mdtest::config::{Log, MarkdownTestConfig, SystemKind};
+use mdtest::db::{self, Db};
+use mdtest::parser::EmbeddedFileSourceMap;
+use mdtest::{Failures, FileFailures, TestFile, matcher, parser as test_parser};
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
-use std::fmt::{Display, Write};
+use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
@@ -28,13 +27,7 @@ use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
-mod assertion;
-mod config;
-mod db;
-mod diagnostic;
 mod external_dependencies;
-mod matcher;
-mod parser;
 
 use ty_static::EnvVars;
 
@@ -50,10 +43,10 @@ pub fn run(
     test_name: &str,
     output_format: OutputFormat,
 ) -> anyhow::Result<()> {
-    let suite = test_parser::parse(short_title, source)
+    let suite = test_parser::parse::<MarkdownTestConfig>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    let mut db = db::Db::setup();
+    let mut db = Db::setup();
 
     let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
@@ -164,75 +157,6 @@ pub fn run(
     Ok(())
 }
 
-/// Defines the format in which mdtest should print an error to the terminal
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    /// The format `cargo test` should use by default.
-    Cli,
-    /// A format that will provide annotations from GitHub Actions
-    /// if mdtest fails on a PR.
-    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
-    GitHub,
-}
-
-impl OutputFormat {
-    const fn is_cli(self) -> bool {
-        matches!(self, OutputFormat::Cli)
-    }
-
-    /// Write a test error in the appropriate format.
-    ///
-    /// For CLI format, errors are appended to `assertion_buf` so they appear
-    /// in the assertion-failure message.
-    ///
-    /// For GitHub format, errors are printed directly to stdout so that GitHub
-    /// Actions can detect them as workflow commands. Workflow commands must
-    /// appear at the beginning of a line in stdout to be parsed by GitHub.
-    #[expect(clippy::print_stdout)]
-    fn write_error(
-        self,
-        assertion_buf: &mut String,
-        file: &str,
-        line: OneIndexed,
-        failure: impl Display,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let _ = writeln!(
-                    assertion_buf,
-                    "  {file_line} {failure}",
-                    file_line = format!("{file}:{line}").cyan()
-                );
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={file},line={line}::{failure}");
-            }
-        }
-    }
-
-    /// Write a module-resolution inconsistency in the appropriate format.
-    ///
-    /// See [`write_error`](Self::write_error) for details on why GitHub-format
-    /// messages must be printed directly to stdout.
-    #[expect(clippy::print_stdout)]
-    fn write_inconsistency(
-        self,
-        assertion_buf: &mut String,
-        fixture_path: &Utf8Path,
-        inconsistency: &impl Display,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let info = fixture_path.to_string().cyan();
-                let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={fixture_path}::{inconsistency}");
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestOutcome {
     Success,
@@ -246,11 +170,11 @@ impl TestOutcome {
 }
 
 fn run_test(
-    db: &mut db::Db,
+    db: &mut Db,
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &parser::MarkdownTest,
+    test: &test_parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
 ) -> Result<TestOutcome, Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
@@ -608,8 +532,13 @@ fn run_test(
             test.name()
         );
     } else if !snapshot_diagnostics.is_empty() {
-        let snapshot =
-            create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
+        let snapshot = mdtest::create_diagnostic_snapshot(
+            db,
+            "ty",
+            relative_fixture_path,
+            test,
+            snapshot_diagnostics,
+        );
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
@@ -715,78 +644,6 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
         }
         Ok(())
     }
-}
-
-type Failures = Vec<FileFailures>;
-
-/// The failures for a single file in a test by line number.
-struct FileFailures {
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    backtick_offsets: Vec<BacktickOffsets>,
-
-    /// The failures by lines in the file.
-    by_line: matcher::FailuresByLine,
-}
-
-/// File in a test.
-struct TestFile {
-    file: File,
-
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    backtick_offsets: Vec<BacktickOffsets>,
-}
-
-fn create_diagnostic_snapshot(
-    db: &mut db::Db,
-    relative_fixture_path: &Utf8Path,
-    test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = Diagnostic>,
-) -> String {
-    let display_config = DisplayDiagnosticConfig::new("ty")
-        .color(false)
-        .show_fix_diff(true)
-        .with_fix_applicability(Applicability::DisplayOnly);
-
-    let mut snapshot = String::new();
-    writeln!(snapshot).unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
-    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot).unwrap();
-
-    writeln!(snapshot, "# Python source files").unwrap();
-    writeln!(snapshot).unwrap();
-    for file in test.files() {
-        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
-        writeln!(snapshot).unwrap();
-        // Note that we don't use ```py here because the line numbering
-        // we add makes it invalid Python. This sacrifices syntax
-        // highlighting when you look at the snapshot on GitHub,
-        // but the line numbers are extremely useful for analyzing
-        // snapshots. So we keep them.
-        writeln!(snapshot, "```").unwrap();
-
-        let line_number_width = file.code.lines().count().to_string().len();
-        for (i, line) in file.code.lines().enumerate() {
-            let line_number = i + 1;
-            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot).unwrap();
-    }
-
-    writeln!(snapshot, "# Diagnostics").unwrap();
-    writeln!(snapshot).unwrap();
-    for (i, diag) in diagnostics.into_iter().enumerate() {
-        if i > 0 {
-            writeln!(snapshot).unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
-        writeln!(snapshot, "```").unwrap();
-    }
-    snapshot
 }
 
 /// Run a function over an embedded test file, catching any panics that occur in the process.

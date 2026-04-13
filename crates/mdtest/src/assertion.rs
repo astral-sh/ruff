@@ -481,7 +481,7 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Db;
+    use crate::db::Db;
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;

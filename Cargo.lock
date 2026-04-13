@@ -2036,6 +2036,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3eede3bdf92f3b4f9dc04072a9ce5ab557d5ec9038773bf9ffcd5588b3cc05b"
 
 [[package]]
+name = "mdtest"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "colored 3.1.1",
+ "insta",
+ "memchr",
+ "path-slash",
+ "regex",
+ "ruff_db",
+ "ruff_diagnostics",
+ "ruff_index",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash",
+ "rustc-stable-hash",
+ "salsa",
+ "serde",
+ "smallvec",
+ "tempfile",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
+ "ty_module_resolver",
+ "ty_python_core",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4749,31 +4783,16 @@ dependencies = [
  "colored 3.1.1",
  "dunce",
  "insta",
- "memchr",
- "path-slash",
- "regex",
+ "mdtest",
  "ruff_db",
- "ruff_diagnostics",
- "ruff_index",
- "ruff_notebook",
  "ruff_python_ast",
- "ruff_python_trivia",
  "ruff_source_file",
- "ruff_text_size",
- "rustc-hash",
- "rustc-stable-hash",
  "salsa",
- "serde",
- "smallvec",
  "tempfile",
- "thiserror 2.0.18",
- "toml 1.1.2+spec-1.1.0",
- "tracing",
  "ty_module_resolver",
  "ty_python_core",
  "ty_python_semantic",
  "ty_static",
- "ty_vendored",
 ]
 
 [[package]]

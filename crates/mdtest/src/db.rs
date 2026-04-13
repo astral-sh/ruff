@@ -21,7 +21,7 @@ use crate::config::Analysis;
 
 #[salsa::db]
 #[derive(Clone)]
-pub(crate) struct Db {
+pub struct Db {
     storage: salsa::Storage<Self>,
     files: Files,
     system: MdtestSystem,
@@ -31,7 +31,7 @@ pub(crate) struct Db {
 }
 
 impl Db {
-    pub(crate) fn setup() -> Self {
+    pub fn setup() -> Self {
         let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
 
         let mut db = Self {
@@ -55,11 +55,11 @@ impl Db {
         self.settings.unwrap()
     }
 
-    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
+    pub fn set_verbosity(&mut self, verbose: bool) {
         self.settings().set_verbose(self).to(verbose);
     }
 
-    pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
+    pub fn update_analysis_options(&mut self, options: Option<&Analysis>) {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
@@ -112,17 +112,17 @@ impl Db {
         }
     }
 
-    pub(crate) fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
+    pub fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
         self.system.with_os(cwd, temp_dir);
         Files::sync_all(self);
     }
 
-    pub(crate) fn use_in_memory_system(&mut self) {
+    pub fn use_in_memory_system(&mut self) {
         self.system.with_in_memory();
         Files::sync_all(self);
     }
 
-    pub(crate) fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+    pub fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.system.create_directory_all(path)
     }
 }
@@ -199,7 +199,7 @@ struct Settings {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MdtestSystem(Arc<MdtestSystemInner>);
+pub struct MdtestSystem(Arc<MdtestSystemInner>);
 
 #[derive(Debug)]
 enum MdtestSystemInner {

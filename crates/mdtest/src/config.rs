@@ -12,7 +12,6 @@
 //! dependencies = ["pydantic==2.12.2"]
 //! ```
 
-use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
@@ -20,17 +19,17 @@ use ty_python_core::platform::PythonPlatform;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct MarkdownTestConfig {
+pub struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
-    pub(crate) log: Option<Log>,
+    pub log: Option<Log>,
 
-    pub(crate) analysis: Option<Analysis>,
+    pub analysis: Option<Analysis>,
 
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
-    pub(crate) system: Option<SystemKind>,
+    pub system: Option<SystemKind>,
 
     /// Project configuration for installing external dependencies.
     pub(crate) project: Option<Project>,
@@ -41,36 +40,38 @@ pub(crate) struct MarkdownTestConfig {
 }
 
 impl MarkdownTestConfig {
-    pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
-        toml::from_str(s).context("Error while parsing Markdown TOML config")
-    }
-
-    pub(crate) fn python_version(&self) -> Option<PythonVersion> {
+    pub fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }
 
-    pub(crate) fn python_platform(&self) -> Option<PythonPlatform> {
+    pub fn python_platform(&self) -> Option<PythonPlatform> {
         self.environment.as_ref()?.python_platform.clone()
     }
 
-    pub(crate) fn typeshed(&self) -> Option<&SystemPath> {
+    pub fn typeshed(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.typeshed.as_deref()
     }
 
-    pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
+    pub fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
         self.environment.as_ref()?.extra_paths.as_deref()
     }
 
-    pub(crate) fn python(&self) -> Option<&SystemPath> {
+    pub fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
     }
 
-    pub(crate) fn dependencies(&self) -> Option<&[String]> {
+    pub fn dependencies(&self) -> Option<&[String]> {
         self.project.as_ref()?.dependencies.as_deref()
     }
 
-    pub(crate) fn verbose(&self) -> bool {
+    pub fn verbose(&self) -> bool {
         self.verbose.unwrap_or_default()
+    }
+}
+
+impl crate::parser::MdtestConfig for MarkdownTestConfig {
+    fn has_dependencies(&self) -> bool {
+        self.dependencies().is_some()
     }
 }
 
@@ -115,18 +116,18 @@ pub(crate) struct Environment {
 
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct Analysis {
+pub struct Analysis {
     /// Whether ty should support `type: ignore` comments.
-    pub(crate) respect_type_ignore_comments: Option<bool>,
+    pub respect_type_ignore_comments: Option<bool>,
 
-    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+    pub allowed_unresolved_imports: Option<Vec<String>>,
 
-    pub(crate) replace_imports_with_any: Option<Vec<String>>,
+    pub replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub(crate) enum Log {
+pub enum Log {
     /// Enable logging with tracing when `true`.
     Bool(bool),
     /// Enable logging and only show filters that match the given [env-filter](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
@@ -136,7 +137,7 @@ pub(crate) enum Log {
 /// The system to use for tests.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum SystemKind {
+pub enum SystemKind {
     /// Use an in-memory system with a case-sensitive file system.
     ///
     /// This is recommended for all tests because it's fast.

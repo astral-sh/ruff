@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 
 use colored::Colorize;
 use path_slash::PathExt;
+use ruff_db::Db;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -15,17 +16,16 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
-use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
-pub(super) struct FailuresByLine {
+pub struct FailuresByLine {
     failures: Vec<String>,
     lines: Vec<LineFailures>,
 }
 
 impl FailuresByLine {
-    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
+    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -34,7 +34,7 @@ impl FailuresByLine {
         })
     }
 
-    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+    pub fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
@@ -54,8 +54,8 @@ struct LineFailures {
     range: Range<usize>,
 }
 
-pub(super) fn match_file(
-    db: &Db,
+pub fn match_file(
+    db: &dyn Db,
     file: File,
     diagnostics: &[Diagnostic],
 ) -> Result<(), FailuresByLine> {
@@ -265,7 +265,7 @@ struct Matcher {
 }
 
 impl Matcher {
-    fn from_file(db: &Db, file: File) -> Self {
+    fn from_file(db: &dyn Db, file: File) -> Self {
         Self {
             line_index: line_index(db, file),
             source: source_text(db, file),
