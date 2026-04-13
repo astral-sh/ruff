@@ -15,9 +15,7 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
-use crate::assertion::{
-    LinePragmaComments, ParsedAssertion, TestPragmaComments, UnparsedAssertion,
-};
+use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 
@@ -98,15 +96,15 @@ pub(super) fn match_file(
     // ordered by line number.
     let source = source_text(db, file);
     let parsed = parsed_module(db, file).load(db);
-    let pragmas = TestPragmaComments::from_file(&source, &parsed, &line_index(db, file));
+    let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index(db, file));
 
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
 
     let mut line_diagnostics = diagnostics.iter_lines();
 
     // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
-    let mut line_pragmas = pragmas.into_iter();
-    let mut current_pragmas = line_pragmas.next();
+    let mut line_assertions = assertions.into_iter();
+    let mut current_assertions = line_assertions.next();
     let mut current_diagnostics = line_diagnostics.next();
 
     let matcher = Matcher::from_file(db, file);
@@ -114,47 +112,47 @@ pub(super) fn match_file(
     let mut snapshot_diagnostics: Vec<Diagnostic> = Vec::new();
 
     loop {
-        match (&current_pragmas, &current_diagnostics) {
-            (Some(pragmas), Some(diagnostics)) => {
-                match pragmas.line_number.cmp(&diagnostics.line_number) {
+        match (&current_assertions, &current_diagnostics) {
+            (Some(assertions), Some(diagnostics)) => {
+                match assertions.line_number.cmp(&diagnostics.line_number) {
                     Ordering::Equal => {
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
                         // iterators.
-                        match matcher.match_line(diagnostics, pragmas) {
+                        match matcher.match_line(diagnostics, assertions) {
                             Ok(inline_diagnostics) => {
                                 snapshot_diagnostics.extend(inline_diagnostics);
                             }
                             Err(messages) => {
-                                failures.push(pragmas.line_number, messages);
+                                failures.push(assertions.line_number, messages);
                             }
                         }
 
-                        current_pragmas = line_pragmas.next();
+                        current_assertions = line_assertions.next();
                         current_diagnostics = line_diagnostics.next();
                     }
                     Ordering::Less => {
-                        // We have pragmas on an earlier line than diagnostics; report these
-                        // pragmas as all unmatched, and advance the assertions iterator.
-                        failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
-                        current_pragmas = line_pragmas.next();
+                        // We have assertions on an earlier line than diagnostics; report these
+                        // assertions as all unmatched, and advance the assertions iterator.
+                        failures.push(assertions.line_number, unmatched(&assertions.assertions));
+                        current_assertions = line_assertions.next();
                     }
                     Ordering::Greater => {
-                        // We have diagnostics on an earlier line than pragmas; report these
+                        // We have diagnostics on an earlier line than assertions; report these
                         // diagnostics as all unmatched, and advance the diagnostics iterator.
                         failures.push(diagnostics.line_number, unmatched(diagnostics));
                         current_diagnostics = line_diagnostics.next();
                     }
                 }
             }
-            (Some(pragmas), None) => {
-                // We've exhausted diagnostics but still have pragmas; report these pragmas
-                // as unmatched and advance the pragmas iterator.
-                failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
-                current_pragmas = line_pragmas.next();
+            (Some(assertions), None) => {
+                // We've exhausted diagnostics but still have assertions; report these assertions
+                // as unmatched and advance the assertions iterator.
+                failures.push(assertions.line_number, unmatched(&assertions.assertions));
+                current_assertions = line_assertions.next();
             }
             (None, Some(diagnostics)) => {
-                // We've exhausted pragmas but still have diagnostics; report these
+                // We've exhausted assertions but still have diagnostics; report these
                 // diagnostics as unmatched and advance the diagnostics iterator.
                 failures.push(diagnostics.line_number, unmatched(diagnostics));
                 current_diagnostics = line_diagnostics.next();
@@ -319,7 +317,7 @@ impl Matcher {
     fn match_line<'a, 'b>(
         &self,
         diagnostics: &'a [&'a Diagnostic],
-        pragmas: &LinePragmaComments,
+        assertions: &LineAssertions,
     ) -> Result<SmallVec<[Diagnostic; 2]>, Vec<Failure>>
     where
         'b: 'a,
@@ -327,7 +325,7 @@ impl Matcher {
         let mut failures = vec![];
         let mut unmatched = diagnostics.to_vec();
         let mut snapshot_diagnostics: SmallVec<[Diagnostic; 2]> = SmallVec::new();
-        for assertion in &pragmas.assertions {
+        for assertion in &assertions.assertions {
             match assertion.parse() {
                 Ok(assertion) => match self.matches(&assertion, &mut unmatched) {
                     Some(diagnostic) => {
@@ -406,7 +404,7 @@ impl Matcher {
             ParsedAssertion::Snapshot(rule) => {
                 let Some(rule) = rule else {
                     // Similar to `error:` with the same diagnostic code. Match the first diagnostic even if this
-                    // is ambigious (and somewhat problematic because we use swap_remove in many places).
+                    // is ambiguous (and somewhat problematic because we use swap_remove in many places).
                     if let Some(first) = unmatched.pop() {
                         return Some(first.clone());
                     }

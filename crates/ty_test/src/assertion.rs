@@ -42,28 +42,28 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::str::FromStr;
 
-/// Test pragma comments a single embedded file.
+/// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
-pub(crate) struct TestPragmaComments<'s> {
-    by_line: Vec<LinePragmaComments<'s>>,
+pub(crate) struct InlineFileAssertions<'s> {
+    by_line: Vec<LineAssertions<'s>>,
 }
 
-impl<'s> TestPragmaComments<'s> {
+impl<'s> InlineFileAssertions<'s> {
     pub(crate) fn from_file(
         source: &'s str,
         parsed: &ParsedModuleRef,
         file_index: &LineIndex,
     ) -> Self {
-        let mut pragmas_by_line = Vec::new();
-        let mut pragma_comments = UnparsedAssertionsIter {
+        let mut by_line = Vec::new();
+        let mut file_assertions = UnparsedAssertionsIter {
             tokens: parsed.tokens().iter(),
             source,
         }
         .peekable();
 
-        while let Some(ranged_pragma) = pragma_comments.next() {
+        while let Some(ranged_assertion) = file_assertions.next() {
             let mut collector = AssertionVec::new();
-            let mut line_number = file_index.line_index(ranged_pragma.start());
+            let mut line_number = file_index.line_index(ranged_assertion.start());
 
             // Collect all own-line comments on consecutive lines; these all apply to the same line of
             // code. For example:
@@ -74,11 +74,11 @@ impl<'s> TestPragmaComments<'s> {
             // reveal_type(x)
             // ```
             //
-            if CommentRanges::is_own_line(ranged_pragma.start(), source) {
-                collector.push(ranged_pragma.into_comment());
+            if CommentRanges::is_own_line(ranged_assertion.start(), source) {
+                collector.push(ranged_assertion.into_comment());
                 let mut only_own_line = true;
 
-                while let Some(ranged_pragma) = pragma_comments.next_if(|next_pragma| {
+                while let Some(ranged_assertion) = file_assertions.next_if(|next_pragma| {
                     let next_line_number = line_number.saturating_add(1);
 
                     if file_index.line_index(next_pragma.start()) == next_line_number {
@@ -88,11 +88,11 @@ impl<'s> TestPragmaComments<'s> {
                         false
                     }
                 }) {
-                    if !CommentRanges::is_own_line(ranged_pragma.start(), source) {
+                    if !CommentRanges::is_own_line(ranged_assertion.start(), source) {
                         only_own_line = false;
                     }
 
-                    collector.push(ranged_pragma.into_comment());
+                    collector.push(ranged_assertion.into_comment());
 
                     // If we see an end-of-line comment, it has to be the end of the stack,
                     // otherwise we'd botch this case, attributing all three errors to the `bar`
@@ -115,35 +115,33 @@ impl<'s> TestPragmaComments<'s> {
                 }
             } else {
                 // We have a line-trailing comment; it applies to its own line, and is not grouped.
-                collector.push(ranged_pragma.into_comment());
+                collector.push(ranged_assertion.into_comment());
             }
 
-            pragmas_by_line.push(LinePragmaComments {
+            by_line.push(LineAssertions {
                 line_number,
                 assertions: collector,
             });
         }
 
-        Self {
-            by_line: pragmas_by_line,
-        }
+        Self { by_line }
     }
 }
 
-impl<'a, 's> IntoIterator for &'a TestPragmaComments<'s> {
-    type Item = &'a LinePragmaComments<'s>;
+impl<'a, 's> IntoIterator for &'a InlineFileAssertions<'s> {
+    type Item = &'a LineAssertions<'s>;
 
-    type IntoIter = std::slice::Iter<'a, LinePragmaComments<'s>>;
+    type IntoIter = std::slice::Iter<'a, LineAssertions<'s>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.by_line.iter()
     }
 }
 
-impl<'s> IntoIterator for TestPragmaComments<'s> {
-    type Item = LinePragmaComments<'s>;
+impl<'s> IntoIterator for InlineFileAssertions<'s> {
+    type Item = LineAssertions<'s>;
 
-    type IntoIter = std::vec::IntoIter<LinePragmaComments<'s>>;
+    type IntoIter = std::vec::IntoIter<LineAssertions<'s>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.by_line.into_iter()
@@ -156,7 +154,7 @@ struct UnparsedAssertionsIter<'a, 's> {
 }
 
 impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
-    type Item = UnparsedAssertionWithComment<'s>;
+    type Item = AssertionWithRange<'s>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -166,8 +164,8 @@ impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
             }
 
             let comment_text = &self.source[token.range()];
-            if let Some(pragma) = UnparsedAssertion::from_comment(comment_text) {
-                return Some(UnparsedAssertionWithComment(pragma, token.range()));
+            if let Some(assertion) = UnparsedAssertion::from_comment(comment_text) {
+                return Some(AssertionWithRange(assertion, token.range()));
             }
         }
     }
@@ -175,15 +173,15 @@ impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
 
 /// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
-struct UnparsedAssertionWithComment<'a>(UnparsedAssertion<'a>, TextRange);
+struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
 
-impl<'a> UnparsedAssertionWithComment<'a> {
+impl<'a> AssertionWithRange<'a> {
     fn into_comment(self) -> UnparsedAssertion<'a> {
         self.0
     }
 }
 
-impl Ranged for UnparsedAssertionWithComment<'_> {
+impl Ranged for AssertionWithRange<'_> {
     fn range(&self) -> TextRange {
         self.1
     }
@@ -195,9 +193,9 @@ impl Ranged for UnparsedAssertionWithComment<'_> {
 /// element to avoid most heap vector allocations.
 type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
 
-/// One or more pragma comment referring to the same line of code.
+/// One or more assertions referring to the same line of code.
 #[derive(Debug)]
-pub(crate) struct LinePragmaComments<'a> {
+pub(crate) struct LineAssertions<'a> {
     /// The line these assertions refer to.
     ///
     /// Not necessarily the same line the assertion comment is located on; for an own-line comment,
@@ -511,7 +509,7 @@ mod tests {
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
-    fn get_assertions(source: &str) -> TestPragmaComments<'_> {
+    fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
@@ -526,10 +524,10 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);
-        TestPragmaComments::from_file(source, &parsed, &line_index(&db, file))
+        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
     }
 
-    fn into_vec(assertions: TestPragmaComments<'_>) -> Vec<LinePragmaComments<'_>> {
+    fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {
         assertions.by_line
     }
 

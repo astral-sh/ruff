@@ -11,7 +11,6 @@ use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::line_index;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
@@ -130,8 +129,8 @@ pub fn run(
                                         last_line_number,
                                         &Failure::new(
                                             "Found a trailing assertion comment \
-                                        (e.g., `# revealed:` or `# error:`) \
-                                        not followed by any statement.",
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
                                         ),
                                     );
 
