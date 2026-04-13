@@ -26,12 +26,12 @@ pub(crate) struct RunTestArgs {
 impl RunTestArgs {
     pub(crate) fn new(
         cwd: &str,
-        file_path: Option<&str>,
+        file_path: &str,
         class_name: Option<&Name>,
         function_name: Option<&str>,
         python_executable: Option<&SystemPath>,
     ) -> Self {
-        let mut test_target = file_path.unwrap_or_default().to_string();
+        let mut test_target = file_path.to_string();
         if let Some(class_name) = class_name {
             if !test_target.is_empty() {
                 test_target.push_str("::");
