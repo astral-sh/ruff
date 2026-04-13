@@ -60,7 +60,7 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
                     } => {
                         let run_test_args = RunTestArgs::new(
                             &cwd,
-                            Some(&file_path),
+                            &file_path,
                             class_name.as_ref(),
                             function_name.as_deref(),
                             snapshot.workspace_settings().python_executable(),
