@@ -230,11 +230,44 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     /// Create a new [`CallArguments`] starting from the specified index.
-    pub(super) fn start_from(&self, index: usize) -> Self {
+    pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
             arguments: self.arguments[index..].to_vec(),
             types: self.types[index..].to_vec(),
         }
+    }
+
+    /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
+    /// concrete enough for partial-application analysis.
+    pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
+        let bound_call_arguments = self.start_from(1);
+
+        // We only handle variadics and keyword-maps that can be normalized to concrete argument
+        // positions for overload matching.
+        if bound_call_arguments.iter().any(|(argument, argument_ty)| {
+            let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
+            match argument {
+                Argument::Variadic => !matches!(
+                    argument_ty
+                        .as_nominal_instance()
+                        .and_then(|nominal| nominal.tuple_spec(db)),
+                    Some(spec) if spec.as_fixed_length().is_some()
+                ),
+                // Optional TypedDict keys may be absent at runtime, so we can only refine
+                // `partial(...)` when every expanded key is guaranteed to be present.
+                Argument::Keywords => argument_ty.as_typed_dict().is_none_or(|typed_dict| {
+                    typed_dict
+                        .items(db)
+                        .values()
+                        .any(|field| !field.is_required())
+                }),
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
+            }
+        }) {
+            return None;
+        }
+
+        Some(bound_call_arguments)
     }
 
     /// Returns an iterator on performing [argument type expansion].

@@ -6,9 +6,9 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
-        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter,
+        Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::CallableSignature,
@@ -213,6 +213,10 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                Some(CallableTypes::one(partial.partial(db)))
+            }
+
             // TODO
             Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
@@ -366,6 +370,12 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+    }
+
+    /// Reifies this callable as the nominal `functools.partial[T]` instance for its return type.
+    pub(crate) fn into_functools_partial_instance(self, db: &'db dyn Db) -> Type<'db> {
+        let return_ty = self.signatures(db).overload_return_type_or_unknown(db);
+        KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty])
     }
 
     pub(crate) fn bind_self(
