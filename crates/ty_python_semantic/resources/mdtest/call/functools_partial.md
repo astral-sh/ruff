@@ -378,16 +378,12 @@ class Box(Generic[T]):
         self.value = value
 
 list_factory = partial(list, [1])
-# TODO: should reveal `partial[() -> list[int]]` once constructor partials are modeled.
-reveal_type(list_factory)  # revealed: partial[Unknown]
-# TODO: should reveal `list[int]` once constructor partials are modeled.
-reveal_type(list_factory())  # revealed: Unknown
+reveal_type(list_factory)  # revealed: partial[() -> list[int]]
+reveal_type(list_factory())  # revealed: list[int]
 
 box_factory = partial(Box, "hi")
-# TODO: should reveal `partial[() -> Box[str]]` once constructor partials are modeled.
-reveal_type(box_factory)  # revealed: partial[Unknown]
-# TODO: should reveal `Box[str]` once constructor partials are modeled.
-reveal_type(box_factory())  # revealed: Unknown
+reveal_type(box_factory)  # revealed: partial[() -> Box[str]]
+reveal_type(box_factory())  # revealed: Box[str]
 ```
 
 ### Stored partials specialize through generic instances
@@ -570,8 +566,7 @@ xs = [1]
 ys = ["a"]
 pairs = list(zips(xs, ys))
 
-# TODO: should reveal `list[tuple[int, str]]` once keyword-only constructor bindings are preserved.
-reveal_type(pairs)  # revealed: list[Unknown]
+reveal_type(pairs)  # revealed: list[tuple[int, str]]
 ```
 
 ### Keyword argument with literal sequence annotation
@@ -789,8 +784,7 @@ class MyClass:
         pass
 
 p = partial(MyClass, 1)
-# TODO: should reveal `partial[(y: str) -> MyClass]` once constructor partials are modeled.
-reveal_type(p)  # revealed: partial[Unknown]
+reveal_type(p)  # revealed: partial[(y: str) -> MyClass]
 ```
 
 ### Class constructor with both `__new__` and `__init__`
@@ -804,11 +798,9 @@ class MyClass:
     def __init__(self, x: int) -> None: ...
 
 p = partial(MyClass, 1)
-reveal_type(p)  # revealed: partial[Unknown]
+reveal_type(p)  # revealed: partial[() -> MyClass]
 p()
-# TODO: should reveal `partial[() -> MyClass]` once constructor signatures are merged.
-# TODO: should error: [too-many-positional-arguments] once constructor signatures are merged.
-p("extra")
+p("extra")  # error: [too-many-positional-arguments]
 ```
 
 ### Class constructor partial preserves one-sided bound `__new__` positional params
@@ -822,12 +814,9 @@ class MyClass:
     def __init__(self) -> None: ...
 
 p = partial(MyClass, 1)
-# TODO: should reveal `partial[(x: Never) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p()
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p(1)
+reveal_type(p)  # revealed: partial[(x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(1)  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial preserves one-sided bound `__new__` keyword params
@@ -841,12 +830,9 @@ class MyClass:
     def __init__(self) -> None: ...
 
 p = partial(MyClass, x=1)
-# TODO: should reveal `partial[(*, x: Never) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p()
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p(x=1)
+reveal_type(p)  # revealed: partial[(*, x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(x=1)  # error: [invalid-argument-type]
 ```
 
 ### Class constructor preserves downstream params after partial binding
@@ -860,12 +846,9 @@ class MyClass:
     def __init__(self, x: int, y: str) -> None: ...
 
 p = partial(MyClass, 1)
-# TODO: should reveal `partial[(y: Never) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p()
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p("extra")
+reveal_type(p)  # revealed: partial[(y: Never) -> MyClass]
+p()  # error: [missing-argument]
+p("extra")  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial preserves one-sided `__init__` params
@@ -879,12 +862,9 @@ class MyClass:
     def __init__(self, x: int) -> None: ...
 
 p = partial(MyClass)
-# TODO: should reveal `partial[(x: Never) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p()
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p(1)
+reveal_type(p)  # revealed: partial[(x: Never) -> MyClass]
+p()  # error: [missing-argument]
+p(1)  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial preserves downstream keyword-only params
@@ -898,11 +878,10 @@ class MyClass:
     def __init__(self, *, y: str) -> None: ...
 
 p = partial(MyClass, 1)
-# TODO: should reveal `partial[(x: Never, *, y: Never) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p()
-# TODO: should error: [missing-argument] and [invalid-argument-type] once constructor signatures are merged.
+reveal_type(p)  # revealed: partial[(x: Never, *, y: Never) -> MyClass]
+p()  # error: [missing-argument]
+# error: [missing-argument]
+# error: [invalid-argument-type]
 p(y="extra")
 ```
 
@@ -917,12 +896,9 @@ class MyClass:
     def __init__(self, x: object) -> None: ...
 
 p = partial(MyClass)
-# TODO: should reveal `partial[(x: int) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should reveal `MyClass` once constructor signatures are merged.
-reveal_type(p(1))  # revealed: Unknown
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p("s")
+reveal_type(p)  # revealed: partial[(x: int) -> MyClass]
+reveal_type(p(1))  # revealed: MyClass
+p("s")  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial matches reordered params by name
@@ -936,12 +912,9 @@ class MyClass:
     def __init__(self, *, y: str, x: int) -> None: ...
 
 p = partial(MyClass)
-# TODO: should reveal `partial[(*, x: int, y: str) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should reveal `MyClass` once constructor signatures are merged.
-reveal_type(p(x=1, y="s"))  # revealed: Unknown
-# TODO: should error: [missing-argument] once constructor signatures are merged.
-p(y="s")
+reveal_type(p)  # revealed: partial[(*, x: int, y: str) -> MyClass]
+reveal_type(p(x=1, y="s"))  # revealed: MyClass
+p(y="s")  # error: [missing-argument]
 ```
 
 ### Class constructor partial keeps reordered positional params keyword-only
@@ -955,11 +928,10 @@ class MyClass:
     def __init__(self, y: str, x: int) -> None: ...
 
 p = partial(MyClass)
-# TODO: should reveal `partial[(*, x: int, y: str) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should reveal `MyClass` once constructor signatures are merged.
-reveal_type(p(x=1, y="s"))  # revealed: Unknown
-# TODO: should error: [missing-argument] and [too-many-positional-arguments] once constructor signatures are merged.
+reveal_type(p)  # revealed: partial[(*, x: int, y: str) -> MyClass]
+reveal_type(p(x=1, y="s"))  # revealed: MyClass
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
 p(1, "s")
 ```
 
@@ -974,11 +946,9 @@ class MyClass:
     def __init__(self, x: int) -> None: ...
 
 p = partial(MyClass)
-# TODO: should reveal `partial[(x: int) -> MyClass]` once constructor signatures are merged.
-reveal_type(p)  # revealed: partial[Unknown]
+reveal_type(p)  # revealed: partial[(x: int) -> MyClass]
 p(1)
-# TODO: should error: [invalid-argument-type] once constructor signatures are merged.
-p("s")
+p("s")  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial preserves per-overload correlations
@@ -995,8 +965,29 @@ class MyClass:
     def __init__(self, x: int, y: str) -> None: ...
 
 p = partial(MyClass)
-# TODO: should error twice with [invalid-argument-type] once constructor signatures are merged.
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
 p(1, "s")
+```
+
+### Class constructor partial keeps shared legacy TypeVars correlated
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class MyClass:
+    def __new__(cls, x: tuple[T, T]) -> "MyClass":
+        return super().__new__(cls)
+
+    def __init__(self, x: tuple[T, str]) -> None: ...
+
+p = partial(MyClass)
+reveal_type(p)  # revealed: partial[[T](x: tuple[T & str, T & str]) -> MyClass]
+reveal_type(p(("s", "s")))  # revealed: MyClass
+p((1, "s"))  # error: [invalid-argument-type]
 ```
 
 ### Class constructor partial keeps non-instance `__new__` overloads
@@ -1020,12 +1011,9 @@ class MyClass:
     def __init__(self, x: int) -> None: ...
 
 p = partial(MyClass)
-# TODO: should preserve the non-instance `__new__` overload in the reduced partial signature.
-reveal_type(p)  # revealed: partial[Unknown]
-# TODO: should reveal `MyClass` once constructor signatures are merged.
-reveal_type(p(1))  # revealed: Unknown
-# TODO: should reveal `str` once constructor signatures are merged.
-reveal_type(p("s"))  # revealed: Unknown
+reveal_type(p)  # revealed: partial[Overload[(x: str) -> str, (x: int) -> MyClass]]
+reveal_type(p(1))  # revealed: MyClass
+reveal_type(p("s"))  # revealed: str
 ```
 
 ## Additional signature-shaping cases
