@@ -3274,6 +3274,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Range { .. } => f
                 .with_type(KnownClass::Range.to_class_literal(self.db))
                 .write_str("range"),
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)
+            }
         }
     }
 }

@@ -139,6 +139,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A `range(...)` call result where we could determine whether it is non-empty.
     Range { is_non_empty: bool },
+
+    /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
+    FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -198,7 +201,8 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
             }
         }
-        KnownInstanceType::FunctoolsPartial(partial) => {
+        KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
         }
     }
@@ -266,6 +270,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::FunctoolsPartialCall(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartialCall),
         }
     }
 
@@ -296,6 +303,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
             Self::Range { .. } => KnownClass::Range,
+            Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
         }
     }
 
@@ -416,6 +424,11 @@ impl<'db> KnownInstanceType<'db> {
                 }
                 _ => Type::KnownInstance(self),
             },
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
