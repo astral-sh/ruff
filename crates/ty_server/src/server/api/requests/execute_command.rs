@@ -14,7 +14,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 use ty_project::Db as _;
 
-/// Serializable arguments for the `ty.runTest` command.
+/// Arguments for the `ty.runTest` command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RunTestArgs {
     cwd: String,
