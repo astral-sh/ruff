@@ -292,6 +292,7 @@ impl<'db> CallableItem<'db> {
     fn functools_partial_callable<'a>(
         &self,
         db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<CallableType<'db>> {
@@ -304,7 +305,12 @@ impl<'db> CallableItem<'db> {
                     bound_call_arguments,
                 )?,
             ),
-            CallableItem::Constructor(_) => None,
+            CallableItem::Constructor(binding) => binding.functools_partial_callable(
+                db,
+                wrapped_callable_ty,
+                partial_overload,
+                bound_call_arguments,
+            ),
         }
     }
 
@@ -756,15 +762,25 @@ impl<'db> Bindings<'db> {
     }
 
     fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
-        for binding in self.iter_flat_mut() {
-            binding.clear_deferred_constructor_errors_for_partial_application();
-        }
-
         for constructor in self.iter_constructor_items_mut() {
             if let Some(downstream) = constructor.downstream_constructor_mut() {
+                for binding in downstream.iter_flat_mut() {
+                    binding.clear_deferred_constructor_errors_for_partial_application();
+                }
                 downstream.clear_deferred_constructor_errors_for_partial_application();
             }
         }
+    }
+
+    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+        for binding in self.iter_flat_mut() {
+            binding.clear_missing_argument_errors_for_partial_application();
+        }
+    }
+
+    fn prepare_for_partial_application(&mut self) {
+        self.clear_missing_argument_errors_for_partial_application();
+        self.clear_deferred_constructor_errors_for_partial_application();
     }
 
     /// Visits the callables that should contribute argument type context, including deferred
@@ -891,14 +907,7 @@ impl<'db> Bindings<'db> {
         let mut partial_bindings = wrapped_callable_ty
             .bindings(db)
             .match_parameters(db, &bound_call_arguments);
-        for binding in partial_bindings.iter_flat_mut() {
-            binding.clear_missing_argument_errors_for_partial_application();
-        }
-        for constructor in partial_bindings.iter_constructor_items_mut() {
-            if let Some(downstream) = constructor.downstream_constructor_mut() {
-                downstream.clear_deferred_constructor_errors_for_partial_application();
-            }
-        }
+        partial_bindings.prepare_for_partial_application();
         Some((
             bound_call_arguments,
             partial_bindings,
@@ -921,7 +930,12 @@ impl<'db> Bindings<'db> {
         if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
             return self.map_item_types(db, |partial_item| {
                 partial_item
-                    .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                    .functools_partial_callable(
+                        db,
+                        wrapped_callable_ty,
+                        partial_overload,
+                        bound_call_arguments,
+                    )
                     .map(|callable| {
                         callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
                     })
@@ -931,7 +945,12 @@ impl<'db> Bindings<'db> {
         let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
             .iter_callable_items()
             .filter_map(|partial_item| {
-                partial_item.functools_partial_callable(db, partial_overload, bound_call_arguments)
+                partial_item.functools_partial_callable(
+                    db,
+                    wrapped_callable_ty,
+                    partial_overload,
+                    bound_call_arguments,
+                )
             })
             .collect();
 
@@ -3068,6 +3087,29 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::Multiple(indexes)
                 } else {
                     MatchingOverloadIndex::Single(first)
+                }
+            }
+        }
+    }
+
+    /// Returns the source overloads that should seed constructor partial-signature merging.
+    ///
+    /// When an overloaded constructor has no compatible source overload, we only fall back to a
+    /// single best failing overload if doing so will not fabricate an arbitrary merged overload set.
+    fn partial_signature_source_overload_indexes(&self) -> Option<Vec<usize>> {
+        match self.matching_partial_overload_index() {
+            MatchingOverloadIndex::Single(index) => Some(vec![index]),
+            MatchingOverloadIndex::Multiple(indexes) => Some(indexes),
+            MatchingOverloadIndex::None => {
+                if self.overloads().len() > 1 {
+                    None
+                } else {
+                    Some(vec![
+                        self.best_failing_overload_index(
+                            FailingOverloadSelection::ReportableForPartial,
+                        )
+                        .unwrap_or(0),
+                    ])
                 }
             }
         }
