@@ -35,13 +35,7 @@ error[invalid-await]: `Awaitable | NotAwaitable` is not awaitable
 9 |     await x  # error: [invalid-await]
   |           ^
   |
- ::: src/mdtest_snippet.py:2:9
-  |
-1 | class Awaitable:
-2 |     def __await__(self):
-  |         --------------- method defined here
-3 |         yield
-  |
 info: `__await__` may be missing
+info: `NotAwaitable` does not implement `__await__`
 
 ```

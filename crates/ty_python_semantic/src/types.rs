@@ -387,6 +387,86 @@ enum InstanceFallbackShadowsNonDataDescriptor {
     No,
 }
 
+/// Describes which kind of composite type a value is.
+///
+/// Used to dispatch per-element composite type handling without repeated pattern
+/// matching on `self` within [`Type::try_call_dunder_with_policy`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CompositeKind {
+    Union,
+    Intersection,
+    ConstrainedTypeVar,
+}
+
+/// The per-element result of looking up a member on a composite type.
+///
+/// See [`Type::member_lookup_per_element`] for details.
+#[derive(Debug, Default)]
+pub(crate) struct PerElementLookup<'db> {
+    /// The composite type elements where the member was always or possibly defined,
+    /// along with the corresponding lookup result.
+    pub(crate) defined: Vec<(Type<'db>, PlaceAndQualifiers<'db>)>,
+    /// The composite type elements where the member was completely undefined.
+    pub(crate) undefined: Vec<Type<'db>>,
+}
+
+impl<'db> PerElementLookup<'db> {
+    /// Construct a `PerElementLookup` from a single lookup result, without decomposing.
+    ///
+    /// Used for non-composite types where the "element" is just the type itself.
+    fn from_single(ty: Type<'db>, result: PlaceAndQualifiers<'db>) -> Self {
+        if result.place.is_undefined() {
+            Self {
+                defined: Vec::new(),
+                undefined: vec![ty],
+            }
+        } else {
+            Self {
+                defined: vec![(ty, result)],
+                undefined: Vec::new(),
+            }
+        }
+    }
+
+    /// Look up `name` on `element` and add the result to this `PerElementLookup`.
+    ///
+    /// Recurses into nested composite types so the final `defined`/`undefined` lists
+    /// contain only "leaf" types, not composite ones.
+    fn add_element(
+        &mut self,
+        db: &'db dyn Db,
+        element: Type<'db>,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) {
+        match element {
+            Type::Union(_) | Type::Intersection(_) => {
+                let nested = element.member_lookup_per_element(db, name, policy);
+                self.defined.extend(nested.defined);
+                self.undefined.extend(nested.undefined);
+            }
+            Type::TypeVar(bound_typevar)
+                if matches!(
+                    bound_typevar.typevar(db).bound_or_constraints(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) =>
+            {
+                let nested = element.member_lookup_per_element(db, name, policy);
+                self.defined.extend(nested.defined);
+                self.undefined.extend(nested.undefined);
+            }
+            _ => {
+                let result = element.member_lookup_with_policy(db, name, policy);
+                if result.place.is_undefined() {
+                    self.undefined.push(element);
+                } else {
+                    self.defined.push((element, result));
+                }
+            }
+        }
+    }
+}
+
 bitflags! {
     #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
     pub(crate) struct MemberLookupPolicy: u8 {
@@ -3614,6 +3694,65 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Look up a member on each element of a composite type, returning per-element results.
+    ///
+    /// For composite types (unions, intersections, and constrained `TypeVars`), this decomposes
+    /// the type into its elements and calls `member_lookup_with_policy` on each individually.
+    /// The returned [`PerElementLookup`] preserves which elements defined the member and which
+    /// didn't — information that the aggregated `member_lookup_with_policy` result discards.
+    ///
+    /// For non-composite types, this just wraps a single lookup result.
+    ///
+    /// This method is efficient because each per-element `member_lookup_with_policy` call hits
+    /// Salsa's cache: the individual lookups on non-composite types are already cached from any
+    /// aggregated lookups on the same composite type.
+    #[must_use]
+    pub(crate) fn member_lookup_per_element(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PerElementLookup<'db> {
+        let mut result = PerElementLookup::default();
+        match self {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    result.add_element(db, *element, name.clone(), policy);
+                }
+            }
+            Type::Intersection(intersection) => {
+                // `object` does not define any of the dunders that are called through
+                // the typical `try_call_dunder_with_policy` path without
+                // `MRO_NO_OBJECT_FALLBACK`, so `positive()` is safe here for those callers.
+                for element in intersection.positive(db) {
+                    result.add_element(db, *element, name.clone(), policy);
+                }
+            }
+            Type::TypeVar(bound_typevar)
+                if matches!(
+                    bound_typevar.typevar(db).bound_or_constraints(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) =>
+            {
+                let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                    bound_typevar.typevar(db).bound_or_constraints(db)
+                else {
+                    unreachable!("guarded by match condition");
+                };
+                for constraint in constraints.elements(db) {
+                    result.add_element(db, *constraint, name.clone(), policy);
+                }
+            }
+            _ => {
+                return PerElementLookup::from_single(
+                    self,
+                    self.member_lookup_with_policy(db, name, policy),
+                );
+            }
+        }
+        result
+    }
+
     /// Return the type of `len()` on a type if it is known more precisely than `int`,
     /// or `None` otherwise.
     ///
@@ -3652,7 +3791,7 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         ) {
             Ok(bindings) => bindings.return_type(db),
-            Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => bindings.return_type(db),
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
@@ -4772,36 +4911,96 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        // For intersection types, call the dunder on each element separately and combine
-        // the results. This avoids intersecting bound methods (which often collapses to Never)
-        // and instead intersects the return types.
+        // Composite types (unions, intersections, constrained TypeVars) are dispatched
+        // per-element so that we can track which elements (if any) lack the dunder.
+        // This both avoids the "intersecting bound methods collapses to `Never`" problem
+        // (https://github.com/astral-sh/ty/issues/2428) and lets us emit precise
+        // per-element diagnostics when a union member doesn't implement a dunder.
         //
-        // TODO: we might be able to remove this after fixing
-        // https://github.com/astral-sh/ty/issues/2428.
-        if let Type::Intersection(intersection) = self {
-            // Using `positive()` rather than `positive_elements_or_object()` is safe
-            // here because `object` does not define any of the dunders that are called
-            // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
-            // `__iter__`, `__enter__`, `__bool__`).
-            let positive = intersection.positive(db);
+        // `object` does not define any of the dunders that are called through this path
+        // without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`, `__iter__`, `__enter__`,
+        // `__bool__`), so using `positive()` (rather than `positive_elements_or_object`)
+        // for intersections is safe.
+        let composite_kind = match self {
+            Type::Union(_) => Some(CompositeKind::Union),
+            Type::Intersection(_) => Some(CompositeKind::Intersection),
+            Type::TypeVar(bound_typevar)
+                if matches!(
+                    bound_typevar.typevar(db).bound_or_constraints(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) =>
+            {
+                Some(CompositeKind::ConstrainedTypeVar)
+            }
+            _ => None,
+        };
 
-            let mut successful_bindings = Vec::with_capacity(positive.len());
-            let mut last_error = None;
+        if let Some(kind) = composite_kind {
+            let elements: Vec<Type<'db>> = match self {
+                Type::Union(union) => union.elements(db).to_vec(),
+                Type::Intersection(intersection) => {
+                    intersection.positive(db).iter().copied().collect()
+                }
+                Type::TypeVar(bound_typevar) => {
+                    let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                        bound_typevar.typevar(db).bound_or_constraints(db)
+                    else {
+                        unreachable!("guarded by `composite_kind` match above");
+                    };
+                    constraints.elements(db).to_vec()
+                }
+                _ => unreachable!("guarded by `composite_kind` match above"),
+            };
 
-            for element in positive {
+            let mut successful_bindings = Vec::with_capacity(elements.len());
+            let mut missing_on: Vec<Type<'db>> = Vec::new();
+            let mut last_error: Option<CallDunderError<'db>> = None;
+
+            for element in &elements {
                 match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
                     Ok(bindings) => successful_bindings.push(bindings),
+                    Err(CallDunderError::MethodNotAvailable) => missing_on.push(*element),
                     Err(err) => last_error = Some(err),
                 }
             }
 
             if successful_bindings.is_empty() {
-                // TODO we are only showing one of the errors here; should we aggregate them
-                // somehow or show all of them?
+                // None of the elements had a valid dunder. Return the last non-
+                // `MethodNotAvailable` error if there was one, otherwise report that
+                // the dunder is missing entirely.
+                //
+                // TODO: for intersections, we are only showing one of the errors here;
+                // should we aggregate them somehow or show all of them?
                 return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
             }
 
-            return Ok(Bindings::from_intersection(self, successful_bindings));
+            let combined = match kind {
+                CompositeKind::Intersection => {
+                    Bindings::from_intersection(self, successful_bindings)
+                }
+                CompositeKind::Union | CompositeKind::ConstrainedTypeVar => {
+                    Bindings::from_union(self, successful_bindings)
+                }
+            };
+
+            return match kind {
+                // Intersection semantics: if at least one positive element defines the
+                // dunder, the intersection defines it. We don't emit a "possibly unbound"
+                // diagnostic for intersections.
+                CompositeKind::Intersection => Ok(combined),
+                CompositeKind::Union | CompositeKind::ConstrainedTypeVar => {
+                    if !missing_on.is_empty() || last_error.is_some() {
+                        // Some elements are missing the dunder or had errors;
+                        // report as possibly unbound with the list of missing elements.
+                        Err(CallDunderError::PossiblyUnbound {
+                            bindings: Box::new(combined),
+                            missing_on: missing_on.into_boxed_slice(),
+                        })
+                    } else {
+                        Ok(combined)
+                    }
+                }
+            };
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -4826,7 +5025,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        missing_on: Box::new([]),
+                    });
                 }
                 Ok(bindings)
             }
@@ -4861,7 +5063,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        missing_on: Box::new([]),
+                    });
                 }
                 Ok(bindings)
             }
@@ -7303,8 +7508,17 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-            Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
+            Self::Call(CallDunderError::PossiblyUnbound {
+                bindings,
+                missing_on,
+            }) => {
                 diag.info("`__await__` may be missing");
+                for missing_ty in missing_on {
+                    diag.info(format_args!(
+                        "`{}` does not implement `__await__`",
+                        missing_ty.display(db)
+                    ));
+                }
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)

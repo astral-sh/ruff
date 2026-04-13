@@ -4109,17 +4109,17 @@ pub(super) fn report_possibly_unresolved_reference(
     builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
-pub(super) fn report_possibly_missing_attribute(
-    context: &InferContext,
+pub(super) fn report_possibly_missing_attribute<'db>(
+    context: &InferContext<'db, '_>,
     target: &ast::ExprAttribute,
     attribute: &str,
-    object_ty: Type,
+    object_ty: Type<'db>,
 ) {
     let Some(builder) = context.report_lint(&POSSIBLY_MISSING_ATTRIBUTE, target) else {
         return;
     };
     let db = context.db();
-    match object_ty {
+    let mut diag = match object_ty {
         Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
             "Member `{attribute}` may be missing on module `{}`",
             module.module(db).name(db),
@@ -4137,6 +4137,23 @@ pub(super) fn report_possibly_missing_attribute(
             object_ty.display(db),
         )),
     };
+
+    // For composite types, identify which specific elements definitely lack the
+    // attribute and emit info sub-diagnostics naming them. This helps users quickly
+    // pinpoint the problematic union member. Non-composite types return a single-
+    // element `defined` result here so this loop is a no-op for them.
+    let lookup_ty = object_ty
+        .as_union_like(db)
+        .map(Type::Union)
+        .unwrap_or(object_ty);
+    let per_element =
+        lookup_ty.member_lookup_per_element(db, attribute.into(), MemberLookupPolicy::default());
+    for missing_ty in &per_element.undefined {
+        diag.info(format_args!(
+            "`{}` does not have an attribute `{attribute}`",
+            missing_ty.display(db)
+        ));
+    }
 }
 
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
@@ -5010,12 +5027,18 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
             match mro_entries_call_error {
                 CallDunderError::MethodNotAvailable => {}
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { missing_on, .. } => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
+                    for missing_ty in missing_on {
+                        diagnostic.info(format_args!(
+                            "`{}` does not implement `__mro_entries__`",
+                            missing_ty.display(db)
+                        ));
+                    }
                 }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     explain_mro_entries(&mut diagnostic);

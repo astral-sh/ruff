@@ -118,5 +118,6 @@ error[invalid-base]: Invalid class base with type `HasMroEntries | NoMroEntries`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `HasMroEntries | NoMroEntries` may have an `__mro_entries__` attribute, but it may be missing
+info: `NoMroEntries` does not implement `__mro_entries__`
 
 ```

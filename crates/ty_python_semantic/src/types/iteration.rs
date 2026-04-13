@@ -283,7 +283,10 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-                Err(CallDunderError::PossiblyUnbound(dunder_aiter_bindings)) => {
+                Err(CallDunderError::PossiblyUnbound {
+                    bindings: dunder_aiter_bindings,
+                    ..
+                }) => {
                     let iterator = dunder_aiter_bindings.return_type(db);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(_) => Err(IterationError::IterCallError {
@@ -361,7 +364,10 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is possibly unbound...
-            Err(CallDunderError::PossiblyUnbound(dunder_iter_outcome)) => {
+            Err(CallDunderError::PossiblyUnbound {
+                bindings: dunder_iter_outcome,
+                missing_on: missing_on_iter,
+            }) => {
                 let iterator = dunder_iter_outcome.return_type(db);
 
                 match try_call_dunder_next_on_iterator(iterator) {
@@ -384,6 +390,7 @@ impl<'db> Type<'db> {
                             .map_err(|dunder_getitem_error| {
                                 IterationError::PossiblyUnboundIterAndGetitemError {
                                     dunder_next_return,
+                                    missing_on_iter,
                                     dunder_getitem_error,
                                 }
                             })
@@ -447,6 +454,9 @@ pub(super) enum IterationError<'db> {
         /// The type of the object returned by the `__next__` method on the iterator.
         /// (The iterator being the type returned by the `__iter__` method on the iterable.)
         dunder_next_return: Type<'db>,
+        /// For union types, the elements where `__iter__` was completely undefined.
+        /// Used to emit per-element info sub-diagnostics identifying the problematic members.
+        missing_on_iter: Box<[Type<'db>]>,
         /// The error we encountered when we tried to call `__getitem__` on the iterable.
         dunder_getitem_error: CallDunderError<'db>,
     },
@@ -511,16 +521,18 @@ impl<'db> IterationError<'db> {
 
             Self::PossiblyUnboundIterAndGetitemError {
                 dunder_next_return,
+                missing_on_iter: _,
                 dunder_getitem_error,
             } => match dunder_getitem_error {
                 CallDunderError::MethodNotAvailable => Some(*dunder_next_return),
-                CallDunderError::PossiblyUnbound(dunder_getitem_outcome) => {
-                    Some(UnionType::from_two_elements(
-                        db,
-                        *dunder_next_return,
-                        dunder_getitem_outcome.return_type(db),
-                    ))
-                }
+                CallDunderError::PossiblyUnbound {
+                    bindings: dunder_getitem_outcome,
+                    ..
+                } => Some(UnionType::from_two_elements(
+                    db,
+                    *dunder_next_return,
+                    dunder_getitem_outcome.return_type(db),
+                )),
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     Some(*dunder_next_return)
                 }
@@ -685,7 +697,7 @@ impl<'db> IterationError<'db> {
                         iterator_type = iterator.display(db),
                     ));
                     }
-                    CallDunderError::PossiblyUnbound(_) => {
+                    CallDunderError::PossiblyUnbound { .. } => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which may not have a `{dunder_next_name}` method",
@@ -730,73 +742,77 @@ impl<'db> IterationError<'db> {
             }
 
             Self::PossiblyUnboundIterAndGetitemError {
+                missing_on_iter,
                 dunder_getitem_error,
                 ..
-            } => match dunder_getitem_error {
-                CallDunderError::MethodNotAvailable => {
-                    reporter.may_not(
+            } => {
+                let mut diag = match dunder_getitem_error {
+                    CallDunderError::MethodNotAvailable => reporter.may_not(
                         "It may not have an `__iter__` method \
                          and it doesn't have a `__getitem__` method",
-                    );
-                }
-                CallDunderError::PossiblyUnbound(_) => {
-                    reporter
-                        .may_not("It may not have an `__iter__` method or a `__getitem__` method");
-                }
-                CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => {
-                    reporter.may_not(format_args!(
-                        "It may not have an `__iter__` method \
-                         and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
-                         which is not callable",
-                        dunder_getitem_type = bindings.callable_type().display(db),
-                    ));
-                }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
-                    if bindings.is_single() =>
-                {
-                    reporter.may_not(
-                        "It may not have an `__iter__` method \
-                         and its `__getitem__` attribute may not be callable",
-                    );
-                }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
-                    reporter.may_not(format_args!(
-                        "It may not have an `__iter__` method \
-                         and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
-                         may not be callable",
-                        dunder_getitem_type = bindings.callable_type().display(db),
-                    ));
-                }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings)
-                    if bindings.is_single() =>
-                {
-                    reporter
-                        .may_not(
+                    ),
+                    CallDunderError::PossiblyUnbound { .. } => reporter
+                        .may_not("It may not have an `__iter__` method or a `__getitem__` method"),
+                    CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => reporter
+                        .may_not(format_args!(
+                            "It may not have an `__iter__` method \
+                             and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
+                             which is not callable",
+                            dunder_getitem_type = bindings.callable_type().display(db),
+                        )),
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
+                        if bindings.is_single() =>
+                    {
+                        reporter.may_not(
+                            "It may not have an `__iter__` method \
+                             and its `__getitem__` attribute may not be callable",
+                        )
+                    }
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
+                        reporter.may_not(format_args!(
+                            "It may not have an `__iter__` method \
+                             and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
+                             may not be callable",
+                            dunder_getitem_type = bindings.callable_type().display(db),
+                        ))
+                    }
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                        if bindings.is_single() =>
+                    {
+                        let mut diag = reporter.may_not(
                             "It may not have an `__iter__` method \
                              and its `__getitem__` method has an incorrect signature \
                              for the old-style iteration protocol",
-                        )
-                        .info(
+                        );
+                        diag.info(
                             "`__getitem__` must be at least as permissive as \
                              `def __getitem__(self, key: int): ...` \
                              to satisfy the old-style iteration protocol",
                         );
-                }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
-                    reporter
-                        .may_not(format_args!(
+                        diag
+                    }
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
+                        let mut diag = reporter.may_not(format_args!(
                             "It may not have an `__iter__` method \
                              and its `__getitem__` method (with type `{dunder_getitem_type}`) \
                              may have an incorrect signature for the old-style iteration protocol",
                             dunder_getitem_type = bindings.callable_type().display(db),
-                        ))
-                        .info(
+                        ));
+                        diag.info(
                             "`__getitem__` must be at least as permissive as \
                              `def __getitem__(self, key: int): ...` \
                              to satisfy the old-style iteration protocol",
                         );
+                        diag
+                    }
+                };
+                for missing_ty in missing_on_iter {
+                    diag.info(format_args!(
+                        "`{}` does not implement `__iter__`",
+                        missing_ty.display(db)
+                    ));
                 }
-            },
+            }
 
             Self::UnboundIterAndGetitemError {
                 dunder_getitem_error,
@@ -805,7 +821,7 @@ impl<'db> IterationError<'db> {
                     reporter
                         .is_not("It doesn't have an `__iter__` method or a `__getitem__` method");
                 }
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     reporter.is_not(
                         "It has no `__iter__` method and it may not have a `__getitem__` method",
                     );

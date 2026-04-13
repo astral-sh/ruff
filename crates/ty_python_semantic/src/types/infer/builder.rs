@@ -2457,7 +2457,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // above) as a fallback for dynamic attribute assignment.
                             match setattr_dunder_call_result {
                                 // If __setattr__ succeeded, allow the assignment.
-                                Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
+                                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
                                 Err(CallDunderError::CallError(..)) => {
                                     if emit_diagnostics
                                         && let Some(builder) =
@@ -2815,7 +2815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
                         if self.validate_final_attribute_deletion(
                             target,
                             object_ty,
@@ -2871,7 +2871,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
 
                     match delete_dunder_call_result {
-                        Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                        Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => return true,
                         Err(CallDunderError::CallError(kind, bindings)) => {
                             if emit_diagnostics {
                                 let failure = CallError(kind, bindings);
@@ -4130,7 +4130,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
                     }
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                    Err(CallDunderError::PossiblyUnbound {
+                        bindings: outcome, ..
+                    }) => {
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
                         UnionType::from_two_elements(
                             db,
@@ -4707,7 +4709,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        missing_on: Box::new([]),
+                    });
                 }
                 Ok(bindings)
             }
@@ -8032,21 +8037,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
-        fn union_elements_missing_attribute<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            attr_name: &str,
-            missing_types: &mut FxIndexSet<Type<'db>>,
-        ) {
-            if let Some(union) = ty.as_union_like(db) {
-                for element in union.elements(db) {
-                    union_elements_missing_attribute(db, *element, attr_name, missing_types);
-                }
-            } else if ty.member(db, attr_name).place.is_undefined() {
-                missing_types.insert(ty);
-            }
-        }
-
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let mut value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
@@ -8275,21 +8265,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // we want it to be an error. Use `as_union_like` here to handle type aliases
                     // of unions and `NewType`s of float/complex in addition to explicit unions.
                     if let Some(union) = value_type.as_union_like(db) {
-                        let mut elements_missing_the_attribute = FxIndexSet::default();
-                        for element in union.elements(db) {
-                            union_elements_missing_attribute(
-                                db,
-                                *element,
-                                attr_name,
-                                &mut elements_missing_the_attribute,
-                            );
-                        }
+                        let per_element = Type::Union(union).member_lookup_per_element(
+                            db,
+                            attr_name.as_str().into(),
+                            MemberLookupPolicy::default(),
+                        );
 
-                        if !elements_missing_the_attribute.is_empty() {
+                        if !per_element.undefined.is_empty() {
                             if let Some(builder) =
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                             {
-                                let missing_types = elements_missing_the_attribute
+                                let missing_types = per_element
+                                    .undefined
                                     .iter()
                                     .map(|ty| format!("`{}`", ty.display(db)))
                                     .collect::<Vec<_>>()

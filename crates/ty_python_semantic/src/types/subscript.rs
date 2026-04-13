@@ -768,7 +768,7 @@ impl<'db> Type<'db> {
             Ok(outcome) => {
                 return Ok(outcome.return_type(db));
             }
-            Err(CallDunderError::PossiblyUnbound(bindings)) => {
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                 return Err(SubscriptError::new(
                     bindings.return_type(db),
                     SubscriptErrorKind::DunderPossiblyUnbound {
@@ -814,7 +814,7 @@ impl<'db> Type<'db> {
                 Ok(bindings) => {
                     return Ok(bindings.return_type(db));
                 }
-                Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                     return Err(SubscriptError::new(
                         bindings.return_type(db),
                         SubscriptErrorKind::DunderPossiblyUnbound {

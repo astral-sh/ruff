@@ -127,9 +127,7 @@ impl<'db> ContextManagerError<'db> {
                 exit_error: _,
                 mode: _,
             } => match enter_error {
-                CallDunderError::PossiblyUnbound(call_outcome) => {
-                    Some(call_outcome.return_type(db))
-                }
+                CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => None,
                 CallDunderError::CallError(_, bindings) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
@@ -162,7 +160,7 @@ impl<'db> ContextManagerError<'db> {
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
@@ -179,9 +177,10 @@ impl<'db> ContextManagerError<'db> {
                                          error_b: &CallDunderError<'db>,
                                          name_b: &str| {
             match (error_a, error_b) {
-                (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                    format!("the methods `{name_a}` and `{name_b}` are possibly missing")
-                }
+                (
+                    CallDunderError::PossiblyUnbound { .. },
+                    CallDunderError::PossiblyUnbound { .. },
+                ) => format!("the methods `{name_a}` and `{name_b}` are possibly missing"),
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
                 }
@@ -225,6 +224,32 @@ impl<'db> ContextManagerError<'db> {
             with_kw,
             formatted_errors,
         ));
+
+        // Emit per-element info sub-diagnostics for union types where specific
+        // members are missing `__enter__` or `__exit__`.
+        let errors_and_names: &[(&CallDunderError<'db>, &str)] = match self {
+            Self::Exit {
+                enter_return_type: _,
+                exit_error,
+                mode: _,
+            } => &[(exit_error, exit_method)],
+            Self::Enter(enter_error, _) => &[(enter_error, enter_method)],
+            Self::EnterAndExit {
+                enter_error,
+                exit_error,
+                mode: _,
+            } => &[(enter_error, enter_method), (exit_error, exit_method)],
+        };
+        for (error, name) in errors_and_names {
+            if let CallDunderError::PossiblyUnbound { missing_on, .. } = error {
+                for missing_ty in missing_on {
+                    diag.info(format_args!(
+                        "`{}` does not implement `{name}`",
+                        missing_ty.display(db)
+                    ));
+                }
+            }
+        }
 
         let (alt_mode, alt_enter_method, alt_exit_method, alt_with_kw) = match mode {
             EvaluationMode::Sync => ("async", "__aenter__", "__aexit__", "async with"),

@@ -39,5 +39,7 @@ error[invalid-context-manager]: Object of type `Manager1 | NotAContextManager` c
    |                ^^^^^^^^^^^^
 13 |         reveal_type(f)  # revealed: str
    |
+info: `NotAContextManager` does not implement `__aenter__`
+info: `NotAContextManager` does not implement `__aexit__`
 
 ```

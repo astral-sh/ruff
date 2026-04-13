@@ -169,7 +169,16 @@ pub(super) enum CallDunderError<'db> {
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Box<Bindings<'db>>),
+    ///
+    /// For composite types like unions, `missing_on` lists the union elements
+    /// where the dunder method was completely undefined. This is used to emit
+    /// per-element info sub-diagnostics that identify which union member(s) lack
+    /// the dunder. It is empty for non-composite types where the dunder is
+    /// possibly unbound for other reasons (e.g. conditionally defined on a class).
+    PossiblyUnbound {
+        bindings: Box<Bindings<'db>>,
+        missing_on: Box<[Type<'db>]>,
+    },
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
@@ -180,7 +189,7 @@ impl<'db> CallDunderError<'db> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
             Self::CallError(_, bindings) => Some(bindings.return_type(db)),
-            Self::PossiblyUnbound(bindings) => Some(bindings.return_type(db)),
+            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
         }
     }
 
@@ -209,7 +218,7 @@ impl From<CallDunderError<'_>> for CallBinOpError {
     fn from(value: CallDunderError<'_>) -> Self {
         match value {
             CallDunderError::CallError(_, _) => Self::CallError,
-            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_) => {
+            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
                 CallBinOpError::NotSupported
             }
         }
