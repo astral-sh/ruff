@@ -8,7 +8,9 @@ use ruff_python_ast as ast;
 mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
+pub(super) use bind::{
+    ArgumentInferenceRefinement, Binding, Bindings, CallableBinding, MatchedArgument,
+};
 
 impl<'db> Type<'db> {
     pub(crate) fn try_call_bin_op(

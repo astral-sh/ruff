@@ -588,8 +588,7 @@ Distribution = Literal["sdist", "wheel", "editable"]
 def build(distributions: Sequence[Distribution]) -> None:
     pass
 
-p = partial(build, distributions=["wheel"])  # error: [invalid-argument-type]
-# TODO: should accept this keyword literal without a construction-time error.
+p = partial(build, distributions=["wheel"])
 reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
 reveal_type(p())  # revealed: None
 ```
@@ -1412,8 +1411,7 @@ class CallbackHost(Generic[T]):
     @classmethod
     def callback(cls, wself: ReferenceType["CallbackHost[Any]"], x: int) -> None: ...
     def __init__(self) -> None:
-        p = partial(self.callback, ref(self))  # error: [invalid-argument-type]
-        # TODO: should accept `ReferenceType[Self]` here and preserve the reduced signature.
+        p = partial(self.callback, ref(self))
         reveal_type(p)  # revealed: partial[(x: int) -> None]
 ```
 
