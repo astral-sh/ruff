@@ -15,11 +15,11 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
-use crate::db::Db;
-use crate::diagnostic::SortedDiagnostics;
-use crate::pragma_comments::{
+use crate::assertion::{
     LinePragmaComments, ParsedAssertion, TestPragmaComments, UnparsedAssertion,
 };
+use crate::db::Db;
+use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -136,7 +136,7 @@ pub(super) fn match_file(
                     Ordering::Less => {
                         // We have pragmas on an earlier line than diagnostics; report these
                         // pragmas as all unmatched, and advance the assertions iterator.
-                        failures.push(pragmas.line_number, unmatched_pragmas(pragmas));
+                        failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
                         current_pragmas = line_pragmas.next();
                     }
                     Ordering::Greater => {
@@ -150,7 +150,7 @@ pub(super) fn match_file(
             (Some(pragmas), None) => {
                 // We've exhausted diagnostics but still have pragmas; report these pragmas
                 // as unmatched and advance the pragmas iterator.
-                failures.push(pragmas.line_number, unmatched_pragmas(pragmas));
+                failures.push(pragmas.line_number, unmatched(&pragmas.assertions));
                 current_pragmas = line_pragmas.next();
             }
             (None, Some(diagnostics)) => {
@@ -175,15 +175,6 @@ trait Unmatched {
     fn unmatched(&self) -> Failure;
 }
 
-fn unmatched_pragmas(pragmas: &LinePragmaComments) -> Vec<Failure> {
-    let mut errors = unmatched(&pragmas.assertions);
-
-    if pragmas.snapshot_pragmas > 0 {
-        errors.push(Failure::new("unmatched snapshot comment.".red()));
-    }
-
-    errors
-}
 fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<Failure> {
     unmatched.iter().map(Unmatched::unmatched).collect()
 }
@@ -339,13 +330,13 @@ impl Matcher {
         for assertion in &pragmas.assertions {
             match assertion.parse() {
                 Ok(assertion) => match self.matches(&assertion, &mut unmatched) {
-                    None => {
-                        failures.push(assertion.unmatched());
-                    }
                     Some(diagnostic) => {
-                        if pragmas.snapshot_pragmas > 0 {
+                        if matches!(assertion, ParsedAssertion::Snapshot(_)) {
                             snapshot_diagnostics.push(diagnostic);
                         }
+                    }
+                    None => {
+                        failures.push(assertion.unmatched());
                     }
                 },
                 Err(error) => {
@@ -356,14 +347,6 @@ impl Matcher {
                     )));
                 }
             }
-        }
-
-        if pragmas.snapshot_pragmas > 1 {
-            failures.push(Failure::new(format_args!(
-                "{} {}",
-                "unnecessary `# snapshot` comment:".red(),
-                "line has multiple `# snapshot` comments"
-            )));
         }
 
         for diagnostic in unmatched {
@@ -392,7 +375,7 @@ impl Matcher {
     /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
     ///
     /// If so, return `Some` and remove the matched diagnostics from `unmatched`. Otherwise, return
-    /// `None`.
+    /// `None`. If  the assertion is a `snapshot` assertion, return the diagnostic.
     ///
     /// An `Error` assertion can only match one diagnostic; even if it could match more than one,
     /// we short-circuit after the first match.
@@ -420,73 +403,108 @@ impl Matcher {
                 });
                 position.map(|position| unmatched.swap_remove(position).clone())
             }
+            ParsedAssertion::Snapshot(rule) => {
+                let Some(rule) = rule else {
+                    // Similar to `error:` with the same diagnostic code. Match the first diagnostic even if this
+                    // is ambigious (and somewhat problematic because we use swap_remove in many places).
+                    if let Some(first) = unmatched.pop() {
+                        return Some(first.clone());
+                    }
+
+                    return None;
+                };
+
+                if *rule == DiagnosticId::RevealedType.as_str() {
+                    match_reveal_type_diagnostic(None, None, unmatched)
+                } else {
+                    unmatched
+                        .iter()
+                        .position(|diagnostic| {
+                            diagnostic.id().is_lint_named(rule) || diagnostic.id().as_str() == *rule
+                        })
+                        .map(|position| unmatched.swap_remove(position).clone())
+                }
+            }
             ParsedAssertion::Revealed(expected_type) => {
                 let expected_type = discard_todo_metadata(expected_type);
                 let expected_reveal_type_message = format!("`{expected_type}`");
 
-                let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
-                    if diagnostic.id() != DiagnosticId::RevealedType {
-                        return false;
-                    }
-                    let primary_message = diagnostic.primary_message();
-                    let Some(primary_annotation) =
-                        (diagnostic.primary_annotation()).and_then(|a| a.get_message())
-                    else {
-                        return false;
-                    };
-
-                    let primary_annotation = normalize_paths(primary_annotation);
-
-                    // reveal_type, reveal_protocol_interface
-                    if matches!(
-                        primary_message,
-                        "Revealed type" | "Revealed protocol interface"
-                    ) && primary_annotation == expected_reveal_type_message
-                    {
-                        return true;
-                    }
-
-                    // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
-                    if matches!(
-                        primary_message,
-                        "Assignability holds" | "Subtyping holds" | "Revealed MRO"
-                    ) && primary_annotation == expected_type
-                    {
-                        return true;
-                    }
-
-                    false
-                };
-
-                // Try to match against any reveal-type diagnostic.
-                // If the `undefined-reveal` diagnostic is present, we also match against it.
-                let mut matched_revealed_type = None;
-                let mut matched_undefined_reveal = false;
-                let mut i = 0;
-
-                while i < unmatched.len() {
-                    let diagnostic = &unmatched[i];
-
-                    if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
-                        matched_revealed_type = Some(unmatched.swap_remove(i).clone());
-                    } else if !matched_undefined_reveal
-                        && diagnostic.id().is_lint_named("undefined-reveal")
-                    {
-                        unmatched.swap_remove(i);
-                        matched_undefined_reveal = true;
-                    } else {
-                        i += 1;
-                    }
-
-                    if matched_revealed_type.is_some() && matched_undefined_reveal {
-                        break;
-                    }
-                }
-
-                matched_revealed_type
+                match_reveal_type_diagnostic(
+                    Some(&expected_type),
+                    Some(&expected_reveal_type_message),
+                    unmatched,
+                )
             }
         }
     }
+}
+
+fn match_reveal_type_diagnostic(
+    expected_reveal_type: Option<&str>,
+    expected_reveal_type_message: Option<&str>,
+    unmatched: &mut Vec<&Diagnostic>,
+) -> Option<Diagnostic> {
+    let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
+        if diagnostic.id() != DiagnosticId::RevealedType {
+            return false;
+        }
+
+        let primary_message = diagnostic.primary_message();
+        let Some(primary_annotation) =
+            (diagnostic.primary_annotation()).and_then(|a| a.get_message())
+        else {
+            return false;
+        };
+
+        let primary_annotation = normalize_paths(primary_annotation);
+
+        // reveal_type, reveal_protocol_interface
+        if matches!(
+            primary_message,
+            "Revealed type" | "Revealed protocol interface"
+        ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
+            primary_annotation == expected_reveal_type_message
+        }) {
+            return true;
+        }
+
+        // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
+        if matches!(
+            primary_message,
+            "Assignability holds" | "Subtyping holds" | "Revealed MRO"
+        ) && expected_reveal_type
+            .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)
+        {
+            return true;
+        }
+
+        false
+    };
+
+    // Try to match against any reveal-type diagnostic.
+    // If the `undefined-reveal` diagnostic is present, we also match against it.
+    let mut matched_revealed_type = None;
+    let mut matched_undefined_reveal = false;
+    let mut i = 0;
+
+    while i < unmatched.len() {
+        let diagnostic = &unmatched[i];
+
+        if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
+            matched_revealed_type = Some(unmatched.swap_remove(i).clone());
+        } else if !matched_undefined_reveal && diagnostic.id().is_lint_named("undefined-reveal") {
+            unmatched.swap_remove(i);
+            matched_undefined_reveal = true;
+        } else {
+            i += 1;
+        }
+
+        if matched_revealed_type.is_some() && matched_undefined_reveal {
+            break;
+        }
+    }
+
+    matched_revealed_type
 }
 
 #[cfg(test)]

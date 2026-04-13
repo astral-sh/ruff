@@ -374,7 +374,7 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) lang: &'s str,
     pub(crate) code: Cow<'s, str>,
     /// The checkable code blocks
-    pub(crate) code_blocks: Vec<CodeBlock<'s>>,
+    pub(crate) python_code_blocks: Vec<CodeBlock<'s>>,
 }
 
 impl EmbeddedFile<'_> {
@@ -390,7 +390,7 @@ impl EmbeddedFile<'_> {
         let start_offset = existing_code.text_len();
         existing_code.push_str(new_code);
 
-        self.code_blocks.push(CodeBlock {
+        self.python_code_blocks.push(CodeBlock {
             backticks: backtick_offsets,
             embedded_start_offset: start_offset,
             inline_snapshot_block: None,
@@ -424,8 +424,7 @@ pub(crate) struct CodeBlock<'s> {
     backticks: BacktickOffsets,
     /// The offset in the concatenated file source at which this code block starts.
     embedded_start_offset: TextSize,
-
-    /// The code block's associated inline snapshot block (where inline snapshots are stored).
+    /// The code block's associated inline snapshot block (capture the expected rendered diagnostics output).
     inline_snapshot_block: Option<InlineSnapshotBlock<'s>>,
 }
 
@@ -703,7 +702,7 @@ impl<'s> Parser<'s> {
                         } else {
                             let code_block_start = self.cursor.token_len();
                             let line = self.source.count_lines(TextRange::up_to(code_block_start));
-                            bail!("Unterminated code block at line {line}.");
+                            bail!("Unterminated code block on line {line}.");
                         }
 
                         self.explicit_path = None;
@@ -799,7 +798,7 @@ impl<'s> Parser<'s> {
             return Ok(());
         }
 
-        if lang == "diagnostics" {
+        if lang == "snapshot" {
             return self.process_inline_snapshot(code, backtick_offsets);
         }
 
@@ -812,9 +811,9 @@ impl<'s> Parser<'s> {
                     .extension()
                     .is_none_or(|extension| extension.eq_ignore_ascii_case(expected_extension))
             {
-                let backtick_start = self.line_index(backtick_offsets.start());
+                let backtick_start = self.line_number(backtick_offsets.start());
                 bail!(
-                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start}`"
+                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block on line `{backtick_start}`"
                 );
             }
         }
@@ -861,7 +860,7 @@ impl<'s> Parser<'s> {
                     section,
                     lang,
                     code: Cow::Borrowed(code),
-                    code_blocks: vec![CodeBlock {
+                    python_code_blocks: vec![CodeBlock {
                         backticks: backtick_offsets,
                         embedded_start_offset: TextSize::new(0),
                         inline_snapshot_block: None,
@@ -901,7 +900,7 @@ impl<'s> Parser<'s> {
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
             .values()
-            .any(|id| self.files[*id].code_blocks.len() > 1)
+            .any(|id| self.files[*id].python_code_blocks.len() > 1)
     }
 
     fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
@@ -935,33 +934,31 @@ impl<'s> Parser<'s> {
         offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
         let Some(file) = self.files.last_mut() else {
-            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
+            let backtick_start = line_number(offsets.start(), self.source);
 
             bail!(
-                "Inline diagnostics block at line {backtick_start} must follow a checkable Python file in the same section."
+                "`snapshot` code block on line {backtick_start} must follow a Python code block in the same section."
             );
         };
 
         if !file.is_checkable() {
-            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
+            let backtick_start = line_number(offsets.start(), self.source);
 
             bail!(
-                "Inline diagnostics block at line {backtick_start} must follow a checkable Python file block in the same section but it follows a `{}` block.",
+                "`snapshot` code block on line {backtick_start} must follow a `python` code block in the same section but it follows a `{}` block.",
                 file.lang
             );
         }
 
-        let code_block = file.code_blocks.last_mut().unwrap();
+        let code_block = file.python_code_blocks.last_mut().unwrap();
 
         if let Some(existing_block) = &code_block.inline_snapshot_block {
-            let backtick_start = self.source.count_lines(TextRange::up_to(offsets.start()));
-            let existing_start = self
-                .source
-                .count_lines(TextRange::up_to(existing_block.range.start()));
+            let code_block_start = line_number(code_block.embedded_start_offset(), self.source);
+            let backtick_start = line_number(offsets.start(), self.source);
+            let existing_start = line_number(existing_block.range.start(), self.source);
 
             bail!(
-                "File `{}` has more than one inline diagnostics block: first at line {existing_start} and another at line {backtick_start}.",
-                file.relative_path(),
+                "Python code block on line `{code_block_start}` has more than one `snapshot` block: first on line {existing_start} and another on line {backtick_start}.",
             );
         }
 
@@ -1012,9 +1009,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn line_index(&self, char_index: TextSize) -> u32 {
-        self.source.count_lines(TextRange::up_to(char_index))
+    fn line_number(&self, char_index: TextSize) -> u32 {
+        line_number(char_index, self.source)
     }
+}
+
+fn line_number(char_index: TextSize, source: &str) -> u32 {
+    source.count_lines(TextRange::up_to(char_index)) + 1
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1557,7 +1558,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block at line `5`"
+            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block on line `6`"
         );
     }
 
@@ -1620,7 +1621,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at line 2.");
+        assert_eq!(err.to_string(), "Unterminated code block on line 2.");
     }
 
     #[test]
@@ -1640,7 +1641,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at line 10.");
+        assert_eq!(err.to_string(), "Unterminated code block on line 10.");
     }
 
     #[test]

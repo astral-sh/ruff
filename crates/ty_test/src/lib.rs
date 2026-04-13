@@ -32,13 +32,13 @@ use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
+mod assertion;
 mod config;
 mod db;
 mod diagnostic;
 mod external_dependencies;
 mod matcher;
 mod parser;
-mod pragma_comments;
 
 /// Filter which tests to run in mdtest.
 ///
@@ -416,7 +416,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                code_blocks: embedded.code_blocks.clone(),
+                code_blocks: embedded.python_code_blocks.clone(),
             })
         })
         .collect();
@@ -788,12 +788,10 @@ fn render_diagnostic(db: &mut Db, diagnostic: &Diagnostic) -> String {
 
 fn render_diagnostics(db: &mut Db, diagnostics: &[Diagnostic]) -> String {
     let mut rendered = String::new();
-    for (index, diag) in diagnostics.iter().enumerate() {
-        if index > 0 {
-            writeln!(rendered).unwrap();
-        }
-        write!(rendered, "{}", render_diagnostic(db, diag)).unwrap();
+    for diag in diagnostics {
+        writeln!(rendered, "{}", render_diagnostic(db, diag)).unwrap();
     }
+
     rendered.trim_end_matches('\n').to_string()
 }
 
@@ -862,7 +860,7 @@ fn validate_inline_snapshot(
                     failures.push(
                         failure_line,
                         vec![Failure::new(
-                            "This code block has a `diagnostics` block but no `# snapshot` assertions. Remove the `diagnostics` block or add a `# snapshot` comment.",
+                            "This code block has a `snapshot` code block but no `# snapshot:` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
                         )],
                     );
                 }
@@ -878,7 +876,7 @@ fn validate_inline_snapshot(
             if update_snapshots {
                 markdown_edits.push(MarkdownEdit {
                     range: TextRange::empty(code_block.backtick_offsets().end()),
-                    replacement: format!("\n\n```diagnostics\n{actual}\n```"),
+                    replacement: format!("\n\n```snapshot\n{actual}\n```"),
                 });
             } else {
                 let first_range = first_diagnostic.primary_span().unwrap().range().unwrap();
@@ -886,7 +884,7 @@ fn validate_inline_snapshot(
                 failures.push(
                     line,
                     vec![Failure::new(format!(
-                        "Add a `diagnostics` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}` to insert one automatically",
+                        "Add a `snapshot` block for this `# snapshot:` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}` to insert one automatically",
                     ))],
                 );
             }
@@ -900,13 +898,13 @@ fn validate_inline_snapshot(
         if update_snapshots {
             markdown_edits.push(MarkdownEdit {
                 range: snapshot_code_block.range(),
-                replacement: format!("```diagnostics\n{actual}\n```"),
+                replacement: format!("```snapshot\n{actual}\n```"),
             });
         } else {
             failures.push(
                 failure_line,
                 vec![Failure::new(format_args!(
-                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}` to update the `diagnostics` block",
+                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}` to update the `snapshot` block",
                     )).with_diff(snapshot_code_block.expected.to_string(), actual)],
                 );
         }

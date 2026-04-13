@@ -55,7 +55,7 @@ impl<'s> TestPragmaComments<'s> {
         file_index: &LineIndex,
     ) -> Self {
         let mut pragmas_by_line = Vec::new();
-        let mut pragma_comments = PragmaCommentsIter {
+        let mut pragma_comments = UnparsedAssertionsIter {
             tokens: parsed.tokens().iter(),
             source,
         }
@@ -64,16 +64,6 @@ impl<'s> TestPragmaComments<'s> {
         while let Some(ranged_pragma) = pragma_comments.next() {
             let mut collector = AssertionVec::new();
             let mut line_number = file_index.line_index(ranged_pragma.start());
-            let mut snapshots = 0usize;
-
-            let mut push_pragma = |comment: UnparsedPragmaComment<'s>| match comment {
-                UnparsedPragmaComment::Snapshot => {
-                    snapshots += 1;
-                }
-                UnparsedPragmaComment::Assertion(assertion) => {
-                    collector.push(assertion);
-                }
-            };
 
             // Collect all own-line comments on consecutive lines; these all apply to the same line of
             // code. For example:
@@ -85,7 +75,7 @@ impl<'s> TestPragmaComments<'s> {
             // ```
             //
             if CommentRanges::is_own_line(ranged_pragma.start(), source) {
-                push_pragma(ranged_pragma.into_comment());
+                collector.push(ranged_pragma.into_comment());
                 let mut only_own_line = true;
 
                 while let Some(ranged_pragma) = pragma_comments.next_if(|next_pragma| {
@@ -102,7 +92,7 @@ impl<'s> TestPragmaComments<'s> {
                         only_own_line = false;
                     }
 
-                    push_pragma(ranged_pragma.into_comment());
+                    collector.push(ranged_pragma.into_comment());
 
                     // If we see an end-of-line comment, it has to be the end of the stack,
                     // otherwise we'd botch this case, attributing all three errors to the `bar`
@@ -125,13 +115,12 @@ impl<'s> TestPragmaComments<'s> {
                 }
             } else {
                 // We have a line-trailing comment; it applies to its own line, and is not grouped.
-                push_pragma(ranged_pragma.into_comment());
+                collector.push(ranged_pragma.into_comment());
             }
 
             pragmas_by_line.push(LinePragmaComments {
                 line_number,
                 assertions: collector,
-                snapshot_pragmas: snapshots,
             });
         }
 
@@ -161,13 +150,13 @@ impl<'s> IntoIterator for TestPragmaComments<'s> {
     }
 }
 
-struct PragmaCommentsIter<'a, 's> {
+struct UnparsedAssertionsIter<'a, 's> {
     source: &'s str,
     tokens: std::slice::Iter<'a, Token>,
 }
 
-impl<'s> Iterator for PragmaCommentsIter<'_, 's> {
-    type Item = PragmaCommentWithRange<'s>;
+impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
+    type Item = UnparsedAssertionWithComment<'s>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -177,24 +166,24 @@ impl<'s> Iterator for PragmaCommentsIter<'_, 's> {
             }
 
             let comment_text = &self.source[token.range()];
-            if let Some(pragma) = UnparsedPragmaComment::from_comment(comment_text) {
-                return Some(PragmaCommentWithRange(pragma, token.range()));
+            if let Some(pragma) = UnparsedAssertion::from_comment(comment_text) {
+                return Some(UnparsedAssertionWithComment(pragma, token.range()));
             }
         }
     }
 }
 
-/// An [`UnparsedPragmaComment`] with the [`TextRange`] of its original inline comment.
+/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
-struct PragmaCommentWithRange<'a>(UnparsedPragmaComment<'a>, TextRange);
+struct UnparsedAssertionWithComment<'a>(UnparsedAssertion<'a>, TextRange);
 
-impl<'a> PragmaCommentWithRange<'a> {
-    fn into_comment(self) -> UnparsedPragmaComment<'a> {
+impl<'a> UnparsedAssertionWithComment<'a> {
+    fn into_comment(self) -> UnparsedAssertion<'a> {
         self.0
     }
 }
 
-impl Ranged for PragmaCommentWithRange<'_> {
+impl Ranged for UnparsedAssertionWithComment<'_> {
     fn range(&self) -> TextRange {
         self.1
     }
@@ -217,30 +206,6 @@ pub(crate) struct LinePragmaComments<'a> {
 
     /// The assertions referring to this line.
     pub(crate) assertions: AssertionVec<'a>,
-
-    /// The number of snapshot comments on this line.
-    pub(crate) snapshot_pragmas: usize,
-}
-
-#[derive(Debug)]
-pub(crate) enum UnparsedPragmaComment<'a> {
-    /// A `# snapshot` pragma comment.
-    Snapshot,
-
-    Assertion(UnparsedAssertion<'a>),
-}
-
-impl<'a> UnparsedPragmaComment<'a> {
-    /// Returns `Some(_)` if the comment starts with `# snapshot`, `# error:` or `# revealed:`,
-    /// indicating that it is a pragma comment.
-    fn from_comment(comment: &'a str) -> Option<Self> {
-        let comment = comment.trim().strip_prefix('#')?.trim();
-        if comment == "snapshot" {
-            return Some(Self::Snapshot);
-        }
-
-        UnparsedAssertion::from_comment(comment).map(Self::Assertion)
-    }
 }
 
 /// A single assertion comment.
@@ -254,6 +219,8 @@ pub(crate) enum UnparsedAssertion<'a> {
     Revealed(&'a str),
     /// An `# error:` assertion.
     Error(&'a str),
+    /// A `# snapshot` assertion
+    Snapshot(&'a str),
 }
 
 impl std::fmt::Display for UnparsedAssertion<'_> {
@@ -263,32 +230,34 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
                 write!(f, "revealed: {expected_type}")
             }
             Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Snapshot(assertion) => write!(f, "snapshot: {assertion}"),
         }
     }
 }
 
 impl<'a> UnparsedAssertion<'a> {
-    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
+    /// Returns `Some(_)` if the comment starts with `# error:`, `snapshot`, or `# revealed:`,
     /// indicating that it is a assertion comment.
-    fn from_comment(comment_body: &'a str) -> Option<Self> {
-        let (keyword, body) = comment_body.split_once(':')?;
-        let keyword = keyword.trim();
-
-        let keyword = keyword.trim();
+    fn from_comment(comment: &'a str) -> Option<Self> {
+        let comment = comment.trim().strip_prefix('#')?.trim();
 
         // Support other pragma comments coming after `error` or `revealed`, e.g.
         // `# error: [code] # type: ignore` (nested pragma comments)
-        let body = if let Some((before_nested, _)) = body.split_once('#') {
+        let comment = if let Some((before_nested, _)) = comment.split_once('#') {
             before_nested
         } else {
-            body
+            comment
         };
 
+        let (keyword, body) = comment.split_once(':')?;
+
+        let keyword = keyword.trim();
         let body = body.trim();
 
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
+            "snapshot" => Some(Self::Snapshot(body)),
             _ => None,
         }
     }
@@ -306,6 +275,13 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
+            Self::Snapshot(rule) => {
+                if rule.is_empty() {
+                    Ok(ParsedAssertion::Snapshot(None))
+                } else {
+                    Ok(ParsedAssertion::Snapshot(Some(rule)))
+                }
+            }
         }
     }
 }
@@ -318,6 +294,9 @@ pub(crate) enum ParsedAssertion<'a> {
 
     /// An `# error:` assertion.
     Error(ErrorAssertion<'a>),
+
+    /// A `# snapshot: <code?>` assertion.
+    Snapshot(Option<&'a str>),
 }
 
 impl std::fmt::Display for ParsedAssertion<'_> {
@@ -325,6 +304,10 @@ impl std::fmt::Display for ParsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => assertion.fmt(f),
+            Self::Snapshot(rule) => match rule {
+                Some(code) => write!(f, "snapshot: {code}"),
+                None => write!(f, "snapshot"),
+            },
         }
     }
 }

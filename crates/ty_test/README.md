@@ -141,23 +141,22 @@ f(2)  # error: [invalid-argument-type]
 
 ## Diagnostic Snapshotting
 
-Inline snapshots store rendered diagnostics directly in the Markdown fixture.
+Inline snapshots store the rendered diagnostics directly in the Markdown file.
 
-Add `# snapshot` to the lines you want to snapshot, then add a fenced
-`diagnostics` block after the corresponding `py` / `pyi` file block:
+Add `# snapshot: <code?>` to the lines you want to snapshot, then add a fenced
+`snapshot` block after the corresponding `py` / `pyi` file block:
 
 ````markdown
 ```py
-# snapshot
-x: int = "a"  # error: [invalid-assignment]
+x: int = "a"  # snapshot: [invalid-assignment]
+y: int = "b"  # snapshot:
 
-# snapshot
-reveal_type(x)  # revealed: int
+reveal_type(x)  # snapshot: revealed-type
 ```
 
 Some explanatory prose can go here.
 
-```diagnostics
+```snapshot
 error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
  --> src/mdtest_snippet.py:2:10
   |
@@ -172,7 +171,7 @@ info: Revealed type is `int`
 ```
 ````
 
-`# snapshot` follows the same placement rules as other inline assertions.
+`# snapshot:` follows the same placement rules as other inline assertions.
 
 To insert or rewrite inline snapshots automatically, run mdtest with
 `MDTEST_UPDATE_SNAPSHOTS` set. For example:
@@ -184,7 +183,7 @@ MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diag
 Or with a test-name filter:
 
 ```sh
-MDTEST_UPDATE_SNAPSHOTS=1 MDTEST_TEST_FILTER="Missing argument diagnostics" cargo test -p ty_python_semantic --test mdtest -- --nocapture
+MDTEST_UPDATE_SNAPSHOTS=1 MDTEST_TEST_FILTER="Missing argument diagnostics" cargo test -p ty_python_semantic --test mdtest
 ```
 
 External `<!-- snapshot-diagnostics -->` snapshots are still supported, but
