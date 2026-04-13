@@ -12,7 +12,6 @@ pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
@@ -22,6 +21,7 @@ pub use suppression::{
     UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
 };
 use ty_module_resolver::ModuleGlobSet;
+use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
@@ -154,10 +154,6 @@ pub(crate) fn attribute_declarations<'db, 's>(
 /// Get the module-level docstring for the given file.
 pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
     let module = parsed_module(db, file).load(db);
-    let stmt = module.suite().first()?;
-    let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-        return None;
-    };
-    let docstring_expr = value.as_string_literal_expr()?;
-    Some(docstring_expr.value.to_str().to_owned())
+    docstring_from_body(module.suite())
+        .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }

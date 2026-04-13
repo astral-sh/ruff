@@ -133,17 +133,14 @@ impl<'db> Definition<'db> {
 }
 
 /// Extract a docstring from a function, module, or class body.
-fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+pub fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = body.first()?;
     // Require the docstring to be a standalone expression.
-    let ast::Stmt::Expr(ast::StmtExpr {
+    let ast::StmtExpr {
         value,
         range: _,
         node_index: _,
-    }) = stmt
-    else {
-        return None;
-    };
+    } = stmt.as_expr_stmt()?;
     // Only match string literals.
     value.as_string_literal_expr()
 }
