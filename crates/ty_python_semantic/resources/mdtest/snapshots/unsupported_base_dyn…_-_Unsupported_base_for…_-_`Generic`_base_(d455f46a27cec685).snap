@@ -33,6 +33,5 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 info: Classes created via `type()` cannot be generic
 info: Consider using `class X(Generic[...]): ...` instead
-info: rule `invalid-base` is enabled by default
 
 ```

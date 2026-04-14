@@ -42,7 +42,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
    |
-info: rule `invalid-key` is enabled by default
 11 | def _(being: Person | Animal) -> None:
 12 |     # error: [invalid-key]
 13 |     # error: [invalid-key]
@@ -63,7 +62,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Animal`
    |     |
    |     TypedDict `Animal` in union type `Person | Animal`
    |
-info: rule `invalid-key` is enabled by default
 11 | def _(being: Person | Animal) -> None:
 12 |     # error: [invalid-key]
 13 |     # error: [invalid-key]

@@ -27,7 +27,7 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_semantic::UseDefaultStrategy;
+use ty_python_core::program::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -845,12 +845,20 @@ impl Session {
             })
             .collect();
         for doc in documents_to_clear {
-            self.clear_diagnostics(client, doc.url());
+            self.clear_diagnostics_if_needed(&doc, client);
         }
 
         self.bump_revision();
 
         Ok(())
+    }
+
+    pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+        if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+        {
+            return;
+        }
+        self.clear_diagnostics(client, document.url());
     }
 
     /// Clears the diagnostics for the document identified by `uri`.

@@ -34,7 +34,6 @@ error[unresolved-attribute]: Unresolved attribute `non_existent` on type `<class
 4 |
 5 | instance = C()
   |
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -46,6 +45,5 @@ error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
 6 | instance.non_existent = 1  # error: [unresolved-attribute]
   | ^^^^^^^^^^^^^^^^^^^^^
   |
-info: rule `unresolved-attribute` is enabled by default
 
 ```

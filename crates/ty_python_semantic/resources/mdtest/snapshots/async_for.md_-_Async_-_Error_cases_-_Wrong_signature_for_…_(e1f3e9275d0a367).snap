@@ -41,6 +41,5 @@ error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
    |
 info: Its `__aiter__` method has an invalid signature
 info: Expected signature `def __aiter__(self): ...`
-info: rule `not-iterable` is enabled by default
 
 ```

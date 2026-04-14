@@ -1,10 +1,8 @@
-use crate::{
-    semantic_index::definition::{AnnotatedAssignmentDefinitionKind, Definition},
-    types::{
-        TypeCheckDiagnostics,
-        infer::{InferenceFlags, TypeInferenceBuilder},
-    },
+use crate::types::{
+    TypeCheckDiagnostics,
+    infer::{InferenceFlags, TypeInferenceBuilder},
 };
+use ty_python_core::definition::{AnnotatedAssignmentDefinitionKind, Definition};
 
 pub(crate) fn check_pep_613_alias<'db>(
     assignment: &AnnotatedAssignmentDefinitionKind,

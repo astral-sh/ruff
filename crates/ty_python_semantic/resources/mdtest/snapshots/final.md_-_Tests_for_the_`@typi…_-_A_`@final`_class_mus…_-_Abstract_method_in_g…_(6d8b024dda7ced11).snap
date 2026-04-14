@@ -48,6 +48,5 @@ error[abstract-method-in-final-class]: Final class `Child` has unimplemented abs
  7 |
  8 | class Parent(GrandParent):
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

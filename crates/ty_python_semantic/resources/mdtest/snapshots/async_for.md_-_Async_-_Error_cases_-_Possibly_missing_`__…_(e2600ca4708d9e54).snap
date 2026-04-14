@@ -40,6 +40,5 @@ error[not-iterable]: Object of type `AsyncIterable` may not be async-iterable
 13 |         reveal_type(x)  # revealed: int
    |
 info: Its `__aiter__` method returns an object of type `PossiblyUnboundAnext`, which may not have a `__anext__` method
-info: rule `not-iterable` is enabled by default
 
 ```

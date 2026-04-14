@@ -43,7 +43,6 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
 11 |     b: AliasB[int],  # error: [not-subscriptable]
 12 | ): ...
    |
-info: rule `not-subscriptable` is enabled by default
 
 ```
 
@@ -59,6 +58,5 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
    |        Alias to `B[int]`, which is already specialized
 12 | ): ...
    |
-info: rule `not-subscriptable` is enabled by default
 
 ```

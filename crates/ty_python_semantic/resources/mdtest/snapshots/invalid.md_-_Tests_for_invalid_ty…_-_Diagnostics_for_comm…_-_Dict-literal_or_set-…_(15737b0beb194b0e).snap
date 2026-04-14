@@ -33,7 +33,6 @@ error[invalid-type-form]: Dict literals are not allowed in parameter annotations
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -49,6 +48,5 @@ error[invalid-type-form]: Set literals are not allowed in parameter annotations
   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```

@@ -44,6 +44,5 @@ info: Item declaration
 5 |
 6 | def _(config: Config) -> None:
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

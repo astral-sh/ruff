@@ -22,7 +22,6 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use crate::semantic_index::definition::Definition;
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
@@ -30,10 +29,11 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    Type, TypeMapping, UnionBuilder, UnionType,
+    Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
-use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
+use ty_python_core::Truthiness;
+use ty_python_core::definition::Definition;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {

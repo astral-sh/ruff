@@ -8,12 +8,12 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
 use ty_module_resolver::SearchPathSettings;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, default_lint_registry};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use test_case::test_case;
 
@@ -251,11 +251,14 @@ impl ty_module_resolver::Db for CorpusDb {
 }
 
 #[salsa::db]
-impl ty_python_semantic::Db for CorpusDb {
+impl ty_python_core::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
+}
 
+#[salsa::db]
+impl ty_python_semantic::Db for CorpusDb {
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }

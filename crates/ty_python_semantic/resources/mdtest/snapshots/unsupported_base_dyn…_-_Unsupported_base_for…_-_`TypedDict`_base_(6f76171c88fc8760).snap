@@ -31,6 +31,5 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 info: Classes created via `type()` cannot be TypedDicts
 info: Consider using `TypedDict("X", {})` instead
-info: rule `invalid-base` is enabled by default
 
 ```

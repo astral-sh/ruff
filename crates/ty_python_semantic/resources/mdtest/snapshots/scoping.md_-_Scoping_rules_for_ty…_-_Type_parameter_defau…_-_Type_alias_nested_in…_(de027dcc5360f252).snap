@@ -35,6 +35,5 @@ error[invalid-type-variable-default]: Invalid default for type parameter `U`
 5 |     type Ok[U = int] = list[U]  # OK
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

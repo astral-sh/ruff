@@ -29,6 +29,5 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
   |                     |
   |                     Expected value of type `int`, got `Literal["three"]`
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

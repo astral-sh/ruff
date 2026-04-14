@@ -28,6 +28,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 13 | 
 14 | def _(source: CheckWithWrongSignature):
 15 |     target: SupportsCheck = source  # error: [invalid-assignment]
+16 | class SupportsName(Protocol):
+17 |     @property
+18 |     def name(self) -> str: ...
+19 | 
+20 | class DoesNotHaveName: ...
+21 | 
+22 | def _(source: DoesNotHaveName):
+23 |     target: SupportsName = source  # error: [invalid-assignment]
 ```
 
 # Diagnostics
@@ -44,7 +52,6 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
 10 | class CheckWithWrongSignature:
 11 |     def check(self, x: int, y: bytes) -> bool:
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -57,7 +64,21 @@ error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assig
    |             -------------   ^^^^^^ Incompatible value of type `CheckWithWrongSignature`
    |             |
    |             Declared type
+16 | class SupportsName(Protocol):
+17 |     @property
    |
-info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to `SupportsName`
+  --> src/mdtest_snippet.py:23:13
+   |
+22 | def _(source: DoesNotHaveName):
+23 |     target: SupportsName = source  # error: [invalid-assignment]
+   |             ------------   ^^^^^^ Incompatible value of type `DoesNotHaveName`
+   |             |
+   |             Declared type
+   |
 
 ```

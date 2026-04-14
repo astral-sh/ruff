@@ -26,7 +26,7 @@ use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{FallibleStrategy, Program};
+use ty_python_core::program::{FallibleStrategy, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

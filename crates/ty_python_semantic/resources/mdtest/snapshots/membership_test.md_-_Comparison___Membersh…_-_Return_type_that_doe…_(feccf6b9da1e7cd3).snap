@@ -39,7 +39,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
 11 | 10 not in WithContains()
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```
 
@@ -53,6 +52,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    | ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```

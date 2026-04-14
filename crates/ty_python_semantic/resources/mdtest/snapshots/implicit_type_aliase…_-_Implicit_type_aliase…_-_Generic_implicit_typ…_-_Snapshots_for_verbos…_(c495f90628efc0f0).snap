@@ -44,7 +44,6 @@ error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
 5 |
 6 | ThreeInts = tuple[int, int, int]
   |
-info: rule `not-subscriptable` is enabled by default
 
 ```
 
@@ -60,7 +59,6 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
 14 |     b: ThreeInts[int],  # error: [not-subscriptable]
 15 | ): ...
    |
-info: rule `not-subscriptable` is enabled by default
 
 ```
 
@@ -76,6 +74,5 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, 
    |        Type is already specialized
 15 | ): ...
    |
-info: rule `not-subscriptable` is enabled by default
 
 ```

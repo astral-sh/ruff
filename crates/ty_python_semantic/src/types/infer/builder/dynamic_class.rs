@@ -10,7 +10,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::TypeInferenceBuilder;
-use crate::types::mro::DynamicMroErrorKind;
+use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
 
 /// Whether a dynamic class is being created via `type()` or `types.new_class()`.
@@ -219,10 +219,50 @@ pub(super) fn report_dynamic_mro_errors<'db>(
         return true;
     };
 
-    let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
+    let bases_display = dynamic_class
+        .explicit_bases(db)
+        .iter()
+        .map(|base| base.display(db))
+        .join(", ");
+    report_mro_error_kind(
+        context,
+        error,
+        dynamic_class.name(db),
+        call_expr,
+        Some(bases),
+        Some(&bases_display),
+    );
 
+    false
+}
+
+/// Report diagnostics for a dynamic MRO error. Shared by both
+/// `report_dynamic_mro_errors` (for `type()` / `new_class()`) and the
+/// functional enum path.
+///
+/// `bases_expr` is the AST node for the bases argument (e.g. the tuple in
+/// `type("Foo", (A, B), {})`). When `Some`, `InvalidBases` diagnostics point
+/// at specific elements in the tuple. When `None` (enums), `InvalidBases`
+/// is skipped since enum bases are always valid.
+///
+/// `bases_display` is an optional pre-formatted string of the bases list
+/// (e.g. `"<class 'X'>, <class 'Y'>"`). When provided, the `UnresolvableMro`
+/// message includes `with bases [...]`.
+pub(super) fn report_mro_error_kind<'db>(
+    context: &InferContext<'db, '_>,
+    error: &DynamicMroError<'db>,
+    class_name: &Name,
+    call_expr: &ast::ExprCall,
+    bases_expr: Option<&ast::Expr>,
+    bases_display: Option<&str>,
+) {
+    let db = context.db();
     match error.reason() {
         DynamicMroErrorKind::InvalidBases(invalid_bases) => {
+            let Some(bases) = bases_expr else {
+                return;
+            };
+            let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
             for (idx, base_type) in invalid_bases {
                 let instance_of_type = KnownClass::Type.to_instance(db);
                 let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
@@ -240,8 +280,7 @@ pub(super) fn report_dynamic_mro_errors<'db>(
                             base_type.display(db)
                         ));
                         diagnostic.info(format_args!(
-                            "ty cannot determine a MRO for class `{}` due to this base",
-                            dynamic_class.name(db)
+                            "ty cannot determine a MRO for class `{class_name}` due to this base",
                         ));
                         diagnostic.info("Only class objects or `Any` are supported as class bases");
                     }
@@ -259,40 +298,35 @@ pub(super) fn report_dynamic_mro_errors<'db>(
         }
         DynamicMroErrorKind::InheritanceCycle => {
             if let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, call_expr) {
-                builder.into_diagnostic(format_args!(
-                    "Cyclic definition of `{}`",
-                    dynamic_class.name(db)
-                ));
+                builder.into_diagnostic(format_args!("Cyclic definition of `{class_name}`"));
             }
         }
         DynamicMroErrorKind::DuplicateBases(duplicates) => {
             if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
                 builder.into_diagnostic(format_args!(
-                    "Duplicate base class{maybe_s} {dupes} in class `{class}`",
+                    "Duplicate base class{maybe_s} {dupes} in class `{class_name}`",
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
                         .map(|base: &ClassBase<'_>| base.display(db))
                         .join(", "),
-                    class = dynamic_class.name(db),
                 ));
             }
         }
         DynamicMroErrorKind::UnresolvableMro => {
             if let Some(builder) = context.report_lint(&INCONSISTENT_MRO, call_expr) {
-                builder.into_diagnostic(format_args!(
-                    "Cannot create a consistent method resolution order (MRO) \
-                        for class `{}` with bases `[{}]`",
-                    dynamic_class.name(db),
-                    dynamic_class
-                        .explicit_bases(db)
-                        .iter()
-                        .map(|base| base.display(db))
-                        .join(", ")
-                ));
+                if let Some(bases) = bases_display {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot create a consistent method resolution order (MRO) \
+                            for class `{class_name}` with bases `[{bases}]`",
+                    ));
+                } else {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot create a consistent method resolution order (MRO) \
+                            for class `{class_name}`",
+                    ));
+                }
             }
         }
     }
-
-    false
 }

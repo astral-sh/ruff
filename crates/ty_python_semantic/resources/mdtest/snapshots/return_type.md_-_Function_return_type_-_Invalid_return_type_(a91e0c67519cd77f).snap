@@ -57,7 +57,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 3 |     1
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -75,7 +74,6 @@ error[invalid-return-type]: Return type does not match returned value
 8 |
 9 | def f() -> int:
   |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -93,7 +91,6 @@ error[invalid-return-type]: Return type does not match returned value
 12 |
 13 | from typing import TypeVar
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -113,7 +110,6 @@ info:  - in stub files
 info:  - in `if TYPE_CHECKING` blocks
 info:  - as methods on protocol classes
 info:  - or as `@abstractmethod`-decorated methods on abstract classes
-info: rule `empty-body` is enabled by default
 
 ```
 
@@ -131,7 +127,6 @@ error[invalid-return-type]: Return type does not match returned value
 25 |
 26 | class B: ...
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -147,6 +142,5 @@ error[invalid-return-type]: Return type does not match returned value
 30 |     return B()  # error: [invalid-return-type]
    |            ^^^ expected `mdtest_snippet.B`, found `mdtest_snippet.<locals of function 'g'>.B`
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```

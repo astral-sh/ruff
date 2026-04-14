@@ -70,7 +70,11 @@ class MDTestRunner:
                 message_format,
             ],
             cwd=CRATE_ROOT,
-            env=dict(os.environ, CLI_COLOR="1"),
+            env=dict(
+                os.environ,
+                CLI_COLOR="1",
+                CARGO_PROFILE_DEV_OPT_LEVEL="0" if self.filters else "1",
+            ),
             stderr=subprocess.STDOUT,
             text=True,
         )

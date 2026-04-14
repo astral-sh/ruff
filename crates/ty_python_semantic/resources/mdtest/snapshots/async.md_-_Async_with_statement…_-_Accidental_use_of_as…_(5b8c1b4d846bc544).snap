@@ -37,6 +37,5 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 info: Objects of type `Manager` can be used as sync context managers
 info: Consider using `with` here
-info: rule `invalid-context-manager` is enabled by default
 
 ```

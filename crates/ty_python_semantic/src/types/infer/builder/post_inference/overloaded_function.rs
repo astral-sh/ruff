@@ -1,17 +1,18 @@
 use ruff_db::diagnostic::Annotation;
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
-    semantic_index::{
-        SemanticIndex, definition::Definition, place::ScopedPlaceId, scope::NodeWithScopeKind,
-    },
     types::{
         KnownClass, Type, binding_type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction},
     },
+};
+use ty_python_core::{
+    SemanticIndex, definition::Definition, place::ScopedPlaceId, scope::NodeWithScopeKind,
 };
 
 /// Check the overloaded functions in this scope.
@@ -100,10 +101,12 @@ pub(crate) fn check_overloaded_function<'db>(
     if implementation.is_none() && !context.in_stub() {
         let mut implementation_required = true;
 
-        if function
-            .iter_overloads_and_implementation(db)
-            .all(|f| f.body_scope(db).scope(db).in_type_checking_block())
-        {
+        if function.iter_overloads_and_implementation(db).all(|f| {
+            index.is_in_type_checking_block(
+                f.body_scope(db).file_scope_id(db),
+                f.node(db, context.file(), context.module()).range(),
+            )
+        }) {
             implementation_required = false;
         } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
             let class = binding_type(

@@ -43,6 +43,5 @@ error[invalid-method-override]: Invalid override of method `foo`
   |         ------------ `a.A.foo` defined here
   |
 info: This violates the Liskov Substitution Principle
-info: rule `invalid-method-override` is enabled by default
 
 ```

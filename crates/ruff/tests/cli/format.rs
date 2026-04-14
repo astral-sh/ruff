@@ -726,7 +726,7 @@ fn check_silent_mode_no_output() -> Result<()> {
     // but there should be no "reformat" output in silent mode
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -741,7 +741,7 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     // should show diagnostics but not summary
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -757,7 +757,7 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     // default mode should show both diagnostics and summary
     let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    assert_cmd_snapshot!(test.format_command().args(["--check"]), @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2306,7 +2306,7 @@ fn range_formatting_notebook() -> Result<()> {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2426,7 +2426,7 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
     assert_cmd_snapshot!(test.format_command()
         .args(["--isolated", "--no-preview", "--diff"])
         .arg(unformatted),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----

@@ -54,7 +54,6 @@ error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str`
   | - Type variable defined here
 4 | U = TypeVar("U", int, bytes)
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -74,6 +73,5 @@ error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `b
 5 |
 6 | class Bounded(Generic[T]):
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```

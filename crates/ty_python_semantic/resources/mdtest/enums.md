@@ -22,6 +22,79 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Constructor calls
+
+```py
+from enum import Enum, IntEnum
+
+class Number(Enum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(Number(1))  # revealed: Number
+reveal_type(Number(value=1))  # revealed: Number
+
+class MixedInt(IntEnum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(MixedInt(1))  # revealed: MixedInt
+
+class MixedStr(str, Enum):
+    RED = "red"
+    BLUE = "blue"
+
+reveal_type(MixedStr("red"))  # revealed: MixedStr
+
+class Maybe(Enum):
+    NONE = None
+    SOME = "some"
+
+reveal_type(Maybe(None))  # revealed: Maybe
+
+class Planet(Enum):
+    _value_: int
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    VENUS = (2, 4.869e24, 6.0518e6)
+
+# TODO: `Planet(1)` raises `ValueError` at runtime. `EnumType.__call__` accepts positional
+# arguments only, then forwards them to the enum's `__new__` / `__init__`, so multi-argument
+# enum members still require the full positional member payload (for example `Planet(1, ...)`).
+reveal_type(Planet(1))  # revealed: Planet
+reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
+
+class EmptyEnum(Enum): ...
+
+# TODO: these raise `TypeError` at runtime, but we do not yet emit diagnostics for them.
+reveal_type(EmptyEnum(foo=1))  # revealed: EmptyEnum
+reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
+
+Dynamic = Enum("Dynamic", {"RED": "red", "GREEN": "green"})
+
+reveal_type(Dynamic("red"))  # revealed: Dynamic
+```
+
+## Constructor calls on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class Triple(Enum):
+    XYZ = 1, 2, 3
+    OTHER = 4, 5, 6
+
+reveal_type(Triple(1, 2, 3))  # revealed: Triple
+```
+
 ## Enum members
 
 ### Basic
@@ -641,6 +714,47 @@ reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
 reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
 ```
 
+`auto()` still uses the preceding concrete value even when `1` and `True` compare equal:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+class IntThenTrue(Enum):
+    A = 1
+    B = True
+    C = auto()
+
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"]]
+reveal_type(enum_members(IntThenTrue))
+
+reveal_type(IntThenTrue.C.value)  # revealed: Literal[2]
+```
+
+Functional enums also detect duplicate-value aliases in both dict and list-of-tuples forms:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+DictAlias = Enum("DictAlias", {"A": 1, "B": 1})
+
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(DictAlias))
+
+# single-member enum is a singleton, so member access resolves to the instance type
+reveal_type(DictAlias.A)  # revealed: DictAlias
+reveal_type(DictAlias.B)  # revealed: DictAlias
+
+PairsAlias = Enum("PairsAlias", [("A", 1), ("B", 1)])
+
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(PairsAlias))
+
+reveal_type(PairsAlias.A)  # revealed: PairsAlias
+reveal_type(PairsAlias.B)  # revealed: PairsAlias
+```
+
 ### Using `auto()`
 
 ```toml
@@ -681,6 +795,40 @@ reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
 reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
 reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
 reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
+```
+
+If `auto()` follows a non-literal value, the generated value widens to `int` since the previous
+value isn't known at type-check time:
+
+```py
+def f(n: int):
+    class StaticDynamic(Enum):
+        A = n
+        B = auto()
+
+    reveal_type(StaticDynamic.A.value)  # revealed: int
+    reveal_type(StaticDynamic.B.value)  # revealed: int
+
+    Dynamic = Enum("Dynamic", {"A": n, "B": auto()})
+
+    reveal_type(Dynamic.A.value)  # revealed: int
+    reveal_type(Dynamic.B.value)  # revealed: int
+```
+
+Bool literals are still concrete predecessors for `auto()`:
+
+```py
+class AfterFalse(Enum):
+    A = False
+    B = auto()
+
+reveal_type(AfterFalse.B.value)  # revealed: Literal[1]
+
+class AfterTrue(Enum):
+    A = True
+    B = auto()
+
+reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
 ```
 
 When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
@@ -1221,6 +1369,7 @@ class EnumWithEnumMetaMetaclass(metaclass=EnumMeta):
     YES = 1
 
 reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaMetaclass.NO]
+reveal_type(EnumWithEnumMetaMetaclass(0))  # revealed: EnumWithEnumMetaMetaclass
 
 class SubclassOfEnumMeta(EnumMeta): ...
 
@@ -1252,6 +1401,18 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
+Open `EnumMeta`-based classes still reject ordinary calls until they are finalized with members:
+
+```py
+from enum import EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# error: [too-many-positional-arguments]
+Empty(1)
+```
+
 ### Enums with (subclasses of) `EnumType` as metaclass
 
 In Python 3.11, the meta-type was renamed to `EnumType`.
@@ -1259,6 +1420,19 @@ In Python 3.11, the meta-type was renamed to `EnumType`.
 ```toml
 [environment]
 python-version = "3.11"
+```
+
+On Python 3.11+, open `EnumMeta`-based classes also accept the functional-enum calling convention,
+though the inferred result is still imprecise:
+
+```py
+from enum import EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# TODO: runtime MRO suggests this should be closer to `type[Empty]`.
+reveal_type(Empty("Dynamic", {"X": 1}))  # revealed: type[Enum]
 ```
 
 ```py
@@ -1303,7 +1477,697 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
 
 ## Function syntax
 
-To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
+### String names (positional)
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", "RED, GREEN, BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### String names (keyword)
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", names="RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### Name mismatch diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```py
+from enum import Enum
+
+# error: [mismatched-type-name]
+Mismatch = Enum("WrongName", "A B")
+
+def f(name: str) -> None:
+    # error: [mismatched-type-name]
+    DynamicMismatch = Enum(name, "A B")
+
+name = "GoodMatch"
+GoodMatch = Enum(name, "A B")
+```
+
+### List/tuple of tuples
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", [("RED", 1), ("GREEN", 2), ("BLUE", 3)])
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", (("RED", 1), ("GREEN", 2), ("BLUE", 3)))
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### List of strings
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", ["RED", "GREEN", "BLUE"])
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### Dict mapping
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", {"RED": 1, "GREEN": 2, "BLUE": 3})
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.BLUE.value)  # revealed: Literal[3]
+```
+
+### Dict mapping with `auto()`
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+Color = Enum("Color", {"RED": auto(), "GREEN": auto(), "BLUE": auto()})
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.BLUE.value)  # revealed: Literal[3]
+```
+
+When mixing explicit values with `auto()` in a dict, the auto value is derived from the previous
+member's value, not from `start + index`:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+Mixed = Enum("Mixed", {"A": 10, "B": auto(), "C": auto()})
+
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"]]
+reveal_type(enum_members(Mixed))
+
+reveal_type(Mixed.A.value)  # revealed: Literal[10]
+reveal_type(Mixed.B.value)  # revealed: Literal[11]
+reveal_type(Mixed.C.value)  # revealed: Literal[12]
+```
+
+This also applies when the previous value is a bool literal:
+
+```py
+from enum import Enum, auto
+
+AfterFalse = Enum("AfterFalse", {"A": False, "B": auto()})
+reveal_type(AfterFalse.B.value)  # revealed: Literal[1]
+
+AfterTrue = Enum("AfterTrue", {"A": True, "B": auto()})
+reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
+```
+
+### `auto()` in tuple/list entries
+
+`auto()` should also expand in tuple/list entry forms of the functional syntax:
+
+```py
+from enum import Enum, Flag, auto
+
+Color = Enum("Color", [("RED", auto()), ("GREEN", auto())])
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+
+Perm = Flag("Perm", (("READ", auto()), ("WRITE", auto())))
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+```
+
+Explicit-value forms should ignore `start`, just like static enums do:
+
+```py
+from enum import Enum, Flag, auto
+
+Color = Enum("Color", [("RED", auto()), ("GREEN", auto())], start=3)
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+
+Mapped = Enum("Mapped", {"RED": auto(), "GREEN": auto()}, start=3)
+
+reveal_type(Mapped.RED.value)  # revealed: Literal[1]
+reveal_type(Mapped.GREEN.value)  # revealed: Literal[2]
+
+Perm = Flag("Perm", (("READ", auto()), ("WRITE", auto())), start=3)
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+```
+
+### Duplicate member names
+
+Duplicate member names raise `TypeError` at runtime. We degrade to unknown members rather than
+synthesizing a broken enum.
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+E1 = Enum("E1", "A A")
+reveal_type(enum_members(E1))  # revealed: Unknown
+
+E2 = Enum("E2", ["A", "A"])
+reveal_type(enum_members(E2))  # revealed: Unknown
+
+E3 = Enum("E3", [("A", 1), ("A", 2)])
+reveal_type(enum_members(E3))  # revealed: Unknown
+```
+
+### Unknown members: inherited attribute access
+
+When members are unknown, own member access returns `Unknown`, but inherited attributes from the
+enum base class should still resolve through the MRO.
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+def f(
+    names: list[str],
+    labels: str,
+    pairs: tuple[tuple[str, int], ...],
+    mapping: dict[str, int],
+    name: str,
+    key: str,
+) -> None:
+    E1 = Enum("E1", names)
+    E2 = Enum("E2", labels)
+    E3 = Enum("E3", pairs)
+    E4 = Enum("E4", mapping)
+    E5 = Enum("E5", ["A", name])
+    E6 = Enum("E6", [(name, 1)])
+    E7 = Enum("E7", {key: 1})
+
+    reveal_type(enum_members(E1))  # revealed: Unknown
+    reveal_type(enum_members(E2))  # revealed: Unknown
+    reveal_type(enum_members(E3))  # revealed: Unknown
+    reveal_type(enum_members(E4))  # revealed: Unknown
+    reveal_type(enum_members(E5))  # revealed: Unknown
+    reveal_type(enum_members(E6))  # revealed: Unknown
+    reveal_type(enum_members(E7))  # revealed: Unknown
+
+    # Inherited class attributes resolve from Enum base.
+    reveal_type(E1.__members__)  # revealed: MappingProxyType[str, E1]
+
+    # But own member access is unknown.
+    reveal_type(E1.FOO)  # revealed: Unknown
+```
+
+### Too many positional args
+
+`Enum(value, names, *, ...)` only accepts two positional args at runtime.
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# error: [too-many-positional-arguments]
+Color = Enum("Color", "RED", "GREEN", "BLUE")
+
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
+
+### Duplicate positional and keyword arguments
+
+Passing the same functional-enum parameter both positionally and by keyword should still report the
+usual duplicate-argument diagnostic:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# error: [parameter-already-assigned]
+Color = Enum("Color", "RED", names="BLUE")
+
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
+
+### No positional args
+
+```py
+from enum import Enum
+
+# This is invalid at runtime but should not panic.
+Color = Enum()
+
+reveal_type(Color)  # revealed: Enum
+```
+
+### Non-literal name
+
+Non-literal names should still be recognized as creating an enum class.
+
+```py
+from enum import Enum
+
+def make_enum(name: str) -> type[Enum]:
+    # error: [mismatched-type-name]
+    result = Enum(name.title(), "RED BLUE", module=__name__)
+    reveal_type(result)  # revealed: type[Enum]
+    return result
+
+def validate_other_args(name: str) -> None:
+    # error: [invalid-argument-type]
+    Enum(name, "RED", start="0")
+
+    # error: [invalid-argument-type]
+    Enum(name, "RED", type=1)
+```
+
+### Non-string name
+
+```py
+from enum import Enum
+
+# error: [invalid-argument-type]
+Color = Enum(123, "RED GREEN BLUE")
+```
+
+### Unknown keyword arguments
+
+```py
+from enum import Enum
+
+# error: [unknown-argument]
+Color = Enum("Color", "RED GREEN BLUE", bad_kwarg=True)
+```
+
+### Definitely invalid `names` arguments
+
+Functional enums should still reject obviously invalid `names` values:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+# error: [invalid-argument-type]
+Color = Enum("Color", 123)
+
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
+
+Empty functional enums are valid, even though they have no members:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+EmptyFromString = Enum("EmptyFromString", "")
+EmptyFromList = Enum("EmptyFromList", [])
+EmptyFromDict = Enum("EmptyFromDict", {})
+
+reveal_type(enum_members(EmptyFromString))  # revealed: tuple[()]
+reveal_type(enum_members(EmptyFromList))  # revealed: tuple[()]
+reveal_type(enum_members(EmptyFromDict))  # revealed: tuple[()]
+
+class ExtendedEmpty(EmptyFromString):
+    A = 1
+
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(ExtendedEmpty))
+```
+
+Literal list/tuple/dict inputs that use unpacking are rejected:
+
+```py
+from enum import Enum
+
+names: list[str] = ["B"]
+pairs: list[tuple[str, int]] = [("B", 2)]
+more: dict[str, int] = {"B": 2}
+bad_keys: dict[int, int] = {1: 2}
+
+# error: [invalid-argument-type]
+Enum("FromNames", ["A", *names])
+
+# error: [invalid-argument-type]
+Enum("FromPairs", [("A", 1), *pairs])
+
+# error: [invalid-argument-type]
+Enum("FromMapping", {"A": 1, **more})
+
+# error: [invalid-argument-type]
+Enum("BadDoubleStar", {**bad_keys})
+```
+
+### Keyword argument type validation
+
+Functional enum construction should still preserve overload-based argument validation:
+
+```py
+from enum import Enum
+
+# error: [invalid-argument-type]
+Color = Enum("Color", "RED", start="0")
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+```
+
+### `boundary` keyword (Python 3.11+)
+
+#### Available on 3.11+
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Flag
+
+Perm = Flag("Perm", "READ WRITE EXECUTE", boundary=None)
+```
+
+#### Rejected before 3.11
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Flag
+
+# error: [unknown-argument]
+Perm = Flag("Perm", "READ WRITE EXECUTE", boundary=None)
+```
+
+### StrEnum function syntax
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+from ty_extensions import enum_members
+
+Color = StrEnum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+reveal_type(Color.RED.value)  # revealed: Literal["red"]
+reveal_type(Color.GREEN.value)  # revealed: Literal["green"]
+reveal_type(Color.BLUE.value)  # revealed: Literal["blue"]
+```
+
+### Custom start value
+
+```py
+from enum import Enum, Flag
+
+Color = Enum("Color", "RED GREEN BLUE", start=0)
+
+reveal_type(Color.RED.value)  # revealed: Literal[0]
+reveal_type(Color.GREEN.value)  # revealed: Literal[1]
+reveal_type(Color.BLUE.value)  # revealed: Literal[2]
+
+Perm = Flag("Perm", "READ WRITE EXECUTE", start=3)
+
+reveal_type(Perm.READ.value)  # revealed: Literal[3]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[4]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[8]
+```
+
+Non-literal integer `start` values should widen member values to `int` rather than pretending the
+default `start=1` was used:
+
+```py
+from enum import Enum, Flag
+
+def make(n: int) -> None:
+    Color = Enum("Color", "RED GREEN", start=n)
+
+    reveal_type(Color.RED.value)  # revealed: int
+    reveal_type(Color.GREEN.value)  # revealed: int
+
+    Perm = Flag("Perm", "READ WRITE", start=n)
+
+    reveal_type(Perm.READ.value)  # revealed: int
+    reveal_type(Perm.WRITE.value)  # revealed: int
+```
+
+### Type mixin
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+Http = Enum("Http", "OK NOT_FOUND", type=int)
+
+reveal_type(Http.OK)  # revealed: Literal[Http.OK]
+reveal_type(Http.OK.value)  # revealed: Literal[1]
+reveal_type(Http.NOT_FOUND.value)  # revealed: Literal[2]
+
+# revealed: tuple[Literal["OK"], Literal["NOT_FOUND"]]
+reveal_type(enum_members(Http))
+
+StringyNames = Enum("StringyNames", "A B", type=str)
+BytesyNames = Enum("BytesyNames", "A B", type=bytes)
+FloatyNames = Enum("FloatyNames", "A B", type=float)
+
+reveal_type(StringyNames.A.value)  # revealed: Literal["1"]
+reveal_type(StringyNames.B.value)  # revealed: Literal["2"]
+reveal_type(BytesyNames.A.value)  # revealed: bytes
+reveal_type(BytesyNames.B.value)  # revealed: bytes
+reveal_type(FloatyNames.A.value)  # revealed: float
+reveal_type(FloatyNames.B.value)  # revealed: float
+
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(StringyNames))
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(BytesyNames))
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(FloatyNames))
+
+Parsed = Enum("Parsed", {"A": "1"}, type=int)
+Stringy = Enum("Stringy", {"A": "1", "B": auto()}, type=str)
+
+reveal_type(enum_members(Parsed))  # revealed: Unknown
+reveal_type(enum_members(Stringy))  # revealed: Unknown
+
+class Prefixed(str):
+    pass
+
+CustomNames = Enum("CustomNames", "A B", type=Prefixed)
+Custom = Enum("Custom", {"A": "1"}, type=Prefixed)
+
+reveal_type(enum_members(CustomNames))  # revealed: Unknown
+reveal_type(enum_members(Custom))  # revealed: Unknown
+```
+
+Functional enums should still validate `type=` arguments eagerly, both for obvious non-types and for
+bases that are structurally invalid to combine with `Enum`:
+
+```py
+from enum import Enum
+from typing import TypedDict
+from ty_extensions import reveal_mro
+
+# error: [invalid-argument-type]
+BadType = Enum("BadType", "RED", type=1)
+
+# error: [invalid-argument-type]
+BadStringType = Enum("BadStringType", "RED", type="Mixin")
+
+TD = TypedDict("TD", {"x": int})
+
+# error: [invalid-base]
+BadBase = Enum("BadBase", "RED", type=TD)
+
+reveal_mro(BadBase)  # revealed: (<class 'BadBase'>, <class 'Enum'>, <class 'object'>)
+```
+
+Mixins that are incompatible with the enum base should still report an error and avoid exposing a
+precise member set:
+
+```py
+from enum import IntEnum, IntFlag
+from ty_extensions import enum_members
+
+# error: [invalid-base]
+BadIntEnum = IntEnum("BadIntEnum", "RED", type=str)
+
+# error: [invalid-base]
+BadIntFlag = IntFlag("BadIntFlag", "RED", type=float)
+
+reveal_type(enum_members(BadIntEnum))  # revealed: Unknown
+reveal_type(enum_members(BadIntFlag))  # revealed: Unknown
+```
+
+Functional enums with a `type=` mixin should also have the same MRO as the equivalent static enum
+class:
+
+```py
+from enum import Enum
+from ty_extensions import reveal_mro
+
+Http = Enum("Http", "OK NOT_FOUND", type=int)
+
+reveal_mro(Http)  # revealed: (<class 'Http'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
+
+class StaticHttp(int, Enum):
+    OK = 1
+    NOT_FOUND = 2
+
+reveal_mro(StaticHttp)  # revealed: (<class 'StaticHttp'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
+```
+
+### IntEnum function syntax
+
+```py
+from enum import IntEnum
+from ty_extensions import enum_members
+
+Color = IntEnum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+```
+
+### Flag function syntax
+
+```py
+from enum import Flag
+from ty_extensions import enum_members
+
+Perm = Flag("Perm", "READ WRITE EXECUTE")
+
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Perm))
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[4]
+```
+
+### IntFlag function syntax
+
+```py
+from enum import IntFlag
+from ty_extensions import enum_members
+
+Perm = IntFlag("Perm", "READ WRITE EXECUTE")
+
+# revealed: tuple[Literal["READ"], Literal["WRITE"], Literal["EXECUTE"]]
+reveal_type(enum_members(Perm))
+
+reveal_type(Perm.READ.value)  # revealed: Literal[1]
+reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+reveal_type(Perm.EXECUTE.value)  # revealed: Literal[4]
+```
+
+### Large start value (overflow guard)
+
+Values that would overflow `i64` should gracefully widen to `int`.
+
+```py
+from enum import Enum, Flag
+
+Big = Enum("Big", "A B", start=9223372036854775807)
+
+reveal_type(Big.A.value)  # revealed: Literal[9223372036854775807]
+reveal_type(Big.B.value)  # revealed: int
+
+BigFlag = Flag("BigFlag", "X Y", start=4611686018427387904)
+
+reveal_type(BigFlag.X.value)  # revealed: Literal[4611686018427387904]
+reveal_type(BigFlag.Y.value)  # revealed: int
+```
+
+### Accessing members from instances
+
+```py
+from enum import Enum
+
+Answer = Enum("Answer", "YES NO")
+
+reveal_type(Answer.YES.NO)  # revealed: Literal[Answer.NO]
+
+def _(answer: Answer) -> None:
+    reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
+    reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
+### Accessing members from `type[…]`
+
+```py
+from enum import Enum
+
+Answer = Enum("Answer", "YES NO")
+
+def _(answer: type[Answer]) -> None:
+    reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
+    reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
+### Implicitly final
+
+Functional enums with members should also be implicitly final:
+
+```py
+from enum import Enum
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+# error: [subclass-of-final-class]
+class ExtendedColor(Color):
+    YELLOW = 4
+```
+
+### Meta-type
+
+```py
+from enum import Enum
+
+Answer = Enum("Answer", "YES NO")
+
+reveal_type(type(Answer.YES))  # revealed: <class 'Answer'>
+
+def _(answer: Answer):
+    reveal_type(type(answer))  # revealed: <class 'Answer'>
+```
 
 ## Exhaustiveness checking
 
@@ -1409,6 +2273,80 @@ def singleton_check(value: Singleton) -> str:
             return "Singleton value"
         case _:
             assert_never(value)
+```
+
+## `if` statements (function syntax)
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+def color_name(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+    else:
+        assert_never(color)
+
+def color_name_without_assertion(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+
+def color_name_misses_one_variant(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    else:
+        assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
+```
+
+## `match` statements (function syntax)
+
+TODO: `match` exhaustiveness does not yet work for functional enums. The pattern matching narrowing
+path does not resolve functional enum members the same way `is` comparisons do.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+# TODO: `assert_never` should not fire here (exhaustive match).
+def color_name(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case Color.BLUE:
+            return "Blue"
+        case _:
+            assert_never(color)  # error: [type-assertion-failure]
+
+# TODO: This should ideally emit `Literal[Color.BLUE]` in the assertion, not `Color`.
+def color_name_misses_one_variant(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case _:
+            assert_never(color)  # error: [type-assertion-failure] "Type `Color` is not equivalent to `Never`"
 ```
 
 ## `__eq__` and `__ne__`

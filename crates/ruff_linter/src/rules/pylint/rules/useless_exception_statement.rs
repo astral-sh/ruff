@@ -109,7 +109,7 @@ fn is_custom_exception(
     };
     let statement = semantic.statement(source);
     if let ast::Stmt::ClassDef(class_def) = statement {
-        return analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        return analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
             if let ["" | "builtins", name] = qualified_name.segments() {
                 return builtins::is_exception(name, target_version.minor);
             }

@@ -1,6 +1,5 @@
 use crate::{
     diagnostic::format_enumeration,
-    semantic_index::definition::Definition,
     types::{
         KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
@@ -18,6 +17,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
+use ty_python_core::definition::Definition;
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,

@@ -222,6 +222,5 @@ info:   (a: str, b: str, c: bool) -> Unknown
 info:   (a: bool, b: str, c: str) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
 info: ... omitted 12 overloads
-info: rule `invalid-argument-type` is enabled by default
 
 ```

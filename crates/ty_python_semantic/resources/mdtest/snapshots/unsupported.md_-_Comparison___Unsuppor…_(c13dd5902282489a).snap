@@ -58,7 +58,6 @@ error[unsupported-operator]: Unsupported `in` operation
   |         Has type `Literal[1]`
 4 |     reveal_type(a)  # revealed: bool
   |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -75,7 +74,6 @@ error[unsupported-operator]: Unsupported `not in` operation
   |         Has type `Literal[0]`
 7 |     reveal_type(b)  # revealed: bool
   |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -91,7 +89,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |         Has type `object`
 11 |     reveal_type(c)  # revealed: Unknown
    |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -107,7 +104,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |         Has type `Literal[5]`
 15 |     reveal_type(d)  # revealed: Unknown
    |
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -125,7 +121,6 @@ error[unsupported-operator]: Unsupported `in` operation
 20 |     reveal_type(e)  # revealed: bool
    |
 info: Operation fails because operator `in` is not supported between objects of type `Literal[42]` and `Literal[1]`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -142,7 +137,6 @@ error[unsupported-operator]: Unsupported `<` operation
 24 |     reveal_type(f)  # revealed: Unknown
    |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -158,6 +152,5 @@ error[unsupported-operator]: Unsupported `<` operation
 28 |     reveal_type(g)  # revealed: Unknown
    |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (both of type `A`)
-info: rule `unsupported-operator` is enabled by default
 
 ```

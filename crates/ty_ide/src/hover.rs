@@ -312,7 +312,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -367,7 +367,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -436,7 +436,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -498,7 +498,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -562,7 +562,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
@@ -618,7 +618,7 @@ mod tests {
             )
             .build();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         initializes MyClass (perfectly)
@@ -673,7 +673,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass(val)
         ---------------------------------------------
         This is such a great class!!
@@ -808,7 +808,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class MyClass()
         ---------------------------------------------
         ```python
@@ -891,7 +891,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class Shape(val: str)
         class Shape(val: int)
         ---------------------------------------------
@@ -985,7 +985,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class S(
             a: int,
             b: str
@@ -1037,7 +1037,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         class S(a: int)
         ---------------------------------------------
         new docs
@@ -1077,7 +1077,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r#"
+        assert_snapshot!(test.hover(), @"
         class Handler(callback: (int, str, /) -> bool)
         ---------------------------------------------
         ```python
@@ -1095,7 +1095,7 @@ mod tests {
           |     |   Cursor offset
           |     source
           |
-        "#);
+        ");
     }
 
     // TODO: should show `class Color(value: object)`
@@ -1192,8 +1192,6 @@ mod tests {
         ");
     }
 
-    // TODO: should show `class Movie(title: str, year: int)`
-    // https://github.com/astral-sh/ruff/pull/24257#issuecomment-4164472728
     #[test]
     fn hover_typeddict_constructor() {
         let test = hover_test(
@@ -1209,10 +1207,18 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ---------------------------------------------
         ```python
-        class Movie()
+        class Movie(
+            *,
+            title: str,
+            year: int
+        )
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1221,6 +1227,186 @@ mod tests {
         6 |     year: int
         7 |
         8 | x = Movie(title="Alien", year=1979)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_positional_map() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        m: Movie = {"title": "Alien", "year": 1979}
+        x = Mov<CURSOR>ie(m)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:5
+          |
+        8 | m: Movie = {"title": "Alien", "year": 1979}
+        9 | x = Movie(m)
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_positional_map_dict_literal_in_constructor() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie({"title": "Alien", "year": 1979})
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            map: Movie,
+            /,
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie({"title": "Alien", "year": 1979})
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_not_required() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict, NotRequired
+
+        class Movie(TypedDict):
+            title: str
+            year: NotRequired[int]
+
+        x = Mov<CURSOR>ie(title="Alien")
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
+            title: str,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: NotRequired[int]
+        7 |
+        8 | x = Movie(title="Alien")
+          |     ^^^-^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_typeddict_constructor_total_false() {
+        let test = hover_test(
+            r#"
+        from typing import TypedDict
+
+        class Movie(TypedDict, total=False):
+            title: str
+            year: int
+
+        x = Mov<CURSOR>ie()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        class Movie(
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ---------------------------------------------
+        ```python
+        class Movie(
+            *,
+            title: str = ...,
+            year: int = ...
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:5
+          |
+        6 |     year: int
+        7 |
+        8 | x = Movie()
           |     ^^^-^
           |     |  |
           |     |  Cursor offset
@@ -1260,7 +1446,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         bound method MyClass.my_method(
             a,
             b
@@ -2576,7 +2762,7 @@ def ab(a: int, *, c: int):
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -3130,7 +3316,7 @@ def function():
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -3400,8 +3586,8 @@ def function():
 
         // See the comment in the `hover_augmented_assignment` test above. The same
         // reasoning applies here.
-        assert_snapshot!(test.hover(), @r#"
-        Unknown | Literal[1]
+        assert_snapshot!(test.hover(), @r###"
+        int
         ---------------------------------------------
         This is the docs for this value
 
@@ -3409,7 +3595,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Unknown | Literal[1]
+        int
         ```
         ---
         This is the docs for this value<HB>
@@ -3427,7 +3613,7 @@ def function():
            |   source
         10 | """Other docs???
            |
-        "#);
+        "###);
     }
 
     #[test]
@@ -3530,7 +3716,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3619,7 +3805,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -5078,7 +5264,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r###"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python
@@ -5093,7 +5279,7 @@ def function():
           |      |
           |      source
           |
-        "###);
+        ");
 
         let test = hover_test(
             r#"
@@ -5131,7 +5317,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         ```python
@@ -5156,7 +5342,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         ```python
@@ -5184,7 +5370,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python
@@ -5209,7 +5395,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[int]
         ---------------------------------------------
         ```python

@@ -44,11 +44,6 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::expression::Expression;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -57,9 +52,13 @@ use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
     declaration_type,
 };
-use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
+use ty_python_core::definition::Definition;
+use ty_python_core::expression::Expression;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::unpack::Unpack;
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, semantic_index};
 
 mod builder;
 mod comparisons;
@@ -908,9 +907,6 @@ struct ExpressionInferenceExtra<'db> {
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
-
-    /// `true` if all places in this expression are definitely bound
-    all_definitely_bound: bool,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -919,7 +915,6 @@ impl<'db> ExpressionInference<'db> {
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
-                all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -1005,6 +1000,9 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting a parameter annotation
         const IN_PARAMETER_ANNOTATION = 1 << 5;
+
+        /// Whether we are currently in a context where `Concatenate` can be legal
+        const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
     }
 }
 

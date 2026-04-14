@@ -1,10 +1,10 @@
 use crate::Db;
-use crate::semantic_index::definition::Definition;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 use ty_module_resolver::Module;
+use ty_python_core::definition::Definition;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TypeDefinition<'db> {

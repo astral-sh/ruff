@@ -35,6 +35,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
 5 |
 6 | S = TypeVar("S", bound=float, default=int)
   |
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

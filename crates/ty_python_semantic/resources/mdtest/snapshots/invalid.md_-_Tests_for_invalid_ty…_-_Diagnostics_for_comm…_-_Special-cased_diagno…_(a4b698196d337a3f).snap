@@ -31,7 +31,6 @@ error[invalid-type-form]: Function `callable` is not valid in a parameter annota
   |                   ^^^^^^^^ Did you mean `collections.abc.Callable`?
 4 |     return fn
   |
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -45,6 +44,5 @@ error[invalid-type-form]: Function `callable` is not valid in a return type anno
   |                                ^^^^^^^^ Did you mean `collections.abc.Callable`?
 4 |     return fn
   |
-info: rule `invalid-type-form` is enabled by default
 
 ```

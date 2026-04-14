@@ -384,8 +384,11 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{PythonPlatform, PythonVersionWithSource};
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -575,9 +578,6 @@ mod tests {
 
     impl SitePackagesCursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            use ty_module_resolver::SearchPathSettings;
-            use ty_python_semantic::{FallibleStrategy, Program, ProgramSettings};
-
             let project_root = SystemPathBuf::from("/src");
             let site_packages_path = SystemPathBuf::from("/site-packages");
 

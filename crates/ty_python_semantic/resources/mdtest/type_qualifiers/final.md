@@ -97,7 +97,7 @@ reveal_type(C().FINAL_A)  # revealed: int
 reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
 reveal_type(C().FINAL_D)  # revealed: Literal[1]
-reveal_type(C().FINAL_E)  # revealed: Literal[1]
+reveal_type(C().FINAL_E)  # revealed: int
 ```
 
 ## Not modifiable
@@ -731,6 +731,66 @@ class C:
         self.x: Final[int] = 1
 ```
 
+### `__post_init__`
+
+`__post_init__` is a dunder that runs as part of instance initialization, so `Final` instance
+attributes may be declared and assigned in it, regardless of whether the class is a dataclass:
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class C:
+    def __post_init__(self):
+        self.x: Final[int] = 1
+
+    def f(self):
+        # error: [invalid-assignment]
+        self.x = 2
+
+reveal_type(C().x)  # revealed: int
+```
+
+```py
+from typing import Final
+
+class NonDataclass:
+    def __post_init__(self):
+        self.x: Final[int] = 1
+```
+
+Assigning to a `Final` attribute via the class literal on a dataclass-like class mentions
+`__post_init__` in the diagnostic:
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class E:
+    x: Final[int] = 1
+
+# error: [invalid-assignment] "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
+E.x = 2
+```
+
+Redeclaring an existing dataclass field as `Final` in `__post_init__` should ideally be an error,
+since the field is not actually `Final`:
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class D:
+    x: str
+
+    def __post_init__(self):
+        # TODO: this should be an error (conflicting declaration)
+        self.x: Final[str] = "bar"
+```
+
 ### Protocol members
 
 Assignments to `Final` protocol members are also invalid, both through a protocol-typed value and
@@ -970,6 +1030,27 @@ class D:
         if flag:
             self.y = 1
         # No else: y may be unbound at runtime, but there is still an assignment path
+```
+
+### Reachable `Final` declaration wins for diagnostics
+
+If an earlier `Final` declaration is statically unreachable, diagnostics should be attached to the
+later declaration that remains visible:
+
+```py
+from typing import Final
+
+if False:
+    UNREACHABLE_MODULE_FINAL: Final[int]
+else:
+    # error: [final-without-value] "`Final` symbol `UNREACHABLE_MODULE_FINAL` is not assigned a value"
+    UNREACHABLE_MODULE_FINAL: Final[str]
+
+class C:
+    if False:
+        x: Final[int]
+    else:
+        x: Final[str]  # error: [final-without-value] "`Final` symbol `x` is not assigned a value"
 ```
 
 ### Assignment in non-`__init__` method

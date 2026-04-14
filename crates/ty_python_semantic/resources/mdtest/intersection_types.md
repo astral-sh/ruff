@@ -1299,11 +1299,11 @@ def _(
 ```py
 from ty_extensions import Intersection, Not
 
-# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a parameter annotation"
 def f(x: Intersection) -> None:
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a parameter annotation"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
 ```

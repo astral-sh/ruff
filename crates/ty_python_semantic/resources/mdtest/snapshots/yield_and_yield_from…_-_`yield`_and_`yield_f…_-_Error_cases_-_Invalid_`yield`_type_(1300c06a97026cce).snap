@@ -34,6 +34,5 @@ error[invalid-yield]: Yield expression type does not match annotation
 5 |     yield ""
   |           ^^ expression of type `Literal[""]`, expected `int`
   |
-info: rule `invalid-yield` is enabled by default
 
 ```

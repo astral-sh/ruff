@@ -57,10 +57,10 @@ One thing that is supported is error messages for using special forms in type ex
 from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, Generic
 
 def _(
-    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
-    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
-    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
-    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
+    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a parameter annotation"
+    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a parameter annotation"
+    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a parameter annotation"
+    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
     e: ParamSpec,
     f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in parameter annotations"
 ) -> None:

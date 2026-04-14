@@ -1,8 +1,6 @@
 use crate::{
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        scope::NodeWithScopeRef,
-    },
+    Db,
+    reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, UnionType,
@@ -30,12 +28,28 @@ use crate::{
         infer_definition_types, infer_scope_types, todo_type,
     },
 };
+use ty_python_core::{
+    UseDefMap,
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeRef,
+};
 
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
+            !use_def
+                .reachability_constraints()
+                .evaluate(
+                    db,
+                    use_def.predicates(),
+                    use_def.end_of_scope_reachability(),
+                )
+                .is_always_false()
+        }
+
         let db = self.db();
 
         // Parameters are odd: they are Definitions in the function body scope, but have no
@@ -65,7 +79,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if self.in_function_overload_or_abstractmethod() {
                     return;
                 }
-                if self.scope().scope(db).in_type_checking_block() {
+                if self.is_in_type_checking_block(self.scope(), function) {
                     return;
                 }
                 if let Some(class) = self.class_context_of_current_method() {
@@ -132,10 +146,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
 
-                    if self
-                        .index
-                        .use_def_map(scope_id)
-                        .can_implicitly_return_none(db)
+                    let use_def = self.index.use_def_map(scope_id);
+
+                    if can_implicitly_return_none(db, use_def)
                         && !Type::none(db).is_assignable_to(db, expected_return_ty)
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
@@ -177,10 +190,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     invalid.ty,
                 );
             }
-            if self
-                .index
-                .use_def_map(scope_id)
-                .can_implicitly_return_none(db)
+            let use_def = self.index.use_def_map(scope_id);
+            if can_implicitly_return_none(db, use_def)
                 && !Type::none(db).is_assignable_to(db, expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
@@ -639,7 +650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !suppress_invalid_default
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
-                        || self.scope().scope(db).in_type_checking_block()
+                        || self.is_in_type_checking_block(self.scope(), default_expr)
                         || self
                             .class_context_of_current_method()
                             .is_some_and(|class| class.is_protocol(db)))

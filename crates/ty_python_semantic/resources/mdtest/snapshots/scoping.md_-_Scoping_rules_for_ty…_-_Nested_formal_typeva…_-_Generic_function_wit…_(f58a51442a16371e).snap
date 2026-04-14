@@ -36,6 +36,5 @@ error[shadowed-type-variable]: Generic function `bad` uses type variable `T` alr
   |     ------------------------ Type variable `T` is bound in this enclosing scope
 2 |     def ok[S](a: S, b: S) -> None: ...
   |
-info: rule `shadowed-type-variable` is enabled by default
 
 ```

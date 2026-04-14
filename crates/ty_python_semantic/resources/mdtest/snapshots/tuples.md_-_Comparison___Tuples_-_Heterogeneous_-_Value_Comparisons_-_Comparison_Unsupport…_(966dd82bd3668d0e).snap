@@ -60,7 +60,6 @@ error[unsupported-operator]: Unsupported `<` operation
 13 | reveal_type(a <= b)  # revealed: Unknown
    |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -79,7 +78,6 @@ error[unsupported-operator]: Unsupported `<=` operation
 15 | reveal_type(a > b)  # revealed: Unknown
    |
 info: Operation fails because operator `<=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -98,7 +96,6 @@ error[unsupported-operator]: Unsupported `>` operation
 17 | reveal_type(a >= b)  # revealed: Unknown
    |
 info: Operation fails because operator `>` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -117,7 +114,6 @@ error[unsupported-operator]: Unsupported `>=` operation
 19 | # error: [unsupported-operator]
    |
 info: Operation fails because operator `>=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -135,7 +131,6 @@ error[unsupported-operator]: Unsupported `<` operation
 22 | b = (999999, "hello")
    |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -153,6 +148,5 @@ error[unsupported-operator]: Unsupported `<` operation
 22 | b = (999999, "hello")
    |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
-info: rule `unsupported-operator` is enabled by default
 
 ```

@@ -4,7 +4,8 @@ use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8Path;
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
-use ty_python_semantic::{PythonEnvironment, PythonPlatform, SysPrefixPathOrigin};
+use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::{PythonEnvironment, SysPrefixPathOrigin};
 
 /// Setup a virtual environment in the in-memory filesystem of `db` with
 /// the specified dependencies installed.

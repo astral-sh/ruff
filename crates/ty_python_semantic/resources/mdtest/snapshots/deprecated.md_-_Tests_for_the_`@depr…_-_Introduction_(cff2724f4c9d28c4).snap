@@ -49,7 +49,6 @@ warning[deprecated]: The function `myfunc` is deprecated
   | ^^^^^^ use OtherClass
 7 | from typing_extensions import deprecated
   |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -63,7 +62,6 @@ warning[deprecated]: The class `MyClass` is deprecated
    | ^^^^^^^ use BetterClass
 13 | from typing_extensions import deprecated
    |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -77,7 +75,6 @@ warning[deprecated]: The function `afunc` is deprecated
    |         ^^^^^ use something else
 22 | MyClass().amethod()  # error: [deprecated] "don't use this!"
    |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -89,6 +86,5 @@ warning[deprecated]: The function `amethod` is deprecated
 22 | MyClass().amethod()  # error: [deprecated] "don't use this!"
    |           ^^^^^^^ don't use this!
    |
-info: rule `deprecated` is enabled by default
 
 ```

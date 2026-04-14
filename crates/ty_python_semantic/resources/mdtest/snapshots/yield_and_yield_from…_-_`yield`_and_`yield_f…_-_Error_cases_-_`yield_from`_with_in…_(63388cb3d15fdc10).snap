@@ -37,6 +37,5 @@ error[invalid-yield]: Send type does not match annotation
 8 |     yield from inner()
   |                ^^^^^^^ generator with send type `int`, expected `str`
   |
-info: rule `invalid-yield` is enabled by default
 
 ```

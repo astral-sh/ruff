@@ -40,6 +40,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for unio
 15 | 10 and get() and True
    |        ^^^^^
    |
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```
