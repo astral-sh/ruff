@@ -4,7 +4,7 @@ use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use smallvec::SmallVec;
 
 use std::fmt::Write as _;
@@ -97,11 +97,6 @@ impl Member {
     /// use [`Self::is_instance_attribute`].
     pub(super) fn is_instance_attribute_candidate(&self) -> bool {
         self.as_instance_attribute_candidate().is_some()
-    }
-
-    /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
-    pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.as_instance_attribute() == Some(name)
     }
 
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
@@ -427,6 +422,9 @@ pub(super) struct MemberTable {
     ///
     /// Uses a hash table to avoid storing the path twice.
     map: hashbrown::HashTable<ScopedMemberId>,
+
+    /// Map from an instance attribute name like `x` in `self.x` to its member ID.
+    instance_attributes_by_name: FxHashMap<Name, ScopedMemberId>,
 }
 
 impl MemberTable {
@@ -470,13 +468,7 @@ impl MemberTable {
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
-        for (id, member) in self.members.iter_enumerated() {
-            if member.is_instance_attribute_named(name) {
-                return Some(id);
-            }
-        }
-
-        None
+        self.instance_attributes_by_name.get(name).copied()
     }
 }
 
@@ -538,6 +530,11 @@ impl MemberTableBuilder {
 
     pub(super) fn build(self) -> MemberTable {
         let mut table = self.table;
+        table.instance_attributes_by_name = table
+            .members
+            .iter_enumerated()
+            .filter_map(|(id, member)| Some((Name::new(member.as_instance_attribute()?), id)))
+            .collect();
         table.members.shrink_to_fit();
         table.map.shrink_to_fit(|id| {
             let ref_expr = table.members[*id].expression.as_ref();
@@ -1104,5 +1101,41 @@ mod tests {
         // Should use Heap allocation due to large relative offset
         assert!(matches!(long_member.segments, Segments::Heap(_)));
         assert_eq!(long_member.num_segments(), 2);
+    }
+
+    #[test]
+    fn test_member_table_lookup_by_instance_attribute_name() {
+        use ruff_python_parser::parse_expression;
+
+        let mut builder = MemberTableBuilder::default();
+
+        let mut foo = Member::new(
+            MemberExpr::try_from_expr(ast::ExprRef::from(
+                parse_expression("self.foo").unwrap().expr(),
+            ))
+            .unwrap(),
+        );
+        foo.mark_instance_attribute();
+        let (foo_id, _) = builder.add(foo);
+
+        let mut bar = Member::new(
+            MemberExpr::try_from_expr(ast::ExprRef::from(
+                parse_expression("self.bar").unwrap().expr(),
+            ))
+            .unwrap(),
+        );
+        bar.mark_instance_attribute();
+        let (bar_id, _) = builder.add(bar);
+
+        let table = builder.build();
+        assert_eq!(
+            table.place_id_by_instance_attribute_name("foo"),
+            Some(foo_id)
+        );
+        assert_eq!(
+            table.place_id_by_instance_attribute_name("bar"),
+            Some(bar_id)
+        );
+        assert_eq!(table.place_id_by_instance_attribute_name("baz"), None);
     }
 }

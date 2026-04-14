@@ -11,7 +11,7 @@ use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
     Type, TypeContext, UnionType,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
+use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel, attribute_scopes_by_name};
 use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -20,7 +20,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use ty_python_core::{global_scope, semantic_index, use_def_map};
 
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
@@ -399,7 +399,11 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         let file = class_scope.file(db);
         let index = semantic_index(db, file);
 
-        for function_scope_id in attribute_scopes(db, class_scope) {
+        for function_scope_id in attribute_scopes_by_name(db, class_scope)
+            .get(attribute_name)
+            .into_iter()
+            .flat_map(|scope_ids| scope_ids.iter().copied())
+        {
             if let Some(place_id) = index
                 .place_table(function_scope_id)
                 .member_id_by_instance_attribute_name(attribute_name)
