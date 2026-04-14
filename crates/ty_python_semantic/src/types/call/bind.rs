@@ -2984,7 +2984,7 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        let overload_slots = matching_overload_indexes
+        let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
                 (
@@ -2996,32 +2996,35 @@ impl<'db> CallableBinding<'db> {
             })
             .collect::<Vec<_>>();
 
-        let max_slot_count = overload_slots
+        let max_slot_count = matching_overload_slots
             .iter()
             .map(|(_, slots)| slots.len())
             .max()
             .unwrap_or(0);
 
-        let mut participating_slot_indexes = HashSet::new();
+        let mut participating_slot_indices = HashSet::new();
         for slot_index in 0..max_slot_count {
             let mut first_parameter_type: Option<Type<'db>> = None;
-            for (_, slots) in &overload_slots {
-                let current_parameter_type = slots.get(slot_index).map(|slot| slot.parameter_type);
+            for (_, overload_slots) in &matching_overload_slots {
+                let current_parameter_type = overload_slots
+                    .get(slot_index)
+                    .map(|slot| slot.parameter_type);
                 match (first_parameter_type, current_parameter_type) {
-                    (Some(first_parameter_type), Some(current_parameter_type))
+                    (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, current_parameter_type, constraints)
-                            .is_always_satisfied(db) =>
-                    {
-                        participating_slot_indexes.insert(slot_index);
+                            .is_always_satisfied(db)
+                        {
+                            participating_slot_indices.insert(slot_index);
+                        }
                     }
                     (Some(_), None) => {
-                        participating_slot_indexes.insert(slot_index);
+                        participating_slot_indices.insert(slot_index);
                     }
                     (None, Some(current_parameter_type)) => {
                         first_parameter_type = Some(current_parameter_type);
                     }
-                    (Some(_), Some(_)) | (None, None) => {}
+                    (None, None) => {}
                 }
             }
         }
@@ -3039,10 +3042,12 @@ impl<'db> CallableBinding<'db> {
             let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
                 .take(max_slot_count)
                 .collect::<Vec<_>>();
-            let current_slots = &overload_slots[upto].1;
-            for (_, slots) in &overload_slots {
+
+            let current_slots = &matching_overload_slots[upto].1;
+
+            for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indexes.contains(&slot_index) {
+                    if participating_slot_indices.contains(&slot_index) {
                         let argument_type = if slot.has_precise_argument_type {
                             slot.argument_type
                         } else {
@@ -3072,9 +3077,9 @@ impl<'db> CallableBinding<'db> {
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
                 .take(max_slot_count)
                 .collect::<Vec<_>>();
-            for (_, slots) in &overload_slots[..=upto] {
+            for (_, slots) in &matching_overload_slots[..=upto] {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indexes.contains(&slot_index) {
+                    if participating_slot_indices.contains(&slot_index) {
                         union_parameter_types[slot_index].add_in_place(slot.parameter_type);
                     }
                 }
@@ -5014,6 +5019,7 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish();
+        tracing::debug!("argument_matches: {:#?}", self.argument_matches);
     }
 
     fn check_types(
@@ -5136,11 +5142,7 @@ impl<'db> Binding<'db> {
                         }
 
                         let argument_type = variadic_argument_type.unwrap_or_else(|| {
-                            if matched_argument.parameters.as_slice() == [parameter_index] {
-                                argument_types.get_for_declared_type(parameter_type)
-                            } else {
-                                argument_types.get_default().unwrap_or(Type::unknown())
-                            }
+                            argument_types.get_for_declared_type(parameter_type)
                         });
 
                         Step5FilteringSlot {
