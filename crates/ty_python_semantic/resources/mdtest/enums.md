@@ -1752,6 +1752,31 @@ Color = Enum()
 reveal_type(Color)  # revealed: Enum
 ```
 
+### Missing `names` argument
+
+```py
+from enum import Enum
+
+# This is invalid at runtime but should not panic.
+Enum("Color")  # error: [missing-argument]
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", start="0")
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", type=1)
+
+# error: [missing-argument]
+# error: [unknown-argument]
+Enum("Color", bad_kwarg=True)
+```
+
 ### Non-literal name
 
 Non-literal names should still be recognized as creating an enum class.
