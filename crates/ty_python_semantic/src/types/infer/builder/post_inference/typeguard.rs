@@ -1,7 +1,6 @@
 use ruff_python_ast as ast;
 
 use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION};
-use ty_python_core::SemanticIndex;
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
@@ -10,7 +9,6 @@ pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
     node: &ast::StmtFunctionDef,
-    index: &SemanticIndex<'db>,
 ) {
     let Type::FunctionLiteral(function) = ty else {
         return;
@@ -35,10 +33,7 @@ pub(crate) fn check_type_guard_definition<'db>(
         };
 
         // Check if this is a non-static method (first parameter is implicit `self`/`cls`).
-        let is_method = index
-            .class_definition_of_method(overload.body_scope(db).file_scope_id(db))
-            .is_some();
-        let has_implicit_receiver = is_method && !overload.is_staticmethod(db);
+        let has_implicit_receiver = overload.has_implicit_receiver(db);
 
         // Find the first positional parameter to narrow (skip implicit `self`/`cls`).
         let positional_params: Vec<_> = signature.parameters().positional().collect();

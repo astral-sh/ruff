@@ -278,6 +278,11 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
+    /// Returns true if this overload has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.body_scope(db).is_method_scope(db) && !self.is_staticmethod(db)
+    }
+
     pub(crate) fn node<'ast>(
         self,
         db: &dyn Db,
@@ -1023,6 +1028,11 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
         self.iter_overloads_and_implementation(db)
             .any(|overload| overload.is_staticmethod(db))
+    }
+
+    /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.literal(db).last_definition.has_implicit_receiver(db)
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.

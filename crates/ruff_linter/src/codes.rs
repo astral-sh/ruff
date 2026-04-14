@@ -1134,6 +1134,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "001") => rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
         (Airflow, "003") => rules::airflow::rules::AirflowVariableGetOutsideTask,
+        (Airflow, "201") => rules::airflow::rules::AirflowXcomPullInTemplateString,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,

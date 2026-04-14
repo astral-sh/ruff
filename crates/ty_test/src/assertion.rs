@@ -40,13 +40,12 @@ use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
-use std::ops::Deref;
 use std::str::FromStr;
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
 pub(crate) struct InlineFileAssertions<'s> {
-    assertions: Vec<LineAssertions<'s>>,
+    by_line: Vec<LineAssertions<'s>>,
 }
 
 impl<'s> InlineFileAssertions<'s> {
@@ -55,8 +54,8 @@ impl<'s> InlineFileAssertions<'s> {
         parsed: &ParsedModuleRef,
         file_index: &LineIndex,
     ) -> Self {
-        let mut assertions = Vec::new();
-        let mut file_assertions = UnparsedAssertionIter {
+        let mut by_line = Vec::new();
+        let mut file_assertions = UnparsedAssertionsIter {
             tokens: parsed.tokens().iter(),
             source,
         }
@@ -76,53 +75,56 @@ impl<'s> InlineFileAssertions<'s> {
             // ```
             //
             if CommentRanges::is_own_line(ranged_assertion.start(), source) {
-                collector.push(ranged_assertion.into());
+                collector.push(ranged_assertion.into_comment());
                 let mut only_own_line = true;
-                while let Some(ranged_assertion) = file_assertions.peek() {
+
+                while let Some(ranged_assertion) = file_assertions.next_if(|next_pragma| {
                     let next_line_number = line_number.saturating_add(1);
-                    if file_index.line_index(ranged_assertion.start()) == next_line_number {
-                        if !CommentRanges::is_own_line(ranged_assertion.start(), source) {
-                            only_own_line = false;
-                        }
+
+                    if file_index.line_index(next_pragma.start()) == next_line_number {
                         line_number = next_line_number;
-                        collector.push(file_assertions.next().unwrap().into());
-                        // If we see an end-of-line comment, it has to be the end of the stack,
-                        // otherwise we'd botch this case, attributing all three errors to the `bar`
-                        // line:
-                        //
-                        // ```py
-                        // # error:
-                        // foo  # error:
-                        // bar  # error:
-                        // ```
-                        //
-                        if !only_own_line {
-                            break;
-                        }
+                        true
                     } else {
+                        false
+                    }
+                }) {
+                    if !CommentRanges::is_own_line(ranged_assertion.start(), source) {
+                        only_own_line = false;
+                    }
+
+                    collector.push(ranged_assertion.into_comment());
+
+                    // If we see an end-of-line comment, it has to be the end of the stack,
+                    // otherwise we'd botch this case, attributing all three errors to the `bar`
+                    // line:
+                    //
+                    // ```py
+                    // # error:
+                    // foo  # error:
+                    // bar  # error:
+                    // ```
+                    //
+                    if !only_own_line {
                         break;
                     }
                 }
+
                 if only_own_line {
                     // The collected comments apply to the _next_ line in the code.
                     line_number = line_number.saturating_add(1);
                 }
             } else {
                 // We have a line-trailing comment; it applies to its own line, and is not grouped.
-                collector.push(ranged_assertion.into());
+                collector.push(ranged_assertion.into_comment());
             }
 
-            assertions.push(LineAssertions {
+            by_line.push(LineAssertions {
                 line_number,
                 assertions: collector,
             });
         }
 
-        Self { assertions }
-    }
-
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, LineAssertions<'s>> {
-        self.assertions.iter()
+        Self { by_line }
     }
 }
 
@@ -132,16 +134,26 @@ impl<'a, 's> IntoIterator for &'a InlineFileAssertions<'s> {
     type IntoIter = std::slice::Iter<'a, LineAssertions<'s>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.assertions.iter()
+        self.by_line.iter()
     }
 }
 
-struct UnparsedAssertionIter<'a, 's> {
+impl<'s> IntoIterator for InlineFileAssertions<'s> {
+    type Item = LineAssertions<'s>;
+
+    type IntoIter = std::vec::IntoIter<LineAssertions<'s>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.by_line.into_iter()
+    }
+}
+
+struct UnparsedAssertionsIter<'a, 's> {
     source: &'s str,
     tokens: std::slice::Iter<'a, Token>,
 }
 
-impl<'s> Iterator for UnparsedAssertionIter<'_, 's> {
+impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
     type Item = AssertionWithRange<'s>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -163,23 +175,15 @@ impl<'s> Iterator for UnparsedAssertionIter<'_, 's> {
 #[derive(Debug)]
 struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
 
-impl<'a> Deref for AssertionWithRange<'a> {
-    type Target = UnparsedAssertion<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl<'a> AssertionWithRange<'a> {
+    fn into_comment(self) -> UnparsedAssertion<'a> {
+        self.0
     }
 }
 
 impl Ranged for AssertionWithRange<'_> {
     fn range(&self) -> TextRange {
         self.1
-    }
-}
-
-impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
-    fn from(value: AssertionWithRange<'a>) -> Self {
-        value.0
     }
 }
 
@@ -202,49 +206,56 @@ pub(crate) struct LineAssertions<'a> {
     pub(crate) assertions: AssertionVec<'a>,
 }
 
-impl<'a> Deref for LineAssertions<'a> {
-    type Target = [UnparsedAssertion<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.assertions
-    }
-}
-
-/// A single diagnostic assertion comment.
+/// A single assertion comment.
 ///
 /// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
 /// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
-/// in the event of an invalid assertion
+/// in the event of an invalid assertion.
 #[derive(Debug)]
 pub(crate) enum UnparsedAssertion<'a> {
     /// A `# revealed:` assertion.
     Revealed(&'a str),
-
     /// An `# error:` assertion.
     Error(&'a str),
+    /// A `# snapshot` assertion
+    Snapshot(&'a str),
+}
+
+impl std::fmt::Display for UnparsedAssertion<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Revealed(expected_type) => {
+                write!(f, "revealed: {expected_type}")
+            }
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Snapshot(assertion) => write!(f, "snapshot: {assertion}"),
+        }
+    }
 }
 
 impl<'a> UnparsedAssertion<'a> {
-    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
-    /// indicating that it is an assertion comment.
+    /// Returns `Some(_)` if the comment starts with `# error`, `# snapshot`, or `# revealed`,
+    /// indicating that it is a assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         let comment = comment.trim().strip_prefix('#')?.trim();
-        let (keyword, body) = comment.split_once(':')?;
-        let keyword = keyword.trim();
 
         // Support other pragma comments coming after `error` or `revealed`, e.g.
         // `# error: [code] # type: ignore` (nested pragma comments)
-        let body = if let Some((before_nested, _)) = body.split_once('#') {
+        let comment = if let Some((before_nested, _)) = comment.split_once('#') {
             before_nested
         } else {
-            body
+            comment
         };
 
+        let (keyword, body) = comment.split_once(':').unwrap_or((comment, ""));
+
+        let keyword = keyword.trim();
         let body = body.trim();
 
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
+            "snapshot" => Some(Self::Snapshot(body)),
             _ => None,
         }
     }
@@ -262,15 +273,13 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-        }
-    }
-}
-
-impl std::fmt::Display for UnparsedAssertion<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
-            Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Snapshot(rule) => {
+                if rule.is_empty() {
+                    Ok(ParsedAssertion::Snapshot(None))
+                } else {
+                    Ok(ParsedAssertion::Snapshot(Some(rule)))
+                }
+            }
         }
     }
 }
@@ -283,6 +292,9 @@ pub(crate) enum ParsedAssertion<'a> {
 
     /// An `# error:` assertion.
     Error(ErrorAssertion<'a>),
+
+    /// A `# snapshot: <code?>` assertion.
+    Snapshot(Option<&'a str>),
 }
 
 impl std::fmt::Display for ParsedAssertion<'_> {
@@ -290,6 +302,10 @@ impl std::fmt::Display for ParsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => assertion.fmt(f),
+            Self::Snapshot(rule) => match rule {
+                Some(code) => write!(f, "snapshot: {code}"),
+                None => write!(f, "snapshot"),
+            },
         }
     }
 }
@@ -512,7 +528,7 @@ mod tests {
     }
 
     fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {
-        assertions.assertions
+        assertions.by_line
     }
 
     #[test]

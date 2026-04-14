@@ -498,6 +498,10 @@ impl ty_module_resolver::Db for ProjectDatabase {
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        ProjectDatabase::check_file(self, file)
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)
@@ -578,7 +582,8 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::{FileRootKind, Files};
+    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::files::{File, FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
@@ -713,6 +718,11 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
+        #[inline]
+        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+            self.project().check_file(self, file)
+        }
+
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }

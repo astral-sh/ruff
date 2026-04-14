@@ -135,8 +135,7 @@ def _(x: object):
     if C().f(x):
         reveal_type(x)  # revealed: str
     if C.f(C(), x):
-        # TODO: should be str
-        reveal_type(x)  # revealed: object
+        reveal_type(x)  # revealed: str
     if C.g(x):
         reveal_type(x)  # revealed: int
     if C().g(x):
@@ -166,6 +165,9 @@ def _(x: object):
         reveal_type(x)  # revealed: int
 
     if A().is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A.is_int(A(), x):
         reveal_type(x)  # revealed: int
 
     if A().is_int2(x):

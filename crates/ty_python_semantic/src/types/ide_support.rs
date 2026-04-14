@@ -1324,7 +1324,8 @@ mod resolve_definition {
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     use crate::Db;
-    use ty_python_core::definition::{Definition, DefinitionKind, module_docstring};
+    use crate::module_docstring;
+    use ty_python_core::definition::{Definition, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 

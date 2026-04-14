@@ -8,7 +8,7 @@ reviewers = ["amyreese", "ntBre"]
 
 [[pools]]
 name = "ty-semantic"
-paths = ["/crates/ty_python_semantic/**"]
+paths = ["/crates/ty_python_core/**", "/crates/ty_python_semantic/**"]
 reviewers = ["carljm", "charliermarsh", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
 
 [[pools]]
