@@ -8,6 +8,7 @@ pub(crate) use suggested_to_move_to_provider_in_3::*;
 pub(crate) use suggested_to_update_3_0::*;
 pub(crate) use task_variable_name::*;
 pub(crate) use variable_get_outside_task::*;
+pub(crate) use xcom_pull_in_template_string::*;
 
 mod dag_schedule_argument;
 mod function_signature_change_in_3;
@@ -19,3 +20,4 @@ mod suggested_to_move_to_provider_in_3;
 mod suggested_to_update_3_0;
 mod task_variable_name;
 mod variable_get_outside_task;
+mod xcom_pull_in_template_string;
