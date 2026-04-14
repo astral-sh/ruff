@@ -227,6 +227,7 @@ python-version = "3.9"
 ```
 
 ```py
+# error: [unsupported-operator]
 def _(x: type[int | str | bytes]):
     # error: [unsupported-operator]
     if issubclass(x, int | str):

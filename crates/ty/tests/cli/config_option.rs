@@ -17,7 +17,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -35,7 +34,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -69,7 +67,6 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -87,7 +84,6 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -110,7 +106,6 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -170,7 +165,6 @@ fn config_file_override() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -188,7 +182,6 @@ fn config_file_override() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 

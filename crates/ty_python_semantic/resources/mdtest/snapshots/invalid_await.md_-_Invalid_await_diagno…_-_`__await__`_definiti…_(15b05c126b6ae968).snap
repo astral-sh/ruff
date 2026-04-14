@@ -39,6 +39,5 @@ error[invalid-await]: `InvalidAwaitArgs` is not awaitable
 3 |         yield value
   |
 info: `__await__` requires arguments and cannot be called implicitly
-info: rule `invalid-await` is enabled by default
 
 ```

@@ -27,11 +27,10 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
+use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
-use ty_python_semantic::{
-    FallibleStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
-};
 
 mod db;
 mod files;

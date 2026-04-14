@@ -1,6 +1,8 @@
 use itertools::Either;
 
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
+};
 use crate::types::class::KnownClass;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
@@ -234,7 +236,7 @@ impl<'db> UnionType<'db> {
                 } else {
                     Definedness::AlwaysDefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -290,7 +292,7 @@ impl<'db> UnionType<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
@@ -779,7 +781,7 @@ impl<'db> IntersectionType<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -832,7 +834,7 @@ impl<'db> IntersectionType<'db> {
                     } else {
                         Definedness::PossiblyUndefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,

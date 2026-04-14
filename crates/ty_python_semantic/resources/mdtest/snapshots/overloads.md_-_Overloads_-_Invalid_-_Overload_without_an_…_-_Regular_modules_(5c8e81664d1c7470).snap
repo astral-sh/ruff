@@ -49,7 +49,6 @@ info:  - in `if TYPE_CHECKING` blocks
 info:  - as methods on protocol classes
 info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -71,6 +70,5 @@ info:  - in `if TYPE_CHECKING` blocks
 info:  - as methods on protocol classes
 info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
-info: rule `invalid-overload` is enabled by default
 
 ```

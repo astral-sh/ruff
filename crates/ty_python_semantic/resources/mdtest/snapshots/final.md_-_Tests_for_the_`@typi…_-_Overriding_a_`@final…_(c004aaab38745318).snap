@@ -56,6 +56,5 @@ info: `Base.method` is decorated with `@final`, forbidding overrides
   |         ------ `Base.method` defined here
   |
 help: Remove the override of `method`
-info: rule `override-of-final-method` is enabled by default
 
 ```

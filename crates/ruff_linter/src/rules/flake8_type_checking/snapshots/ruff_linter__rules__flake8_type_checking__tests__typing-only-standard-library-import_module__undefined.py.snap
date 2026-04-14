@@ -11,13 +11,13 @@ TC003 [*] Move standard library import `collections.abc.Sequence` into a type-ch
   |
 help: Move into type-checking block
 1 | from __future__ import annotations
-2 | 
+2 |
   - from collections.abc import Sequence
 3 + from typing import TYPE_CHECKING
-4 + 
+4 +
 5 + if TYPE_CHECKING:
 6 +     from collections.abc import Sequence
-7 | 
-8 | 
+7 |
+8 |
 9 | class Foo(MyBaseClass):
 note: This is an unsafe fix and may change runtime behavior

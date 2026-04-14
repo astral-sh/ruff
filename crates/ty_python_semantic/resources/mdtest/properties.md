@@ -112,8 +112,7 @@ c.my_property = "b"
 
 ## `property.deleter`
 
-We do not support `property.deleter` yet, but we make sure that it does not invalidate the getter or
-setter:
+We support `property.deleter`, and it preserves the getter and setter:
 
 ```py
 class C:
@@ -131,6 +130,7 @@ class C:
 
 c = C()
 reveal_type(c.my_property)  # revealed: int
+del c.my_property
 c.my_property = 2
 # error: [invalid-assignment]
 c.my_property = "a"
@@ -199,7 +199,7 @@ c.attr = 1
 
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
-reveal_type(c.attr)  # revealed: Unknown
+reveal_type(c.attr)  # revealed: Never
 ```
 
 ### Wrong setter signature
@@ -229,7 +229,7 @@ class C:
 
 ### Manually constructed property
 
-Properties can also be constructed manually using the `property` class. We partially support this:
+Properties can also be constructed manually using the `property` class. We support this:
 
 ```py
 class C:
@@ -238,14 +238,12 @@ class C:
     attr = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Unknown | int
+reveal_type(c.attr)  # revealed: int
 ```
 
-But note that we return `Unknown | int` because we did not declare the `attr` attribute. This is
-consistent with how we usually treat attributes, but here, if we try to declare `attr` as
-`property`, we fail to understand the property, since the `property` declaration shadows the more
-precise type that we infer for `property(attr_getter)` (which includes the actual information about
-the getter).
+If we try to declare `attr` as `property`, we fail to understand the property, since the `property`
+declaration shadows the more precise type that we infer for `property(attr_getter)` (which includes
+the actual information about the getter).
 
 ```py
 class C:
@@ -255,6 +253,29 @@ class C:
 
 c = C()
 reveal_type(c.attr)  # revealed: Unknown
+```
+
+### Attempting to write to a read-only manually constructed property
+
+We should emit an error when trying to set an attribute that was created using a manually
+constructed property with `fset=None`, just like we do for decorator-based read-only properties:
+
+```py
+class Foo:
+    myprop = property(fget=lambda self: 42, fset=None)
+
+class Bar:
+    @property
+    def myprop(self) -> int:
+        return 42
+
+f = Foo()
+# error: [invalid-assignment]
+f.myprop = 56
+
+b = Bar()
+# error: [invalid-assignment]
+b.myprop = 42
 ```
 
 ## Behind the scenes
@@ -491,10 +512,12 @@ empty_b = property()
 getter_only_a = property(get_int)
 getter_only_b = property(get_int)
 getter_only_c = property(get_str)
+getter_only_d = property(get_int, None)
 
 setter_only_a = property(fset=set_int)
 setter_only_b = property(fset=set_int)
 setter_only_c = property(fset=set_str)
+setter_only_d = property(None, set_int)
 
 both_a = property(get_int, set_int)
 both_b = property(get_int, set_int)
@@ -503,7 +526,9 @@ both_d = property(get_str, set_int)
 
 static_assert(is_equivalent_to(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(is_equivalent_to(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(is_equivalent_to(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(is_equivalent_to(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(not is_equivalent_to(TypeOf[empty_a], TypeOf[getter_only_a]))
@@ -518,7 +543,9 @@ static_assert(not is_equivalent_to(TypeOf[both_a], TypeOf[both_d]))
 
 static_assert(not is_disjoint_from(TypeOf[empty_a], TypeOf[empty_b]))
 static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[getter_only_a], TypeOf[getter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_b]))
+static_assert(not is_disjoint_from(TypeOf[setter_only_a], TypeOf[setter_only_d]))
 static_assert(not is_disjoint_from(TypeOf[both_a], TypeOf[both_b]))
 
 static_assert(is_disjoint_from(TypeOf[empty_a], TypeOf[getter_only_a]))

@@ -1,6 +1,5 @@
 use crate::{
     Db,
-    semantic_index::definition::Definition,
     types::{
         ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
         TypeContext, UnionType,
@@ -10,7 +9,9 @@ use crate::{
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
             PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            report_mismatched_type_name,
         },
+        extract_fixed_length_iterable_element_types,
         function::KnownFunction,
         infer::TypeInferenceBuilder,
     },
@@ -18,6 +19,7 @@ use crate::{
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
@@ -205,41 +207,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
-                    // Extract element types from AST literals (using already-inferred types)
-                    // or fall back to the inferred tuple spec.
-                    match &kw.value {
-                        ast::Expr::List(list) => {
-                            // Elements were already inferred when we inferred kw.value above.
-                            default_types = list
-                                .elts
-                                .iter()
-                                .map(|elt| self.expression_type(elt))
-                                .collect();
-                        }
-                        ast::Expr::Tuple(tuple) => {
-                            // Elements were already inferred when we inferred kw.value above.
-                            default_types = tuple
-                                .elts
-                                .iter()
-                                .map(|elt| self.expression_type(elt))
-                                .collect();
-                        }
-                        _ => {
-                            // Fall back to using the already-inferred type.
-                            // Try to extract element types from tuple.
-                            if let Some(spec) = kw_type.exact_tuple_instance_spec(db)
-                                && let Some(fixed) = spec.as_fixed_length()
-                            {
-                                default_types = fixed.all_elements().to_vec();
-                            } else {
-                                // Can't determine individual types; use Any for each element.
-                                let count = kw_type
-                                    .exact_tuple_instance_spec(db)
-                                    .and_then(|spec| spec.len().maximum())
-                                    .unwrap_or(0);
-                                default_types = vec![Type::any(); count];
-                            }
-                        }
+                    if let Some(element_types) =
+                        extract_fixed_length_iterable_element_types(db, &kw.value, |expr| {
+                            self.expression_type(expr)
+                        })
+                    {
+                        default_types = element_types.into_vec();
+                    } else {
+                        // Can't determine individual types; use Any for each element.
+                        let count = kw_type
+                            .exact_tuple_instance_spec(db)
+                            .and_then(|spec| spec.len().maximum())
+                            .unwrap_or(0);
+                        default_types = vec![Type::any(); count];
                     }
                     // Emit diagnostic for invalid types (not Iterable[Any] | None).
                     let iterable_any =
@@ -333,23 +313,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Extract name.
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            // Name is not a string literal; use <unknown> like we do for type() calls.
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `typename` of `{kind}()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
-            }
-            Name::new_static("<unknown>")
-        };
+        let name = name_type
+            .as_string_literal()
+            .map(|literal| Name::new(literal.value(db)));
+
+        if name.is_none()
+            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `typename` of `{kind}()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `str`, found `{}`",
+                name_type.display(db)
+            ));
+        } else if let Some(actual_name) = name.as_deref()
+            && let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && assigned_name.as_str() != actual_name
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                &kind.to_string(),
+                &assigned_name,
+                Some(actual_name),
+                name_type,
+            );
+        }
+
+        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
 
         // Handle fields based on which namedtuple variant.
         let anchor = match definition {
@@ -436,32 +430,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .map(Name::new)
                         .collect(),
                 )
-            } else if let Some(tuple_spec) = fields_type.tuple_instance_spec(db)
-                && let Some(fixed_tuple) = tuple_spec.as_fixed_length()
-            {
-                // Handle list/tuple of strings (must be fixed-length).
-                fixed_tuple
-                    .all_elements()
-                    .iter()
-                    .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
-                    .collect()
             } else {
-                // Get the elements from the list or tuple literal.
-                let elements = match fields_arg {
-                    ast::Expr::List(list) => Some(&list.elts),
-                    ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                    _ => None,
-                };
-
-                elements.and_then(|elts| {
-                    elts.iter()
-                        .map(|elt| {
-                            // Each element should be a string literal.
-                            let field_ty = self.expression_type(elt);
-                            let field_lit = field_ty.as_string_literal()?;
-                            Some(Name::new(field_lit.value(db)))
-                        })
-                        .collect::<Option<_>>()
+                extract_fixed_length_iterable_element_types(db, fields_arg, |expr| {
+                    self.expression_type(expr)
+                })
+                .and_then(|field_types| {
+                    field_types
+                        .iter()
+                        .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
+                        .collect()
                 })
             };
 

@@ -36,6 +36,5 @@ error[invalid-assignment]: Cannot assign to read-only property `immutable` on ob
 6 | DontAssignToMe().immutable = "the properties, they are a-changing"
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

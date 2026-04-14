@@ -90,7 +90,6 @@ info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
   |       ^^^ Definition of `Foo`
 6 |     x: int
   |
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -112,6 +111,5 @@ info: `Baz._asdict` is a generated method created because `Baz` inherits from `t
    |       ^^^^^^^^^^^^^^^ Definition of `Baz`
 51 |     x: int
    |
-info: rule `invalid-method-override` is enabled by default
 
 ```

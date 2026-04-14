@@ -49,7 +49,6 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 7 |     if cond:
 8 |         return 1
   |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -64,7 +63,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 13 |         raise ValueError()
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -78,6 +76,5 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 17 |     if cond:
 18 |         cond = False
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```

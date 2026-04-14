@@ -41,6 +41,5 @@ info: Function defined here
 226 |     *,
 227 |     cls: type[JSONDecoder] | None = None,
     |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -16,7 +16,7 @@ help: Replace with `...`
 2 + field02: int = ...  # Error: PYI054
 3 | field03: int = -0xFFFFFFFF
 4 | field04: int = -0xFFFFFFFFF  # Error: PYI054
-5 | 
+5 |
 
 PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
  --> PYI054.pyi:4:17
@@ -34,7 +34,7 @@ help: Replace with `...`
 3 | field03: int = -0xFFFFFFFF
   - field04: int = -0xFFFFFFFFF  # Error: PYI054
 4 + field04: int = -...  # Error: PYI054
-5 | 
+5 |
 6 | field05: int = 1234567890
 7 | field06: int = 12_456_890
 
@@ -49,14 +49,14 @@ PYI054 [*] Numeric literals with a string representation longer than ten charact
 10 | field09: int = -234_567_890  # Error: PYI054
    |
 help: Replace with `...`
-5  | 
+5  |
 6  | field05: int = 1234567890
 7  | field06: int = 12_456_890
    - field07: int = 12345678901  # Error: PYI054
 8  + field07: int = ...  # Error: PYI054
 9  | field08: int = -1234567801
 10 | field09: int = -234_567_890  # Error: PYI054
-11 | 
+11 |
 
 PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
   --> PYI054.pyi:10:17
@@ -74,7 +74,7 @@ help: Replace with `...`
 9  | field08: int = -1234567801
    - field09: int = -234_567_890  # Error: PYI054
 10 + field09: int = -...  # Error: PYI054
-11 | 
+11 |
 12 | field10: float = 123.456789
 13 | field11: float = 123.4567890  # Error: PYI054
 
@@ -89,13 +89,13 @@ PYI054 [*] Numeric literals with a string representation longer than ten charact
    |
 help: Replace with `...`
 10 | field09: int = -234_567_890  # Error: PYI054
-11 | 
+11 |
 12 | field10: float = 123.456789
    - field11: float = 123.4567890  # Error: PYI054
 13 + field11: float = ...  # Error: PYI054
 14 | field12: float = -123.456789
 15 | field13: float = -123.567_890  # Error: PYI054
-16 | 
+16 |
 
 PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
   --> PYI054.pyi:15:19
@@ -113,7 +113,7 @@ help: Replace with `...`
 14 | field12: float = -123.456789
    - field13: float = -123.567_890  # Error: PYI054
 15 + field13: float = -...  # Error: PYI054
-16 | 
+16 |
 17 | field14: complex = 1e1234567j
 18 | field15: complex = 1e12345678j  # Error: PYI054
 
@@ -128,7 +128,7 @@ PYI054 [*] Numeric literals with a string representation longer than ten charact
    |
 help: Replace with `...`
 15 | field13: float = -123.567_890  # Error: PYI054
-16 | 
+16 |
 17 | field14: complex = 1e1234567j
    - field15: complex = 1e12345678j  # Error: PYI054
 18 + field15: complex = ...  # Error: PYI054

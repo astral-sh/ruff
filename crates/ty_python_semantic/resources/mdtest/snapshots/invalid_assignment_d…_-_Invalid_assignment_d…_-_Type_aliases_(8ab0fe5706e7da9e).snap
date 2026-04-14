@@ -25,21 +25,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 10 | type StringOrName = str | SupportsName
 11 | 
 12 | def _(source: HasName):
-13 |     target: SupportsName = source  # error: [invalid-assignment]
+13 |     target: StringOrName = source  # error: [invalid-assignment]
 ```
 
 # Diagnostics
 
 ```
-error[invalid-assignment]: Object of type `HasName` is not assignable to `SupportsName`
+error[invalid-assignment]: Object of type `HasName` is not assignable to `StringOrName`
   --> src/mdtest_snippet.py:13:13
    |
 12 | def _(source: HasName):
-13 |     target: SupportsName = source  # error: [invalid-assignment]
+13 |     target: StringOrName = source  # error: [invalid-assignment]
    |             ------------   ^^^^^^ Incompatible value of type `HasName`
    |             |
    |             Declared type
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

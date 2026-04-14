@@ -20,7 +20,7 @@ fn add_ignore() -> anyhow::Result<()> {
             "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @r"
+    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -31,7 +31,7 @@ fn add_ignore() -> anyhow::Result<()> {
     ");
 
     // There should be no diagnostics when running ty again
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -73,7 +73,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--add-ignore").env("RUST_BACKTRACE", "1"), @r"
+    assert_cmd_snapshot!(case.command().arg("--add-ignore").env("RUST_BACKTRACE", "1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -94,7 +94,6 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     1 | print(x  # [unresolved-reference]
       |       ^
       |
-    info: rule `unresolved-reference` is enabled by default
 
     error[invalid-syntax]: unexpected EOF while parsing
      --> has_syntax_error.py:1:34

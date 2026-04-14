@@ -153,9 +153,8 @@ info: `Good.bar` is decorated with `@final`, forbidding overrides
 8 |     def bar(self, x: int) -> int: ...
   |
 help: Remove all overloads for `bar`
-info: rule `override-of-final-method` is enabled by default
 13 |     def baz(self, x: int) -> int: ...
-14 | 
+14 |
 15 | class ChildOfGood(Good):
    -     @overload
    -     def bar(self, x: str) -> str: ...
@@ -195,7 +194,6 @@ info: `Good.baz` is decorated with `@final`, forbidding overrides
 13 |     def baz(self, x: int) -> int: ...
    |
 help: Remove all overloads for `baz`
-info: rule `override-of-final-method` is enabled by default
 17 |     def bar(self, x: str) -> str: ...
 18 |     @overload
 19 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
@@ -205,7 +203,7 @@ info: rule `override-of-final-method` is enabled by default
    -     def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
 20 +     
 21 +       # error: [override-of-final-method]
-22 | 
+22 |
 23 | class Bad:
 24 |     @overload
 note: This is an unsafe fix and may change runtime behavior
@@ -229,7 +227,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 32 |     @overload
 33 |     def baz(self, x: str) -> str: ...
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -250,7 +247,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 38 |
 39 | class ChildOfBad(Bad):
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -276,9 +272,8 @@ info: `Bad.bar` is decorated with `@final`, forbidding overrides
 29 |     @final
    |
 help: Remove all overloads for `bar`
-info: rule `override-of-final-method` is enabled by default
 37 |     def baz(self, x: int) -> int: ...
-38 | 
+38 |
 39 | class ChildOfBad(Bad):
    -     @overload
    -     def bar(self, x: str) -> str: ...
@@ -313,7 +308,6 @@ info: `Bad.baz` is decorated with `@final`, forbidding overrides
 35 |     @overload
    |
 help: Remove all overloads for `baz`
-info: rule `override-of-final-method` is enabled by default
 41 |     def bar(self, x: str) -> str: ...
 42 |     @overload
 43 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
@@ -348,9 +342,8 @@ info: `Good.f` is decorated with `@final`, forbidding overrides
 10 |         return x
    |
 help: Remove all overloads and the implementation for `f`
-info: rule `override-of-final-method` is enabled by default
 10 |         return x
-11 | 
+11 |
 12 | class ChildOfGood(Good):
    -     @overload
    -     def f(self, x: str) -> str: ...
@@ -358,12 +351,12 @@ info: rule `override-of-final-method` is enabled by default
    -     def f(self, x: int) -> int: ...
 13 +     pass
 14 +     pass
-15 | 
+15 |
 16 |     # error: [override-of-final-method]
    -     def f(self, x: int | str) -> int | str:
    -         return x
 17 +     pass
-18 | 
+18 |
 19 | class Bad:
 20 |     @overload
 note: This is an unsafe fix and may change runtime behavior
@@ -386,7 +379,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         - Implementation defined here
 29 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -407,7 +399,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         - Implementation defined here
 37 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -425,7 +416,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         - Implementation defined here
 45 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -444,7 +434,6 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
    |         - Implementation defined here
 53 |         return x
    |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
@@ -469,7 +458,6 @@ info: `Bad.f` is decorated with `@final`, forbidding overrides
 29 |         return x
    |
 help: Remove the override of `f`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -494,7 +482,6 @@ info: `Bad.g` is decorated with `@final`, forbidding overrides
 37 |         return x
    |
 help: Remove the override of `g`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -518,7 +505,6 @@ info: `Bad.h` is decorated with `@final`, forbidding overrides
 45 |         return x
    |
 help: Remove the override of `h`
-info: rule `override-of-final-method` is enabled by default
 
 ```
 
@@ -541,6 +527,5 @@ info: `Bad.i` is decorated with `@final`, forbidding overrides
 53 |         return x
    |
 help: Remove the override of `i`
-info: rule `override-of-final-method` is enabled by default
 
 ```

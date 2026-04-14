@@ -55,6 +55,5 @@ info: Matching overload defined here
 info: Non-matching overloads for function `f`:
 info:   () -> None
 info:   (x: int, y: int) -> int
-info: rule `invalid-argument-type` is enabled by default
 
 ```

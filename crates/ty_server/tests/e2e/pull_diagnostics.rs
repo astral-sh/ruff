@@ -28,7 +28,6 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -55,7 +54,6 @@ def foo():
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -85,13 +83,42 @@ def foo():
             Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
         )?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
     let diagnostics = server.workspace_diagnostic_request(None, None);
 
     assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn loop_carried_rebinding_is_not_reported_unused() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def buy_sell_once(prices: list[float]) -> float:
+    assert len(prices) > 1
+    best_buy, best_so_far = prices[0], 0.0
+    for i in range(1, len(prices)):
+        best_so_far = max(best_so_far, prices[i] - best_buy)
+        best_buy = min(best_buy, prices[i])
+    return best_so_far
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
 
     Ok(())
 }
@@ -113,7 +140,6 @@ def foo() -> str:
             Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Off)),
         )?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -146,7 +172,6 @@ def foo(
                 .with_show_syntax_errors(false)
                 .with_diagnostic_mode(DiagnosticMode::Workspace),
         )
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -196,7 +221,6 @@ reveal_type(total)
     let mut server = TestServerBuilder::new()?
         .with_workspace(SystemPath::new("src"), None)?
         .with_file(file_path, &content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -228,7 +252,6 @@ exclude = ["src/excluded/"]
         .with_file(main_path, main_content)?
         .with_file(excluded_path, excluded_content)?
         .with_file(SystemPath::new("ty.toml"), config)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -257,7 +280,6 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -313,7 +335,6 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content_v1)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -433,7 +454,6 @@ def foo() -> str:
         .with_file(file_c, file_c_content_v1)?
         .with_file(file_d, file_d_content_v1)?
         .with_file(file_e, file_e_content_v1)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -542,7 +562,6 @@ def foo() -> str:
         .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -644,10 +663,7 @@ def foo() -> str:
         builder = builder.with_file(file_path, error_content)?;
     }
 
-    let mut server = builder
-        .enable_pull_diagnostics(true)
-        .build()
-        .wait_until_workspaces_are_initialized();
+    let mut server = builder.build().wait_until_workspaces_are_initialized();
 
     let partial_token = lsp_types::ProgressToken::String("streaming-diagnostics".to_string());
     let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
@@ -735,10 +751,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
         builder = builder.with_file(file_path, error_content)?; // All files have errors initially
     }
 
-    let mut server = builder
-        .enable_pull_diagnostics(true)
-        .build()
-        .wait_until_workspaces_are_initialized();
+    let mut server = builder.build().wait_until_workspaces_are_initialized();
 
     server.open_text_document(SystemPath::new("src/error_0.py"), error_content, 1);
     server.open_text_document(SystemPath::new("src/error_1.py"), error_content, 1);
@@ -1116,7 +1129,6 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(main_path, main_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -1163,7 +1175,6 @@ fn create_workspace_server_with_file(
         .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized())
 }

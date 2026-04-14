@@ -40,7 +40,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
 8 | class Foo(TypedDict):
   |
 info: The base of a `NewType` is not allowed to be a protocol class.
-info: rule `invalid-newtype` is enabled by default
 
 ```
 
@@ -54,6 +53,5 @@ error[invalid-newtype]: invalid base for `typing.NewType`
    |                      ^^^ type `Foo`
    |
 info: The base of a `NewType` is not allowed to be a `TypedDict`.
-info: rule `invalid-newtype` is enabled by default
 
 ```

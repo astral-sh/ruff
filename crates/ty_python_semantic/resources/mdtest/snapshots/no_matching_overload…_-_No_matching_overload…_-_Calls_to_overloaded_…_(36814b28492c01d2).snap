@@ -144,6 +144,5 @@ info: Overload implementation defined here
    | |______________^
 59 |       return 0
    |
-info: rule `no-matching-overload` is enabled by default
 
 ```

@@ -51,7 +51,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
 10 |
 11 | # evaluates to False, with a message as the second argument
    |
-info: rule `static-assert-error` is enabled by default
 
 ```
 
@@ -68,7 +67,6 @@ error[static-assert-error]: Static assertion error: with a message
 14 |
 15 | # evaluates to something falsey
    |
-info: rule `static-assert-error` is enabled by default
 
 ```
 
@@ -85,7 +83,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
 18 |
 19 | # evaluates to something ambiguous
    |
-info: rule `static-assert-error` is enabled by default
 
 ```
 
@@ -100,6 +97,5 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    |               |
    |               Inferred type of argument is `int`
    |
-info: rule `static-assert-error` is enabled by default
 
 ```

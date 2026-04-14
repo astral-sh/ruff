@@ -41,6 +41,5 @@ error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
    |
 info: Its `__aiter__` method returns an object of type `AsyncIterator`, which has an invalid `__anext__` method
 info: Expected signature for `__anext__` is `def __anext__(self): ...`
-info: rule `not-iterable` is enabled by default
 
 ```

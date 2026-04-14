@@ -31,7 +31,6 @@ error[unresolved-import]: Cannot resolve imported module `tomllib`
   |
 info: The stdlib module `tomllib` is only available on Python 3.11+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -46,7 +45,6 @@ error[unresolved-import]: Cannot resolve imported module `string.templatelib`
   |
 info: The stdlib module `string.templatelib` is only available on Python 3.14+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -61,6 +59,5 @@ error[unresolved-import]: Module `importlib.resources` has no member `abc`
   |
 info: The stdlib module `importlib.resources` only has a `abc` submodule on Python 3.11+
 info: Python 3.10 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```

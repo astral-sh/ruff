@@ -15,7 +15,7 @@ help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): 
 1 | """Case: There's a random import, so it should add `contextlib` after it."""
 2 | import math
 3 + import contextlib
-4 | 
+4 |
 5 | # SIM105
   - try:
 6 + with contextlib.suppress(ValueError):

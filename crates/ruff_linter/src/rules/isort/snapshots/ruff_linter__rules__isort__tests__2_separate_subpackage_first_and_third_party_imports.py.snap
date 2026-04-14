@@ -16,14 +16,14 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
 1  | import sys
-2  + 
+2  +
 3  | import baz
    - from foo import bar, baz
 4  + import foo.bar
 5  + import foo.bar.baz
 6  | from foo.bar import blah, blub
 7  | from foo.bar.baz import something
-8  + 
+8  +
 9  | import foo
    - import foo.bar
    - import foo.bar.baz

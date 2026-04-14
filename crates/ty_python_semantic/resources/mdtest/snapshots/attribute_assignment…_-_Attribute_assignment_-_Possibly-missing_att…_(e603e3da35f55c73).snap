@@ -37,7 +37,6 @@ info[possibly-missing-attribute]: Attribute `attr` may be missing on class `C`
 7 |
 8 |     instance = C()
   |
-info: rule `possibly-missing-attribute` is enabled by default
 
 ```
 
@@ -49,6 +48,5 @@ info[possibly-missing-attribute]: Attribute `attr` may be missing on object of t
 9 |     instance.attr = 1  # error: [possibly-missing-attribute]
   |     ^^^^^^^^^^^^^
   |
-info: rule `possibly-missing-attribute` is enabled by default
 
 ```

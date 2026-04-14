@@ -11,11 +11,11 @@ E223 [*] Tab before operator
 44 | #:
    |
 help: Replace with single space
-40 | 
+40 |
 41 | #: E223
 42 | foobart = 4
    - a	= 3  # aligned with tab
 43 + a = 3  # aligned with tab
 44 | #:
-45 | 
+45 |
 46 |

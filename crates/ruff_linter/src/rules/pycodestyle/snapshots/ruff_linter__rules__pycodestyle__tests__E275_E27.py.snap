@@ -112,13 +112,13 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
 74 | type	Number = int
-75 | 
+75 |
 76 | #: E275
    - match(foo):
 77 + match (foo):
 78 |     case(1):
 79 |         pass
-80 | 
+80 |
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:78:5
@@ -130,11 +130,11 @@ E275 [*] Missing whitespace after keyword
 79 |         pass
    |
 help: Added missing whitespace after keyword
-75 | 
+75 |
 76 | #: E275
 77 | match(foo):
    -     case(1):
 78 +     case (1):
 79 |         pass
-80 | 
+80 |
 81 | # https://github.com/astral-sh/ruff/issues/12094

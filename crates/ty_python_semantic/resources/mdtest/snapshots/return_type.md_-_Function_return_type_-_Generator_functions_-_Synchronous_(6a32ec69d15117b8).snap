@@ -65,7 +65,6 @@ error[invalid-return-type]: Return type does not match returned value
    |
 info: Function is inferred as returning `types.GeneratorType` because it is a generator function
 info: See https://docs.python.org/3/glossary.html#term-generator for more details
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -83,7 +82,6 @@ error[invalid-return-type]: Return type does not match returned value
 25 | def wrong_return() -> typing.Generator[int, int, int]:
 26 |     yield 1
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -101,7 +99,6 @@ error[invalid-return-type]: Return type does not match returned value
 28 | def bare_return_ok() -> typing.Generator[int, int, None]:
 29 |     yield 1
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -117,7 +114,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 33 | def iterator_must_not_return() -> typing.Iterator[int]:
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -134,6 +130,5 @@ error[invalid-return-type]: Return type does not match returned value
 36 |     return "foo"
    |            ^^^^^ expected `None`, found `Literal["foo"]`
    |
-info: rule `invalid-return-type` is enabled by default
 
 ```

@@ -39,6 +39,5 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |             |
    |             Declared type
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

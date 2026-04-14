@@ -492,7 +492,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
+                for (index, arg_or_keyword) in call.arguments.iter_source_order().enumerate() {
                     if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
                         && !arg_matches_name(&arg_or_keyword, name)
                     {
@@ -7235,6 +7235,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy

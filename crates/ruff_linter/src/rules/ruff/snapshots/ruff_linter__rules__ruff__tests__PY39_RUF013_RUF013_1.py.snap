@@ -10,8 +10,8 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
 help: Convert to `Optional[T]`
 1 | # No `typing.Optional` import
-2 | 
-3 | 
+2 |
+3 |
   - def f(arg: int = None):  # RUF013
 4 + from typing import Optional
 5 + def f(arg: Optional[int] = None):  # RUF013

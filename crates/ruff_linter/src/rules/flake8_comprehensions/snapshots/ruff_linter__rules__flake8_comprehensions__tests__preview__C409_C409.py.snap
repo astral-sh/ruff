@@ -105,7 +105,7 @@ help: Remove the outer call to `tuple()`
    -     (1, 2)
    - )
 8  + t5 = (1, 2)
-9  | 
+9  |
 10 | tuple(  # comment
 11 |     [1, 2]
 note: This is an unsafe fix and may change runtime behavior
@@ -125,12 +125,12 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 help: Rewrite as a tuple literal
 9  |     (1, 2)
 10 | )
-11 | 
+11 |
    - tuple(  # comment
    -     [1, 2]
    - )
 12 + (1, 2)
-13 | 
+13 |
 14 | tuple([  # comment
 15 |     1, 2
 note: This is an unsafe fix and may change runtime behavior
@@ -150,13 +150,13 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 help: Rewrite as a tuple literal
 13 |     [1, 2]
 14 | )
-15 | 
+15 |
    - tuple([  # comment
 16 + (  # comment
 17 |     1, 2
    - ])
 18 + )
-19 | 
+19 |
 20 | tuple((
 21 |     1,
 note: This is an unsafe fix and may change runtime behavior
@@ -176,13 +176,13 @@ C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to
 help: Remove the outer call to `tuple()`
 17 |     1, 2
 18 | ])
-19 | 
+19 |
    - tuple((
 20 + (
 21 |     1,
    - ))
 22 + )
-23 | 
+23 |
 24 | t6 = tuple([1])
 25 | t7 = tuple((1,))
 note: This is an unsafe fix and may change runtime behavior
@@ -200,12 +200,12 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 help: Rewrite as a tuple literal
 21 |     1,
 22 | ))
-23 | 
+23 |
    - t6 = tuple([1])
 24 + t6 = (1,)
 25 | t7 = tuple((1,))
 26 | t8 = tuple([1,])
-27 | 
+27 |
 note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
@@ -218,12 +218,12 @@ C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to
    |
 help: Remove the outer call to `tuple()`
 22 | ))
-23 | 
+23 |
 24 | t6 = tuple([1])
    - t7 = tuple((1,))
 25 + t7 = (1,)
 26 | t8 = tuple([1,])
-27 | 
+27 |
 28 | tuple([x for x in range(5)])
 note: This is an unsafe fix and may change runtime behavior
 
@@ -238,12 +238,12 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 28 | tuple([x for x in range(5)])
    |
 help: Rewrite as a tuple literal
-23 | 
+23 |
 24 | t6 = tuple([1])
 25 | t7 = tuple((1,))
    - t8 = tuple([1,])
 26 + t8 = (1,)
-27 | 
+27 |
 28 | tuple([x for x in range(5)])
 29 | tuple({x for x in range(10)})
 note: This is an unsafe fix and may change runtime behavior
@@ -261,7 +261,7 @@ C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite as a genera
 help: Rewrite as a generator
 25 | t7 = tuple((1,))
 26 | t8 = tuple([1,])
-27 | 
+27 |
    - tuple([x for x in range(5)])
 28 + tuple(x for x in range(5))
 29 | tuple({x for x in range(10)})
@@ -357,7 +357,7 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 help: Rewrite as a tuple literal
 43 |     }
 44 | )
-45 | 
+45 |
    - t9 = tuple([1],)
 46 + t9 = (1,)
 47 | t10 = tuple([1, 2],)
@@ -372,7 +372,7 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
    |
 help: Rewrite as a tuple literal
 44 | )
-45 | 
+45 |
 46 | t9 = tuple([1],)
    - t10 = tuple([1, 2],)
 47 + t10 = (1, 2)

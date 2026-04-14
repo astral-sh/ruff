@@ -74,7 +74,6 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    | ------------------ `T2` defined here
  6 | T3 = TypeVar("T3")
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -104,7 +103,6 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
  7 |
  8 | DefaultStrT = TypeVar("DefaultStrT", default=str)
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -132,7 +130,6 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    | ------------------ `T2` defined here
  6 | T3 = TypeVar("T3")
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -160,7 +157,6 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    | ------------------ `T2` defined here
  6 | T3 = TypeVar("T3")
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -176,7 +172,6 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
 34 | ): ...
    |
 help: Remove the type parameters from the `Protocol` base
-info: rule `invalid-generic-class` is enabled by default
 29 | class VeryBad(
 30 |     # error: [invalid-generic-class]
 31 |     # error: [invalid-generic-class]
@@ -213,6 +208,5 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    | ------------------ `T2` defined here
  6 | T3 = TypeVar("T3")
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```

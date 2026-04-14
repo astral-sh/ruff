@@ -1,0 +1,35 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Assigning to `Iterable`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from collections.abc import Iterable
+2 | 
+3 | def _(source: list[str]):
+4 |     target: Iterable[bytes] = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `list[str]` is not assignable to `Iterable[bytes]`
+ --> src/mdtest_snippet.py:4:13
+  |
+3 | def _(source: list[str]):
+4 |     target: Iterable[bytes] = source  # error: [invalid-assignment]
+  |             ---------------   ^^^^^^ Incompatible value of type `list[str]`
+  |             |
+  |             Declared type
+  |
+
+```

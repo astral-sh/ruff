@@ -60,10 +60,6 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
-use crate::semantic_index::ast_ids::HasScopedUseId;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
@@ -93,6 +89,10 @@ use crate::types::{
     binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -276,6 +276,11 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
             || is_implicit_classmethod(self.name(db))
+    }
+
+    /// Returns true if this overload has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.body_scope(db).is_method_scope(db) && !self.is_staticmethod(db)
     }
 
     pub(crate) fn node<'ast>(
@@ -1025,6 +1030,11 @@ impl<'db> FunctionType<'db> {
             .any(|overload| overload.is_staticmethod(db))
     }
 
+    /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
+    pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
+        self.literal(db).last_definition.has_implicit_receiver(db)
+    }
+
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
@@ -1446,13 +1456,8 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        ty.as_nominal_instance().is_some_and(|instance| {
-            instance
-                .class(db)
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|mro_class| mro_class.class_literal(db) == class)
-        })
+        ty.as_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_subtype_of_class_literal(db, class))
     };
 
     let always_true_if = |test: bool| {
@@ -1775,6 +1780,8 @@ pub enum KnownFunction {
     RevealMro,
     /// `struct.unpack`
     Unpack,
+    /// `types.new_class`
+    NewClass,
 }
 
 impl KnownFunction {
@@ -1859,6 +1866,9 @@ impl KnownFunction {
             Self::ImportModule => module.is_importlib(),
             Self::Unpack => {
                 matches!(module, KnownModule::Struct)
+            }
+            Self::NewClass => {
+                matches!(module, KnownModule::Types)
             }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
@@ -2207,9 +2217,10 @@ impl KnownFunction {
                 if let Type::ClassLiteral(class) = second_argument
                     && self == KnownFunction::IsInstance
                 {
-                    overload.set_return_type(
-                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                    );
+                    overload.set_return_type(Type::from_truthiness(
+                        db,
+                        is_instance_truthiness(db, *first_arg, *class),
+                    ));
                 }
             }
 
@@ -2364,6 +2375,7 @@ pub(crate) mod tests {
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
                 KnownFunction::Unpack => KnownModule::Struct,
+                KnownFunction::NewClass => KnownModule::Types,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

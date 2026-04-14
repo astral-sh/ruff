@@ -15,10 +15,10 @@ help: Replace with `Path(...).resolve()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
-7  | 
+7  |
    - a = foo_p.abspath(p)
 8  + a = pathlib.Path(p).resolve()
 9  | aa = foo.chmod(p)
@@ -51,10 +51,10 @@ help: Replace with `Path(...).mkdir()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
-7  | 
+7  |
 8  | a = foo_p.abspath(p)
 9  | aa = foo.chmod(p)
    - aaa = foo.mkdir(p)
@@ -77,7 +77,7 @@ help: Replace with `Path(...).mkdir(parents=True)`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -128,7 +128,7 @@ help: Replace with `Path(...).rmdir()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ help: Replace with `Path(...).unlink()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -182,7 +182,7 @@ help: Replace with `Path(...).unlink()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -221,7 +221,7 @@ help: Replace with `Path(...).exists()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -248,7 +248,7 @@ help: Replace with `Path(...).expanduser()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -276,7 +276,7 @@ help: Replace with `Path(...).is_dir()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -303,7 +303,7 @@ help: Replace with `Path(...).is_file()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -330,7 +330,7 @@ help: Replace with `Path(...).is_symlink()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -357,7 +357,7 @@ help: Replace with `Path(...).readlink()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -395,7 +395,7 @@ help: Replace with `Path(...).is_absolute()`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -455,7 +455,7 @@ help: Replace with `Path(...).name`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------
@@ -483,7 +483,7 @@ help: Replace with `Path(...).parent`
 1  | import os as foo
 2  | import os.path as foo_p
 3  + import pathlib
-4  | 
+4  |
 5  | p = "/foo"
 6  | q = "bar"
 --------------------------------------------------------------------------------

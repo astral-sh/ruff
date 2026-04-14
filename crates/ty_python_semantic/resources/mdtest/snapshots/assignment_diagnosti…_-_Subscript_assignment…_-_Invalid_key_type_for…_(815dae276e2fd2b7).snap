@@ -32,6 +32,5 @@ error[invalid-key]: TypedDict `Config` can only be subscripted with a string lit
 7 |     config[0] = 3  # error: [invalid-key]
   |            ^
   |
-info: rule `invalid-key` is enabled by default
 
 ```

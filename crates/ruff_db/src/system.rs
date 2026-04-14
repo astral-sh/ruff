@@ -209,7 +209,7 @@ pub trait System: Debug + Sync + Send {
         Err(std::env::VarError::NotPresent)
     }
 
-    /// Returns a handle to a [`WritableSystem`] if this system is writeable.
+    /// Returns a handle to a [`WritableSystem`] if this system is writable.
     fn as_writable(&self) -> Option<&dyn WritableSystem>;
 
     fn as_any(&self) -> &dyn std::any::Any;

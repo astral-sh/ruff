@@ -40,6 +40,5 @@ error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `st
 8 | | )
   | |_^ Incompatible value of type `Literal[15]`
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

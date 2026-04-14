@@ -525,7 +525,6 @@ mod tests {
         2 | a = x +
           |     ^
           |
-        info: rule `unresolved-reference` is enabled by default
 
         error[invalid-syntax]: Expected an expression
          --> test.py:2:8

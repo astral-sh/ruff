@@ -57,7 +57,6 @@ warning[unsupported-base]: Unsupported class base
    |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `Foo` due to this base
 info: Only class objects or `Any` are supported as class bases
-info: rule `unsupported-base` is enabled by default
 
 ```
 
@@ -72,6 +71,5 @@ warning[unsupported-base]: Unsupported class base
    |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `D` due to this base
 info: Only class objects or `Any` are supported as class bases
-info: rule `unsupported-base` is enabled by default
 
 ```

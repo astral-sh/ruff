@@ -65,7 +65,7 @@ def f():
 ```py
 from typing import Union
 
-# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a parameter annotation"
 def f(x: Union) -> None:
     reveal_type(x)  # revealed: Unknown
 ```

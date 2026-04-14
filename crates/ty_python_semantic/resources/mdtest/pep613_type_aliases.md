@@ -440,8 +440,7 @@ Empty: TypeAlias
 
 ## Simple syntactic validation
 
-We don't yet do full validation for the right-hand side of a `TypeAlias` assignment, but we do
-simple syntactic validation:
+We do full validation of the right-hand side of a type alias.
 
 ```toml
 [environment]
@@ -454,6 +453,9 @@ from typing_extensions import Annotated, Literal, TypeAlias
 GoodTypeAlias: TypeAlias = Annotated[int, (1, 3.14, lambda x: x)]
 GoodTypeAlias: TypeAlias = tuple[int, *tuple[str, ...]]
 
+var1 = 3
+
+# typing conformance cases:
 BadTypeAlias1: TypeAlias = eval("".join(map(chr, [105, 110, 116])))  # error: [invalid-type-form]
 BadTypeAlias2: TypeAlias = [int, str]  # error: [invalid-type-form]
 BadTypeAlias3: TypeAlias = ((int, str),)  # error: [invalid-type-form]
@@ -462,15 +464,24 @@ BadTypeAlias5: TypeAlias = {"a": "b"}  # error: [invalid-type-form]
 BadTypeAlias6: TypeAlias = (lambda: int)()  # error: [invalid-type-form]
 BadTypeAlias7: TypeAlias = [int][0]  # error: [invalid-type-form]
 BadTypeAlias8: TypeAlias = int if 1 < 3 else str  # error: [invalid-type-form]
+BadTypeAlias9: TypeAlias = var1  # error: [invalid-type-form]
 BadTypeAlias10: TypeAlias = True  # error: [invalid-type-form]
 BadTypeAlias11: TypeAlias = 1  # error: [invalid-type-form]
 BadTypeAlias12: TypeAlias = list or set  # error: [invalid-type-form]
 BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
-BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
 
-# error: [invalid-type-form]
-# error: [invalid-type-form]
+# bonus ones from Alex:
+#
+# TODO should be just one error for both of these (we currently validate type-form subscripts
+# twice, once when inferring as a value expression and again when inferring as a
+# type expression in post-inference)
+#
+# error:[invalid-type-form]
+# error:[invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
+# error: [invalid-type-form]
+# error: [invalid-type-form]
+BadTypeAlias15: TypeAlias = Literal[-3.14]
 ```
 
 ## No type qualifiers

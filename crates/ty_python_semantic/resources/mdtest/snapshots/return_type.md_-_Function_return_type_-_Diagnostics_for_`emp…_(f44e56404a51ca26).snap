@@ -49,6 +49,5 @@ info: Only classes that directly inherit from `typing.Protocol` or `typing_exten
 7 |     def method(self) -> str: ...  # error: [empty-body]
   |
 info: See https://typing.python.org/en/latest/spec/protocol.html#
-info: rule `empty-body` is enabled by default
 
 ```

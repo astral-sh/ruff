@@ -8,8 +8,8 @@ use ruff_python_ast::{self as ast};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
-use crate::semantic_index::{SemanticIndex, semantic_index};
-use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
+use crate::types::{Type, TypeContext, infer_expression_types};
+use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.

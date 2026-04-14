@@ -12,7 +12,7 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
 9 | def f3(
   |
 help: Replace with `...`
-4  | 
+4  |
 5  | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 6  | def f2(
    -     x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
@@ -57,7 +57,7 @@ help: Replace with `...`
    -     x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
 25 +     x: bytes = ...,  # Error: PYI053
 26 | ) -> None: ...
-27 | 
+27 |
 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 
 PYI053 [*] String and bytes literals longer than 50 characters are not permitted
@@ -71,14 +71,14 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
    |
 help: Replace with `...`
-27 | 
+27 |
 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
-29 | 
+29 |
    - bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
 30 + bar: str = ...  # Error: PYI053
-31 | 
+31 |
 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
-33 | 
+33 |
 
 PYI053 [*] String and bytes literals longer than 50 characters are not permitted
   --> PYI053.pyi:34:14
@@ -91,14 +91,14 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
    |
 help: Replace with `...`
-31 | 
+31 |
 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
-33 | 
+33 |
    - qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
 34 + qux: bytes = ...  # Error: PYI053
-35 | 
+35 |
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
-37 | 
+37 |
 
 PYI053 [*] String and bytes literals longer than 50 characters are not permitted
   --> PYI053.pyi:38:13
@@ -111,12 +111,12 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
 40 | class Demo:
    |
 help: Replace with `...`
-35 | 
+35 |
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
-37 | 
+37 |
    - fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
 38 + fbar: str = ...  # Error: PYI053
-39 | 
+39 |
 40 | class Demo:
 41 |     """Docstrings are excluded from this rule. Some padding."""  # OK
 
@@ -131,13 +131,13 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 help: Replace with `...`
 61 | ) -> Callable[[Callable[[], None]], Callable[[], None]]: ...
-62 | 
+62 |
 63 | @not_warnings_dot_deprecated(
    -     "Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!"  # Error: PYI053
 64 +     ...  # Error: PYI053
 65 | )
 66 | def not_a_deprecated_function() -> None: ...
-67 | 
+67 |
 
 PYI053 [*] String and bytes literals longer than 50 characters are not permitted
   --> PYI053.pyi:68:13
@@ -152,9 +152,9 @@ PYI053 [*] String and bytes literals longer than 50 characters are not permitted
 help: Replace with `...`
 65 | )
 66 | def not_a_deprecated_function() -> None: ...
-67 | 
+67 |
    - fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
 68 + fbaz: str = ...  # Error: PYI053
-69 | 
+69 |
 70 | from typing import TypeAlias, Literal, Annotated
 71 |

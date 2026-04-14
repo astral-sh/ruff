@@ -32,6 +32,5 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<cl
   | Declared type `<class 'C'>`
   |
 info: Implicit shadowing of class `C`, add an annotation to make it explicit if this is intentional
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -134,6 +134,5 @@ info:   () -> None
 info:   (**kwargs: int) -> C
 info:   (x: A, /, **kwargs: int) -> A
 info:   (x: B, /, **kwargs: int) -> B
-info: rule `no-matching-overload` is enabled by default
 
 ```

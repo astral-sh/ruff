@@ -14,7 +14,7 @@ FURB161 [*] Use of `bin(x).count('1')`
 help: Replace with `(x).bit_count()`
 3 | def ten() -> int:
 4 |     return 10
-5 | 
+5 |
   - count = bin(x).count("1")  # FURB161
 6 + count = (x).bit_count()  # FURB161
 7 | count = bin(10).count("1")  # FURB161
@@ -33,7 +33,7 @@ FURB161 [*] Use of `bin(10).count('1')`
   |
 help: Replace with `(10).bit_count()`
 4  |     return 10
-5  | 
+5  |
 6  | count = bin(x).count("1")  # FURB161
    - count = bin(10).count("1")  # FURB161
 7  + count = (10).bit_count()  # FURB161
@@ -52,7 +52,7 @@ FURB161 [*] Use of `bin(0b1010).count('1')`
 10 | count = bin(0o12).count("1")  # FURB161
    |
 help: Replace with `0b1010.bit_count()`
-5  | 
+5  |
 6  | count = bin(x).count("1")  # FURB161
 7  | count = bin(10).count("1")  # FURB161
    - count = bin(0b1010).count("1")  # FURB161
@@ -160,7 +160,7 @@ help: Replace with `(10).bit_count()`
 13 + count = (10).bit_count()  # FURB161
 14 | count = bin("10" "15").count("1")  # FURB161
 15 | count = bin("123").count("1") # FURB161
-16 | 
+16 |
 
 FURB161 [*] Use of `bin("10" "15").count('1')`
   --> FURB161.py:14:9
@@ -178,7 +178,7 @@ help: Replace with `("10" "15").bit_count()`
    - count = bin("10" "15").count("1")  # FURB161
 14 + count = ("10" "15").bit_count()  # FURB161
 15 | count = bin("123").count("1") # FURB161
-16 | 
+16 |
 17 | count = x.bit_count()  # OK
 note: This is an unsafe fix and may change runtime behavior
 
@@ -198,7 +198,7 @@ help: Replace with `"123".bit_count()`
 14 | count = bin("10" "15").count("1")  # FURB161
    - count = bin("123").count("1") # FURB161
 15 + count = "123".bit_count() # FURB161
-16 | 
+16 |
 17 | count = x.bit_count()  # OK
 18 | count = (10).bit_count()  # OK
 note: This is an unsafe fix and may change runtime behavior

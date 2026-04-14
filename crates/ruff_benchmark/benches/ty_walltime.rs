@@ -6,8 +6,8 @@ use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
-use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
@@ -107,7 +107,7 @@ static ALTAIR: Benchmark = Benchmark::new(
             "types-jsonschema",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
+        python_version: SupportedPythonVersion::Py312,
     },
     950,
 );
@@ -126,7 +126,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
             "scipy-stubs",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY310,
+        python_version: SupportedPythonVersion::Py310,
     },
     350,
 );
@@ -149,7 +149,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
             "types-tabulate",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
+        python_version: SupportedPythonVersion::Py312,
     },
     650,
 );
@@ -169,9 +169,9 @@ static PANDAS: Benchmark = Benchmark::new(
             "pytest",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
+        python_version: SupportedPythonVersion::Py312,
     },
-    4600,
+    5500,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -187,7 +187,7 @@ static PYDANTIC: Benchmark = Benchmark::new(
             "typing-inspection",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY39,
+        python_version: SupportedPythonVersion::Py39,
     },
     3200,
 );
@@ -200,9 +200,9 @@ static SYMPY: Benchmark = Benchmark::new(
         paths: &["sympy"],
         dependencies: &["mpmath"],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
+        python_version: SupportedPythonVersion::Py312,
     },
-    13600,
+    14150,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -213,7 +213,7 @@ static TANJUN: Benchmark = Benchmark::new(
         paths: &["tanjun"],
         dependencies: &["hikari", "alluka"],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
+        python_version: SupportedPythonVersion::Py312,
     },
     120,
 );
@@ -229,7 +229,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         // (seems to be built from source on the Codspeed CI runners for some reason).
         dependencies: &["numpy"],
         max_dep_date: "2025-08-09",
-        python_version: PythonVersion::PY311,
+        python_version: SupportedPythonVersion::Py311,
     },
     1800,
 );

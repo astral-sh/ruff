@@ -22,11 +22,11 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-pub(crate) use self::connection::ConnectionInitializer;
-pub use self::connection::ConnectionSender;
+pub use self::connection::ConnectionInitializer;
+pub(crate) use self::connection::ConnectionSender;
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-pub use crate::server::main_loop::MainLoopSender;
+pub(crate) use crate::server::main_loop::MainLoopSender;
 pub(crate) use crate::server::main_loop::{Event, MainLoopReceiver};
 use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
@@ -49,10 +49,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
+    pub fn new(
         worker_threads: NonZeroUsize,
         connection: ConnectionInitializer,
         preview: Option<bool>,
+        is_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
@@ -92,10 +93,12 @@ impl Server {
             workspace: workspace_options,
         } = all_options;
 
-        crate::logging::init_logging(
-            global_options.tracing.log_level.unwrap_or_default(),
-            global_options.tracing.log_file.as_deref(),
-        );
+        if !is_test {
+            crate::logging::init_logging(
+                global_options.tracing.log_level.unwrap_or_default(),
+                global_options.tracing.log_file.as_deref(),
+            );
+        }
 
         let workspaces = Workspaces::from_workspace_folders(
             workspace_folders,

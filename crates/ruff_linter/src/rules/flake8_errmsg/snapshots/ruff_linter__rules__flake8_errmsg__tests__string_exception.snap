@@ -13,8 +13,8 @@ help: Assign to variable; remove string literal
   -     raise RuntimeError(b"This is an example exception")
 2 +     msg = b"This is an example exception"
 3 +     raise RuntimeError(msg)
-4 | 
-5 | 
+4 |
+5 |
 6 | def f_byte_empty():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -26,8 +26,8 @@ EM101 [*] Exception must not use a string literal, assign to variable first
   |                        ^^^
   |
 help: Assign to variable; remove string literal
-3 | 
-4 | 
+3 |
+4 |
 5 | def f_byte_empty():
   -     raise RuntimeError(b"")
 6 +     msg = b""

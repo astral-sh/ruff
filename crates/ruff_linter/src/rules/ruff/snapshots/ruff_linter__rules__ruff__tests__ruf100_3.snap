@@ -144,7 +144,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 help: Remove unused `noqa` directive
 11 | print(a)  # noqa comment
 12 | print(a)  # noqa  comment
-13 | 
+13 |
    - # noqa: E501, F821
 14 | # noqa: E501, F821 # comment
 15 | print()  # noqa: E501, F821
@@ -161,7 +161,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 help: Remove unused `noqa` directive
 12 | print(a)  # noqa  comment
-13 | 
+13 |
 14 | # noqa: E501, F821
    - # noqa: E501, F821 # comment
 15 + # comment
@@ -180,7 +180,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 18 | print()  # noqa: E501, F821  # comment
    |
 help: Remove unused `noqa` directive
-13 | 
+13 |
 14 | # noqa: E501, F821
 15 | # noqa: E501, F821 # comment
    - print()  # noqa: E501, F821
@@ -387,7 +387,7 @@ help: Remove unused `noqa` directive
 26 + print(a)  # noqa: F821  comment
 27 | print(a)  # noqa: E501, ,F821  comment
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_3.py:27:11
@@ -405,7 +405,7 @@ help: Remove unused `noqa` directive
    - print(a)  # noqa: E501, ,F821  comment
 27 + print(a)  # noqa: F821  comment
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
@@ -424,7 +424,7 @@ help: Remove unused `noqa` directive
 27 | print(a)  # noqa: E501, ,F821  comment
    - print(a)  # noqa: E501 F821  comment
 28 + print(a)  # noqa: F821  comment
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
 31 | print(a)  # comment with unicode µ    # noqa: E501, F821
 
@@ -450,7 +450,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
 help: Remove unused `noqa` directive
 27 | print(a)  # noqa: E501, ,F821  comment
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
    - print(a)  # comment with unicode µ    # noqa: E501
 30 + print(a)  # comment with unicode µ
 31 | print(a)  # comment with unicode µ    # noqa: E501, F821
@@ -464,7 +464,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
 28 | print(a)  # noqa: E501 F821  comment
-29 | 
+29 |
 30 | print(a)  # comment with unicode µ    # noqa: E501
    - print(a)  # comment with unicode µ    # noqa: E501, F821
 31 + print(a)  # comment with unicode µ    # noqa: F821

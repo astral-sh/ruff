@@ -9,8 +9,8 @@ LOG014 [*] `exc_info=` outside exception handlers
   |
 help: Remove `exc_info=`
 1 | _ = (logger := __import__("somewhere").logger)
-2 | 
-3 | 
+2 |
+3 |
   - logger.info("", exc_info=True)
 4 + logger.info("")
 note: This is an unsafe fix and may change runtime behavior

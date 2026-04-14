@@ -56,7 +56,6 @@ error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from Ty
 349 |     """int([x]) -> integer
 350 |     int(x, base=10) -> integer
     |
-info: rule `invalid-typed-dict-header` is enabled by default
 
 ```
 
@@ -77,7 +76,6 @@ error[invalid-typed-dict-header]: TypedDict class `Foo2` can only inherit from T
     |       ------ `object` defined here
 122 |     """The base class of the class hierarchy.
     |
-info: rule `invalid-typed-dict-header` is enabled by default
 
 ```
 
@@ -92,7 +90,6 @@ error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDic
 8 | class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
 9 | def f(is_total: bool):
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -107,7 +104,6 @@ error[invalid-argument-type]: Invalid argument to parameter `closed` in `TypedDi
  9 | def f(is_total: bool):
 10 |     class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -122,7 +118,6 @@ error[invalid-argument-type]: Invalid argument to parameter `total` in `TypedDic
 11 | class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
 12 | from abc import ABCMeta
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -136,7 +131,6 @@ error[unknown-argument]: Unknown keyword argument `weird` in `TypedDict` definit
    |                         ^^^^^^^^
 12 | from abc import ABCMeta
    |
-info: rule `unknown-argument` is enabled by default
 
 ```
 
@@ -151,7 +145,6 @@ error[invalid-typed-dict-header]: Custom metaclasses are not supported in `Typed
 15 |
 16 | # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
    |
-info: rule `invalid-typed-dict-header` is enabled by default
 
 ```
 
@@ -166,7 +159,6 @@ error[invalid-typed-dict-header]: Custom metaclasses are not supported in `Typed
 19 | def f(kwargs: dict):
 20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
    |
-info: rule `invalid-typed-dict-header` is enabled by default
 
 ```
 
@@ -179,6 +171,5 @@ error[invalid-typed-dict-header]: Keyword-variadic arguments are not supported i
 20 |     class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
    |                           ^^^^^^^^
    |
-info: rule `invalid-typed-dict-header` is enabled by default
 
 ```

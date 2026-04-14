@@ -32,6 +32,5 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `def
   | Declared type `def f() -> Unknown`
   |
 info: Implicit shadowing of function `f`, add an annotation to make it explicit if this is intentional
-info: rule `invalid-assignment` is enabled by default
 
 ```

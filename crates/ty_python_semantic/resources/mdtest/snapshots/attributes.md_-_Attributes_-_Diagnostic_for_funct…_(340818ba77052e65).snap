@@ -33,7 +33,6 @@ error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute 
   |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
-info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -48,6 +47,5 @@ error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute 
   |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
-info: rule `unresolved-attribute` is enabled by default
 
 ```

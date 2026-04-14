@@ -38,8 +38,8 @@ help: Rewrite as a list comprehension
 4 |     2 * x + 1 for x in range(3)
   - )
 5 + ]
-6 | 
-7 | 
+6 |
+7 |
 8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
 note: This is an unsafe fix and may change runtime behavior
 
@@ -53,8 +53,8 @@ C400 [*] Unnecessary generator (rewrite using `list()`)
 11 |     x for x in range(3)
    |
 help: Rewrite using `list()`
-6  | 
-7  | 
+6  |
+7  |
 8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
    - x = list(x for x in range(3))
 9  + x = list(range(3))
@@ -77,14 +77,14 @@ C400 [*] Unnecessary generator (rewrite using `list()`)
 14 |   # Strip parentheses from inner generators.
    |
 help: Rewrite using `list()`
-7  | 
+7  |
 8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
 9  | x = list(x for x in range(3))
    - x = list(
    -     x for x in range(3)
    - )
 10 + x = list(range(3))
-11 | 
+11 |
 12 | # Strip parentheses from inner generators.
 13 | list((2 * x for x in range(3)))
 note: This is an unsafe fix and may change runtime behavior
@@ -100,13 +100,13 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
    |
 help: Rewrite as a list comprehension
 12 | )
-13 | 
+13 |
 14 | # Strip parentheses from inner generators.
    - list((2 * x for x in range(3)))
 15 + [2 * x for x in range(3)]
 16 | list(((2 * x for x in range(3))))
 17 | list((((2 * x for x in range(3)))))
-18 | 
+18 |
 note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
@@ -119,13 +119,13 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
 17 | list((((2 * x for x in range(3)))))
    |
 help: Rewrite as a list comprehension
-13 | 
+13 |
 14 | # Strip parentheses from inner generators.
 15 | list((2 * x for x in range(3)))
    - list(((2 * x for x in range(3))))
 16 + [2 * x for x in range(3)]
 17 | list((((2 * x for x in range(3)))))
-18 | 
+18 |
 19 | # Account for trailing comma in fix
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,7 +145,7 @@ help: Rewrite as a list comprehension
 16 | list(((2 * x for x in range(3))))
    - list((((2 * x for x in range(3)))))
 17 + [2 * x for x in range(3)]
-18 | 
+18 |
 19 | # Account for trailing comma in fix
 20 | # See https://github.com/astral-sh/ruff/issues/15852
 note: This is an unsafe fix and may change runtime behavior
@@ -161,7 +161,7 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
 23 |      (0 for _ in [])
    |
 help: Rewrite as a list comprehension
-18 | 
+18 |
 19 | # Account for trailing comma in fix
 20 | # See https://github.com/astral-sh/ruff/issues/15852
    - list((0 for _ in []),)
@@ -197,7 +197,7 @@ help: Rewrite as a list comprehension
    -      # some more
    -  )
 25 +      ]
-26 | 
-27 | 
+26 |
+27 |
 28 | # Not built-in list.
 note: This is an unsafe fix and may change runtime behavior

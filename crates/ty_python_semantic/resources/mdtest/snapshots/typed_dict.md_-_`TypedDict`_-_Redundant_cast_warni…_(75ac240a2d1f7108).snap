@@ -37,7 +37,6 @@ warning[redundant-cast]: Value is already of type `Foo2`
    |     ^^^^^^^^^^^^^^^
 11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
    |
-info: rule `redundant-cast` is enabled by default
 
 ```
 
@@ -51,6 +50,5 @@ warning[redundant-cast]: Value is already of type `Bar2`
    |     ^^^^^^^^^^^^^^^
    |
 info: `Bar2` is equivalent to `Foo2`
-info: rule `redundant-cast` is enabled by default
 
 ```

@@ -30,6 +30,5 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
   |                         Expected value of type `str`, got `Literal[3]`
   |
 info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
-info: rule `invalid-assignment` is enabled by default
 
 ```

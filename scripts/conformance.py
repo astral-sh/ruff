@@ -499,6 +499,7 @@ def collect_ty_diagnostics(
             "--ignore=assert-type-unspellable-subtype",
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
+            "--error=mismatched-type-name",
             "--error=deprecated",
             "--error=redundant-final-classvar",
             "--exit-zero",

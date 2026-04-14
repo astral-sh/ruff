@@ -45,6 +45,5 @@ error[abstract-method-in-final-class]: Final class `Derived` has unimplemented a
    |         --- `foo` declared as abstract on superclass `Base`
  7 |         raise NotImplementedError
    |
-info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
