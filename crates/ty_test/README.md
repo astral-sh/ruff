@@ -423,11 +423,11 @@ x: int = "foo"  # error: [invalid-assignment]
 
 ## Running the tests
 
-All Markdown-based tests are executed in a normal `cargo test` / `cargo run nextest` run. If you want to run the Markdown tests
-*only*, you can filter the tests using `mdtest__`:
+All Markdown-based tests are executed in a normal `cargo test` / `cargo nextest run` invocation. If you want to run the Markdown tests
+*only*, you can filter the tests using `mdtest`:
 
 ```bash
-cargo test -p ty_python_semantic -- mdtest__
+cargo test -p ty_python_semantic -- mdtest
 ```
 
 Alternatively, you can use the `mdtest.py` runner which has a watch mode that will re-run corresponding tests when Markdown files change, and recompile automatically when Rust code changes:
