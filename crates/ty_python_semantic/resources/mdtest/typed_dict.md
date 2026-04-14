@@ -584,18 +584,6 @@ def _(mapping: dict[str, str]):
     FullFromKeywords(mapping, a=1)
 ```
 
-Conditional plain-dict positional mappings should not be validated as `TypedDict` literals:
-
-```py
-from typing import TypedDict
-
-class ConditionalTarget(TypedDict):
-    a: int
-
-def _(cond: bool):
-    ConditionalTarget({"x": 1} if cond else {}, a=1)
-```
-
 All of these are missing the required `age` field:
 
 ```py

@@ -19,7 +19,7 @@ use crate::types::typed_dict::{
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType, UnionType,
+    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
 };
 use ty_python_core::definition::Definition;
 
@@ -370,9 +370,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
             }
             TypedDictConstructorForm::MixedPositionalAndKeywords => {
-                // Infer the positional argument against a schema that relaxes keys overridden by
-                // later keywords, while also keeping a plain-dict fallback available so conditional
-                // dict-literal branches don't eagerly validate as `TypedDict` literals.
                 let unpacked_keyword_types =
                     infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
                         self.get_or_infer_expression(expr, tcx)
@@ -385,14 +382,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
                 let positional_target =
                     typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
-                let target_ty = UnionType::from_two_elements(
-                    self.db(),
-                    Type::TypedDict(positional_target),
-                    KnownClass::Dict.to_specialized_instance(
-                        self.db(),
-                        &[KnownClass::Str.to_instance(self.db()), Type::object()],
-                    ),
-                );
+                let target_ty = Type::TypedDict(positional_target);
                 self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
             }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
