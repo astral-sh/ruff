@@ -56,8 +56,8 @@ async def main() -> None:
 
 ## Non-callable `__await__`
 
-This diagnostic doesn't point to the attribute definition, but complains about it being possibly not
-awaitable.
+This diagnostic points at the binding site of `__await__` on the user's class, rather than at the
+definition of the attribute's type (see <https://github.com/astral-sh/ty/issues/3250>).
 
 ```py
 class NonCallableAwait:
@@ -65,6 +65,19 @@ class NonCallableAwait:
 
 async def main() -> None:
     await NonCallableAwait()  # error: [invalid-await]
+```
+
+If `__await__` is inherited from a base class, the diagnostic follows the MRO and points at the base
+class's assignment.
+
+```py
+class BaseWithBadAwait:
+    __await__ = 42
+
+class InheritedNonCallableAwait(BaseWithBadAwait): ...
+
+async def main() -> None:
+    await InheritedNonCallableAwait()  # error: [invalid-await]
 ```
 
 ## `__await__` definition with explicit invalid return type
