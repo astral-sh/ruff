@@ -5,8 +5,8 @@ use camino::Utf8Path;
 use colored::Colorize;
 pub use mdtest::OutputFormat;
 use mdtest::matcher::Failure;
-use mdtest::parser::EmbeddedFileSourceMap;
-use mdtest::{Failures, FileFailures, TestFile, matcher, parser as test_parser};
+use mdtest::parser::{self, EmbeddedFileSourceMap};
+use mdtest::{Failures, FileFailures, TestFile, matcher};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -51,7 +51,7 @@ pub fn run(
     test_name: &str,
     output_format: OutputFormat,
 ) -> anyhow::Result<()> {
-    let suite = test_parser::parse::<MarkdownTestConfig>(short_title, source)
+    let suite = parser::parse::<MarkdownTestConfig>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = Db::setup();
@@ -194,7 +194,7 @@ fn run_test(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &test_parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
+    test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
 ) -> Result<(TestOutcome, Vec<mdtest::MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {

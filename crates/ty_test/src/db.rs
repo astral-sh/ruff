@@ -1,3 +1,4 @@
+use crate::config::Analysis;
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -19,8 +20,6 @@ use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
 };
-
-use crate::config::Analysis;
 
 #[salsa::db]
 #[derive(Clone)]

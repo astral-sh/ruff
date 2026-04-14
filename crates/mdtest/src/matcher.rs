@@ -44,7 +44,7 @@ impl FailuresByLine {
         });
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
 }
@@ -65,18 +65,17 @@ impl Failure {
         }
     }
 
-    pub fn message(&self) -> &str {
+    pub(super) fn message(&self) -> &str {
         &self.message
     }
 
-    pub fn diff(&self) -> Option<(&str, &str)> {
+    pub(super) fn diff(&self) -> Option<(&str, &str)> {
         self.diff
             .as_ref()
             .map(|(expected, actual)| (expected.as_str(), actual.as_str()))
     }
 
-    #[must_use]
-    pub fn with_diff(mut self, expected: String, actual: String) -> Self {
+    pub(super) fn with_diff(mut self, expected: String, actual: String) -> Self {
         self.diff = Some((expected, actual));
         self
     }

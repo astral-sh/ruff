@@ -179,18 +179,18 @@ pub fn create_diagnostic_snapshot<C>(
 
 #[derive(Debug, Clone)]
 pub struct MarkdownEdit {
-    pub range: TextRange,
-    pub replacement: String,
+    pub(crate) range: TextRange,
+    pub(crate) replacement: String,
 }
 
-pub fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
+pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
     DisplayDiagnosticConfig::new(tool_name)
         .color(false)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly)
 }
 
-pub fn render_diagnostic(
+pub(crate) fn render_diagnostic(
     resolver: &dyn FileResolver,
     tool_name: &'static str,
     diagnostic: &Diagnostic,
@@ -200,7 +200,7 @@ pub fn render_diagnostic(
         .to_string()
 }
 
-pub fn render_diagnostics(
+pub(crate) fn render_diagnostics(
     resolver: &dyn FileResolver,
     tool_name: &'static str,
     diagnostics: &[Diagnostic],
@@ -213,14 +213,14 @@ pub fn render_diagnostics(
     rendered.trim_end_matches('\n').to_string()
 }
 
-pub fn is_update_inline_snapshots_enabled() -> bool {
+pub(crate) fn is_update_inline_snapshots_enabled() -> bool {
     let is_enabled: std::sync::LazyLock<_> = std::sync::LazyLock::new(|| {
         std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some_and(|v| v != "0")
     });
     *is_enabled
 }
 
-pub fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
+pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
     static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
         std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
 
@@ -357,7 +357,11 @@ pub fn try_apply_markdown_edits(
     }
 }
 
-pub fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std::fmt::Result {
+pub(crate) fn render_diff(
+    f: &mut dyn std::fmt::Write,
+    expected: &str,
+    actual: &str,
+) -> std::fmt::Result {
     let diff = TextDiff::from_lines(expected, actual);
 
     writeln!(f, "{}", "--- expected".red())?;

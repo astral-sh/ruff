@@ -22,14 +22,14 @@ use ty_python_core::platform::PythonPlatform;
 pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
-    pub log: Option<Log>,
+    pub(crate) log: Option<Log>,
 
-    pub analysis: Option<Analysis>,
+    pub(crate) analysis: Option<Analysis>,
 
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
-    pub system: Option<SystemKind>,
+    pub(crate) system: Option<SystemKind>,
 
     /// Project configuration for installing external dependencies.
     pub(crate) project: Option<Project>,
@@ -118,11 +118,11 @@ pub(crate) struct Environment {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
     /// Whether ty should support `type: ignore` comments.
-    pub respect_type_ignore_comments: Option<bool>,
+    pub(crate) respect_type_ignore_comments: Option<bool>,
 
-    pub allowed_unresolved_imports: Option<Vec<String>>,
+    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
 
-    pub replace_imports_with_any: Option<Vec<String>>,
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
