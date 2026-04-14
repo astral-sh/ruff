@@ -2458,7 +2458,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // above) as a fallback for dynamic attribute assignment.
                             match setattr_dunder_call_result {
                                 // If __setattr__ succeeded, allow the assignment.
-                                Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
+                                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
                                 Err(CallDunderError::CallError(..)) => {
                                     if emit_diagnostics
                                         && let Some(builder) =
@@ -2816,7 +2816,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
                         if self.validate_final_attribute_deletion(
                             target,
                             object_ty,
@@ -2872,7 +2872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
 
                     match delete_dunder_call_result {
-                        Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
+                        Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => return true,
                         Err(CallDunderError::CallError(kind, bindings)) => {
                             if emit_diagnostics {
                                 let failure = CallError(kind, bindings);
@@ -4131,7 +4131,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
                     }
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                    Err(CallDunderError::PossiblyUnbound {
+                        bindings: outcome, ..
+                    }) => {
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
                         UnionType::from_two_elements(
                             db,
@@ -4708,7 +4710,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        unbound_on: Box::new([]),
+                    });
                 }
                 Ok(bindings)
             }

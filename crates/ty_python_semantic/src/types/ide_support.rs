@@ -1092,14 +1092,15 @@ pub fn definitions_for_unary_op<'db>(
                 Ok(bindings) => bindings,
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
-                    CallDunderError::PossiblyUnbound(bindings)
+                    CallDunderError::PossiblyUnbound { bindings, .. }
                     | CallDunderError::CallError(_, bindings),
                 ) => *bindings,
             }
         }
         Err(CallDunderError::MethodNotAvailable) => return None,
         Err(
-            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+            CallDunderError::PossiblyUnbound { bindings, .. }
+            | CallDunderError::CallError(_, bindings),
         ) => *bindings,
     };
 
