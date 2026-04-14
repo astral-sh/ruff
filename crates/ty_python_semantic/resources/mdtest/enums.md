@@ -2368,10 +2368,11 @@ class MyEnum[T](MyEnumBase):
 python-version = "3.11"
 ```
 
-Enum can be created by subclassing:
+The constructor of an enum takes a single `value` argument and returns the enum member corresponding
+to that value:
 
 ```py
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, StrEnum
 from ty_extensions import into_regular_callable
 
 class Color(Enum):
@@ -2387,22 +2388,29 @@ class Priority(IntEnum):
 
 # revealed: (value: int) -> Priority
 reveal_type(into_regular_callable(Priority))
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+# revealed: (value: str) -> Answer
+reveal_type(into_regular_callable(Answer))
 ```
 
-Or calling the `Enum` class directly
+The signature of `Enum`, `IntEnum`, and `StrEnum` is defined by `EnumMeta.__call__`, which allows
+dynamic construction of enums using the functional syntax:
 
 ```py
 from enum import Enum, IntEnum, StrEnum
 from ty_extensions import into_regular_callable
 
-# TODO: the following signatures should show the EnumMeta `__call__` signature
-# revealed: (value: object) -> Enum
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(Enum))
 
-# revealed: (value: int) -> IntEnum
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(IntEnum))
 
-# revealed: (value: str) -> StrEnum
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(StrEnum))
 ```
 
