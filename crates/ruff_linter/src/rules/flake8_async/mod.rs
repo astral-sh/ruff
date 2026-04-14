@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
+    #[test_case(Rule::YieldInContextManagerInAsyncGenerator, Path::new("ASYNC119.py"))]
     #[test_case(Rule::AsyncBusyWait, Path::new("ASYNC110.py"))]
     #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
     #[test_case(Rule::LongSleepNotForever, Path::new("ASYNC116.py"))]

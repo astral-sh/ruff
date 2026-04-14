@@ -11,6 +11,7 @@ pub(crate) use blocking_sleep::*;
 pub(crate) use cancel_scope_no_checkpoint::*;
 pub(crate) use long_sleep_not_forever::*;
 pub(crate) use sync_call::*;
+pub(crate) use yield_in_cm_in_async_generator::*;
 
 mod async_busy_wait;
 mod async_function_with_timeout;
@@ -25,3 +26,4 @@ mod blocking_sleep;
 mod cancel_scope_no_checkpoint;
 mod long_sleep_not_forever;
 mod sync_call;
+mod yield_in_cm_in_async_generator;

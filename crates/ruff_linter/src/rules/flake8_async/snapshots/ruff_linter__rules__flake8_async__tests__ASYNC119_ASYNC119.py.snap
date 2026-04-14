@@ -1,0 +1,79 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:12:9
+   |
+10 | async def unsafe_yield():
+11 |     with open(""):
+12 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:17:9
+   |
+15 | async def async_with():
+16 |     async with open(""):
+17 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:22:9
+   |
+20 | async def warn_on_each_yield():
+21 |     with open(""):
+22 |         yield  # ASYNC119
+   |         ^^^^^
+23 |         yield  # ASYNC119
+24 |     with open(""):
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:23:9
+   |
+21 |     with open(""):
+22 |         yield  # ASYNC119
+23 |         yield  # ASYNC119
+   |         ^^^^^
+24 |     with open(""):
+25 |         yield  # ASYNC119
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:25:9
+   |
+23 |         yield  # ASYNC119
+24 |     with open(""):
+25 |         yield  # ASYNC119
+   |         ^^^^^
+26 |         yield  # ASYNC119
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:26:9
+   |
+24 |     with open(""):
+25 |         yield  # ASYNC119
+26 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:32:13
+   |
+30 |     with open(""):
+31 |         with open(""):
+32 |             yield  # ASYNC119
+   |             ^^^^^
+   |
+
+ASYNC119 Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed
+  --> ASYNC119.py:60:9
+   |
+58 |         async def foo():
+59 |             yield
+60 |         yield  # ASYNC119
+   |         ^^^^^
+   |
