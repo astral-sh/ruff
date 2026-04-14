@@ -10,6 +10,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
 
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     let snapshot_path = crate_dir.join("resources").join("mdtest").join("snapshots");
+    let absolute_fixture_path = crate_dir.join(fixture_path);
     let workspace_relative_fixture_path = Utf8Path::new("crates/ruff_linter")
         .join(fixture_path.strip_prefix(".").unwrap_or(fixture_path));
 
@@ -19,6 +20,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .as_str();
 
     ruff_test::run(
+        &absolute_fixture_path,
         &workspace_relative_fixture_path,
         &content,
         &snapshot_path,

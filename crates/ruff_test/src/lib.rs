@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
-use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, TestFile, output_format};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
 use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::source::source_text;
@@ -36,6 +36,7 @@ impl MdtestConfig for RuffOptions {
 ///
 /// Panic on test failure, and print failure details.
 pub fn run(
+    absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     source: &str,
     snapshot_path: &Utf8Path,
@@ -48,6 +49,7 @@ pub fn run(
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
+    let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
@@ -69,42 +71,45 @@ pub fn run(
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = result {
-            let md_index = LineIndex::from_source_text(source);
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
 
-            for test_failures in failures {
-                let source_map =
-                    EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
-                for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = relative_fixture_path.as_str();
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
 
-                    let absolute_line_number =
-                        match source_map.to_absolute_line_number(relative_line_number) {
-                            Ok(line_number) => line_number,
-                            Err(last_line_number) => {
-                                output_format.write_error(
-                                    &mut assertion,
-                                    file,
-                                    last_line_number,
-                                    &Failure::new(
-                                        "Found a trailing assertion comment \
-                                        (e.g., `# revealed:` or `# error:`) \
-                                        not followed by any statement.",
-                                    ),
-                                );
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
+                                        ),
+                                    );
 
-                                continue;
-                            }
-                        };
+                                    continue;
+                                }
+                            };
 
-                    for failure in failures {
-                        output_format.write_error(
-                            &mut assertion,
-                            file,
-                            absolute_line_number,
-                            failure,
-                        );
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
                     }
                 }
             }
@@ -127,6 +132,10 @@ pub fn run(
         }
     }
 
+    if !markdown_edits.is_empty() {
+        mdtest::try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
+    }
+
     assert!(!any_failures, "{}", &assertion);
 
     Ok(())
@@ -142,7 +151,7 @@ fn run_test(
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &mdtest::parser::MarkdownTest<RuffOptions>,
-) -> Result<TestOutcome, Failures> {
+) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     db.use_in_memory_system();
 
@@ -214,6 +223,10 @@ fn run_test(
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
 
+    // Construct a separate `FileResolver` for rendering diagnostics.
+    let notebook_indexes = FxHashMap::default();
+    let resolver = EmitterContext::new(&notebook_indexes);
+
     let failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
@@ -238,7 +251,8 @@ fn run_test(
                 |inline_diagnostics| {
                     mdtest::validate_inline_snapshot(
                         db,
-                        "ty",
+                        &resolver,
+                        "ruff",
                         test_file,
                         &inline_diagnostics,
                         &mut markdown_edits,
@@ -266,8 +280,6 @@ fn run_test(
             test.name()
         );
     } else if !snapshot_diagnostics.is_empty() {
-        let notebook_indexes = FxHashMap::default();
-        let resolver = EmitterContext::new(&notebook_indexes);
         let snapshot = mdtest::create_diagnostic_snapshot(
             &resolver,
             "ruff",
@@ -288,7 +300,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(TestOutcome::Success)
+        Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
     }

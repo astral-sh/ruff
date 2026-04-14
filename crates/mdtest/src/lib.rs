@@ -241,6 +241,7 @@ pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str
 
 pub fn validate_inline_snapshot(
     db: &dyn ruff_db::Db,
+    resolver: &dyn FileResolver,
     tool_name: &'static str,
     test_file: &TestFile<'_>,
     inline_diagnostics: &[Diagnostic],
@@ -301,8 +302,9 @@ pub fn validate_inline_snapshot(
             continue;
         };
 
-        let actual = apply_snapshot_filters(&render_diagnostics(&db, tool_name, block_diagnostics))
-            .into_owned();
+        let actual =
+            apply_snapshot_filters(&render_diagnostics(resolver, tool_name, block_diagnostics))
+                .into_owned();
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
