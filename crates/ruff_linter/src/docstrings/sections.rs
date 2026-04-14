@@ -530,7 +530,7 @@ fn is_docstring_section(
         //         The return value of the function.
         //     """
         // ```
-        if previous_line.is_some_and(|line| line.trim().is_empty()) {
+        if previous_line.is_some_and(|line| line.chars().all(char::is_whitespace)) {
             return true;
         }
 
