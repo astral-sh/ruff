@@ -15,6 +15,7 @@ use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_ma
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
+use crate::types::context::ClassStatementHint;
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
@@ -6453,17 +6454,12 @@ pub(super) fn report_invalid_init_subclass_call<'db>(
                     not be callable",
                 ));
             }
-            diagnostic.info(
-                "`__init_subclass__` on a superclass is implicitly called \
-                during creation of a class object",
-            );
-            diagnostic.info(
-                "See https://docs.python.org/3/reference/datamodel.html\
-                #customizing-class-creation",
-            );
+            attach_init_subclass_hints(&mut diagnostic);
         }
         CallErrorKind::BindingError => {
+            context.attach_class_statement_hint(ClassStatementHint::InitSubclass);
             bindings.report_diagnostics(context, class_node.into());
+            context.clear_class_statement_hint();
         }
     }
 }
@@ -6522,17 +6518,12 @@ pub(super) fn report_invalid_dunder_prepare_call<'db>(
                 diagnostic.annotate(annotation);
             }
 
-            diagnostic.info(
-                "`__prepare__` on a class's metaclass is implicitly called \
-                during creation of the class object",
-            );
-            diagnostic.info(
-                "See https://docs.python.org/3/reference/datamodel.html\
-                #preparing-the-class-namespace",
-            );
+            attach_dunder_prepare_hints(&mut diagnostic);
         }
         CallErrorKind::BindingError => {
+            context.attach_class_statement_hint(ClassStatementHint::MetaclassPrepare);
             bindings.report_diagnostics(context, class_node.into());
+            context.clear_class_statement_hint();
         }
     }
 }
@@ -6563,12 +6554,36 @@ pub(super) fn report_invalid_metaclass<'db>(
                 "Metaclass of type `{}` is not callable",
                 metaclass.display(db)
             ));
-            diagnostic
-                .info("A `class` statement leads to an implicit call to the class's metaclass");
-            diagnostic.info("See https://docs.python.org/3/reference/datamodel.html#metaclasses");
+            attach_metaclass_constructor_hints(&mut diagnostic);
         }
         CallErrorKind::BindingError => {
+            context.attach_class_statement_hint(ClassStatementHint::MetaclassConstructor);
             bindings.report_diagnostics(context, class_node.into());
+            context.clear_class_statement_hint();
         }
     }
+}
+
+pub(super) fn attach_init_subclass_hints(diagnostic: &mut Diagnostic) {
+    diagnostic.info(
+        "`__init_subclass__` on a superclass is implicitly called \
+        during creation of a class object",
+    );
+    diagnostic
+        .info("See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation");
+}
+
+pub(super) fn attach_dunder_prepare_hints(diagnostic: &mut Diagnostic) {
+    diagnostic.info(
+        "`__prepare__` on a class's metaclass is implicitly called \
+        during creation of the class object",
+    );
+    diagnostic.info(
+        "See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace",
+    );
+}
+
+pub(super) fn attach_metaclass_constructor_hints(diagnostic: &mut Diagnostic) {
+    diagnostic.info("A `class` statement leads to an implicit call to the class's metaclass");
+    diagnostic.info("See https://docs.python.org/3/reference/datamodel.html#metaclasses");
 }

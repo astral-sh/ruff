@@ -46,5 +46,7 @@ info: Method defined here
   |         ^^^^^^^^^^^                                             ----------------- Parameter declared here
 6 |         return {}
   |
+info: `__prepare__` on a class's metaclass is implicitly called during creation of the class object
+info: See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
 
 ```
