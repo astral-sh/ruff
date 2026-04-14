@@ -1089,12 +1089,16 @@ impl<'src> Lexer<'src> {
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self, first: char) -> TokenKind {
         if first == '0' {
-            if self.cursor.eat_if(|c| matches!(c, 'x' | 'X')).is_some() {
-                self.lex_number_radix(Radix::Hex)
-            } else if self.cursor.eat_if(|c| matches!(c, 'o' | 'O')).is_some() {
-                self.lex_number_radix(Radix::Octal)
-            } else if self.cursor.eat_if(|c| matches!(c, 'b' | 'B')).is_some() {
-                self.lex_number_radix(Radix::Binary)
+            let radix = match self.cursor.rest().as_bytes() {
+                [b'x' | b'X', ..] => Some(Radix::Hex),
+                [b'o' | b'O', ..] => Some(Radix::Octal),
+                [b'b' | b'B', ..] => Some(Radix::Binary),
+                _ => None,
+            };
+
+            if let Some(radix) = radix {
+                self.cursor.skip_bytes(1);
+                self.lex_number_radix(radix)
             } else {
                 self.lex_decimal_number(first)
             }
