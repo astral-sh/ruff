@@ -668,12 +668,11 @@ fn run_test(
     }
 
     if test.should_snapshot_diagnostics() {
-        if all_diagnostics.is_empty() {
-            panic!(
-                "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
-                test.name()
-            );
-        }
+        assert!(
+            !all_diagnostics.is_empty(),
+            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+            test.name()
+        );
 
         // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
         // since they make snapshots very noisy!
@@ -1105,7 +1104,7 @@ fn create_diagnostic_snapshot<'d>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", render_diagnostic(db, &diagnostic)).unwrap();
+        write!(snapshot, "{}", render_diagnostic(db, diagnostic)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

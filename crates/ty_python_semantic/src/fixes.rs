@@ -40,7 +40,13 @@ pub fn suppress_all_diagnostics(
     diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
-    fix_all(db, diagnostics, cancellation_token, FixMode::Suppress)
+    fix_all(
+        db,
+        diagnostics,
+        FixMode::Suppress,
+        cancellation_token,
+        Db::check_file,
+    )
 }
 
 /// Applies the safe fixes for all diagnostics and writes the changed files back to disk.
@@ -54,17 +60,30 @@ pub fn fix_all_diagnostics(
     diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
-    fix_all(db, diagnostics, cancellation_token, FixMode::ApplyFixes)
+    fix_all(
+        db,
+        diagnostics,
+        FixMode::ApplyFixes,
+        cancellation_token,
+        Db::check_file,
+    )
 }
 
 const MAX_ITERATIONS: usize = 10;
 
-fn fix_all(
+/// Applies all fixes for the given fix mode.
+///
+/// `check_file` is a separate parameter so that tests can easily mock out a file's diagnostics.
+fn fix_all<F>(
     db: &mut dyn Db,
     mut diagnostics: Vec<Diagnostic>,
-    cancellation_token: &CancellationToken,
     fix_mode: FixMode,
-) -> Result<FixAllResults, Canceled> {
+    cancellation_token: &CancellationToken,
+    check_file: F,
+) -> Result<FixAllResults, Canceled>
+where
+    F: Fn(&dyn Db, File) -> Vec<Diagnostic> + Sync,
+{
     let system = WritableSystem::dyn_clone(
         db.system()
             .as_writable()
@@ -129,6 +148,7 @@ fn fix_all(
     let mut completed: Vec<FixedFile> = Vec::with_capacity(queue.len());
 
     while !queue.is_empty() {
+        let is_last_iteration = remaining_iterations == 1;
         let mut unstaged_fixes = Vec::with_capacity(queue.len());
 
         for (file, fixes) in queue.drain(..) {
@@ -153,7 +173,13 @@ fn fix_all(
 
         // Check if applying the files introduced any syntax errors, compute the remaining diagnostics and any new fixes.
         // This is done outside the above loop so that it can run in parallel.
-        let check_results = recheck_files(&*db, unstaged_fixes, fix_mode, cancellation_token);
+        let check_results = recheck_files(
+            &*db,
+            unstaged_fixes,
+            fix_mode,
+            cancellation_token,
+            &check_file,
+        );
 
         if cancellation_token.is_cancelled() {
             source_texts.revert_all(db);
@@ -175,7 +201,7 @@ fn fix_all(
                         continue;
                     }
 
-                    if remaining_iterations == 0 {
+                    if is_last_iteration {
                         file.push_diagnostic(create_too_many_iterations_diagnostics(
                             file.file,
                             fix_mode,
@@ -202,7 +228,7 @@ fn fix_all(
             }
         }
 
-        if remaining_iterations == 0 {
+        if is_last_iteration {
             break;
         }
 
@@ -689,12 +715,16 @@ enum CheckResult<'a> {
     },
 }
 
-fn recheck_files<'a>(
+fn recheck_files<'a, F>(
     db: &dyn Db,
     changes: Vec<(QueuedFile<'a>, usize)>,
     fix_mode: FixMode,
     cancellation_token: &CancellationToken,
-) -> Vec<CheckResult<'a>> {
+    check_file: &F,
+) -> Vec<CheckResult<'a>>
+where
+    F: Fn(&dyn Db, File) -> Vec<Diagnostic> + Sync,
+{
     let results = Mutex::new(Vec::with_capacity(changes.len()));
 
     {
@@ -721,7 +751,7 @@ fn recheck_files<'a>(
 
                         CheckResult::SyntaxError { diagnostic, file }
                     } else {
-                        let diagnostics = db.check_file(file.file);
+                        let diagnostics = check_file(db, file.file);
                         let fixes = fix_mode.fixes(db, file.file, &diagnostics);
 
                         file.applied_fixes += applied_fixes;
@@ -746,16 +776,22 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::cancellation::CancellationTokenSource;
-    use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics,
+        Severity, Span,
+    };
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
     use ruff_db::system::SystemPath;
+    use ruff_diagnostics::{Edit, Fix};
+    use ruff_text_size::{TextRange, TextSize};
     use rustc_hash::FxHashMap;
 
     use super::suppress_all_diagnostics;
-    use crate::Db as _;
+    use crate::Db;
     use crate::db::tests::TestDbBuilder;
+    use crate::fixes::{FixMode, fix_all};
 
     #[test]
     fn simple_suppression() {
@@ -1040,6 +1076,212 @@ class B(A):
           |
         help: Remove the unused suppression code
         "#);
+    }
+
+    /// Tests that the `fix_all` doesn't end up in an infinite loop
+    /// if the fixes never converge and that it emits a diagnostic in that case.
+    #[test]
+    fn fix_non_convergence() {
+        let mut db = TestDbBuilder::new()
+            .with_file("test.py", "a = 10")
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        const LINT_ID: DiagnosticId = DiagnosticId::lint("unsatisfiable-lint");
+
+        // For this test, we intentionally keep renaming a variable form `a` -> `b` and
+        // from `b` -> `a`. This ensures that the fix never converges.
+        let check_file = |db: &dyn Db, file: File| {
+            let text = source_text(db, file);
+
+            let message = if text.contains("a") {
+                "Variable `a` should be named `b`."
+            } else {
+                "Variable `b` should be named `a`."
+            };
+
+            let mut diag = Diagnostic::new(LINT_ID, Severity::Warning, message);
+
+            let variable_range = TextRange::new(TextSize::new(0), TextSize::new(1));
+
+            diag.annotate(Annotation::primary(
+                Span::from(file).with_range(variable_range),
+            ));
+
+            let new_name = if text.contains("a") { "b" } else { "a" };
+
+            diag.set_fix(Fix::safe_edit(Edit::range_replacement(
+                new_name.to_string(),
+                variable_range,
+            )));
+
+            vec![diag]
+        };
+
+        let initial_diagnostics = check_file(&db, file);
+
+        let cancellation_token_source = CancellationTokenSource::new();
+        let fixes = fix_all(
+            &mut db,
+            initial_diagnostics,
+            FixMode::ApplyFixes,
+            &cancellation_token_source.token(),
+            check_file,
+        )
+        .expect("operation never gets cancelled");
+
+        // Returns two diagnostic: One is the not fixed diagnostic, the other a fatal diagnostic
+        // making the user aware of the non convergence.
+        let [convergence_diagnostic, diagnostic] = &*fixes.diagnostics else {
+            panic!(
+                "Expected `fix_all` to return two diagnostics but it returned  {}",
+                fixes.diagnostics.len()
+            );
+        };
+
+        assert_eq!(diagnostic.id(), LINT_ID);
+        assert_eq!(
+            diagnostic.primary_message(),
+            "Variable `a` should be named `b`."
+        );
+
+        assert_eq!(convergence_diagnostic.id(), DiagnosticId::InternalError);
+        assert_snapshot!(convergence_diagnostic.primary_message(), @"Fixes failed to converge after 10 iterations.");
+
+        // It should keep the source text from the last allowed fix iteration.
+        assert_eq!(&*source_text(&db, file), "a = 10");
+    }
+
+    /// Tests that `fix_all` reverts fixes that introduce a syntax error.
+    #[test]
+    fn fix_syntax_error() {
+        let mut db = TestDbBuilder::new()
+            .with_file("test.py", "a = 10")
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        const LINT_ID: DiagnosticId = DiagnosticId::lint("with-faulty-fix");
+
+        // For this test, we intentionally keep renaming a variable form `a` -> `b` and
+        // from `b` -> `a`. This ensures that the fix never converges.
+        let check_file = |db: &dyn Db, file: File| {
+            let text = source_text(db, file);
+
+            let message = if text.contains("a") {
+                "Variable `a` should be named `b`."
+            } else {
+                "Variable `b` should be named `c`."
+            };
+
+            let mut diag = Diagnostic::new(LINT_ID, Severity::Warning, message);
+
+            let variable_range = TextRange::new(TextSize::new(0), TextSize::new(1));
+
+            diag.annotate(Annotation::primary(
+                Span::from(file).with_range(variable_range),
+            ));
+
+            let edit = if text.contains("a") {
+                Edit::range_replacement("b".to_string(), variable_range)
+            } else {
+                // Insert an extra `=`, resulting in a syntax error
+                Edit::range_replacement("c =".to_string(), variable_range)
+            };
+
+            diag.set_fix(Fix::safe_edit(edit));
+
+            vec![diag]
+        };
+
+        let initial_diagnostics = check_file(&db, file);
+
+        let cancellation_token_source = CancellationTokenSource::new();
+        let fixes = fix_all(
+            &mut db,
+            initial_diagnostics,
+            FixMode::ApplyFixes,
+            &cancellation_token_source.token(),
+            check_file,
+        )
+        .expect("operation never gets cancelled");
+
+        // Returns two diagnostic: One is the not fixed diagnostic, the other a fatal diagnostic
+        // making the user aware of the non convergence.
+        let [syntax_error, diagnostic] = &*fixes.diagnostics else {
+            panic!(
+                "Expected `fix_all` to return two diagnostics but it returned  {}",
+                fixes.diagnostics.len()
+            );
+        };
+
+        assert_eq!(diagnostic.id(), LINT_ID);
+        assert_eq!(
+            diagnostic.primary_message(),
+            "Variable `b` should be named `c`."
+        );
+
+        assert_eq!(syntax_error.id(), DiagnosticId::InternalError);
+        assert_snapshot!(syntax_error.primary_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
+
+        // It should revert the source to the last known error free version.
+        assert_eq!(&*source_text(&db, file), "b = 10");
+    }
+
+    #[test]
+    fn fix_cancellation_reverts_changes() {
+        let mut db = TestDbBuilder::new()
+            .with_file("test.py", "a = 10")
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        const LINT_ID: DiagnosticId = DiagnosticId::lint("rename-a-to-b");
+
+        let cancellation_token_source = CancellationTokenSource::new();
+
+        let create_diagnostics = |file: File| {
+            let mut diag = Diagnostic::new(
+                LINT_ID,
+                Severity::Warning,
+                "Variable `a` should be named `b`.",
+            );
+
+            let variable_range = TextRange::new(TextSize::new(0), TextSize::new(1));
+
+            diag.annotate(Annotation::primary(
+                Span::from(file).with_range(variable_range),
+            ));
+            diag.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "b".to_string(),
+                variable_range,
+            )));
+
+            vec![diag]
+        };
+
+        let initial_diagnostics = create_diagnostics(file);
+
+        let check_file = |_: &dyn Db, file: File| {
+            // Normally, this would happen on another thread but we do it here for simplicity.
+            cancellation_token_source.cancel();
+
+            create_diagnostics(file)
+        };
+
+        let result = fix_all(
+            &mut db,
+            initial_diagnostics,
+            FixMode::ApplyFixes,
+            &cancellation_token_source.token(),
+            check_file,
+        );
+
+        assert!(matches!(result, Err(ruff_db::cancellation::Canceled)));
+
+        // Cancellation should revert any staged or unstaged source text overrides.
+        assert_eq!(&*source_text(&db, file), "a = 10");
     }
 
     #[track_caller]
