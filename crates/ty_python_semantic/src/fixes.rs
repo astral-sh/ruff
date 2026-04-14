@@ -1284,6 +1284,112 @@ class B(A):
         assert_eq!(&*source_text(&db, file), "a = 10");
     }
 
+    #[test]
+    fn fix_overlapping_diagnostics_requires_multiple_iterations() {
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "test.py",
+                "from typing import List, Optional\n\
+                 value: Optional[List[int]] = None\n\
+                ",
+            )
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        // Simulates two overlapping typing-modernization diagnostics for
+        // `Optional[List[int]]`: one rewrites the outer `Optional[...]` to `... | None`, while
+        // the other rewrites the nested `List[int]` to `list[int]` and, on the next pass,
+        // removes the now-unused `List` import. Because `List[int]` is nested inside
+        // `Optional[List[int]]`, only the outer rewrite can apply in the first iteration.
+        let check_file = |db: &dyn Db, file: File| {
+            let text = source_text(db, file);
+
+            let range_of = |needle: &str| {
+                let start = text.find(needle).unwrap_or_else(|| {
+                    panic!("Expected `{needle}` in source:\n{}", text.as_str());
+                }) as u32;
+                let end = start + needle.len() as u32;
+                TextRange::new(TextSize::new(start), TextSize::new(end))
+            };
+
+            let use_builtin_list_diagnostic = |file: File| {
+                let mut list = Diagnostic::new(
+                    DiagnosticId::lint("use-builtin-list"),
+                    Severity::Warning,
+                    "Use `list` instead of `List`.",
+                );
+                let list_range = range_of("List[int]");
+                list.annotate(Annotation::primary(Span::from(file).with_range(list_range)));
+                (list, list_range)
+            };
+
+            // Iteration 0: Replace `Optional[List[int]]` with `List[int] | None`
+            if text.contains("Optional[List[int]]") {
+                let mut optional = Diagnostic::new(
+                    DiagnosticId::lint("use-pep604-optional"),
+                    Severity::Warning,
+                    "Use PEP 604 syntax for `Optional`.",
+                );
+                let optional_range = range_of("Optional[List[int]]");
+                optional.annotate(Annotation::primary(
+                    Span::from(file).with_range(optional_range),
+                ));
+                optional.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "List[int] | None".to_string(),
+                    optional_range,
+                )));
+
+                // This fix overlaps with `Optional[List[int]]` but the `Optional` fix applies
+                // first because its `range.start` sorts before `List[int]`.
+                let (mut list, list_range) = use_builtin_list_diagnostic(file);
+                list.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "list[int]".to_string(),
+                    list_range,
+                )));
+
+                vec![optional, list]
+            }
+            // Iteration 2, replace `List[int] | None` with `list[int] | None`
+            else if text.contains("List[int] | None") {
+                let (mut list, list_range) = use_builtin_list_diagnostic(file);
+                list.set_fix(Fix::safe_edits(
+                    Edit::range_replacement("list[int]".to_string(), list_range),
+                    [Edit::range_replacement(
+                        "from typing import Optional".to_string(),
+                        range_of("from typing import List, Optional"),
+                    )],
+                ));
+
+                vec![list]
+            } else {
+                Vec::new()
+            }
+        };
+
+        let initial_diagnostics = check_file(&db, file);
+
+        let cancellation_token_source = CancellationTokenSource::new();
+        let fixes = fix_all(
+            &mut db,
+            initial_diagnostics,
+            FixMode::ApplyFixes,
+            &cancellation_token_source.token(),
+            check_file,
+        )
+        .expect("operation never gets cancelled");
+
+        assert!(fixes.diagnostics.is_empty());
+        assert_eq!(fixes.count, 2);
+        assert_eq!(
+            &*source_text(&db, file),
+            "from typing import Optional\n\
+             value: list[int] | None = None\n\
+            "
+        );
+    }
+
     #[track_caller]
     fn suppress_all_in(source: &str) -> String {
         use std::fmt::Write as _;
