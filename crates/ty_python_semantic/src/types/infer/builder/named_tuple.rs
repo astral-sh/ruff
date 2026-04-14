@@ -161,7 +161,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // If any argument is a starred expression or any keyword is a double-starred expression,
         // we can't statically determine the arguments, so fall back to normal call binding.
         if has_starred || has_double_starred {
+            self.infer_expression(fields_arg, TypeContext::default());
+
             for kw in keywords {
+                if let Some(arg) = kw.arg.as_ref() {
+                    if name_from_keyword && arg.id.as_str() == "typename" {
+                        continue;
+                    }
+                    if fields_from_keyword && arg.id.as_str() == "field_names" {
+                        continue;
+                    }
+                }
                 self.infer_expression(&kw.value, TypeContext::default());
             }
             return fallback();

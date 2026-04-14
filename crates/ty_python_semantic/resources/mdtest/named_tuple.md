@@ -666,6 +666,9 @@ Bad1 = collections.namedtuple("Bad1", "x y", typename="Bad1")
 
 # error: [parameter-already-assigned] "Multiple values provided for parameter `field_names` of `namedtuple`"
 Bad2 = collections.namedtuple("Bad2", "x y", field_names="a b")
+
+# This is valid at runtime and should not panic.
+collections.namedtuple(typename="NT4", field_names="x", **{})
 ```
 
 The `rename`, `defaults`, and `module` keyword arguments:
