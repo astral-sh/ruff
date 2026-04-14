@@ -3267,6 +3267,18 @@ impl<'db> Parameter<'db> {
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
     }
+
+    /// Rewrites a positional-or-keyword parameter as keyword-only while preserving its metadata.
+    pub(crate) fn positional_or_keyword_to_keyword_only(&self) -> Self {
+        let mut result = self.clone();
+        if let ParameterKind::PositionalOrKeyword { name, default_type } = &self.kind {
+            result.kind = ParameterKind::KeywordOnly {
+                name: name.clone(),
+                default_type: *default_type,
+            };
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]

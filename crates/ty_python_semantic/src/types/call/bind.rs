@@ -5646,7 +5646,7 @@ impl<'db> Binding<'db> {
                 .is_some_and(|first_bound_index| index >= first_bound_index)
                 && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
             {
-                parameter = positional_or_keyword_to_keyword_only(&parameter);
+                parameter = parameter.positional_or_keyword_to_keyword_only();
             }
 
             if parameter.is_keyword_variadic() {
@@ -5851,25 +5851,6 @@ impl<'db> Binding<'db> {
         self.parameter_tys = Box::from([]);
         self.errors.clear();
     }
-}
-
-/// Rewrites a positional-or-keyword parameter as keyword-only while preserving its metadata.
-fn positional_or_keyword_to_keyword_only<'db>(parameter: &Parameter<'db>) -> Parameter<'db> {
-    let ParameterKind::PositionalOrKeyword { name, .. } = parameter.kind() else {
-        return parameter.clone();
-    };
-
-    let was_type_form = matches!(parameter.form, ParameterForm::Type);
-
-    let mut parameter = Parameter::keyword_only(name.clone())
-        .with_annotated_type(parameter.annotated_type())
-        .with_optional_default_type(parameter.default_type());
-
-    if was_type_form {
-        parameter = parameter.type_form();
-    }
-
-    parameter
 }
 
 /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
