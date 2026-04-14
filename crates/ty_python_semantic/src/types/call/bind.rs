@@ -2984,15 +2984,42 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
+        struct OverloadFilterSlot<'db> {
+            parameter: Type<'db>,
+            argument: Type<'db>,
+            variadic_argument: Option<Type<'db>>,
+        }
+
         let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
-                (
-                    index,
-                    self.overloads[index]
-                        .step_5_filtering_slots(db, arguments)
-                        .collect::<Vec<_>>(),
-                )
+                let overload = &self.overloads[index];
+                let slots = overload
+                    .argument_matches
+                    .iter()
+                    .zip(arguments.types())
+                    .flat_map(move |(matched_argument, argument_types)| {
+                        matched_argument.iter().map(
+                            move |(parameter_index, variadic_argument_type)| {
+                                // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                                // `typing.Self` / `type[typing.Self]`
+                                let mut parameter_type = overload.signature.parameters()
+                                    [parameter_index]
+                                    .annotated_type();
+                                if let Some(specialization) = overload.specialization {
+                                    parameter_type =
+                                        parameter_type.apply_specialization(db, specialization);
+                                }
+                                OverloadFilterSlot {
+                                    parameter: parameter_type,
+                                    argument: argument_types.get_for_declared_type(parameter_type),
+                                    variadic_argument: variadic_argument_type,
+                                }
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                (index, slots)
             })
             .collect::<Vec<_>>();
 
@@ -3006,9 +3033,8 @@ impl<'db> CallableBinding<'db> {
         for slot_index in 0..max_slot_count {
             let mut first_parameter_type: Option<Type<'db>> = None;
             for (_, overload_slots) in &matching_overload_slots {
-                let current_parameter_type = overload_slots
-                    .get(slot_index)
-                    .map(|slot| slot.parameter_type);
+                let current_parameter_type =
+                    overload_slots.get(slot_index).map(|slot| slot.parameter);
                 match (first_parameter_type, current_parameter_type) {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
@@ -3048,13 +3074,14 @@ impl<'db> CallableBinding<'db> {
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
                     if participating_slot_indices.contains(&slot_index) {
-                        let argument_type = if slot.has_precise_argument_type {
-                            slot.argument_type
-                        } else {
-                            current_slots
-                                .get(slot_index)
-                                .map_or(Type::unknown(), |slot| slot.argument_type)
-                        };
+                        let argument_type =
+                            if let Some(variadic_argument_type) = slot.variadic_argument {
+                                variadic_argument_type
+                            } else {
+                                current_slots
+                                    .get(slot_index)
+                                    .map_or(Type::unknown(), |slot| slot.argument)
+                            };
                         union_argument_type_builders[slot_index]
                             .add_in_place(argument_type.top_materialization(db));
                     }
@@ -3080,7 +3107,7 @@ impl<'db> CallableBinding<'db> {
             for (_, slots) in &matching_overload_slots[..=upto] {
                 for (slot_index, slot) in slots.iter().enumerate() {
                     if participating_slot_indices.contains(&slot_index) {
-                        union_parameter_types[slot_index].add_in_place(slot.parameter_type);
+                        union_parameter_types[slot_index].add_in_place(slot.parameter);
                     }
                 }
             }
@@ -3459,13 +3486,6 @@ impl<'db> CallableBinding<'db> {
             }
         }
     }
-}
-
-#[derive(Clone, Copy)]
-struct Step5FilteringSlot<'db> {
-    parameter_type: Type<'db>,
-    argument_type: Type<'db>,
-    has_precise_argument_type: bool,
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
@@ -5118,40 +5138,6 @@ impl<'db> Binding<'db> {
     /// Mark this overload binding as an unmatched overload.
     fn mark_as_unmatched_overload(&mut self) {
         self.errors.push(BindingError::UnmatchedOverload);
-    }
-
-    fn step_5_filtering_slots<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        arguments: &'a CallArguments<'_, 'db>,
-    ) -> impl Iterator<Item = Step5FilteringSlot<'db>> + 'a {
-        self.argument_matches
-            .iter()
-            .zip(arguments.types())
-            .flat_map(move |(matched_argument, argument_types)| {
-                matched_argument
-                    .iter()
-                    .map(move |(parameter_index, variadic_argument_type)| {
-                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                        // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type =
-                            self.signature.parameters()[parameter_index].annotated_type();
-                        if let Some(specialization) = self.specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, specialization);
-                        }
-
-                        let argument_type = variadic_argument_type.unwrap_or_else(|| {
-                            argument_types.get_for_declared_type(parameter_type)
-                        });
-
-                        Step5FilteringSlot {
-                            parameter_type,
-                            argument_type,
-                            has_precise_argument_type: variadic_argument_type.is_some(),
-                        }
-                    })
-            })
     }
 
     fn report_diagnostics(
