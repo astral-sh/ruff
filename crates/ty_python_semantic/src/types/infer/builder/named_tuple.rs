@@ -164,11 +164,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(fields_arg, TypeContext::default());
 
             for kw in keywords {
-                if let Some(arg) = kw.arg.as_ref() {
-                    if name_from_keyword && arg.id.as_str() == "typename" {
+                if let Some(arg) = kw.arg.as_deref() {
+                    if name_from_keyword && arg == "typename" {
                         continue;
                     }
-                    if fields_from_keyword && arg.id.as_str() == "field_names" {
+                    if fields_from_keyword && arg == "field_names" {
                         continue;
                     }
                 }
