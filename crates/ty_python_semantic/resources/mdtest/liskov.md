@@ -430,8 +430,6 @@ However, if the parent class itself already has an LSP violation with an ancesto
 the same violation for the child class. This is because the child class cannot fix the violation
 without introducing a new, worse violation against its immediate parent's contract.
 
-<!-- snapshot-diagnostics -->
-
 `stub.pyi`:
 
 ```pyi
@@ -441,7 +439,7 @@ class Grandparent:
     def method(self, x: int) -> None: ...
 
 class Parent(Grandparent):
-    def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
 
 class Child(Parent):
     # compatible with the signature of `Parent.method`, but not with `Grandparent.method`.
@@ -451,23 +449,23 @@ class Child(Parent):
 
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
-    def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: int) -> None: ...  # snapshot: invalid-method-override
 
 class ChildWithNewViolation(Parent):
     # incompatible with BOTH `Parent.method` (str) and `Grandparent.method` (int).
     # We report the violation against the immediate parent (`Parent`), not the grandparent.
-    def method(self, x: bytes) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: bytes) -> None: ...  # snapshot: invalid-method-override
 
 class GrandparentWithReturnType:
     def method(self) -> int: ...
 
 class ParentWithReturnType(GrandparentWithReturnType):
-    def method(self) -> str: ...  # error: [invalid-method-override]
+    def method(self) -> str: ...  # snapshot: invalid-method-override
 
 class ChildWithReturnType(ParentWithReturnType):
     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
-    def method(self) -> int: ...  # error: [invalid-method-override]
+    def method(self) -> int: ...  # snapshot: invalid-method-override
 
 class GradualParent(Grandparent):
     def method(self, x: Any) -> None: ...
@@ -476,7 +474,119 @@ class ThirdChild(GradualParent):
     # `GradualParent.method` is compatible with the signature of `Grandparent.method`,
     # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
     # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
-    def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/stub.pyi:4:9
+  |
+3 | class Grandparent:
+4 |     def method(self, x: int) -> None: ...
+  |         ---------------------------- `Grandparent.method` defined here
+5 |
+6 | class Parent(Grandparent):
+7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
+8 |
+9 | class Child(Parent):
+  |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:17:9
+   |
+15 | class OtherChild(Parent):
+16 |     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
+17 |     def method(self, x: int) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+18 |
+19 | class ChildWithNewViolation(Parent):
+   |
+  ::: src/stub.pyi:7:9
+   |
+ 6 | class Parent(Grandparent):
+ 7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ---------------------------- `Parent.method` defined here
+ 8 |
+ 9 | class Child(Parent):
+   |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:22:9
+   |
+20 |     # incompatible with BOTH `Parent.method` (str) and `Grandparent.method` (int).
+21 |     # We report the violation against the immediate parent (`Parent`), not the grandparent.
+22 |     def method(self, x: bytes) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+23 |
+24 | class GrandparentWithReturnType:
+   |
+  ::: src/stub.pyi:7:9
+   |
+ 6 | class Parent(Grandparent):
+ 7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ---------------------------- `Parent.method` defined here
+ 8 |
+ 9 | class Child(Parent):
+   |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:25:9
+   |
+24 | class GrandparentWithReturnType:
+25 |     def method(self) -> int: ...
+   |         ------------------- `GrandparentWithReturnType.method` defined here
+26 |
+27 | class ParentWithReturnType(GrandparentWithReturnType):
+28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `GrandparentWithReturnType.method`
+29 |
+30 | class ChildWithReturnType(ParentWithReturnType):
+   |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:28:9
+   |
+27 | class ParentWithReturnType(GrandparentWithReturnType):
+28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+   |         ------------------- `ParentWithReturnType.method` defined here
+29 |
+30 | class ChildWithReturnType(ParentWithReturnType):
+31 |     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
+32 |     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
+33 |     def method(self) -> int: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentWithReturnType.method`
+34 |
+35 | class GradualParent(Grandparent):
+   |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:42:9
+   |
+40 |     # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
+41 |     # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
+42 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
+   |
+  ::: src/stub.pyi:4:9
+   |
+ 3 | class Grandparent:
+ 4 |     def method(self, x: int) -> None: ...
+   |         ---------------------------- `Grandparent.method` defined here
+ 5 |
+ 6 | class Parent(Grandparent):
+   |
+info: This violates the Liskov Substitution Principle
 ```
 
 `other_stub.pyi`:
@@ -486,7 +596,7 @@ class A:
     def get(self, default): ...
 
 class B(A):
-    def get(self, default, /): ...  # error: [invalid-method-override]
+    def get(self, default, /): ...  # snapshot: invalid-method-override
 
 get = 56
 
@@ -499,6 +609,23 @@ class D(C):
     # compatible with `C.get` and `B.get`, but not with `A.get`.
     # Since `B.get` already violates LSP with `A.get`, we don't report for `D`.
     def get(self, my_default): ...
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `get`
+ --> src/other_stub.pyi:2:9
+  |
+1 | class A:
+2 |     def get(self, default): ...
+  |         ------------------ `A.get` defined here
+3 |
+4 | class B(A):
+5 |     def get(self, default, /): ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
+6 |
+7 | get = 56
+  |
+info: This violates the Liskov Substitution Principle
 ```
 
 Unannotated overrides of overloaded dunder methods should remain accepted.
@@ -671,8 +798,6 @@ class B2[T](A2[T]):
 
 ## Fully qualified names are used in diagnostics where appropriate
 
-<!-- snapshot-diagnostics -->
-
 `a.pyi`:
 
 ```pyi
@@ -686,7 +811,24 @@ class A:
 import a
 
 class A(a.A):
-    def foo(self, y): ...  # error: [invalid-method-override]
+    def foo(self, y): ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `foo`
+ --> src/b.pyi:4:9
+  |
+3 | class A(a.A):
+4 |     def foo(self, y): ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^ Definition is incompatible with `a.A.foo`
+  |
+ ::: src/a.pyi:2:9
+  |
+1 | class A:
+2 |     def foo(self, x): ...
+  |         ------------ `a.A.foo` defined here
+  |
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Excluded methods
@@ -733,8 +875,6 @@ class DataSub(DataSuper):
 
 ## Edge case: function defined in another module and then assigned in a class body
 
-<!-- snapshot-diagnostics -->
-
 `foo.pyi`:
 
 ```pyi
@@ -750,24 +890,92 @@ class A:
     def x(self, y: int): ...
 
 class B(A):
-    x = foo.x  # error: [invalid-method-override]
+    x = foo.x  # snapshot: invalid-method-override
 
 class C:
     x = foo.x
 
 class D(C):
-    def x(self, y: int): ...  # error: [invalid-method-override]
+    def x(self, y: int): ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `x`
+ --> src/bar.pyi:4:9
+  |
+3 | class A:
+4 |     def x(self, y: int): ...
+  |         --------------- `A.x` defined here
+5 |
+6 | class B(A):
+7 |     x = foo.x  # snapshot: invalid-method-override
+  |     ^^^^^^^^^ Definition is incompatible with `A.x`
+8 |
+9 | class C:
+  |
+ ::: src/foo.pyi:1:5
+  |
+1 | def x(self, y: str): ...
+  |     --------------- Signature of `B.x`
+  |
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `x`
+  --> src/bar.pyi:10:5
+   |
+ 9 | class C:
+10 |     x = foo.x
+   |     --------- `C.x` defined here
+11 |
+12 | class D(C):
+13 |     def x(self, y: int): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
+   |
+  ::: src/foo.pyi:1:5
+   |
+ 1 | def x(self, y: str): ...
+   |     --------------- Signature of `C.x`
+   |
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Bad override of `__eq__`
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class Bad:
     x: int
-    def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
+    def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
         return self.x == other.x
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__eq__`
+   --> src/mdtest_snippet.py:3:9
+    |
+  1 | class Bad:
+  2 |     x: int
+  3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
+  4 |         return self.x == other.x
+    |
+   ::: stdlib/builtins.pyi:142:9
+    |
+140 |     def __setattr__(self, name: str, value: Any, /) -> None: ...
+141 |     def __delattr__(self, name: str, /) -> None: ...
+142 |     def __eq__(self, value: object, /) -> bool: ...
+    |         -------------------------------------- `object.__eq__` defined here
+143 |     def __ne__(self, value: object, /) -> bool: ...
+144 |     def __str__(self) -> str: ...  # noqa: Y029
+    |
+info: This violates the Liskov Substitution Principle
+help: It is recommended for `__eq__` to work with arbitrary objects, for example:
+help
+help:     def __eq__(self, other: object) -> bool:
+help:         if not isinstance(other, Bad):
+help:             return False
+help:         return <logic to compare two `Bad` instances>
+help
 ```
 
 ## Class-private names do not override
@@ -792,8 +1000,6 @@ source-code definitions. There are several scenarios to consider here:
 1. A "normal" method on a superclass is overridden by a synthesized method on a subclass
 1. A synthesized method on a superclass is overridden by a synthesized method on a subclass
 
-<!-- snapshot-diagnostics -->
-
 ```pyi
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -803,7 +1009,7 @@ class Foo:
     x: int
 
 class Bar(Foo):
-    def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+    def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
 
 # TODO: specifying `order=True` on the subclass means that a `__lt__` method is
 # generated that is incompatible with the generated `__lt__` method on the superclass.
@@ -848,15 +1054,53 @@ class Baz(NamedTuple):
     x: int
 
 class Spam(Baz):
-    def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
+    def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__lt__`
+  --> src/mdtest_snippet.pyi:9:9
+   |
+ 8 | class Bar(Foo):
+ 9 |     def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
+10 |
+11 | # TODO: specifying `order=True` on the subclass means that a `__lt__` method is
+   |
+info: This violates the Liskov Substitution Principle
+info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
+ --> src/mdtest_snippet.pyi:5:7
+  |
+4 | @dataclass(order=True)
+5 | class Foo:
+  |       ^^^ Definition of `Foo`
+6 |     x: int
+  |
+
+
+error[invalid-method-override]: Invalid override of method `_asdict`
+  --> src/mdtest_snippet.pyi:54:9
+   |
+53 | class Spam(Baz):
+54 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
+   |
+info: This violates the Liskov Substitution Principle
+info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
+  --> src/mdtest_snippet.pyi:50:7
+   |
+48 |     x: int
+49 |
+50 | class Baz(NamedTuple):
+   |       ^^^^^^^^^^^^^^^ Definition of `Baz`
+51 |     x: int
+   |
 ```
 
 ## Staticmethods and classmethods
 
 Methods decorated with `@staticmethod` or `@classmethod` are checked in much the same way as other
 methods.
-
-<!-- snapshot-diagnostics -->
 
 ```pyi
 class Parent:
