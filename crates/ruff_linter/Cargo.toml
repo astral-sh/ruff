@@ -73,7 +73,6 @@ url = { workspace = true }
 
 [dev-dependencies]
 ruff_test = { workspace = true }
-ty_static = { workspace = true }
 
 camino = { workspace = true }
 # Disable colored output in tests

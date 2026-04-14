@@ -1,7 +1,5 @@
 use anyhow::anyhow;
 use camino::Utf8Path;
-use ruff_test::OutputFormat;
-use ty_static::EnvVars;
 
 /// See `crates/ty_test/README.md` for documentation on these tests.
 #[expect(clippy::needless_pass_by_value)]
@@ -20,19 +18,12 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    let output_format = if std::env::var(EnvVars::MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
-        OutputFormat::GitHub
-    } else {
-        OutputFormat::Cli
-    };
-
     ruff_test::run(
         &workspace_relative_fixture_path,
         &content,
         &snapshot_path,
         short_title,
         test_name,
-        output_format,
     )?;
 
     Ok(())
