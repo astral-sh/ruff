@@ -258,7 +258,7 @@ a = 10 / 0  # ty: ignore[*-*]
 <!-- fmt:off -->
 
 ```py
-a = 10 / 0  # ty: ignore[division-by-zero]
+a = 10 / 0  # ty: ignore[division-by-zero]       
             #                               ^^^^^^ trailing whitespace
 ```
 
