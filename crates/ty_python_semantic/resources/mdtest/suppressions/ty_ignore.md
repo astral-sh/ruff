@@ -35,7 +35,7 @@ help: Remove the unused suppression comment
 1 | test = 10
 2 | # snapshot
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
-3 + a = test + 3  
+3 + a = test + 3
 ```
 
 ## Unused suppression if the error codes don't match
@@ -44,6 +44,7 @@ help: Remove the unused suppression comment
 # snapshot: unused-ignore-comment
 # error: [unresolved-reference]
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
+print(a)
 ```
 
 ```snapshot
@@ -54,12 +55,14 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
 2 | # error: [unresolved-reference]
 3 | a = test + 3  # ty: ignore[possibly-unresolved-reference]
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | print(a)
   |
 help: Remove the unused suppression comment
 1 | # snapshot: unused-ignore-comment
 2 | # error: [unresolved-reference]
   - a = test + 3  # ty: ignore[possibly-unresolved-reference]
-3 + a = test + 3  
+3 + a = test + 3
+4 | print(a)
 ```
 
 ## Suppressed unused comment

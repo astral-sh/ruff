@@ -206,7 +206,7 @@ help: Remove the unused suppression comment
 10 | a = (3
 11 |   # snapshot
    -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
-12 +   + 2)  # fmt: skip 
+12 +   + 2)  # fmt: skip
 ```
 
 ## Misspelled `type: ignore`
@@ -340,7 +340,7 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive
 help: Remove the unused suppression comment
 1 | # snapshot
   - a = 10 / 2  # type: ignore[ty:division-by-zero]
-2 + a = 10 / 2  
+2 + a = 10 / 2
 ```
 
 ## Unknown ignore code
