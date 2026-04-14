@@ -4,7 +4,7 @@ paths = [
   "/crates/ruff/**",
   "/crates/ruff_linter/**",
 ]
-reviewers = ["amyreese", "ntBre"]
+reviewers = ["ntBre"]
 
 [[pools]]
 name = "ty-semantic"
