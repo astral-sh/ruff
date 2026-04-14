@@ -798,35 +798,35 @@ class B2[T](A2[T]):
 
 ## Fully qualified names are used in diagnostics where appropriate
 
-`a.pyi`:
+`one.pyi`:
 
 ```pyi
 class A:
     def foo(self, x): ...
 ```
 
-`b.pyi`:
+`two.pyi`:
 
 ```pyi
-import a
+import one
 
-class A(a.A):
+class A(one.A):
     def foo(self, y): ...  # snapshot: invalid-method-override
 ```
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `foo`
- --> src/b.pyi:4:9
+ --> src/two.pyi:4:9
   |
-3 | class A(a.A):
+3 | class A(one.A):
 4 |     def foo(self, y): ...  # snapshot: invalid-method-override
-  |         ^^^^^^^^^^^^ Definition is incompatible with `a.A.foo`
+  |         ^^^^^^^^^^^^ Definition is incompatible with `one.A.foo`
   |
- ::: src/a.pyi:2:9
+ ::: src/one.pyi:2:9
   |
 1 | class A:
 2 |     def foo(self, x): ...
-  |         ------------ `a.A.foo` defined here
+  |         ------------ `one.A.foo` defined here
   |
 info: This violates the Liskov Substitution Principle
 ```
