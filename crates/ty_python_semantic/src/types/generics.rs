@@ -1735,17 +1735,74 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
+        let mut types = self.types.clone();
+        self.remove_pure_inferable_typevar_cycles(&mut types);
         let types = generic_context
             .variables_inner(self.db)
             .iter()
             .map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied()?;
+                let mapped_ty = types.get(identity).copied()?;
                 // The typevar was inferred — present both bounds as the inferred type.
                 let chosen = choose(*variable, mapped_ty, mapped_ty);
                 Some(chosen.unwrap_or(mapped_ty))
             });
 
         generic_context.specialize_recursive(self.db, types)
+    }
+
+    fn pure_inferable_typevar_mapping_target(
+        &self,
+        types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<BoundTypeVarIdentity<'db>> {
+        let ty = types.get(&typevar)?;
+        let Type::TypeVar(bound_typevar) = *ty else {
+            return None;
+        };
+        bound_typevar
+            .is_inferable(self.db, self.inferable)
+            .then_some(bound_typevar.identity(self.db))
+    }
+
+    fn remove_pure_inferable_typevar_cycles(
+        &self,
+        types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    ) {
+        let mut seen = FxHashSet::default();
+
+        let starts = types.keys().copied().collect::<Vec<_>>();
+        for start in starts {
+            if !seen.insert(start) {
+                continue;
+            }
+
+            let mut path = Vec::new();
+            let mut path_indices = FxHashMap::default();
+            let mut current = start;
+
+            loop {
+                if let Some(index) = path_indices.insert(current, path.len()) {
+                    // Pure inferable-to-inferable cycles carry no concrete information and
+                    // currently collapse to `Never` during recursive specialization. Drop those
+                    // mappings here while keeping anchored equalities like `A -> B | Literal[1]`
+                    // intact.
+                    for cycle_member in &path[index..] {
+                        types.remove(cycle_member);
+                    }
+                    break;
+                }
+
+                path.push(current);
+
+                let Some(next) = self.pure_inferable_typevar_mapping_target(types, current) else {
+                    break;
+                };
+                if !seen.insert(next) && !path_indices.contains_key(&next) {
+                    break;
+                }
+                current = next;
+            }
+        }
     }
 
     /// Insert a type mapping for a bound typevar.

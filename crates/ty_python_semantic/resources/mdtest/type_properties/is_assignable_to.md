@@ -1314,7 +1314,7 @@ specializations. That means that a generic callable is assignable to any particu
 the generic callable.)
 
 ```py
-from typing import Callable
+from typing import Callable, Generic, Self
 from ty_extensions import RegularCallableTypeOf, TypeOf, is_assignable_to, static_assert
 
 def identity[T](t: T) -> T:
@@ -1322,15 +1322,96 @@ def identity[T](t: T) -> T:
 
 static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
 
 static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], str]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(not is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], int]))
+
+from typing import TypeVar
+
+T_bound = TypeVar("T_bound", bound=object)
+
+def bounded(t: T_bound) -> T_bound:
+    return t
+
+static_assert(is_assignable_to(TypeOf[bounded], Callable[[str], str]))
+static_assert(not is_assignable_to(TypeOf[bounded], Callable[[str], int]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[bounded], Callable[[str], str]))
+static_assert(not is_assignable_to(RegularCallableTypeOf[bounded], Callable[[str], int]))
+
+T_constrained = TypeVar("T_constrained", str, bytes)
+
+def constrained(t: T_constrained) -> T_constrained:
+    return t
+
+static_assert(is_assignable_to(TypeOf[constrained], Callable[[str], str]))
+static_assert(is_assignable_to(TypeOf[constrained], Callable[[bytes], bytes]))
+static_assert(not is_assignable_to(TypeOf[constrained], Callable[[str], int]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str], str]))
+static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[bytes], bytes]))
+static_assert(not is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str], int]))
+
+A_method = TypeVar("A_method")
+T_method = TypeVar("T_method", bound=str)
+
+# This exercises the case where a method's inferable set includes an outer class typevar in
+# addition to the typevars directly bound by the method's own generic context.
+class MethodCarrier(Generic[A_method]):
+    def method(self: "MethodCarrier[A_method]", t: T_method) -> tuple[A_method, T_method]:
+        raise NotImplementedError
+
+static_assert(
+    is_assignable_to(
+        TypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], str], tuple[int, str]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], str], tuple[int, str]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        TypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], int], tuple[int, int]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], int], tuple[int, int]],
+    )
+)
+
+A_self = TypeVar("A_self")
+T_self = TypeVar("T_self", bound=str)
+
+class SelfCarrier(Generic[A_self]):
+    def method(self: Self, t: T_self) -> tuple[A_self, T_self]:
+        raise NotImplementedError
+
+# TODO: This should be assignable. The unbound method type currently loses the outer class type
+# argument carried through `Self`, so the return type degrades to `tuple[Unknown, T_self]` before
+# the generic-callable assignability logic runs.
+# error: [static-assert-error]
+static_assert(
+    is_assignable_to(
+        TypeOf[SelfCarrier.method],
+        Callable[[SelfCarrier[int], str], tuple[int, str]],
+    )
+)
+# error: [static-assert-error]
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[SelfCarrier.method],
+        Callable[[SelfCarrier[int], str], tuple[int, str]],
+    )
+)
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any

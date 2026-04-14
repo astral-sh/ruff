@@ -26,6 +26,8 @@ use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::typevar::{BoundTypeVarIdentity, walk_type_var_bounds};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
@@ -1123,6 +1125,45 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let source_inferable = source.inferable_typevars(db);
+        let target_inferable = target.inferable_typevars(db);
+
+        if self.should_use_generic_callable_assignability_path(
+            db,
+            source,
+            target,
+            source_inferable,
+            target_inferable,
+        ) {
+            // A generic callable value is assignable to a concrete callable target when one
+            // specialization of the source signature works. Use constraint-set assignability so a
+            // source typevar is specialized consistently across parameters and returns, then
+            // existentially quantify away the full inferable set introduced for the source
+            // signature while preserving the bounds and constraints of any bounded or constrained
+            // inferables reachable from the signature.
+            let inferable = self.inferable.merge(db, source_inferable);
+            let relation_visitor = HasRelationToVisitor::default(self.constraints);
+            let disjointness_visitor = IsDisjointVisitor::default(self.constraints);
+            let checker = TypeRelationChecker::constraint_set_assignability(
+                self.constraints,
+                &relation_visitor,
+                &disjointness_visitor,
+            )
+            .with_inferable_typevars(inferable);
+            return checker
+                .check_signature_pair_inner(db, source, target)
+                .reduce_inferable_with_valid_specializations(
+                    db,
+                    self.constraints,
+                    Self::collect_inferable_bound_typevars_in_signature(
+                        db,
+                        source,
+                        source_inferable,
+                    ),
+                    source_inferable.iter(db),
+                );
+        }
+
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
@@ -1135,8 +1176,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
         //         # inferable, even though other uses of T in the function body are non-inferable.
         //         return t
-        let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 
@@ -1153,6 +1192,83 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
+    }
+
+    fn should_use_generic_callable_assignability_path(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_inferable: InferableTypeVars<'db>,
+        target_inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        let target_is_fully_static = target.generic_context.is_none()
+            && !target.return_ty.has_dynamic(db)
+            && !target.return_ty.has_typevar_or_typevar_instance(db)
+            && target.parameters.iter().all(|parameter| {
+                let annotated_type = parameter.annotated_type();
+                !annotated_type.has_dynamic(db)
+                    && !annotated_type.has_typevar_or_typevar_instance(db)
+            });
+
+        // Keep existential specialization of a generic source callable narrowly scoped to fully
+        // static targets. This path is only for "does some specialization of the source generic
+        // signature satisfy this concrete callable type?" and should not reach generic targets.
+        self.allow_generic_callable_assignability_path
+            && self.relation.is_assignability()
+            && target_is_fully_static
+            && !matches!(source_inferable, InferableTypeVars::None)
+            && matches!(target_inferable, InferableTypeVars::None)
+            && source.generic_context.is_some()
+    }
+
+    fn collect_inferable_bound_typevars_in_signature(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Vec<BoundTypeVarInstance<'db>> {
+        struct CollectInferableBoundTypeVars<'db> {
+            inferable: InferableTypeVars<'db>,
+            instances:
+                std::cell::RefCell<FxHashMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectInferableBoundTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                if bound_typevar.is_inferable(db, self.inferable) {
+                    self.instances
+                        .borrow_mut()
+                        .entry(bound_typevar.identity(db))
+                        .or_insert(bound_typevar);
+                }
+
+                let typevar = bound_typevar.typevar(db);
+                if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
+                    walk_type_var_bounds(db, bound_or_constraints, self);
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let visitor = CollectInferableBoundTypeVars {
+            inferable,
+            instances: std::cell::RefCell::default(),
+            recursion_guard: TypeCollector::default(),
+        };
+        walk_signature(db, signature, &visitor);
+        visitor.instances.into_inner().into_values().collect()
     }
 
     fn check_signature_pair_inner(

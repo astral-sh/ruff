@@ -674,6 +674,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // The generic-callable assignability special path is for first-class callable values, not
+        // structural protocol checks on method members.
+        let checker = self.without_generic_callable_assignability_path();
+
         match &member.kind {
             ProtocolMemberKind::Method(method) => {
                 // `__call__` members must be special cased for several reasons:
@@ -722,7 +726,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 attribute_type
                     .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                     .when_some_and(db, self.constraints, |callables| {
-                        self.check_callables_vs_callable(
+                        checker.check_callables_vs_callable(
                             db,
                             &callables.map(|callable| callable.apply_self(db, fallback_other)),
                             protocol_bind_self(db, *method, Some(fallback_other)),
@@ -747,13 +751,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ..
                 }) = ty.member(db, member.name).place
                 else {
-                    return self.never();
+                    return checker.never();
                 };
-                self.check_type_pair(db, *member_type, attribute_type).and(
-                    db,
-                    self.constraints,
-                    || self.check_type_pair(db, attribute_type, *member_type),
-                )
+                checker
+                    .check_type_pair(db, *member_type, attribute_type)
+                    .and(db, self.constraints, || {
+                        checker.check_type_pair(db, attribute_type, *member_type)
+                    })
             }
         }
     }
@@ -764,6 +768,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ProtocolInterface<'db>,
         target: ProtocolInterface<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Structural protocol method comparisons should use the general callable relation path.
+        let checker = self.without_generic_callable_assignability_path();
+
         target
             .members(db)
             .when_all(db, self.constraints, |target_member| {
@@ -802,11 +809,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 ProtocolMemberKind::Other(source_type),
                                 ProtocolMemberKind::Method(target_callable),
                             ) => ConstraintSet::from_bool(
-                                self.constraints,
+                                checker.constraints,
                                 source_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
                             )
                             .and(db, self.constraints, || {
-                                self.check_type_pair(
+                                checker.check_type_pair(
                                     db,
                                     source_type,
                                     Type::Callable(protocol_bind_self(db, target_callable, None)),
@@ -816,7 +823,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             (
                                 ProtocolMemberKind::Method(source_method),
                                 ProtocolMemberKind::Method(target_method),
-                            ) => self.check_callable_pair(
+                            ) => checker.check_callable_pair(
                                 db,
                                 source_method.bind_self(db, None),
                                 protocol_bind_self(db, target_method, None),
@@ -825,10 +832,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             (
                                 ProtocolMemberKind::Other(source_type),
                                 ProtocolMemberKind::Other(target_type),
-                            ) => self.check_type_pair(db, source_type, target_type).and(
+                            ) => checker.check_type_pair(db, source_type, target_type).and(
                                 db,
                                 self.constraints,
-                                || self.check_type_pair(db, target_type, source_type),
+                                || checker.check_type_pair(db, target_type, source_type),
                             ),
 
                             // TODO: finish assignability/subtyping between two `@property` members,

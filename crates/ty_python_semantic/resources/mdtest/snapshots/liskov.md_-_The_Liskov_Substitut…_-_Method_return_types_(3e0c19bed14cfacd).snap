@@ -27,6 +27,29 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 12 | 
 13 | class Sub4(Super):
 14 |     def method(self) -> str: ...  # error: [invalid-method-override]
+15 | from typing import Generic, TypeVar, Union
+16 | 
+17 | class Root: ...
+18 | 
+19 | class Base:
+20 |     def get_parent_id(self) -> Union["Base", Root]: ...
+21 | 
+22 | PT = TypeVar("PT", bound=Union[Base, Root])
+23 | 
+24 | class Child(Base, Generic[PT]):
+25 |     parent_id: PT
+26 | 
+27 |     def get_parent_id(self) -> PT: ...
+28 | 
+29 | class DataArray: ...
+30 | 
+31 | class Coordinates:
+32 |     def __getitem__(self, key: object) -> DataArray: ...
+33 | 
+34 | T_DataArray = TypeVar("T_DataArray", bound=DataArray)
+35 | 
+36 | class DataArrayCoordinates(Coordinates, Generic[T_DataArray]):
+37 |     def __getitem__(self, key: object) -> T_DataArray: ...
 ```
 
 # Diagnostics
@@ -60,6 +83,7 @@ error[invalid-method-override]: Invalid override of method `method`
 13 | class Sub4(Super):
 14 |     def method(self) -> str: ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+15 | from typing import Generic, TypeVar, Union
    |
   ::: src/mdtest_snippet.pyi:2:9
    |
