@@ -311,9 +311,9 @@ impl Diagnostic {
 
     /// Returns a key that can be used to sort two diagnostics into the canonical order
     /// in which they should appear when rendered.
-    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
+    pub fn rendering_sort_key<'a>(&'a self, resolver: &'a dyn FileResolver) -> impl Ord + 'a {
         RenderingSortKey {
-            db,
+            resolver,
             diagnostic: self,
         }
     }
@@ -544,7 +544,7 @@ struct DiagnosticInner {
 }
 
 struct RenderingSortKey<'a> {
-    db: &'a dyn Db,
+    resolver: &'a dyn FileResolver,
     diagnostic: &'a Diagnostic,
 }
 
@@ -558,7 +558,10 @@ impl Ord for RenderingSortKey<'_> {
             self.diagnostic.primary_span(),
             other.diagnostic.primary_span(),
         ) {
-            let order = span1.file().path(&self.db).cmp(span2.file().path(&self.db));
+            let order = span1
+                .file()
+                .path(self.resolver)
+                .cmp(span2.file().path(self.resolver));
             if order.is_ne() {
                 return order;
             }

@@ -1,6 +1,6 @@
 use crate::{is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::cancellation::{Canceled, CancellationToken};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics, FileResolver};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::SourceText;
 use ruff_db::system::{SystemPath, WritableSystem};
@@ -227,8 +227,10 @@ pub fn suppress_all_diagnostics(
     // Stitch the remaining diagnostics back together.
     diagnostics.extend(by_file.into_values().flatten());
     diagnostics.sort_by(|left, right| {
-        left.rendering_sort_key(db)
-            .cmp(&right.rendering_sort_key(db))
+        let db: &dyn ruff_db::Db = db;
+        let resolver: &dyn FileResolver = &db;
+        left.rendering_sort_key(resolver)
+            .cmp(&right.rendering_sort_key(resolver))
     });
 
     Ok(SuppressAllResult {

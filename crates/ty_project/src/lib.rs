@@ -139,9 +139,11 @@ pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 impl CollectReporter {
     pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
         let mut diagnostics = self.0.into_inner().unwrap();
-        diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(db)
-                .cmp(&right.rendering_sort_key(db))
+        diagnostics.sort_unstable_by(|a, b| {
+            let db: &dyn ruff_db::Db = db;
+            let resolver: &dyn ruff_db::diagnostic::FileResolver = &db;
+            a.rendering_sort_key(resolver)
+                .cmp(&b.rendering_sort_key(resolver))
         });
         diagnostics
     }
