@@ -511,6 +511,8 @@ fn match_reveal_type_diagnostic(
 
 #[cfg(test)]
 mod tests {
+    use crate::assertion::tests::TestDb;
+
     use super::FailuresByLine;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
@@ -564,7 +566,7 @@ mod tests {
     ) -> Result<Vec<Diagnostic>, FailuresByLine> {
         colored::control::set_override(false);
 
-        let mut db = crate::db::Db::setup();
+        let mut db = TestDb::setup();
 
         let settings = ProgramSettings {
             python_version: PythonVersionWithSource::default(),

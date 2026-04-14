@@ -1087,15 +1087,54 @@ mod tests {
     use ruff_source_file::OneIndexed;
 
     use insta::assert_snapshot;
+    use serde::Deserialize;
 
-    use crate::config::MarkdownTestConfig;
     use crate::parser::EmbeddedFilePath;
+
+    /// A minimal copy of `ty_test::config::MarkdownTestConfig` for testing the
+    /// parser.
+    ///
+    /// Supports the following options:
+    ///
+    /// ```toml
+    /// [project]
+    /// dependencies = ["package==1.2.3"]
+    ///
+    /// [environment]
+    /// typeshed = "path/to/typeshed"
+    /// ```
+    #[derive(Clone, Debug, Default, Deserialize)]
+    #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+    struct TestConfig {
+        project: Option<Project>,
+        #[expect(unused)]
+        environment: Option<Environment>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize)]
+    struct Project {
+        dependencies: Option<Vec<String>>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize)]
+    struct Environment {
+        #[expect(unused)]
+        typeshed: Option<String>,
+    }
+
+    impl super::MdtestConfig for TestConfig {
+        fn has_dependencies(&self) -> bool {
+            self.project
+                .as_ref()
+                .is_some_and(|project| project.dependencies.is_some())
+        }
+    }
 
     fn parse<'s>(
         title: &'s str,
         source: &'s str,
-    ) -> anyhow::Result<super::MarkdownTestSuite<'s, MarkdownTestConfig>> {
-        super::parse::<MarkdownTestConfig>(title, source)
+    ) -> anyhow::Result<super::MarkdownTestSuite<'s, TestConfig>> {
+        super::parse::<TestConfig>(title, source)
     }
 
     #[test]

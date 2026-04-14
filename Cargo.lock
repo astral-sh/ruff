@@ -2050,7 +2050,6 @@ dependencies = [
  "ruff_db",
  "ruff_diagnostics",
  "ruff_index",
- "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2061,7 +2060,6 @@ dependencies = [
  "serde",
  "similar 3.1.0",
  "smallvec",
- "tempfile",
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
@@ -4784,13 +4782,17 @@ dependencies = [
  "insta",
  "mdtest",
  "ruff_db",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_source_file",
  "salsa",
+ "serde",
  "tempfile",
+ "tracing",
  "ty_module_resolver",
  "ty_python_core",
  "ty_python_semantic",
+ "ty_vendored",
 ]
 
 [[package]]

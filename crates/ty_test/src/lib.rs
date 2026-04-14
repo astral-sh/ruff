@@ -1,9 +1,9 @@
+use crate::config::{Log, MarkdownTestConfig, SystemKind};
+use crate::db::Db;
 use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 pub use mdtest::OutputFormat;
-use mdtest::config::{Log, MarkdownTestConfig, SystemKind};
-use mdtest::db::{self, Db};
 use mdtest::matcher::Failure;
 use mdtest::parser::EmbeddedFileSourceMap;
 use mdtest::{Failures, FileFailures, TestFile, matcher, parser as test_parser};
@@ -27,6 +27,8 @@ use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
+mod config;
+mod db;
 mod external_dependencies;
 
 /// Filter which tests to run in mdtest.

@@ -17,11 +17,13 @@ test = false
 [dependencies]
 mdtest = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
 ty_python_core = { workspace = true }
+ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }
@@ -29,7 +31,9 @@ colored = { workspace = true }
 dunce = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 salsa = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

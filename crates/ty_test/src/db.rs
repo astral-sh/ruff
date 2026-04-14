@@ -1,4 +1,3 @@
-use crate::config::Analysis;
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -21,9 +20,11 @@ use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
 };
 
+use crate::config::Analysis;
+
 #[salsa::db]
 #[derive(Clone)]
-pub struct Db {
+pub(crate) struct Db {
     storage: salsa::Storage<Self>,
     files: Files,
     system: MdtestSystem,
@@ -33,7 +34,7 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn setup() -> Self {
+    pub(crate) fn setup() -> Self {
         let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
 
         let mut db = Self {
@@ -57,11 +58,11 @@ impl Db {
         self.settings.unwrap()
     }
 
-    pub fn set_verbosity(&mut self, verbose: bool) {
+    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
         self.settings().set_verbose(self).to(verbose);
     }
 
-    pub fn update_analysis_options(&mut self, options: Option<&Analysis>) {
+    pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
@@ -114,17 +115,17 @@ impl Db {
         }
     }
 
-    pub fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
+    pub(crate) fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
         self.system.with_os(cwd, temp_dir);
         Files::sync_all(self);
     }
 
-    pub fn use_in_memory_system(&mut self) {
+    pub(crate) fn use_in_memory_system(&mut self) {
         self.system.with_in_memory();
         Files::sync_all(self);
     }
 
-    pub fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+    pub(crate) fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.system.create_directory_all(path)
     }
 }
@@ -209,7 +210,7 @@ struct Settings {
 }
 
 #[derive(Debug, Clone)]
-pub struct MdtestSystem(Arc<MdtestSystemInner>);
+pub(crate) struct MdtestSystem(Arc<MdtestSystemInner>);
 
 #[derive(Debug)]
 enum MdtestSystemInner {

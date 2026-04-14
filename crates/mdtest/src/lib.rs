@@ -15,8 +15,6 @@ use parser::BacktickOffsets;
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
 mod assertion;
-pub mod config;
-pub mod db;
 mod diagnostic;
 pub mod matcher;
 pub mod parser;

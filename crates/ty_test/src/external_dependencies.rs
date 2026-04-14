@@ -1,4 +1,4 @@
-use mdtest::db::Db;
+use crate::db::Db;
 
 use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8Path;

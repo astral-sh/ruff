@@ -19,7 +19,7 @@ use ty_python_core::platform::PythonPlatform;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct MarkdownTestConfig {
+pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub log: Option<Log>,
@@ -40,36 +40,36 @@ pub struct MarkdownTestConfig {
 }
 
 impl MarkdownTestConfig {
-    pub fn python_version(&self) -> Option<PythonVersion> {
+    pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }
 
-    pub fn python_platform(&self) -> Option<PythonPlatform> {
+    pub(crate) fn python_platform(&self) -> Option<PythonPlatform> {
         self.environment.as_ref()?.python_platform.clone()
     }
 
-    pub fn typeshed(&self) -> Option<&SystemPath> {
+    pub(crate) fn typeshed(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.typeshed.as_deref()
     }
 
-    pub fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
+    pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
         self.environment.as_ref()?.extra_paths.as_deref()
     }
 
-    pub fn python(&self) -> Option<&SystemPath> {
+    pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
     }
 
-    pub fn dependencies(&self) -> Option<&[String]> {
+    pub(crate) fn dependencies(&self) -> Option<&[String]> {
         self.project.as_ref()?.dependencies.as_deref()
     }
 
-    pub fn verbose(&self) -> bool {
+    pub(crate) fn verbose(&self) -> bool {
         self.verbose.unwrap_or_default()
     }
 }
 
-impl crate::parser::MdtestConfig for MarkdownTestConfig {
+impl mdtest::parser::MdtestConfig for MarkdownTestConfig {
     fn has_dependencies(&self) -> bool {
         self.dependencies().is_some()
     }
@@ -116,7 +116,7 @@ pub(crate) struct Environment {
 
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct Analysis {
+pub(crate) struct Analysis {
     /// Whether ty should support `type: ignore` comments.
     pub respect_type_ignore_comments: Option<bool>,
 
@@ -127,7 +127,7 @@ pub struct Analysis {
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum Log {
+pub(crate) enum Log {
     /// Enable logging with tracing when `true`.
     Bool(bool),
     /// Enable logging and only show filters that match the given [env-filter](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
@@ -137,7 +137,7 @@ pub enum Log {
 /// The system to use for tests.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "kebab-case")]
-pub enum SystemKind {
+pub(crate) enum SystemKind {
     /// Use an in-memory system with a case-sensitive file system.
     ///
     /// This is recommended for all tests because it's fast.
