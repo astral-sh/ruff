@@ -6,8 +6,9 @@ use colored::Colorize;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
+use mdtest::matcher::{self, Failure};
 use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
-use mdtest::{Failures, FileFailures, TestFile};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, TestFile, output_format};
 use ruff_db::Db as _;
 use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::source::source_text;
@@ -22,7 +23,6 @@ use ty_module_resolver::SearchPaths;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_semantic::PythonVersionWithSource;
-use ty_static::EnvVars;
 
 pub use mdtest::OutputFormat;
 
@@ -47,14 +47,15 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
-    output_format: OutputFormat,
 ) -> anyhow::Result<()> {
+    let output_format = output_format();
+
     let suite = mdtest::parser::parse::<RuffOptions>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
 
-    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     let mut assertion = String::new();
     for test in suite.tests() {
@@ -92,9 +93,11 @@ pub fn run(
                                     &mut assertion,
                                     file,
                                     last_line_number,
-                                    "Found a trailing assertion comment \
+                                    &Failure::new(
+                                        "Found a trailing assertion comment \
                                         (e.g., `# revealed:` or `# error:`) \
                                         not followed by any statement.",
+                                    ),
                                 );
 
                                 continue;
@@ -118,14 +121,12 @@ pub fn run(
             let _ = writeln!(
                 assertion,
                 "\nTo rerun this specific test, \
-                set the environment variable: {}='{escaped_test_name}'",
-                EnvVars::MDTEST_TEST_FILTER,
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             let _ = writeln!(
                 assertion,
-                "{}='{escaped_test_name}' cargo test -p ruff_linter \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ruff_linter \
                 --test mdtest -- {test_name}",
-                EnvVars::MDTEST_TEST_FILTER,
             );
 
             let _ = writeln!(assertion, "\n{}", "-".repeat(50));
@@ -198,7 +199,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                backtick_offsets: embedded.backtick_offsets.clone(),
+                code_blocks: embedded.python_code_blocks.clone(),
             })
         })
         .collect();
@@ -224,6 +225,9 @@ fn run_test(
     // all diagnostics. Otherwise it remains empty.
     let mut snapshot_diagnostics = vec![];
 
+    // Edits for updating changed inline snapshots.
+    let mut markdown_edits = vec![];
+
     let failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
@@ -244,10 +248,20 @@ fn run_test(
                     .cmp(&right.rendering_sort_key(db))
             });
 
-            let failure = match mdtest::matcher::match_file(db, test_file.file, &diagnostics) {
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
+                |inline_diagnostics| {
+                    mdtest::validate_inline_snapshot(
+                        db,
+                        "ty",
+                        test_file,
+                        &inline_diagnostics,
+                        &mut markdown_edits,
+                    )
+                },
+            ) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.backtick_offsets.clone(),
+                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
                     by_line: line_failures,
                 }),
             };
