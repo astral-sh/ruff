@@ -19,12 +19,6 @@ use ruff_linter::test::test_contents;
 use ruff_source_file::LineIndex;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
-use ty_module_resolver::SearchPaths;
-use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{Program, ProgramSettings};
-use ty_python_semantic::PythonVersionWithSource;
-
-pub use mdtest::OutputFormat;
 
 mod db;
 
@@ -212,14 +206,6 @@ fn run_test(
     .expect("Failed to construct configuration from options")
     .into_settings(project_root.as_std_path())
     .expect("Failed to construct settings");
-
-    let program_settings = ProgramSettings {
-        python_version: PythonVersionWithSource::default(),
-        search_paths: SearchPaths::empty(ty_vendored::file_system()),
-        python_platform: PythonPlatform::All,
-    };
-
-    Program::init_or_update(db, program_settings);
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
