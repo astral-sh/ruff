@@ -73,6 +73,7 @@ use crate::types::function::{
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
@@ -7039,28 +7040,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
-        let has_mixed_typed_dict_literal_argument = is_typed_dict_constructor
-            && arguments.args.len() == 1
-            && arguments.args[0].is_dict_expr()
-            && !arguments.keywords.is_empty();
-
-        // Validate `TypedDict` constructor calls before general argument inference so the field
+        // Prepare `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
-        if let Some(class) = class
-            && is_typed_dict_constructor
-        {
-            let typed_dict = TypedDictType::new(class);
-            self.infer_typed_dict_constructor_values(typed_dict, arguments, func.as_ref().into());
-        }
+        let has_prepared_typed_dict_constructor = class
+            .filter(|class| class.is_typed_dict(self.db()))
+            .map(|class| {
+                let typed_dict = TypedDictType::new(class);
+                let form = TypedDictConstructorForm::from_arguments(arguments);
+                self.prepare_typed_dict_constructor(
+                    typed_dict,
+                    form,
+                    arguments,
+                    func.as_ref().into(),
+                );
+            })
+            .is_some();
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if has_mixed_typed_dict_literal_argument && expr.is_dict_expr() {
-                    builder.try_expression_type(expr).unwrap_or(Type::unknown())
-                } else if is_typed_dict_constructor {
+                if has_prepared_typed_dict_constructor {
                     builder.get_or_infer_expression(expr, tcx)
                 } else {
                     builder.infer_expression(expr, tcx)

@@ -292,6 +292,20 @@ reveal_type(eve3a)  # revealed: Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
+Constructor calls with multiple positional arguments should be rejected, including for empty
+`TypedDict`s:
+
+```py
+class Empty(TypedDict):
+    pass
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Empty` constructor: expected 1, got 2"
+Empty({}, {})
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Person` constructor: expected 1, got 2"
+Person({}, {})
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py
@@ -475,6 +489,101 @@ Record({VALUE_KEY: "x"}, count=1)
 Record({VALUE_KEY: 1}, count=1)
 ```
 
+Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
+preserve shared required keys:
+
+```py
+from typing import TypedDict
+
+class ChildWithOptionalCount(TypedDict, total=False):
+    count: int
+
+ChildWithOptionalCount({"count": "wrong"}, count=1)
+
+class Base(TypedDict):
+    name: str
+
+class ChildKwargs(TypedDict):
+    name: str
+    count: int
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+def _(
+    base: Base,
+    maybe_name: MaybeName,
+):
+    ChildKwargs(base, count=1)
+    ChildKwargs(**base, count=1)
+
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ChildKwargs` constructor"
+    ChildKwargs(**maybe_name, count=1)
+```
+
+TypedDict positional arguments in mixed constructors should validate their declared keys:
+
+```py
+from typing import TypedDict
+
+class Target(TypedDict):
+    a: int
+    b: int
+
+class Source(TypedDict):
+    a: int
+
+class BadSource(TypedDict):
+    a: str
+
+class MaybeSource(TypedDict, total=False):
+    a: int
+
+class WiderSource(TypedDict):
+    a: int
+    extra: str
+
+class WiderBadSource(TypedDict):
+    a: str
+    extra: str
+
+def _(
+    source: Source,
+    bad: BadSource,
+    maybe: MaybeSource,
+    wide: WiderSource,
+    wide_bad: WiderBadSource,
+    cond: bool,
+):
+    Target(source, b=2)
+    Target(source if cond else {"a": 1}, b=2)
+    Target(source if cond else {"a": 1, "b": 0}, b=2)
+    Target(source if cond else {"a": 1, "b": "shadowed"}, b=2)
+    Target(wide, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(bad, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(wide_bad, b=2)
+
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `Target` constructor"
+    Target(maybe, b=2)
+```
+
+Mixed constructors should stay lenient for non-`TypedDict` positional mappings once the keyword
+arguments cover the full schema:
+
+```py
+from typing import TypedDict
+
+class FullFromKeywords(TypedDict):
+    a: int
+
+def _(mapping: dict[str, str]):
+    FullFromKeywords(mapping, a=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -588,6 +697,45 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
 (a_person := {"name": "Alice", "age": 30, "extra": True})
+```
+
+## Mixed positional and unpacked keyword constructors
+
+These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
+validate normally and produce ordinary diagnostics:
+
+```py
+from typing import Any, TypedDict
+from typing_extensions import Never
+
+class MixedTarget(TypedDict):
+    x: int
+    y: int
+
+class MaybeY(TypedDict, total=False):
+    y: int
+
+def _(target: MixedTarget, maybe_y: MaybeY, kwargs: Any, never_kwargs: Never, cond: bool):
+    MixedTarget(target, **maybe_y)
+    MixedTarget(maybe_y if cond else {}, **kwargs)
+    MixedTarget(maybe_y if cond else {}, **never_kwargs)
+
+    # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
+    MixedTarget({"x": 1}, **maybe_y)
+
+class TD(TypedDict):
+    a: int
+
+def _(td: TD):
+    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+    TD({"a": "foo"}, **{"a": 1})
+
+    TD({"a": "foo"}, a=1)
+    TD({"a": "foo"}, **td)
+
+def _(x: Any):
+    TD({"a": "foo"}, **x)
 ```
 
 ## Union of `TypedDict`
