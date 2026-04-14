@@ -408,7 +408,7 @@ impl Matcher {
                 let Some(rule) = rule else {
                     // Similar to `error:` with the same diagnostic code. Match the first diagnostic even if this
                     // is ambiguous (and somewhat problematic because we use swap_remove in many places).
-                    if unmatched.len() > 0 {
+                    if !unmatched.is_empty() {
                         return Some(unmatched.swap_remove(0).clone());
                     }
 
