@@ -47,6 +47,7 @@ use crate::types::generics::{
 use crate::types::known_instance::{FieldInstance, FunctoolsPartialInstance};
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, PartialApplication,
+    PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -2896,31 +2897,14 @@ impl<'db> CallableBinding<'db> {
         };
 
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let mut new_overloads = Vec::new();
-        let mut seen_overloads = FxHashSet::default();
-        for index in selected_overload_indexes {
-            let Some(bound_overload) = self.overloads().get(index) else {
-                continue;
-            };
-            let partial_application =
-                bound_overload.partial_application(signature_arguments.as_ref());
-            let signature = bound_overload.signature.partially_apply(
-                db,
-                &partial_application,
-                bound_overload.specialization,
-                bound_overload.unspecialized_return_type(db),
-            );
-            let dedup_key = signature.clone().with_definition(None);
-            if seen_overloads.insert(dedup_key) {
-                new_overloads.push(signature);
-            }
-        }
-
-        if new_overloads.is_empty() {
-            return None;
-        }
-
-        let new_callable_sig = CallableSignature::from_overloads(new_overloads);
+        let new_callable_sig = CallableSignature::partially_apply(
+            db,
+            selected_overload_indexes.into_iter().filter_map(|index| {
+                self.overloads().get(index).map(|overload| {
+                    overload.partial_signature_application(signature_arguments.as_ref(), db)
+                })
+            }),
+        )?;
         Some(CallableType::new(
             db,
             new_callable_sig,
@@ -5568,6 +5552,20 @@ impl<'db> Binding<'db> {
         }
 
         partial_application
+    }
+
+    /// Packages the information needed to synthesize this overload's reduced partial signature.
+    fn partial_signature_application(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        db: &'db dyn Db,
+    ) -> PartialSignatureApplication<'db> {
+        PartialSignatureApplication::new(
+            self.signature.clone(),
+            self.partial_application(arguments),
+            self.specialization,
+            self.unspecialized_return_type(db),
+        )
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to

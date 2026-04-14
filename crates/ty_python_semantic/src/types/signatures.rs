@@ -74,6 +74,33 @@ pub struct CallableSignature<'db> {
     pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
+/// The per-overload information needed to synthesize one reduced signature for
+/// `functools.partial(...)`.
+#[derive(Clone, Debug)]
+pub(crate) struct PartialSignatureApplication<'db> {
+    signature: Signature<'db>,
+    partial_application: PartialApplication<'db>,
+    specialization: Option<Specialization<'db>>,
+    unspecialized_return_ty: Type<'db>,
+}
+
+impl<'db> PartialSignatureApplication<'db> {
+    /// Creates a new per-overload partial-application summary.
+    pub(crate) fn new(
+        signature: Signature<'db>,
+        partial_application: PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+        unspecialized_return_ty: Type<'db>,
+    ) -> Self {
+        Self {
+            signature,
+            partial_application,
+            specialization,
+            unspecialized_return_ty,
+        }
+    }
+}
+
 impl<'db> CallableSignature<'db> {
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
@@ -119,6 +146,30 @@ impl<'db> CallableSignature<'db> {
                 .clone()
                 .with_inherited_generic_context(db, inherited_generic_context)
         }))
+    }
+
+    /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
+    pub(crate) fn partially_apply(
+        db: &'db dyn Db,
+        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
+    ) -> Option<Self> {
+        let mut new_overloads = Vec::new();
+        let mut seen_overloads = FxHashSet::default();
+
+        for overload in overloads {
+            let signature = overload.signature.partially_apply(
+                db,
+                &overload.partial_application,
+                overload.specialization,
+                overload.unspecialized_return_ty,
+            );
+            let dedup_key = signature.clone().with_definition(None);
+            if seen_overloads.insert(dedup_key) {
+                new_overloads.push(signature);
+            }
+        }
+
+        (!new_overloads.is_empty()).then(|| Self::from_overloads(new_overloads))
     }
 
     pub(crate) fn cycle_normalized(
