@@ -1605,12 +1605,27 @@ impl<'db> StaticClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`StaticClassLiteral::own_fields`] for more details.
+    pub(crate) fn fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> &'db FxIndexMap<Name, Field<'db>> {
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
+            // fields of this class only.
+            return self.own_fields(db, specialization, field_policy);
+        }
+
+        self.fields_inner(db, specialization, field_policy)
+    }
+
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
-    pub(crate) fn fields(
+    fn fields_inner(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -1621,11 +1636,11 @@ impl<'db> StaticClassLiteral<'db> {
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
         }
 
-        if field_policy == CodeGeneratorKind::NamedTuple {
-            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
-            // fields of this class only.
-            return self.own_fields(db, specialization, field_policy);
-        }
+        debug_assert_ne!(
+            field_policy,
+            CodeGeneratorKind::NamedTuple,
+            "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
+        );
 
         self.iter_mro(db, specialization)
             .rev()
@@ -1650,7 +1665,8 @@ impl<'db> StaticClassLiteral<'db> {
                 FieldSource::Static(class, specialization) => Either::Left(
                     class
                         .own_fields(db, specialization, field_policy)
-                        .into_iter(),
+                        .iter()
+                        .map(|(name, field)| (name.clone(), field.clone())),
                 ),
                 FieldSource::DynamicTypedDict(typeddict) => {
                     Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
@@ -1753,11 +1769,16 @@ impl<'db> StaticClassLiteral<'db> {
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
     /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
     /// only what is explicitly specified in each field definition.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
+        heap_size=get_size2::GetSize::get_heap_size
+    )]
     pub(crate) fn own_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        field_policy: CodeGeneratorKind,
+        field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
         let mut attributes = FxIndexMap::default();
 
@@ -1767,6 +1788,8 @@ impl<'db> StaticClassLiteral<'db> {
         let use_def = use_def_map(db, class_body_scope);
 
         let typed_dict_params = self.typed_dict_params(db);
+        let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+            .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
@@ -1878,7 +1901,7 @@ impl<'db> StaticClassLiteral<'db> {
                     ..
                 } = field.kind
                 {
-                    *kw = Some(self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
+                    *kw = dataclass_kw_only_default;
                 }
 
                 attributes.insert(symbol.name().clone(), field);
