@@ -1,15 +1,17 @@
+use std::fmt::{Display, Write};
+
 use camino::Utf8Path;
 use colored::Colorize;
+use similar::{ChangeTag, TextDiff};
+
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
 use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
-use similar::{ChangeTag, TextDiff};
-use std::fmt::{Display, Write};
 
-use matcher::Failure;
-use parser::BacktickOffsets;
+use crate::matcher::Failure;
+use crate::parser::BacktickOffsets;
 
 /// Filter which tests to run in mdtest.
 ///

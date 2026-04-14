@@ -4,9 +4,9 @@ use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 pub use mdtest::OutputFormat;
-use mdtest::matcher::Failure;
+use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
-use mdtest::{Failures, FileFailures, TestFile, matcher};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -30,8 +30,6 @@ use ty_python_semantic::{
 mod config;
 mod db;
 mod external_dependencies;
-
-use mdtest::MDTEST_TEST_FILTER;
 
 /// If set to a value other than "0", runs tests that include external dependencies.
 const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
@@ -192,7 +190,7 @@ fn run_test(
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
-) -> Result<(TestOutcome, Vec<mdtest::MarkdownEdit>), Failures> {
+) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
