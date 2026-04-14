@@ -1129,8 +1129,23 @@ class TypingChild(TypingBase):
     id: int = 0
 ```
 
-Once an earlier base has already overridden the name, we do not emit a second conflict for later
-subclasses:
+The same check applies through deeper inheritance chains:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    name: str
+
+class Intermediate(Base):
+    unrelated: bytes
+
+class Sub(Intermediate):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `Base`"
+    name: int
+```
+
+Later subclasses still get their own conflict if an earlier base has already overridden the name:
 
 ```py
 from typing import NamedTuple
@@ -1142,6 +1157,7 @@ class ShadowingMid(ShadowTupleBase):
     name = "shadowed"
 
 class ShadowedChild(ShadowingMid):
+    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
     name: int
 ```
 

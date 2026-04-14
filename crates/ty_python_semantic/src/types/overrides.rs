@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{DefinedPlace, Place},
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
         Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -84,8 +84,7 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 }
 
-/// Returns the first inherited `NamedTuple` field in the MRO that remains visible for
-/// `field_name`, together with its declaration definition when one is available.
+/// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
 fn conflicting_named_tuple_field_in_mro<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -120,52 +119,9 @@ fn conflicting_named_tuple_field_in_mro<'db>(
                 | ClassLiteral::DynamicEnum(_) => {}
             }
         }
-
-        let shadows_name = match superclass_literal {
-            ClassLiteral::Static(superclass_literal) => class_body_first_end_of_scope_definition(
-                db,
-                superclass_literal.body_scope(db),
-                field_name,
-            )
-            .is_some(),
-            ClassLiteral::Dynamic(class_literal) => class_literal
-                .members(db)
-                .iter()
-                .any(|(member_name, _)| member_name == field_name),
-            ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => false,
-            ClassLiteral::DynamicEnum(enum_lit) => {
-                let spec = enum_lit.spec(db);
-                !spec.has_known_members(db)
-                    || spec
-                        .members(db)
-                        .iter()
-                        .any(|(member_name, _)| member_name == field_name)
-            }
-        };
-
-        if shadows_name {
-            return None;
-        }
     }
 
     None
-}
-
-/// Returns the first end-of-scope definition for `field_name` in `class_scope`, preferring a
-/// declaration over a binding when both are present.
-fn class_body_first_end_of_scope_definition<'db>(
-    db: &'db dyn Db,
-    class_scope: ScopeId<'db>,
-    field_name: &Name,
-) -> Option<Definition<'db>> {
-    let symbol_id = place_table(db, class_scope).symbol_id(field_name.as_str())?;
-    let use_def = use_def_map(db, class_scope);
-    place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id))
-        .first_declaration
-        .or_else(|| {
-            place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol_id))
-                .first_definition
-        })
 }
 
 fn check_class_declaration<'db>(
@@ -271,8 +227,6 @@ fn check_class_declaration<'db>(
     }
 
     if configuration.check_invalid_named_tuple_overrides()
-        && class_body_first_end_of_scope_definition(db, class_scope, &member.name)
-            .is_some_and(|definition| definition == *first_reachable_definition)
         && let Some((superclass, overridden_field_declaration)) =
             conflicting_named_tuple_field_in_mro(db, literal, &member.name)
         && let Some(builder) = context.report_lint(
