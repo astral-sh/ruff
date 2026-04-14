@@ -511,7 +511,7 @@ fn match_reveal_type_diagnostic(
 
 #[cfg(test)]
 mod tests {
-    use crate::assertion::tests::TestDb;
+    use crate::tests::TestDb;
 
     use super::FailuresByLine;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};

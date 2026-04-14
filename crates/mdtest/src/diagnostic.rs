@@ -147,7 +147,7 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::assertion::tests::TestDb;
+    use crate::tests::TestDb;
 
     #[test]
     fn sort_and_group() {

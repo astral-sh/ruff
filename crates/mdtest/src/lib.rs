@@ -389,3 +389,62 @@ pub fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) ->
 
     Ok(())
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use ruff_db::Db;
+    use ruff_db::files::Files;
+    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
+    use ruff_db::vendored::VendoredFileSystem;
+
+    /// Database that can be used for testing.
+    ///
+    /// Uses an in-memory filesystem and an empty vendored filesystem. Since the
+    /// parser only needs source text and line info, no typeshed stubs are required.
+    #[salsa::db]
+    #[derive(Default, Clone)]
+    pub(crate) struct TestDb {
+        storage: salsa::Storage<Self>,
+        files: Files,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
+    }
+
+    impl TestDb {
+        pub(crate) fn setup() -> Self {
+            Self::default()
+        }
+    }
+
+    #[salsa::db]
+    impl Db for TestDb {
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
+        }
+
+        fn system(&self) -> &dyn System {
+            &self.system
+        }
+
+        fn files(&self) -> &Files {
+            &self.files
+        }
+
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            ruff_python_ast::PythonVersion::latest_ty()
+        }
+    }
+
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
+        }
+    }
+
+    #[salsa::db]
+    impl salsa::Database for TestDb {}
+}

@@ -495,87 +495,15 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use std::sync::{Arc, Mutex};
-
+mod tests {
     use super::*;
-    use ruff_db::Db;
-    use ruff_db::files::Files;
+    use crate::tests::TestDb;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
-    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, System, TestSystem};
-    use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-
-    type Events = Arc<Mutex<Vec<salsa::Event>>>;
-
-    /// Database that can be used for testing.
-    ///
-    /// Uses an in memory filesystem and it stubs out the vendored files by default.
-    #[salsa::db]
-    #[derive(Default, Clone)]
-    pub(crate) struct TestDb {
-        storage: salsa::Storage<Self>,
-        files: Files,
-        system: TestSystem,
-        vendored: VendoredFileSystem,
-        #[allow(unused)]
-        events: Events,
-    }
-
-    impl TestDb {
-        pub(crate) fn setup() -> Self {
-            let events = Events::default();
-            Self {
-                storage: salsa::Storage::new(Some(Box::new({
-                    let events = events.clone();
-                    move |event| {
-                        tracing::trace!("event: {:?}", event);
-                        let mut events = events.lock().unwrap();
-                        events.push(event);
-                    }
-                }))),
-                system: TestSystem::default(),
-                vendored: VendoredFileSystem::default(),
-                events,
-                files: Files::default(),
-            }
-        }
-    }
-
-    #[salsa::db]
-    impl Db for TestDb {
-        fn vendored(&self) -> &VendoredFileSystem {
-            &self.vendored
-        }
-
-        fn system(&self) -> &dyn System {
-            &self.system
-        }
-
-        fn files(&self) -> &Files {
-            &self.files
-        }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
-        }
-    }
-
-    impl DbWithTestSystem for TestDb {
-        fn test_system(&self) -> &TestSystem {
-            &self.system
-        }
-
-        fn test_system_mut(&mut self) -> &mut TestSystem {
-            &mut self.system
-        }
-    }
-
-    #[salsa::db]
-    impl salsa::Database for TestDb {}
 
     fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
         let mut db = TestDb::setup();
