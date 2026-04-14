@@ -37,5 +37,6 @@ error[invalid-context-manager]: Object of type `Manager1 | NotAContextManager` c
 12 |     async with context_expr as f:
    |                ^^^^^^^^^^^^
    |
+info: `NotAContextManager` does not implement `__aenter__` or `__aexit__`
 
 ```

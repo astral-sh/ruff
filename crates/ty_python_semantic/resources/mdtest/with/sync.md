@@ -160,6 +160,30 @@ def _(flag: bool):
         reveal_type(f)  # revealed: str
 ```
 
+## Context expression with overlapping possibly-unbound union variants
+
+<!-- snapshot-diagnostics -->
+
+```py
+def _(flag1: bool, flag2: bool):
+    class GoodManager:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class MissingExitManager:
+        def __enter__(self) -> str:
+            return "bar"
+
+    class NotAContextManager: ...
+    context_expr = GoodManager() if flag1 else MissingExitManager() if flag2 else NotAContextManager()
+
+    # error: [invalid-context-manager] "Object of type `GoodManager | MissingExitManager | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
 ## Context expression where one union variant has a non-callable dunder
 
 <!-- snapshot-diagnostics -->

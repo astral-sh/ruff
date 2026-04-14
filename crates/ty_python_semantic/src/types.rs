@@ -4776,6 +4776,10 @@ impl<'db> Type<'db> {
             return intersection.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
+        if let Type::Union(union) = self {
+            return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+        }
+
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
@@ -6387,8 +6391,8 @@ impl<'db> IntersectionType<'db> {
         }
 
         if successful_bindings.is_empty() {
-            // TODO we are only showing one of the errors here; should we aggregate them
-            // somehow or show all of them?
+            // TODO we are only showing one of the errors here; should we aggregate
+            // them somehow or show all of them?
             return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
         }
 
@@ -6396,6 +6400,78 @@ impl<'db> IntersectionType<'db> {
             Type::Intersection(self),
             successful_bindings,
         ))
+    }
+}
+
+impl<'db> UnionType<'db> {
+    // Performs a lookup for the dunder on each union member separately, then
+    // aggregates the results.
+    //
+    // This alternative to aggregating the dunder lookups with
+    // `UnionType.map_with_boundness_and_qualifiers` preserves the information
+    // necessary to emit more precise diagnostics for "possibly unbound" errors.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let elements = self.elements(db);
+        let mut builder = UnionBuilder::new(db);
+        let mut unbound_on: Vec<Type<'db>> = Vec::new();
+        let mut any_defined = false;
+        let mut possibly_undefined = false;
+
+        for element in elements {
+            match element
+                .member_lookup_with_policy(
+                    db,
+                    name.into(),
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                    possibly_undefined = true;
+                }
+                Place::Defined(DefinedPlace { ty, .. }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                }
+                Place::Undefined => {
+                    unbound_on.push(*element);
+                    possibly_undefined = true;
+                }
+            }
+        }
+
+        if !any_defined {
+            return Err(CallDunderError::MethodNotAvailable);
+        }
+
+        let dunder_callable = builder.build();
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = dunder_callable
+            .bindings(db)
+            .match_parameters(db, argument_types)
+            .check_types(db, &constraints, argument_types, tcx, &[])?;
+
+        if possibly_undefined {
+            return Err(CallDunderError::PossiblyUnbound {
+                bindings: Box::new(bindings),
+                unbound_on: (!unbound_on.is_empty()).then(|| unbound_on.into_boxed_slice()),
+            });
+        }
+
+        Ok(bindings)
     }
 }
 

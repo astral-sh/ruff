@@ -173,7 +173,6 @@ pub(super) enum CallDunderError<'db> {
         // Describes the places where the dunder was indeed defined.
         bindings: Box<Bindings<'db>>,
 
-        #[expect(unused)]
         // Lists the types on which the dunder was undefined (e.g., the specific
         // members of a union on which the dunder was missing). `None` means
         // that the call path does not track where the dunder may be unbound.
