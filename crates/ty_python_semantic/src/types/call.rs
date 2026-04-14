@@ -169,7 +169,16 @@ pub(super) enum CallDunderError<'db> {
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Box<Bindings<'db>>),
+    PossiblyUnbound {
+        // Describes the places where the dunder was indeed defined.
+        bindings: Box<Bindings<'db>>,
+
+        #[expect(unused)]
+        // Lists the types on which the dunder was undefined (e.g., the specific
+        // members of a union on which the dunder was missing). `None` means
+        // that the call path does not track where the dunder may be unbound.
+        unbound_on: Option<Box<[Type<'db>]>>,
+    },
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
@@ -180,7 +189,7 @@ impl<'db> CallDunderError<'db> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
             Self::CallError(_, bindings) => Some(bindings.return_type(db)),
-            Self::PossiblyUnbound(bindings) => Some(bindings.return_type(db)),
+            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
         }
     }
 
@@ -209,7 +218,7 @@ impl From<CallDunderError<'_>> for CallBinOpError {
     fn from(value: CallDunderError<'_>) -> Self {
         match value {
             CallDunderError::CallError(_, _) => Self::CallError,
-            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_) => {
+            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
                 CallBinOpError::NotSupported
             }
         }
