@@ -835,7 +835,7 @@ error[invalid-assignment]: Object of type `list[str]` is not assignable to `Iter
 info: type `list[str]` is not compatible with protocol `Iterable[bytes]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── incompatible return types `Iterator[str]` and `Iterator[bytes]`
-info:         └── type `Iterator[str]` is not compatible with protocol `Iterator[bytes]`
+info:         └── protocol `Iterator[str]` is not compatible with protocol `Iterator[bytes]`
 info:             └── incompatible return types `str` and `bytes`
 ```
 

@@ -154,11 +154,21 @@ impl<'db> ErrorContext<'db> {
                     target = target.display(db)
                 )
             }
-            Self::TypeNotCompatibleWithProtocol { ty, protocol } => format!(
-                "type `{}` is not compatible with protocol `{}`",
-                ty.display(db),
-                protocol.display(db),
-            ),
+            Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
+                if let Type::ProtocolInstance(_) = ty {
+                    format!(
+                        "protocol `{}` is not compatible with protocol `{}`",
+                        ty.display(db),
+                        protocol.display(db),
+                    )
+                } else {
+                    format!(
+                        "type `{}` is not compatible with protocol `{}`",
+                        ty.display(db),
+                        protocol.display(db),
+                    )
+                }
+            }
             Self::ProtocolMemberNotDefined { member_name, ty } => format!(
                 "protocol member `{member_name}` is not defined on type `{}`",
                 ty.display(db),
