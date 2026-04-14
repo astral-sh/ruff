@@ -4745,6 +4745,7 @@ dependencies = [
  "camino",
  "colored 3.1.1",
  "dunce",
+ "indexmap",
  "insta",
  "memchr",
  "path-slash",

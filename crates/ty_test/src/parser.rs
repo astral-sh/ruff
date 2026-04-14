@@ -1,13 +1,13 @@
 use std::{
     borrow::Cow,
-    collections::hash_map::Entry,
     fmt::{Formatter, LowerHex, Write},
     hash::Hash,
 };
 
 use anyhow::bail;
+use indexmap::{IndexMap, map::Entry};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::config::MarkdownTestConfig;
 use ruff_index::{IndexVec, newtype_index};
@@ -496,7 +496,7 @@ struct Parser<'s> {
     stack: SectionStack,
 
     /// Names of embedded files in current active section.
-    current_section_files: FxHashMap<EmbeddedFilePath<'s>, EmbeddedFileId>,
+    current_section_files: IndexMap<EmbeddedFilePath<'s>, EmbeddedFileId, FxBuildHasher>,
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
@@ -524,7 +524,7 @@ impl<'s> Parser<'s> {
             preceding_blank_lines: 0,
             explicit_path: None,
             stack: SectionStack::new(root_section_id),
-            current_section_files: FxHashMap::default(),
+            current_section_files: IndexMap::default(),
             current_section_has_config: false,
             file_has_dependencies: false,
         }
@@ -933,13 +933,15 @@ impl<'s> Parser<'s> {
         code: &'s str,
         offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
-        let Some(file) = self.files.last_mut() else {
+        let Some((_, current_file)) = self.current_section_files.last() else {
             let backtick_start = line_number(offsets.start(), self.source);
 
             bail!(
-                "`snapshot` code block on line {backtick_start} must follow a Python code block in the same section."
+                "`snapshot` code block on line {backtick_start} must follow a Python code block, but section has no files."
             );
         };
+
+        let file = &mut self.files[*current_file];
 
         if !file.is_checkable() {
             let backtick_start = line_number(offsets.start(), self.source);

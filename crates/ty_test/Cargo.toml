@@ -31,6 +31,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 dunce = { workspace = true }
+indexmap = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 path-slash = { workspace = true }

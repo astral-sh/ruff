@@ -234,7 +234,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
 }
 
 impl<'a> UnparsedAssertion<'a> {
-    /// Returns `Some(_)` if the comment starts with `# error:`, `snapshot`, or `# revealed:`,
+    /// Returns `Some(_)` if the comment starts with `# error`, `# snapshot`, or `# revealed`,
     /// indicating that it is a assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         let comment = comment.trim().strip_prefix('#')?.trim();
@@ -247,7 +247,7 @@ impl<'a> UnparsedAssertion<'a> {
             comment
         };
 
-        let (keyword, body) = comment.split_once(':')?;
+        let (keyword, body) = comment.split_once(':').unwrap_or((comment, ""));
 
         let keyword = keyword.trim();
         let body = body.trim();

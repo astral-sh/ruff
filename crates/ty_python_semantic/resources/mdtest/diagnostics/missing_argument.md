@@ -20,7 +20,7 @@ class Foo:
 ```py
 from module import f, g, Foo
 
-f()  # snapshot: missing-argument
+f()  # snapshot
 
 def coinflip() -> bool:
     return True
@@ -40,7 +40,7 @@ error[missing-argument]: No argument provided for required parameter `a` of func
   |
 1 | from module import f, g, Foo
 2 |
-3 | f()  # snapshot: missing-argument
+3 | f()  # snapshot
   | ^^^
 4 |
 5 | def coinflip() -> bool:

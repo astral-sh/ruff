@@ -859,7 +859,7 @@ fn validate_inline_snapshot(
                     failures.push(
                         failure_line,
                         vec![Failure::new(
-                            "This code block has a `snapshot` code block but no `# snapshot:` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
+                            "This code block has a `snapshot` code block but no `# snapshot` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
                         )],
                     );
                 }
@@ -883,7 +883,7 @@ fn validate_inline_snapshot(
                 failures.push(
                     line,
                     vec![Failure::new(format!(
-                        "Add a `snapshot` block for this `# snapshot:` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}` to insert one automatically",
+                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}` to insert one automatically",
                     ))],
                 );
             }

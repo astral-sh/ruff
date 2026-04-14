@@ -149,7 +149,7 @@ Add `# snapshot: <code?>` to the lines you want to snapshot, then add a fenced
 ````markdown
 ```py
 x: int = "a"  # snapshot: [invalid-assignment]
-y: int = "b"  # snapshot:
+y: int = "b"  # snapshot
 
 reveal_type(x)  # snapshot: revealed-type
 ```
