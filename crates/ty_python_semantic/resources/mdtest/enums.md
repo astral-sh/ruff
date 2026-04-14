@@ -61,9 +61,9 @@ class Planet(Enum):
     MERCURY = (1, 3.303e23, 2.4397e6)
     VENUS = (2, 4.869e24, 6.0518e6)
 
-# TODO: this raises `ValueError` at runtime. For enums with multi-argument member definitions,
-# lookup still follows `EnumMeta.__call__` / `Enum.__new__` semantics rather than the apparent
-# `.value` shape implied by `__init__`.
+# TODO: `Planet(1)` raises `ValueError` at runtime. `EnumType.__call__` accepts positional
+# arguments only, then forwards them to the enum's `__new__` / `__init__`, so multi-argument
+# enum members still require the full positional member payload (for example `Planet(1, ...)`).
 reveal_type(Planet(1))  # revealed: Planet
 reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
 
@@ -2494,6 +2494,59 @@ class MyEnumBase(Enum):
 # error: [invalid-generic-enum] "Enum class `MyEnum` cannot be generic"
 class MyEnum[T](MyEnumBase):
     A = 1
+```
+
+## Constructor signature
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+The constructor of an enum takes a single `value` argument and returns the enum member corresponding
+to that value:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+# revealed: (value: object) -> Color
+reveal_type(into_regular_callable(Color))
+
+class Priority(IntEnum):
+    HIGH = 1
+    LOW = 2
+
+# revealed: (value: int) -> Priority
+reveal_type(into_regular_callable(Priority))
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+# revealed: (value: str) -> Answer
+reveal_type(into_regular_callable(Answer))
+```
+
+The signature of `Enum`, `IntEnum`, and `StrEnum` is defined by `EnumMeta.__call__`, which allows
+dynamic construction of enums using the functional syntax:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(Enum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(IntEnum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(StrEnum))
 ```
 
 ## References

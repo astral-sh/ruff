@@ -4,13 +4,13 @@ use colored::Colorize;
 pub use mdtest::OutputFormat;
 use mdtest::config::{Log, MarkdownTestConfig, SystemKind};
 use mdtest::db::{self, Db};
+use mdtest::matcher::Failure;
 use mdtest::parser::EmbeddedFileSourceMap;
 use mdtest::{Failures, FileFailures, TestFile, matcher, parser as test_parser};
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
+use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -22,14 +22,20 @@ use ty_module_resolver::{
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
+use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod external_dependencies;
 
-use ty_static::EnvVars;
+/// Filter which tests to run in mdtest.
+///
+/// Only tests whose names contain this filter string will be executed.
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+
+/// If set to a value other than "0", runs tests that include external dependencies.
+const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -47,8 +53,9 @@ pub fn run(
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = Db::setup();
+    let mut markdown_edits = vec![];
 
-    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     let mut assertion = String::new();
     for test in suite.tests() {
@@ -71,7 +78,11 @@ pub fn run(
             snapshot_path,
             &test,
         );
-        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+
+        let inconsistencies = if result
+            .as_ref()
+            .is_ok_and(|(outcome, _)| outcome.has_been_skipped())
+        {
             Ok(())
         } else {
             run_module_resolution_consistency_test(&db)
@@ -84,40 +95,45 @@ pub fn run(
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = result {
-            let md_index = LineIndex::from_source_text(source);
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
 
-            for test_failures in failures {
-                let source_map =
-                    EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
-                for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let file = relative_fixture_path.as_str();
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
 
-                    let absolute_line_number =
-                        match source_map.to_absolute_line_number(relative_line_number) {
-                            Ok(line_number) => line_number,
-                            Err(last_line_number) => {
-                                output_format.write_error(
-                                    &mut assertion,
-                                    file,
-                                    last_line_number,
-                                    "Found a trailing assertion comment \
-                                        (e.g., `# revealed:` or `# error:`) \
-                                        not followed by any statement.",
-                                );
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
+                                        ),
+                                    );
 
-                                continue;
-                            }
-                        };
+                                    continue;
+                                }
+                            };
 
-                    for failure in failures {
-                        output_format.write_error(
-                            &mut assertion,
-                            file,
-                            absolute_line_number,
-                            failure,
-                        );
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
                     }
                 }
             }
@@ -138,18 +154,20 @@ pub fn run(
             let _ = writeln!(
                 assertion,
                 "\nTo rerun this specific test, \
-                set the environment variable: {}='{escaped_test_name}'",
-                EnvVars::MDTEST_TEST_FILTER,
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             let _ = writeln!(
                 assertion,
-                "{}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic \
                 --test mdtest -- {test_name}",
-                EnvVars::MDTEST_TEST_FILTER,
             );
 
             let _ = writeln!(assertion, "\n{}", "-".repeat(50));
         }
+    }
+
+    if !markdown_edits.is_empty() {
+        mdtest::try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
     }
 
     assert!(!any_failures, "{}", &assertion);
@@ -170,12 +188,12 @@ impl TestOutcome {
 }
 
 fn run_test(
-    db: &mut Db,
+    db: &mut db::Db,
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &test_parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
-) -> Result<TestOutcome, Failures> {
+) -> Result<(TestOutcome, Vec<mdtest::MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -209,8 +227,8 @@ fn run_test(
     // Setup virtual environment with dependencies if specified
     let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
     if let Some(dependencies) = test.configuration().dependencies() {
-        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
-            return Ok(TestOutcome::Skipped);
+        if !std::env::var(MDTEST_EXTERNAL).is_ok_and(|v| v == "1") {
+            return Ok((TestOutcome::Skipped, vec![]));
         }
 
         let python_platform = test.configuration().python_platform().expect(
@@ -303,7 +321,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                backtick_offsets: embedded.backtick_offsets.clone(),
+                code_blocks: embedded.python_code_blocks.clone(),
             })
         })
         .collect();
@@ -397,29 +415,17 @@ fn run_test(
     // all diagnostics. Otherwise it remains empty.
     let mut snapshot_diagnostics = vec![];
 
+    // Edits for updating changed inline snapshots.
+    let mut markdown_edits = vec![];
+
     let mut any_pull_types_failures = false;
     let mut panic_info = None;
 
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file).load(db);
-
-            let mut diagnostics: Vec<Diagnostic> = parsed
-                .errors()
-                .iter()
-                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
-                .collect();
-
-            diagnostics.extend(
-                parsed
-                    .unsupported_syntax_errors()
-                    .iter()
-                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
-            );
-
-            let mdtest_result = attempt_test(db, check_types, test_file);
-            let type_diagnostics = match mdtest_result {
+            let mdtest_result = attempt_test(db, ty_python_semantic::Db::check_file, test_file);
+            let diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
                     if test.should_expect_panic().is_ok() {
@@ -431,16 +437,20 @@ fn run_test(
                 }
             };
 
-            diagnostics.extend(type_diagnostics);
-            diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(db)
-                    .cmp(&right.rendering_sort_key(db))
-            });
-
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
+                |inline_diagnostics| {
+                    mdtest::validate_inline_snapshot(
+                        db,
+                        "ty",
+                        test_file,
+                        &inline_diagnostics,
+                        &mut markdown_edits,
+                    )
+                },
+            ) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.backtick_offsets.clone(),
+                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
                     by_line: line_failures,
                 }),
             };
@@ -513,14 +523,13 @@ fn run_test(
         let mut by_line = matcher::FailuresByLine::default();
         by_line.push(
             OneIndexed::from_zero_indexed(0),
-            vec![
+            vec![Failure::new(
                 "Remove the `<!-- pull-types:skip -->` directive from this test: pulling types \
-                 succeeded for all files in the test."
-                    .to_string(),
-            ],
+                 succeeded for all files in the test.",
+            )],
         );
         let failure = FileFailures {
-            backtick_offsets: test_files[0].backtick_offsets.clone(),
+            backtick_offsets: test_files[0].to_code_block_backtick_offsets(),
             by_line,
         };
         failures.push(failure);
@@ -552,7 +561,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(TestOutcome::Success)
+        Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
     }
@@ -655,7 +664,7 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
 fn attempt_test<'db, 'a, T, F>(
     db: &'db Db,
     test_fn: F,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 ) -> Result<T, AttemptTestError<'a>>
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
@@ -666,7 +675,7 @@ where
 
 struct AttemptTestError<'a> {
     info: PanicError,
-    test_file: &'a TestFile,
+    test_file: &'a TestFile<'a>,
 }
 
 impl AttemptTestError<'_> {
@@ -681,34 +690,34 @@ impl AttemptTestError<'_> {
         let mut by_line = matcher::FailuresByLine::default();
         let mut messages = vec![];
         match info.location {
-            Some(location) => messages.push(format!(
+            Some(location) => messages.push(Failure::new(format_args!(
                 "Attempting to {action} caused a panic at {location}"
-            )),
-            None => messages.push(format!(
+            ))),
+            None => messages.push(Failure::new(format_args!(
                 "Attempting to {action} caused a panic at an unknown location",
-            )),
+            ))),
         }
         if let Some(clarification) = clarification {
-            messages.push(clarification.to_string());
+            messages.push(Failure::new(clarification));
         }
-        messages.push(String::new());
+        messages.push(Failure::new(""));
         match info.payload.as_str() {
-            Some(message) => messages.push(message.to_string()),
+            Some(message) => messages.push(Failure::new(message)),
             // Mimic the default panic hook's rendering of the panic payload if it's
             // not a string.
-            None => messages.push("Box<dyn Any>".to_string()),
+            None => messages.push(Failure::new("Box<dyn Any>")),
         }
-        messages.push(String::new());
+        messages.push(Failure::new(""));
 
         if let Some(backtrace) = info.backtrace {
             match backtrace.status() {
                 BacktraceStatus::Disabled => {
-                    let msg =
-                        "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
-                    messages.push(msg.to_string());
+                    let msg = "run with `RUST_BACKTRACE=1` environment variable to \
+                         a backtrace";
+                    messages.push(Failure::new(msg));
                 }
                 BacktraceStatus::Captured => {
-                    messages.extend(backtrace.to_string().split('\n').map(String::from));
+                    messages.extend(backtrace.to_string().split('\n').map(Failure::new));
                 }
                 _ => {}
             }
@@ -716,14 +725,14 @@ impl AttemptTestError<'_> {
 
         if let Some(backtrace) = info.salsa_backtrace {
             salsa::attach(db, || {
-                messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
+                messages.extend(format!("{backtrace:#}").split('\n').map(Failure::new));
             });
         }
 
         by_line.push(OneIndexed::from_zero_indexed(0), messages);
 
         FileFailures {
-            backtick_offsets: self.test_file.backtick_offsets.clone(),
+            backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
             by_line,
         }
     }

@@ -1,11 +1,18 @@
 use camino::Utf8Path;
 use colored::Colorize;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
+use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
+use ruff_text_size::{Ranged, TextRange};
+use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Write};
 
+use matcher::Failure;
 use parser::BacktickOffsets;
+
+/// If set to a value other than "0", updates the content of inline snapshots.
+const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
 mod assertion;
 pub mod config;
@@ -44,18 +51,25 @@ impl OutputFormat {
         assertion_buf: &mut String,
         file: &str,
         line: OneIndexed,
-        failure: impl Display,
+        failure: &Failure,
     ) {
         match self {
             OutputFormat::Cli => {
                 let _ = writeln!(
                     assertion_buf,
-                    "  {file_line} {failure}",
-                    file_line = format!("{file}:{line}").cyan()
+                    "  {file_line} {message}",
+                    file_line = format!("{file}:{line}").cyan(),
+                    message = failure.message()
                 );
+                if let Some((expected, actual)) = failure.diff() {
+                    let _ = render_diff(assertion_buf, actual, expected);
+                }
             }
             OutputFormat::GitHub => {
-                println!("::error file={file},line={line}::{failure}");
+                println!(
+                    "::error file={file},line={line}::{message}",
+                    message = failure.message()
+                );
             }
         }
     }
@@ -95,11 +109,20 @@ pub struct FileFailures {
 }
 
 /// File in a test.
-pub struct TestFile {
+pub struct TestFile<'a> {
     pub file: ruff_db::files::File,
 
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    pub backtick_offsets: Vec<BacktickOffsets>,
+    /// Information about the checkable code block(s) that compose this file.
+    pub code_blocks: Vec<parser::CodeBlock<'a>>,
+}
+
+impl TestFile<'_> {
+    pub fn to_code_block_backtick_offsets(&self) -> Vec<BacktickOffsets> {
+        self.code_blocks
+            .iter()
+            .map(parser::CodeBlock::backtick_offsets)
+            .collect()
+    }
 }
 
 pub fn create_diagnostic_snapshot<C>(
@@ -109,11 +132,6 @@ pub fn create_diagnostic_snapshot<C>(
     test: &parser::MarkdownTest<'_, '_, C>,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::new(tool_name)
-        .color(false)
-        .show_fix_diff(true)
-        .with_fix_applicability(Applicability::DisplayOnly);
-
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
@@ -150,8 +168,226 @@ pub fn create_diagnostic_snapshot<C>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(resolver, &display_config)).unwrap();
+        write!(
+            snapshot,
+            "{}",
+            render_diagnostic(resolver, tool_name, &diag)
+        )
+        .unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
+}
+
+#[derive(Debug, Clone)]
+pub struct MarkdownEdit {
+    pub range: TextRange,
+    pub replacement: String,
+}
+
+pub fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
+    DisplayDiagnosticConfig::new(tool_name)
+        .color(false)
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly)
+}
+
+pub fn render_diagnostic(
+    resolver: &dyn FileResolver,
+    tool_name: &'static str,
+    diagnostic: &Diagnostic,
+) -> String {
+    diagnostic
+        .display(resolver, &diagnostic_display_config(tool_name))
+        .to_string()
+}
+
+pub fn render_diagnostics(
+    resolver: &dyn FileResolver,
+    tool_name: &'static str,
+    diagnostics: &[Diagnostic],
+) -> String {
+    let mut rendered = String::new();
+    for diag in diagnostics {
+        writeln!(rendered, "{}", render_diagnostic(resolver, tool_name, diag)).unwrap();
+    }
+
+    rendered.trim_end_matches('\n').to_string()
+}
+
+pub fn is_update_inline_snapshots_enabled() -> bool {
+    let is_enabled: std::sync::LazyLock<_> = std::sync::LazyLock::new(|| {
+        std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some_and(|v| v != "0")
+    });
+    *is_enabled
+}
+
+pub fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
+    static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
+
+    INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
+}
+
+pub fn validate_inline_snapshot(
+    db: &dyn ruff_db::Db,
+    tool_name: &'static str,
+    test_file: &TestFile<'_>,
+    inline_diagnostics: &[Diagnostic],
+    markdown_edits: &mut Vec<MarkdownEdit>,
+) -> Result<(), matcher::FailuresByLine> {
+    let update_snapshots = is_update_inline_snapshots_enabled();
+    let line_index = line_index(db, test_file.file);
+    let mut failures = matcher::FailuresByLine::default();
+    let mut inline_diagnostics = inline_diagnostics;
+
+    // Group the inline diagnostics by code block. We do this by using the code blocks
+    // start offsets. All diagnostics between the current's and next code blocks offset belong to the current code block.
+    for (index, code_block) in test_file.code_blocks.iter().enumerate() {
+        let next_block_start_offset = test_file
+            .code_blocks
+            .get(index + 1)
+            .map_or(ruff_text_size::TextSize::new(u32::MAX), |next_code_block| {
+                next_code_block.embedded_start_offset()
+            });
+
+        // Find the offset of the first diagnostic that belongs to the next code block.
+        let diagnostics_end = inline_diagnostics
+            .iter()
+            .position(|diagnostic| {
+                diagnostic
+                    .primary_span()
+                    .and_then(|span| span.range())
+                    .map(TextRange::start)
+                    .is_some_and(|offset| offset >= next_block_start_offset)
+            })
+            .unwrap_or(inline_diagnostics.len());
+
+        let (block_diagnostics, remaining_diagnostics) =
+            inline_diagnostics.split_at(diagnostics_end);
+        inline_diagnostics = remaining_diagnostics;
+
+        let failure_line = line_index.line_index(code_block.embedded_start_offset());
+
+        let Some(first_diagnostic) = block_diagnostics.first() else {
+            // If there are no inline diagnostics (no usages of `# snapshot`) but the code block has a
+            // diagnostics section, mark it as unnecessary or remove it.
+            if let Some(snapshot_code_block) = code_block.inline_snapshot_block() {
+                if update_snapshots {
+                    markdown_edits.push(MarkdownEdit {
+                        range: Ranged::range(snapshot_code_block),
+                        replacement: String::new(),
+                    });
+                } else {
+                    failures.push(
+                        failure_line,
+                        vec![Failure::new(
+                            "This code block has a `snapshot` code block but no `# snapshot` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
+                        )],
+                    );
+                }
+            }
+
+            continue;
+        };
+
+        let actual = apply_snapshot_filters(&render_diagnostics(&db, tool_name, block_diagnostics))
+            .into_owned();
+
+        let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
+            if update_snapshots {
+                markdown_edits.push(MarkdownEdit {
+                    range: TextRange::empty(code_block.backtick_offsets().end()),
+                    replacement: format!("\n\n```snapshot\n{actual}\n```"),
+                });
+            } else {
+                let first_range = first_diagnostic.primary_span().unwrap().range().unwrap();
+                let line = line_index.line_index(first_range.start());
+                failures.push(
+                    line,
+                    vec![Failure::new(format!(
+                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
+                    ))],
+                );
+            }
+            continue;
+        };
+
+        if snapshot_code_block.expected == actual {
+            continue;
+        }
+
+        if update_snapshots {
+            markdown_edits.push(MarkdownEdit {
+                range: Ranged::range(snapshot_code_block),
+                replacement: format!("```snapshot\n{actual}\n```"),
+            });
+        } else {
+            failures.push(
+                failure_line,
+                vec![Failure::new(format_args!(
+                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
+                    )).with_diff(snapshot_code_block.expected.to_string(), actual)],
+                );
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures)
+    }
+}
+
+pub fn try_apply_markdown_edits(
+    absolute_fixture_path: &Utf8Path,
+    source: &str,
+    mut edits: Vec<MarkdownEdit>,
+) {
+    edits.sort_unstable_by_key(|edit| edit.range.start());
+
+    let mut updated = source.to_string();
+    for edit in edits.into_iter().rev() {
+        updated.replace_range(
+            edit.range.start().to_usize()..edit.range.end().to_usize(),
+            &edit.replacement,
+        );
+    }
+
+    if let Err(err) = std::fs::write(absolute_fixture_path, updated) {
+        tracing::error!("Failed to write updated inline snapshots in: {err}");
+    }
+}
+
+pub fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std::fmt::Result {
+    let diff = TextDiff::from_lines(expected, actual);
+
+    writeln!(f, "{}", "--- expected".red())?;
+    writeln!(f, "{}", "+++ actual".green())?;
+
+    let mut unified = diff.unified_diff();
+    let unified = unified.header("expected", "actual");
+
+    for hunk in unified.iter_hunks() {
+        writeln!(f, "{}", hunk.header())?;
+
+        for change in hunk.iter_changes() {
+            let value = change.value();
+            match change.tag() {
+                ChangeTag::Equal => write!(f, " {value}")?,
+                ChangeTag::Delete => {
+                    write!(f, "{}{}", "-".red(), value.red())?;
+                }
+                ChangeTag::Insert => {
+                    write!(f, "{}{}", "+".green(), value.green()).unwrap();
+                }
+            }
+
+            if !diff.newline_terminated() || change.missing_newline() {
+                writeln!(f)?;
+            }
+        }
+    }
+
+    Ok(())
 }

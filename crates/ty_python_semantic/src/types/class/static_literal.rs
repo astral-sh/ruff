@@ -785,6 +785,27 @@ impl<'db> StaticClassLiteral<'db> {
             || transformer_params.is_some_and(|params| params.flags(db).contains(param))
     }
 
+    /// Returns the nearest `@dataclass_transform` parameters for this class or its MRO.
+    ///
+    /// This is used for metaclass-based transforms because `__dataclass_transform__` is inherited,
+    /// so a metaclass subclass should preserve the transform metadata of its decorated base class
+    /// unless it provides its own.
+    fn inherited_dataclass_transformer_params(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<DataclassTransformerParams<'db>> {
+        self.dataclass_transformer_params(db).or_else(|| {
+            self.iter_mro(db, specialization).skip(1).find_map(|base| {
+                base.into_class().and_then(|class| {
+                    class
+                        .static_class_literal(db)
+                        .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+                })
+            })
+        })
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -945,7 +966,9 @@ impl<'db> StaticClassLiteral<'db> {
         let transform_info = candidate
             .metaclass
             .static_class_literal(db)
-            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db))
+            .and_then(|(metaclass_literal, specialization)| {
+                metaclass_literal.inherited_dataclass_transformer_params(db, specialization)
+            })
             .map(|params| MetaclassTransformInfo {
                 params,
                 from_explicit_metaclass: candidate.explicit_metaclass_of == self,

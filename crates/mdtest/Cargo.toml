@@ -30,6 +30,7 @@ ty_python_core = { workspace = true }
 anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
+indexmap = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 path-slash = { workspace = true }
@@ -38,6 +39,7 @@ rustc-hash = { workspace = true }
 rustc-stable-hash = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }
+similar = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

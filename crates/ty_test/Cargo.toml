@@ -21,7 +21,6 @@ ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
-ty_static = { workspace = true }
 ty_python_core = { workspace = true }
 
 anyhow = { workspace = true }

@@ -2042,6 +2042,7 @@ dependencies = [
  "anyhow",
  "camino",
  "colored 3.1.1",
+ "indexmap",
  "insta",
  "memchr",
  "path-slash",
@@ -2058,6 +2059,7 @@ dependencies = [
  "rustc-stable-hash",
  "salsa",
  "serde",
+ "similar 3.1.0",
  "smallvec",
  "tempfile",
  "thiserror 2.0.18",
@@ -2697,7 +2699,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95c589f335db0f6aaa168a7cd27b1fc6920f5e1470c804f814d9cd6e62a0f70b"
 dependencies = [
- "rand 0.10.0",
+ "rand 0.10.1",
 ]
 
 [[package]]
@@ -2773,9 +2775,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc266eb313df6c5c09c1c7b1fbe2510961e5bcd3add930c1e31f7ed9da0feff8"
+checksum = "d2e8e8bcc7961af1fdac401278c6a831614941f6164ee3bf4ce61b7edb162207"
 dependencies = [
  "chacha20",
  "getrandom 0.4.2",
@@ -3280,7 +3282,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
- "rand 0.10.0",
+ "rand 0.10.1",
  "ruff_diagnostics",
  "ruff_source_file",
  "ruff_text_size",
@@ -4067,7 +4069,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.0",
@@ -4596,13 +4598,11 @@ dependencies = [
  "regex-automata",
  "ruff_cache",
  "ruff_db",
- "ruff_diagnostics",
  "ruff_macros",
  "ruff_memory_usage",
  "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
- "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "salsa",
@@ -4702,7 +4702,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_python_core",
  "ty_site_packages",
- "ty_static",
  "ty_test",
  "ty_vendored",
 ]
@@ -4792,7 +4791,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_python_core",
  "ty_python_semantic",
- "ty_static",
 ]
 
 [[package]]
@@ -4973,7 +4971,7 @@ checksum = "5ac8b6f42ead25368cf5b098aeb3dc8a1a2c05a3eee8a9a1a68c640edbfc79d9"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
- "rand 0.10.0",
+ "rand 0.10.1",
  "wasm-bindgen",
 ]
 
