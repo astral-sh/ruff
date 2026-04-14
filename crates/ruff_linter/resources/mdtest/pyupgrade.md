@@ -5,6 +5,8 @@ target-version = "py312"
 lint.select = ["UP046"]
 ```
 
+## Basic tests
+
 ```py
 from typing import Any, AnyStr, Generic, ParamSpec, TypeVar, TypeVarTuple
 
@@ -448,4 +450,52 @@ error[UP046]: Generic class `TooManyGenerics` uses `Generic` subclass instead of
 100 |     var: S
     |
 help: Use type parameters
+```
+
+## `AnyStr`
+
+Replacing AnyStr requires specifying the constraints `bytes` and `str`, so
+it can't be replaced if these have been shadowed. This test is in a separate
+fixture because it doesn't seem possible to restore `str` to its builtin state
+
+```py
+from typing import AnyStr, Generic
+
+str = "string"
+
+
+class BadStr(Generic[AnyStr]):  # snapshot: non-pep695-generic-class
+    var: AnyStr
+```
+
+```snapshot
+error[UP046]: Generic class `BadStr` uses `Generic` subclass instead of type parameters
+ --> mdtest_snippet.py:6:14
+  |
+6 | class BadStr(Generic[AnyStr]):  # snapshot: non-pep695-generic-class
+  |              ^^^^^^^^^^^^^^^
+7 |     var: AnyStr
+  |
+help: Use type parameters
+```
+
+## `typing_extensions`
+
+This is placed in a separate fixture as `TypeVar` needs to be imported
+from `typing_extensions` to support default arguments in Python version < 3.13.
+We verify that UP046 doesn't apply in this case.
+
+```py
+from typing import Generic
+from typing_extensions import TypeVar
+
+T = TypeVar("T", default=str)
+
+
+class DefaultTypeVar(Generic[T]):
+    var: T
+
+
+class KeywordArguments(Generic[T], metaclass=type):
+    var: T
 ```
