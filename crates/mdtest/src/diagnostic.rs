@@ -3,7 +3,7 @@
 //! We don't assume that we will get the diagnostics in source order.
 
 use ruff_db::diagnostic::Diagnostic;
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::{OneIndexed, SourceCode};
 use std::ops::{Deref, Range};
 
 /// All diagnostics for one embedded Python file, sorted and grouped by start line number.
@@ -20,7 +20,7 @@ pub(crate) struct SortedDiagnostics<'a> {
 impl<'a> SortedDiagnostics<'a> {
     pub(crate) fn new(
         diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
-        line_index: &LineIndex,
+        source_code: &SourceCode<'_, '_>,
     ) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
@@ -29,7 +29,7 @@ impl<'a> SortedDiagnostics<'a> {
                     .primary_span()
                     .and_then(|span| span.range())
                     .map_or(OneIndexed::from_zero_indexed(0), |range| {
-                        line_index.line_index(range.start())
+                        source_code.line_index(range.start())
                     }),
                 diagnostic,
             })
@@ -140,9 +140,10 @@ struct DiagnosticWithLine<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, UnifiedFile,
+    };
     use ruff_db::files::system_path_to_file;
-    use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
@@ -154,7 +155,9 @@ mod tests {
         let mut db = TestDb::setup();
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let lines = line_index(&db, file);
+        let unified_file = UnifiedFile::Ty(file);
+        let diagnostic_source = unified_file.diagnostic_source(&db);
+        let source_code = diagnostic_source.as_source_code();
 
         let ranges = [
             TextRange::new(TextSize::new(0), TextSize::new(1)),
@@ -176,7 +179,7 @@ mod tests {
             })
             .collect();
 
-        let sorted = super::SortedDiagnostics::new(diagnostics.iter(), &lines);
+        let sorted = super::SortedDiagnostics::new(diagnostics.iter(), &source_code);
         let grouped = sorted.iter_lines().collect::<Vec<_>>();
 
         let [line1, line2] = &grouped[..] else {

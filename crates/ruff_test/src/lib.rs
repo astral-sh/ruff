@@ -10,6 +10,7 @@ use mdtest::matcher::{self, Failure};
 use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
+use ruff_db::diagnostic::UnifiedFile;
 use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
@@ -247,18 +248,22 @@ fn run_test(
                     .cmp(&right.rendering_sort_key(db))
             });
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
-                |inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        &resolver,
-                        "ruff",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                },
-            ) {
+            let failure = match matcher::match_file(
+                db,
+                &UnifiedFile::Ty(test_file.file),
+                parsed.tokens(),
+                &diagnostics,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    &resolver,
+                    "ruff",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),

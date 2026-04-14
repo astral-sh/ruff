@@ -13,7 +13,7 @@ pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
 };
 use crate::cancellation::CancellationToken;
-use crate::{Db, files::File};
+use crate::files::File;
 
 mod render;
 mod stylesheet;
@@ -1166,7 +1166,7 @@ impl UnifiedFile {
         path
     }
 
-    fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
+    pub fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
         match self {
             UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
             UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),
@@ -1184,14 +1184,14 @@ impl UnifiedFile {
 /// See [`UnifiedFile::diagnostic_source`] for a way to obtain a [`DiagnosticSource`] from a file
 /// and [`FileResolver`].
 #[derive(Clone, Debug)]
-enum DiagnosticSource {
+pub enum DiagnosticSource {
     Ty(Input),
     Ruff(SourceFile),
 }
 
 impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode<'_, '_> {
+    pub fn as_source_code(&self) -> SourceCode<'_, '_> {
         match self {
             DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
             DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),

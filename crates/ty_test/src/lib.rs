@@ -7,9 +7,10 @@ use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
-use ruff_db::diagnostic::DiagnosticId;
+use ruff_db::diagnostic::{DiagnosticId, UnifiedFile};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
+use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -434,18 +435,24 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
-                |inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                },
-            ) {
+            let parsed = parsed_module(db, test_file.file).load(db);
+
+            let failure = match matcher::match_file(
+                db,
+                &UnifiedFile::Ty(test_file.file),
+                parsed.tokens(),
+                &diagnostics,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
