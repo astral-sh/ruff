@@ -7052,7 +7052,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     form,
                     arguments,
                     func.as_ref().into(),
-                )
+                );
             })
             .is_some();
 

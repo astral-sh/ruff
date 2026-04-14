@@ -722,6 +722,20 @@ def _(target: MixedTarget, maybe_y: MaybeY, kwargs: Any, never_kwargs: Never, co
 
     # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
     MixedTarget({"x": 1}, **maybe_y)
+
+class TD(TypedDict):
+    a: int
+
+def _(td: TD):
+    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+    TD({"a": "foo"}, **{"a": 1})
+
+    TD({"a": "foo"}, a=1)
+    TD({"a": "foo"}, **td)
+
+def _(x: Any):
+    TD({"a": "foo"}, **x)
 ```
 
 ## Union of `TypedDict`

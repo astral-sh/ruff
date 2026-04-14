@@ -1004,6 +1004,9 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
                     field.is_required().then_some(key_name.clone())
                 }),
             );
+        // TODO: also extract guaranteed keys from unpacked dict literals like `**{"a": 1}`.
+        // Today we only suppress positional-key diagnostics for explicit keywords and unpacked
+        // TypedDicts, which makes those literal-unpack cases inconsistent with equivalent calls.
         } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type) {
             provided_keys.extend(
                 unpacked_keys
