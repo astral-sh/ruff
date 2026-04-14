@@ -34,7 +34,6 @@ error[call-non-callable]: `NotImplemented` is not callable
 3 |
 4 | def _():
   |
-info: rule `call-non-callable` is enabled by default
 
 ```
 
@@ -48,6 +47,5 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           |
   |           Did you mean `NotImplementedError`?
   |
-info: rule `call-non-callable` is enabled by default
 
 ```

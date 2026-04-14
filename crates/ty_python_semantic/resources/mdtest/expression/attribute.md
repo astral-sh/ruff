@@ -22,7 +22,7 @@ def _(flag: bool):
 
     reveal_type(A.always_bound)  # revealed: int
 
-    reveal_type(A.union)  # revealed: Unknown | Literal[1, "abc"]
+    reveal_type(A.union)  # revealed: int | str
 
     reveal_type(A.union_declared)  # revealed: int | str
 

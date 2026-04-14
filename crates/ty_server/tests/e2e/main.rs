@@ -1181,10 +1181,12 @@ impl TestServerBuilder {
         // These are enabled by default for convenience but can be disabled using the builder
         // methods:
         // - Supports pulling workspace configuration
+        // - Support for pull diagnostics
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
                 publish_diagnostics: Some(PublishDiagnosticsClientCapabilities::default()),
-                ..Default::default()
+                diagnostic: Some(DiagnosticClientCapabilities::default()),
+                ..TextDocumentClientCapabilities::default()
             }),
             workspace: Some(WorkspaceClientCapabilities {
                 configuration: Some(true),
@@ -1341,6 +1343,10 @@ impl TestServerBuilder {
         self.test_context.root().join(path)
     }
 
+    pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
+        Url::from_file_path(self.file_path(path).as_std_path()).expect("Path must be a valid URL")
+    }
+
     /// Write a file to the test directory
     pub(crate) fn with_file(
         self,
@@ -1423,7 +1429,6 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to url"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_url.path()), "<temp_dir>/");
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

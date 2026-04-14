@@ -3,15 +3,8 @@
 
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::{
-    FileScopeId,
-    definition::{Definition, DefinitionKind},
-    place_table,
-    scope::ScopeId,
-    semantic_index, use_def_map,
-};
 use crate::types::IntersectionType;
+use crate::types::infer::InferenceFlags;
 use crate::types::{
     CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
     generics::typing_self,
@@ -20,6 +13,14 @@ use crate::types::{
 use ruff_db::files::File;
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_python_core::{
+    FileScopeId,
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    place_table,
+    scope::ScopeId,
+    semantic_index, use_def_map,
+};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
@@ -648,6 +649,7 @@ impl SpecialFormType {
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
+        inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
@@ -726,8 +728,17 @@ impl SpecialFormType {
 
             Self::Protocol => Err(InvalidTypeExpression::Protocol),
             Self::Generic => Err(InvalidTypeExpression::Generic),
-            Self::Annotated => Err(InvalidTypeExpression::RequiresTwoArguments(self)),
-            Self::Concatenate => Err(InvalidTypeExpression::Concatenate),
+
+            // `Concatenate` is just always invalid in this context in a type expression
+            Self::Concatenate
+                if !inference_flags.contains(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT) =>
+            {
+                Err(InvalidTypeExpression::Concatenate)
+            }
+
+            Self::Concatenate | Self::Annotated => {
+                Err(InvalidTypeExpression::RequiresTwoArguments(self))
+            }
 
             Self::Optional
             | Self::Not

@@ -34,6 +34,5 @@ error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> boo
   |         |
   |         Declared type
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::notification::{DidOpenTextDocument, PublishDiagnostics};
+use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{
     DidOpenTextDocumentParams, InlayHintParams, Position, Range, TextDocumentIdentifier,
@@ -34,7 +34,6 @@ y = foo(1)
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
         .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))
@@ -138,7 +137,6 @@ fn variable_inlay_hints_disabled() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
         .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))
@@ -179,8 +177,6 @@ fn variable_inlay_hints_disabled_for_virtual_file() -> Result<()> {
             text: content.to_string(),
         },
     });
-
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
         .send_request_await::<InlayHintRequest>(InlayHintParams {
@@ -227,7 +223,6 @@ def get_a() -> A:
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
         .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))

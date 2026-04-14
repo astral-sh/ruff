@@ -45,6 +45,17 @@ reveal_type(bob["age"])  # revealed: int | None
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
+Functional `TypedDict`s with non-identifier keys should synthesize `__init__` without turning those
+keys into invalid named parameters:
+
+```py
+from typing import TypedDict
+
+Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+reveal_type(Config.__init__)
+```
+
 If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
@@ -408,6 +419,62 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+TypedDict constructor validation should not duplicate diagnostics emitted by argument inference:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+# error: [unresolved-reference] "Name `missing` used when not defined"
+TD(x=missing)
+```
+
+TypedDict constructor validation should respect string-valued constants used as keys in positional
+dict literals:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+
+Record({VALUE_KEY: "x"})
+```
+
+TypedDict constructor validation should combine positional dict literals with keyword arguments:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+    y: str
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+TD({"x": "foo"}, y="bar")
+```
+
+TypedDict constructor validation should preserve string-valued constant keys in mixed calls:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+    count: int
+
+Record({VALUE_KEY: "x"}, count=1)
+
+# error: [invalid-argument-type] "Invalid argument to key "value" with declared type `str` on TypedDict `Record`: value of type `Literal[1]`"
+Record({VALUE_KEY: 1}, count=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -687,6 +754,22 @@ def copy_person(p: PersonBase) -> PersonAlias:
 
 def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
+```
+
+Optional source keys should not satisfy required constructor keys when unpacking:
+
+```py
+from typing import TypedDict
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+class NeedsName(TypedDict):
+    name: str
+
+def f(maybe: MaybeName) -> NeedsName:
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
+    return NeedsName(**maybe)
 ```
 
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
@@ -2382,6 +2465,32 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+TypedDict constructor calls should also use field type context when inferring nested values:
+
+```py
+from typing import TypedDict
+
+class Comparison(TypedDict):
+    field: str
+    value: object
+
+class Logical(TypedDict):
+    primary: Comparison
+    conditions: list[Comparison]
+
+logical_from_literal = Logical(
+    primary=Comparison(field="a", value="b"),
+    conditions=[Comparison(field="c", value="d")],
+)
+logical_from_dict_call = Logical(dict(primary=dict(field="a", value="b"), conditions=[dict(field="c", value="d")]))
+
+# error: [missing-typed-dict-key]
+missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[dict(field="c", value="d")])
+
+# error: [missing-typed-dict-key]
+missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
+```
+
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
@@ -2739,14 +2848,15 @@ TypedDict()
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 TypedDict("Foo")
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+# error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
+reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:

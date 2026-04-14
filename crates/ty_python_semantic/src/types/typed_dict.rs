@@ -18,16 +18,16 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, TypeQualifiers,
+    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers,
     definition_expression_type, visitor,
 };
 use crate::Db;
-use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use ty_python_core::definition::Definition;
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -816,22 +816,37 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     !has_missing_key
 }
 
-/// Extracts `TypedDict` keys and their types from a type, resolving type aliases and handling
-/// intersections.
+#[derive(Debug, Clone, Copy)]
+struct UnpackedTypedDictKey<'db> {
+    value_ty: Type<'db>,
+    is_required: bool,
+}
+
+/// Extracts `TypedDict` keys, their value types, and whether they are required when unpacked as
+/// `**kwargs`, resolving type aliases and handling intersections.
 ///
-/// For intersections, returns ALL keys from ALL `TypedDict` types (union of keys), because a
-/// value of an intersection type must satisfy all `TypedDict`s and therefore has all their keys.
-/// For keys that appear in multiple `TypedDict`s, the types are intersected.
-fn extract_typed_dict_keys<'db>(
+/// For intersections, returns ALL declared keys from ALL `TypedDict` types (union of keys),
+/// because unpacking a value of an intersection type may expose any key declared by any
+/// constituent `TypedDict`. For keys that appear in multiple `TypedDict`s, the value types are
+/// intersected, and the key is considered required if any constituent `TypedDict` requires it.
+fn extract_unpacked_typed_dict_keys<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-) -> Option<BTreeMap<Name, Type<'db>>> {
+) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
     match ty {
         Type::TypedDict(td) => {
             let keys = td
                 .items(db)
                 .iter()
-                .map(|(name, field)| (name.clone(), field.declared_ty))
+                .map(|(name, field)| {
+                    (
+                        name.clone(),
+                        UnpackedTypedDictKey {
+                            value_ty: field.declared_ty,
+                            is_required: field.is_required(),
+                        },
+                    )
+                })
                 .collect();
             Some(keys)
         }
@@ -840,28 +855,29 @@ fn extract_typed_dict_keys<'db>(
             let all_key_maps: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| extract_typed_dict_keys(db, *element))
+                .filter_map(|element| extract_unpacked_typed_dict_keys(db, *element))
                 .collect();
 
             if all_key_maps.is_empty() {
                 return None;
             }
 
-            // Union all keys from all TypedDicts, intersecting types for shared keys
-            let mut result: BTreeMap<Name, Type<'db>> = BTreeMap::new();
+            // Union all keys from all TypedDicts, intersecting value types for shared keys.
+            let mut result: BTreeMap<Name, UnpackedTypedDictKey<'db>> = BTreeMap::new();
 
             for key_map in all_key_maps {
-                for (key, ty) in key_map {
+                for (key, unpacked_key) in key_map {
                     result
                         .entry(key)
-                        .and_modify(|existing_ty| {
-                            // Key exists in multiple TypedDicts - intersect the types
-                            *existing_ty = IntersectionBuilder::new(db)
-                                .add_positive(*existing_ty)
-                                .add_positive(ty)
-                                .build();
+                        .and_modify(|existing| {
+                            existing.value_ty = IntersectionType::from_two_elements(
+                                db,
+                                existing.value_ty,
+                                unpacked_key.value_ty,
+                            );
+                            existing.is_required |= unpacked_key.is_required;
                         })
-                        .or_insert(ty);
+                        .or_insert(unpacked_key);
                 }
             }
 
@@ -869,7 +885,7 @@ fn extract_typed_dict_keys<'db>(
         }
         // TODO: handle unions by checking all TypedDict elements separately
         Type::Union(_) => None,
-        Type::TypeAlias(alias) => extract_typed_dict_keys(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => extract_unpacked_typed_dict_keys(db, alias.value_type(db)),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -906,7 +922,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     error_node: AnyNodeRef<'ast>,
-    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+    mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -918,13 +934,24 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         arguments.args.len() == 1 && arguments.keywords.is_empty() && !has_positional_dict_literal;
 
     if has_positional_dict_literal {
-        let provided_keys = validate_from_dict_literal(
+        let mut provided_keys = validate_from_dict_literal(
             context,
             typed_dict,
             arguments,
             error_node,
-            &expression_type_fn,
+            &mut expression_type_fn,
         );
+
+        for key in validate_from_keywords(
+            context,
+            typed_dict,
+            arguments,
+            error_node,
+            &mut expression_type_fn,
+        ) {
+            provided_keys.insert(key);
+        }
+
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
     } else if is_single_positional_arg {
         // Single positional argument: check if assignable to the target TypedDict.
@@ -932,8 +959,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg);
         let target_ty = Type::TypedDict(typed_dict);
+        let arg_ty = expression_type_fn(arg, TypeContext::new(Some(target_ty)));
 
         if !arg_ty.is_assignable_to(db, target_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
@@ -950,7 +977,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             typed_dict,
             arguments,
             error_node,
-            &expression_type_fn,
+            &mut expression_type_fn,
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
     }
@@ -963,23 +990,26 @@ fn validate_from_dict_literal<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let mut provided_keys = OrderSet::new();
+    let items = typed_dict.items(context.db());
 
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
         for dict_item in &dict_expr.items {
             if let Some(ref key_expr) = dict_item.key
-                && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_value, ..
-                }) = key_expr
+                && let Some(key_value) =
+                    expression_type_fn(key_expr, TypeContext::default()).as_string_literal()
             {
-                let key = key_value.to_str();
+                let key = key_value.value(context.db());
                 provided_keys.insert(Name::new(key));
 
-                // Get the already-inferred argument type
-                let value_ty = expression_type_fn(&dict_item.value);
+                let value_tcx = items
+                    .get(key)
+                    .map(|field| TypeContext::new(Some(field.declared_ty)))
+                    .unwrap_or_default();
+                let value_ty = expression_type_fn(&dict_item.value, value_tcx);
                 TypedDictKeyAssignment {
                     context,
                     typed_dict,
@@ -1007,9 +1037,10 @@ fn validate_from_keywords<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
+    let items = typed_dict.items(db);
 
     // Collect keys from explicit keyword arguments
     let mut provided_keys: OrderSet<Name> = arguments
@@ -1022,7 +1053,11 @@ fn validate_from_keywords<'db, 'ast>(
     for keyword in &arguments.keywords {
         if let Some(arg_name) = &keyword.arg {
             // Explicit keyword argument: e.g., `name="Alice"`
-            let value_ty = expression_type_fn(&keyword.value);
+            let value_tcx = items
+                .get(arg_name.id.as_str())
+                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .unwrap_or_default();
+            let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
                 context,
                 typed_dict,
@@ -1041,7 +1076,7 @@ fn validate_from_keywords<'db, 'ast>(
             // Unlike positional TypedDict arguments, unpacking passes all keys as explicit
             // keyword arguments, so extra keys should be flagged as errors (consistent with
             // explicitly providing those keys).
-            let unpacked_type = expression_type_fn(&keyword.value);
+            let unpacked_type = expression_type_fn(&keyword.value, TypeContext::default());
 
             // Never and Dynamic types are special: they can have any keys, so we skip
             // validation and mark all required keys as provided.
@@ -1051,15 +1086,18 @@ fn validate_from_keywords<'db, 'ast>(
                         provided_keys.insert(key_name.clone());
                     }
                 }
-            } else if let Some(unpacked_keys) = extract_typed_dict_keys(db, unpacked_type) {
-                for (key_name, value_ty) in &unpacked_keys {
-                    provided_keys.insert(key_name.clone());
+            } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type)
+            {
+                for (key_name, unpacked_key) in &unpacked_keys {
+                    if unpacked_key.is_required {
+                        provided_keys.insert(key_name.clone());
+                    }
                     TypedDictKeyAssignment {
                         context,
                         typed_dict,
                         full_object_ty: None,
                         key: key_name.as_str(),
-                        value_ty: *value_ty,
+                        value_ty: unpacked_key.value_ty,
                         typed_dict_node,
                         key_node: keyword.into(),
                         value_node: (&keyword.value).into(),

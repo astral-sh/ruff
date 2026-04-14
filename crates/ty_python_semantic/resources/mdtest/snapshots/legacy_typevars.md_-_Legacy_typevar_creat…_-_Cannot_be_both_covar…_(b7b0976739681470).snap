@@ -29,6 +29,5 @@ error[invalid-legacy-type-variable]: A `TypeVar` cannot be both covariant and co
 4 | T = TypeVar("T", covariant=True, contravariant=True)
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

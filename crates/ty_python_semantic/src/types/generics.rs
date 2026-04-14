@@ -7,10 +7,6 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::node_key::NodeKey;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -32,9 +28,14 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::node_key::NodeKey;
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
+use ty_python_core::{SemanticIndex, semantic_index};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -45,7 +46,7 @@ pub(crate) fn enclosing_generic_contexts<'db>(
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, ancestor_scope)| ancestor_scope.node().generic_context(db, index))
+        .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
 }
 
 /// Binds an unbound typevar.
@@ -107,7 +108,7 @@ pub(crate) fn bind_typevar<'db>(
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
-            && let Some(generic_context) = ancestor_scope.node().generic_context(db, index)
+            && let Some(generic_context) = GenericContext::of_node(db, ancestor_scope.node(), index)
             && let Some(bound) = generic_context.binds_typevar(db, typevar)
         {
             return Some(bound);
@@ -319,6 +320,38 @@ impl<'db> GenericContext<'db> {
         });
 
         Self::from_typevar_instances(db, variables)
+    }
+
+    pub(crate) fn of_node(
+        db: &'db dyn Db,
+        node: &NodeWithScopeKind,
+        index: &SemanticIndex<'db>,
+    ) -> Option<Self> {
+        match node {
+            NodeWithScopeKind::Class(class) => {
+                let definition = index.expect_single_definition(class);
+                binding_type(db, definition)
+                    .as_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                let definition = index.expect_single_definition(function);
+                infer_definition_types(db, definition)
+                    .undecorated_type()
+                    .expect("function should have undecorated type")
+                    .as_function_literal()?
+                    .last_definition_signature(db)
+                    .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias);
+                binding_type(db, definition)
+                    .as_type_alias()?
+                    .as_pep_695_type_alias()?
+                    .generic_context(db)
+            }
+            _ => None,
+        }
     }
 
     /// Creates a generic context from a list of `BoundTypeVarInstance`s.
@@ -1230,7 +1263,11 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Invariant => {
                         let top_materialization =
                             vartype.materialize(db, MaterializationKind::Top, visitor);
-                        if !vartype.is_equivalent_to(db, top_materialization) {
+                        if !visitor.is_equivalent_to_materialization(
+                            db,
+                            *vartype,
+                            top_materialization,
+                        ) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype
@@ -1270,11 +1307,13 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
+            &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
     }
@@ -1455,10 +1494,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        let source_top = source_type.top_materialization(db);
-        let source_bottom = source_type.bottom_materialization(db);
-        let target_top = target_type.top_materialization(db);
-        let target_bottom = target_type.bottom_materialization(db);
+        let source_top =
+            source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let source_bottom = source_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
+        let target_top =
+            target_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        let target_bottom = target_type.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
 
         let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
             // TODO:

@@ -136,4 +136,60 @@ help: Replace with `dict.get`
 28 +         d.get("key")
 29 | ):
 30 |     ...
+31 |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:42:4
+   |
+41 | c = Formatter()
+42 | if f"{c}" in d and d[f"{c}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+43 |     pass
+   |
+help: Replace with `dict.get`
+39 |         return "key"
+40 |
+41 | c = Formatter()
+   - if f"{c}" in d and d[f"{c}"]:
+42 + if d.get(f"{c}"):
+43 |     pass
+44 |
+45 | # F-string with only literal interpolation — safe fix
+note: This is an unsafe fix and may change runtime behavior
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:46:4
+   |
+45 | # F-string with only literal interpolation — safe fix
+46 | if f"{1}" in d and d[f"{1}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |     pass
+   |
+help: Replace with `dict.get`
+43 |     pass
+44 |
+45 | # F-string with only literal interpolation — safe fix
+   - if f"{1}" in d and d[f"{1}"]:
+46 + if d.get(f"{1}"):
+47 |     pass
+48 |
+49 | # Plain f-string without interpolation — safe fix
+
+RUF019 [*] Unnecessary key check before dictionary access
+  --> RUF019.py:50:4
+   |
+49 | # Plain f-string without interpolation — safe fix
+50 | if f"key" in d and d[f"key"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+51 |     pass
+   |
+help: Replace with `dict.get`
+47 |     pass
+48 |
+49 | # Plain f-string without interpolation — safe fix
+   - if f"key" in d and d[f"key"]:
+50 + if d.get(f"key"):
+51 |     pass
+52 |
+53 | # Walrus operator is a side effect — should not emit

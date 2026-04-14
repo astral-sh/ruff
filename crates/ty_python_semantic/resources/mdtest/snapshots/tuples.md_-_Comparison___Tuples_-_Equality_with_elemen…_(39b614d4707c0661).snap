@@ -54,7 +54,6 @@ help:         if not isinstance(other, A):
 help:             return False
 help:         return <logic to compare two `A` instances>
 help
-info: rule `invalid-method-override` is enabled by default
 
 ```
 
@@ -67,6 +66,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    | ^^^^^^^^^^^^^^^^
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```

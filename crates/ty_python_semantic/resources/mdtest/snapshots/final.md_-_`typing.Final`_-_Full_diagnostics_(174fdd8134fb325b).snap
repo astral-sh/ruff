@@ -88,7 +88,6 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
   | ^^^^^^^^^^^^^^^ Symbol later reassigned here
 8 | from _stat import ST_INO
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -102,7 +101,6 @@ error[invalid-assignment]: Reassignment of `Final` symbol `ST_INO` is not allowe
    | ^^^^^^^^^^ Reassignment of `Final` symbol
 11 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -119,7 +117,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
 18 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -136,7 +133,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `C`
    |     ^^^ `Final` attributes can only be assigned in the class body or `__init__`
 25 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -150,7 +146,6 @@ error[final-without-value]: `Final` symbol `x` is not assigned a value
 29 |
 30 |     def f(self):
    |
-info: rule `final-without-value` is enabled by default
 
 ```
 
@@ -167,7 +162,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
 32 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -184,7 +178,6 @@ error[invalid-assignment]: Invalid assignment to final attribute
    |         ^^^^^^ `x` already has a value in the class body
 39 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -202,7 +195,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
 47 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -215,7 +207,6 @@ error[invalid-assignment]: Cannot assign to final attribute `x` on type `Self@f`
    |         ^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
 54 | from typing import Final
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -228,6 +219,5 @@ error[final-without-value]: `Final` symbol `UNINITIALIZED` is not assigned a val
 56 | UNINITIALIZED: Final[int]  # error: [final-without-value]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-info: rule `final-without-value` is enabled by default
 
 ```

@@ -48,6 +48,5 @@ help:         if not isinstance(other, Bad):
 help:             return False
 help:         return <logic to compare two `Bad` instances>
 help
-info: rule `invalid-method-override` is enabled by default
 
 ```

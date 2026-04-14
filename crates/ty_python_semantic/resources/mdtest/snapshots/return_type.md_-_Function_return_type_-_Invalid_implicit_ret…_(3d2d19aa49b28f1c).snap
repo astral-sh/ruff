@@ -30,6 +30,5 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 3 |     print("hello")
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```

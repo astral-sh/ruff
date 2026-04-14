@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.15.10
+
+Released on 2026-04-09.
+
+### Preview features
+
+- \[`flake8-logging`\] Allow closures in except handlers (`LOG004`) ([#24464](https://github.com/astral-sh/ruff/pull/24464))
+- \[`flake8-self`\] Make `SLF` diagnostics robust to non-self-named variables ([#24281](https://github.com/astral-sh/ruff/pull/24281))
+- \[`flake8-simplify`\] Make the fix for `collapsible-if` safe in `preview` (`SIM102`) ([#24371](https://github.com/astral-sh/ruff/pull/24371))
+
+### Bug fixes
+
+- Avoid emitting multi-line f-string elements before Python 3.12 ([#24377](https://github.com/astral-sh/ruff/pull/24377))
+- Avoid syntax error from `E502` fixes in f-strings and t-strings ([#24410](https://github.com/astral-sh/ruff/pull/24410))
+- Strip form feeds from indent passed to `dedent_to` ([#24381](https://github.com/astral-sh/ruff/pull/24381))
+- \[`pyupgrade`\] Fix panic caused by handling of octals (`UP012`) ([#24390](https://github.com/astral-sh/ruff/pull/24390))
+- Reject multi-line f-string elements before Python 3.12 ([#24355](https://github.com/astral-sh/ruff/pull/24355))
+
+### Rule changes
+
+- \[`ruff`\] Treat f-string interpolation as potential side effect (`RUF019`) ([#24426](https://github.com/astral-sh/ruff/pull/24426))
+
+### Server
+
+- Add support for custom file extensions ([#24463](https://github.com/astral-sh/ruff/pull/24463))
+
+### Documentation
+
+- Document adding fixes in CONTRIBUTING.md ([#24393](https://github.com/astral-sh/ruff/pull/24393))
+- Fix JSON typo in settings example ([#24517](https://github.com/astral-sh/ruff/pull/24517))
+
+### Contributors
+
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@dylwil3](https://github.com/dylwil3)
+- [@silverstein](https://github.com/silverstein)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@shizukushq](https://github.com/shizukushq)
+- [@zanieb](https://github.com/zanieb)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+
 ## 0.15.9
 
 Released on 2026-04-02.

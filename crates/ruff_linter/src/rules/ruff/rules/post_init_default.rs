@@ -151,7 +151,7 @@ fn use_initvar(
     // (PEP 695), moving it to the class body would produce a `NameError`.
     if let Some(annotation) = parameter.annotation() {
         if let Some(type_params) = &post_init_def.type_params {
-            if any_over_expr(annotation, &|expr| {
+            if any_over_expr(annotation, |expr| {
                 expr.as_name_expr()
                     .is_some_and(|name| type_params.iter().any(|tp| tp.name().id == name.id))
             }) {

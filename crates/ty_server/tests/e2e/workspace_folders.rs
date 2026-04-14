@@ -4,7 +4,7 @@ use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     FullDocumentDiagnosticReport, Position, WorkspaceDiagnosticReport,
     WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, notification::PublishDiagnostics,
+    WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -35,7 +35,7 @@ fn initialize_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -66,7 +66,7 @@ fn add_workspace_folder_after_init() -> Result<()> {
     // don't see `root2/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -78,7 +78,7 @@ fn add_workspace_folder_after_init() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -110,7 +110,7 @@ fn add_multiple_workspace_folders() -> Result<()> {
     // don't see `root2/main.py` or `root3/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -123,7 +123,7 @@ fn add_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -157,7 +157,7 @@ fn remove_workspace_folder_after_init() -> Result<()> {
     // initially.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -175,7 +175,7 @@ fn remove_workspace_folder_after_init() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -207,7 +207,7 @@ fn remove_multiple_workspace_folders() -> Result<()> {
     // initially.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -227,7 +227,7 @@ fn remove_multiple_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -257,7 +257,6 @@ fn remove_workspace_folder_with_open_document() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(&main1, main1_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -265,7 +264,6 @@ fn remove_workspace_folder_with_open_document() -> Result<()> {
     );
 
     server.open_text_document(&main2, main2_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main2, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -273,7 +271,6 @@ fn remove_workspace_folder_with_open_document() -> Result<()> {
     );
 
     server.change_workspace_folders([], [root2]);
-    let _ = server.await_notification::<PublishDiagnostics>();
 
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
@@ -312,7 +309,7 @@ fn add_and_remove_workspace_folders() -> Result<()> {
     // don't see `root3/main.py`.
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root2/main.py
@@ -328,7 +325,7 @@ fn add_and_remove_workspace_folders() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     file://<temp_dir>/root3/main.py
@@ -365,7 +362,7 @@ fn add_existing_workspace_folder_is_no_op() -> Result<()> {
 
     let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(
-        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @r"
+        condensed_workspace_diagnostic_snapshot(workspace_diagnostics), @"
     file://<temp_dir>/root1/main.py
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
@@ -431,7 +428,6 @@ fn different_settings() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(&main1, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let completions = server.completion_request(&server.file_uri(&main1), Position::new(1, 4));
     insta::assert_json_snapshot!(completions, @r#"
     [
@@ -449,7 +445,6 @@ fn different_settings() -> Result<()> {
     "#);
 
     server.open_text_document(&main2, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let completions = server.completion_request(&server.file_uri(&main2), Position::new(1, 4));
     insta::assert_json_snapshot!(completions, @"[]");
 
@@ -498,7 +493,6 @@ fn global_settings_precedence() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(&main1, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -506,7 +500,6 @@ fn global_settings_precedence() -> Result<()> {
     );
 
     server.open_text_document(&main2, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main2, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -536,7 +529,6 @@ fn global_settings_precedence() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(&main1, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -544,7 +536,6 @@ fn global_settings_precedence() -> Result<()> {
     );
 
     server.open_text_document(&main2, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main2, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -577,7 +568,6 @@ fn global_settings_change() -> Result<()> {
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(&main1, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main1, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),
@@ -607,7 +597,6 @@ fn global_settings_change() -> Result<()> {
     );
 
     server.open_text_document(&main2, main_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
     let document_diagnostics = server.document_diagnostic_request(&main2, None);
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(document_diagnostics),

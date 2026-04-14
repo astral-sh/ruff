@@ -38,6 +38,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
   |                          |
   |                          Upper bound `object` of default `T1` is not assignable to upper bound of `S`
   |
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

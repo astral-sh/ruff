@@ -29,6 +29,5 @@ error[invalid-assignment]: Object of type `Literal["three"]` is not assignable t
   | |
   | Declared type `int`
   |
-info: rule `invalid-assignment` is enabled by default
 
 ```

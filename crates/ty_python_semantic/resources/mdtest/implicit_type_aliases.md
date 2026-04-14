@@ -347,14 +347,10 @@ if TYPE_CHECKING:
         def f(obj: X):
             reveal_type(obj)  # revealed: int | str
 
-    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
-    # if a whole *scope* is inside the `if TYPE_CHECKING` block
-    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
-    Y = int | str  # error: [unsupported-operator]
+    Y = int | str
 
     def g(obj: Y):
-        # TODO: should be `int | str`
-        reveal_type(obj)  # revealed: Unknown
+        reveal_type(obj)  # revealed: int | str
 
 Y = list["int | str"]
 
@@ -678,10 +674,7 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-# TODO: one error would be enough here
-#
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 WorseList = list[int][0]
 
 def _(doubly_specialized: List, doubly_specialized_2: WorseList):

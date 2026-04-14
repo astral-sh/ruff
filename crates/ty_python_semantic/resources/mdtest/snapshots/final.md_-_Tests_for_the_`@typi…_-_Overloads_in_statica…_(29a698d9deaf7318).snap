@@ -79,7 +79,6 @@ info: `Foo.method` is decorated with `@final`, forbidding overrides
 10 |     else:
    |
 help: Remove all overloads for `method`
-info: rule `override-of-final-method` is enabled by default
 25 |     def method2(self, x: str) -> str: ...
 26 |
 27 | class Bar(Foo):

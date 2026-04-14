@@ -110,7 +110,6 @@ error[unresolved-reference]: Name `x` used when not defined
 8 |     x: int = 1
   |
 info: An attribute `x` is available: consider using `self.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -126,7 +125,6 @@ error[unresolved-reference]: Name `x` used when not defined
 14 |     def __init__(self):
    |
 info: An attribute `x` is available: consider using `self.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -142,7 +140,6 @@ error[unresolved-reference]: Name `x` used when not defined
 21 |     def __init__(self):
    |
 info: An attribute `x` is available: consider using `self.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -156,7 +153,6 @@ error[unresolved-reference]: Name `x` used when not defined
    |             ^
 28 | from typing import ClassVar
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -172,7 +168,6 @@ error[unresolved-reference]: Name `x` used when not defined
 38 |     def __init__(self):
    |
 info: An attribute `x` is available: consider using `cls.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -187,7 +182,6 @@ error[unresolved-reference]: Name `x` used when not defined
 45 | class Foo:
 46 |     x: ClassVar[int]
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -202,7 +196,6 @@ error[unresolved-reference]: Name `x` used when not defined
 53 | class Foo:
 54 |     def __init__(self):
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -217,7 +210,6 @@ error[unresolved-reference]: Name `x` used when not defined
 60 | from typing import ClassVar
    |
 info: An attribute `x` is available: consider using `other.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -232,7 +224,6 @@ error[unresolved-reference]: Name `x` used when not defined
 69 | from typing import ClassVar
    |
 info: An attribute `x` is available: consider using `c_other.x`
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -247,7 +238,6 @@ error[unresolved-reference]: Name `x` used when not defined
 77 |
 78 |     @classmethod
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -260,6 +250,5 @@ error[unresolved-reference]: Name `x` used when not defined
 81 |         y = x
    |             ^
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```

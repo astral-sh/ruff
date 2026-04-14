@@ -29,6 +29,5 @@ error[invalid-legacy-type-variable]: The `name` parameter of `TypeVar` can only 
 4 | T = TypeVar("T", name="T")
   |                  ^^^^^^^^
   |
-info: rule `invalid-legacy-type-variable` is enabled by default
 
 ```

@@ -40,6 +40,5 @@ info: Function defined here
 info: `list` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-argument-type` is enabled by default
 
 ```

@@ -112,7 +112,6 @@ error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1,
    |                    ^^^
 12 | from typing import Union
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -134,7 +133,6 @@ error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int`
    | -------- Type variable defined here
 15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -156,7 +154,6 @@ error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound
    | -------- Type variable defined here
 15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -178,7 +175,6 @@ error[invalid-type-arguments]: Type `object` does not satisfy constraints `int`,
 35 |
 36 | class Constrained(Generic[ConstrainedT]): ...
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -191,7 +187,6 @@ error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: e
    |                                   ^^^
 61 | from typing_extensions import TypeVar, Generic
    |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -216,7 +211,6 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 65 |
 66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -240,7 +234,6 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 65 |
 66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```
 
@@ -260,6 +253,5 @@ error[invalid-generic-class]: Default of `Start2T` cannot reference out-of-scope
    | --------------------------------------------- `Start2T` defined here
 82 | Stop2T = TypeVar("Stop2T", default=int)
    |
-info: rule `invalid-generic-class` is enabled by default
 
 ```

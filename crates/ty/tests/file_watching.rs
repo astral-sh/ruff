@@ -9,14 +9,14 @@ use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
-use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
 use ty_project::metadata::pyproject::{PyProject, Tool};
+use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::PythonPlatform;
+use ty_python_core::platform::PythonPlatform;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -1130,7 +1130,7 @@ print(sys.last_exc, os.getegid())
         )?;
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(PythonVersion::PY311)),
+                python_version: Some(RangedValue::cli(SupportedPythonVersion::Py311)),
                 python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
                     "win32".to_string(),
                 ))),
@@ -1157,7 +1157,7 @@ print(sys.last_exc, os.getegid())
     // Change the python version
     case.update_options(Options {
         environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
                 "linux".to_string(),
             ))),
@@ -1617,7 +1617,7 @@ mod unix {
                     extra_paths: Some(vec![RelativePathBuf::cli(
                         ".venv/lib/python3.12/site-packages",
                     )]),
-                    python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+                    python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()

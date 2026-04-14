@@ -1,10 +1,12 @@
 use crate::metadata::options::Options;
+use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
 use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
 use std::ops::Deref;
+use strum::IntoEnumIterator;
 use thiserror::Error;
 
 /// A `pyproject.toml` as specified in PEP 517.
@@ -68,7 +70,7 @@ pub struct Project {
 impl Project {
     pub(super) fn resolve_requires_python_lower_bound(
         &self,
-    ) -> Result<Option<RangedValue<PythonVersion>>, ResolveRequiresPythonError> {
+    ) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
         let Some(requires_python) = self.requires_python.as_ref() else {
             return Ok(None);
         };
@@ -115,8 +117,8 @@ impl Project {
             u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
 
         let lower_bound = PythonVersion::from((major, minor));
-        let supported_version =
-            PythonVersion::iter().find(|supported_version| *supported_version >= lower_bound);
+        let supported_version = SupportedPythonVersion::iter()
+            .find(|supported_version| supported_version.to_python_version() >= lower_bound);
 
         let Some(supported_version) = supported_version else {
             return Err(ResolveRequiresPythonError::NoSupportedVersion(

@@ -50,7 +50,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
 7 | reveal_type(baz.bar)  # revealed: Unknown
   |
 help: Consider explicitly importing `foo.bar`
-info: rule `possibly-missing-submodule` is enabled by default
 
 ```
 
@@ -64,6 +63,5 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |             ^^^^^^^
   |
 help: Consider explicitly importing `baz.bar`
-info: rule `possibly-missing-submodule` is enabled by default
 
 ```

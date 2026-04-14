@@ -14,8 +14,8 @@ def _(
     b: TypeIs[str | int],
     c: TypeGuard[bool],
     d: TypeIs[tuple[TypeOf[bytes]]],
-    e: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
-    f: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
+    e: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a parameter annotation"
+    f: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a parameter annotation"
 ):
     reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
@@ -135,8 +135,7 @@ def _(x: object):
     if C().f(x):
         reveal_type(x)  # revealed: str
     if C.f(C(), x):
-        # TODO: should be str
-        reveal_type(x)  # revealed: object
+        reveal_type(x)  # revealed: str
     if C.g(x):
         reveal_type(x)  # revealed: int
     if C().g(x):
@@ -166,6 +165,9 @@ def _(x: object):
         reveal_type(x)  # revealed: int
 
     if A().is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A.is_int(A(), x):
         reveal_type(x)  # revealed: int
 
     if A().is_int2(x):

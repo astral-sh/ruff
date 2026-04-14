@@ -54,7 +54,6 @@ error[invalid-typed-dict-statement]: invalid statement in TypedDict class body
 19 |     b: str = "hello"
    |
 info: Only annotated declarations (`<name>: <type>`) are allowed.
-info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 
@@ -69,7 +68,6 @@ error[invalid-typed-dict-statement]: TypedDict item cannot have a value
 20 |     # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
 21 |     def bar(self): ...
    |
-info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 
@@ -84,7 +82,6 @@ error[invalid-typed-dict-statement]: TypedDict class cannot have methods
 22 | class Baz(Bar):
 23 |     # error: [invalid-typed-dict-statement]
    |
-info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 
@@ -98,6 +95,5 @@ error[invalid-typed-dict-statement]: TypedDict class cannot have methods
 25 | |         pass
    | |____________^
    |
-info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```

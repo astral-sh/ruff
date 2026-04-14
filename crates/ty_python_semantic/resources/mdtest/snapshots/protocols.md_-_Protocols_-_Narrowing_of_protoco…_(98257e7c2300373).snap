@@ -118,7 +118,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -144,7 +143,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -169,7 +167,6 @@ info: A protocol class cannot be used in `issubclass` checks if it has non-metho
 21 |
 22 | def f(arg: object):
    |
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -195,7 +192,6 @@ info: `MultipleNonMethodMembers` has non-method members `a` and `b`
 40 |
 41 | def f(arg1: type):
    |
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -220,7 +216,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -246,7 +241,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -272,7 +266,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -297,7 +290,6 @@ info: A protocol class cannot be used in `issubclass` checks if it has non-metho
 21 |
 22 | def f(arg: object):
    |
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -323,7 +315,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -349,7 +340,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -374,7 +364,6 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -398,7 +387,6 @@ info: A protocol class cannot be used in `issubclass` checks if it has non-metho
 21 |
 22 | def f(arg: object):
    |
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 
@@ -421,6 +409,5 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
   |
 info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
-info: rule `isinstance-against-protocol` is enabled by default
 
 ```

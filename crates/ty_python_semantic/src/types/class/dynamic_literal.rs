@@ -5,7 +5,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
-    semantic_index::{definition::Definition, scope::ScopeId},
     types::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
         SubclassOfType, Type,
@@ -17,6 +16,7 @@ use crate::{
         mro::{DynamicMroError, Mro, MroIterator},
     },
 };
+use ty_python_core::{definition::Definition, scope::ScopeId};
 
 /// A class created dynamically via a three-argument `type()` or `types.new_class()` call.
 ///

@@ -45,7 +45,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 typed_dict,
                 arguments,
                 func.into(),
-                |expr| self.expression_type(expr),
+                |expr, _| self.expression_type(expr),
             );
 
             return Some(Type::TypedDict(typed_dict));

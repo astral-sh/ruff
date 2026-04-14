@@ -10,10 +10,8 @@ use crate::suppression::{
 };
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use program::{
-    FallibleStrategy, MisconfigurationStrategy, Program, ProgramSettings, UseDefaultStrategy,
-};
-pub use python_platform::PythonPlatform;
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
@@ -23,6 +21,14 @@ pub use suppression::{
     UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
 };
 use ty_module_resolver::ModuleGlobSet;
+use ty_python_core::definition::docstring_from_body;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::Program;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{
+    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
+    semantic_index,
+};
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesPaths, SysPrefixPathOrigin,
@@ -35,21 +41,15 @@ pub use types::ide_support::{
 };
 pub use types::{DisplaySettings, TypeQualifiers};
 
-pub mod ast_node_ref;
 mod db;
 mod dunder_all;
 pub mod lint;
-mod node_key;
 pub(crate) mod place;
-mod program;
-mod python_platform;
-mod rank;
-pub mod semantic_index;
+mod reachability;
 mod semantic_model;
 mod subscript;
 mod suppression;
 pub mod types;
-mod unpack;
 
 mod diagnostic;
 #[cfg(feature = "testing")]
@@ -104,4 +104,56 @@ impl Default for AnalysisSettings {
             replace_imports_with_any: ModuleGlobSet::empty(),
         }
     }
+}
+
+/// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_assignments<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
+        let use_def = index.use_def_map(function_scope_id);
+        Some((use_def.reachable_member_bindings(member), function_scope_id))
+    })
+}
+
+/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_declarations<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
+        let use_def = index.use_def_map(function_scope_id);
+        Some((
+            use_def.reachable_member_declarations(member),
+            function_scope_id,
+        ))
+    })
+}
+
+/// Get the module-level docstring for the given file.
+pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
+    let module = parsed_module(db, file).load(db);
+    docstring_from_body(module.suite())
+        .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }

@@ -22,92 +22,93 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
  7 | # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
  8 | TypedDict("Foo")
  9 | 
-10 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
+10 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 11 | Bad1 = TypedDict(123, {"name": str})
 12 | 
-13 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+13 | # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
-15 | 
-16 | def f(x: str) -> None:
-17 |     # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
-18 |     Y = TypedDict(x, {})
-19 | 
-20 | def g(x: str) -> None:
-21 |     TypedDict(x, {})  # fine
-22 | 
-23 | name = "GoodTypedDict"
-24 | GoodTypedDict = TypedDict(name, {"name": str})
-25 | 
-26 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-27 | Bad2 = TypedDict("Bad2", "not a dict")
-28 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-29 | TypedDict("Bad2", "not a dict")
-30 | 
-31 | def get_fields() -> dict[str, object]:
-32 |     return {"name": str}
-33 | 
-34 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-35 | Bad2b = TypedDict("Bad2b", get_fields())
-36 | 
-37 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
-38 | Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
-39 | 
-40 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
-41 | Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
-42 | 
-43 | tup = ("foo", "bar")
-44 | kw = {"name": str}
-45 | 
-46 | # error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
-47 | Bad5 = TypedDict(*tup)
-48 | 
-49 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-50 | Bad6 = TypedDict("Bad6", {"name": str}, **kw)
-51 | 
-52 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
-53 | Bad7 = TypedDict(*tup, "foo", "bar", **kw)
-54 | 
-55 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-56 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
-57 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
-58 | 
-59 | kwargs = {"x": int}
-60 | 
-61 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-62 | Bad8 = TypedDict("Bad8", {**kwargs})
-63 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-64 | TypedDict("Bad8", {**kwargs})
-65 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+15 | reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
+16 | 
+17 | def f(x: str) -> None:
+18 |     # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+19 |     Y = TypedDict(x, {})
+20 | 
+21 | def g(x: str) -> None:
+22 |     TypedDict(x, {})  # fine
+23 | 
+24 | name = "GoodTypedDict"
+25 | GoodTypedDict = TypedDict(name, {"name": str})
+26 | 
+27 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+28 | Bad2 = TypedDict("Bad2", "not a dict")
+29 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+30 | TypedDict("Bad2", "not a dict")
+31 | 
+32 | def get_fields() -> dict[str, object]:
+33 |     return {"name": str}
+34 | 
+35 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+36 | Bad2b = TypedDict("Bad2b", get_fields())
+37 | 
+38 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+39 | Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
+40 | 
+41 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+42 | Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
+43 | 
+44 | tup = ("foo", "bar")
+45 | kw = {"name": str}
+46 | 
+47 | # error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
+48 | Bad5 = TypedDict(*tup)
+49 | 
+50 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+51 | Bad6 = TypedDict("Bad6", {"name": str}, **kw)
+52 | 
+53 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
+54 | Bad7 = TypedDict(*tup, "foo", "bar", **kw)
+55 | 
+56 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+57 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
+58 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
+59 | 
+60 | kwargs = {"x": int}
+61 | 
+62 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+63 | Bad8 = TypedDict("Bad8", {**kwargs})
+64 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+65 | TypedDict("Bad8", {**kwargs})
 66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-67 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
-68 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+67 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+68 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
 69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-70 | TypedDict("Bad81", {**kwargs, **kwargs})
-71 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-72 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-73 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
-74 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-75 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-76 | TypedDict("Bad82", {**kwargs, "foo": []})
-77 | 
-78 | def get_name() -> str:
-79 |     return "x"
-80 | 
-81 | name = get_name()
-82 | 
-83 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-84 | Bad9 = TypedDict("Bad9", {name: int})
-85 | 
-86 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-87 | # error: [invalid-type-form]
-88 | Bad10 = TypedDict("Bad10", {name: 42})
-89 | 
-90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-91 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-92 | class Bad11(TypedDict("Bad11", {name: 42})): ...
-93 | 
-94 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
-95 | class Bad12(TypedDict(123, {"field": int})): ...
+70 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+71 | TypedDict("Bad81", {**kwargs, **kwargs})
+72 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+73 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+74 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
+75 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+76 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+77 | TypedDict("Bad82", {**kwargs, "foo": []})
+78 | 
+79 | def get_name() -> str:
+80 |     return "x"
+81 | 
+82 | name = get_name()
+83 | 
+84 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+85 | Bad9 = TypedDict("Bad9", {name: int})
+86 | 
+87 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+88 | # error: [invalid-type-form]
+89 | Bad10 = TypedDict("Bad10", {name: 42})
+90 | 
+91 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+92 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+93 | class Bad11(TypedDict("Bad11", {name: 42})): ...
+94 | 
+95 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+96 | class Bad12(TypedDict(123, {"field": int})): ...
 ```
 
 # Diagnostics
@@ -122,7 +123,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
 5 | # error: [missing-argument] "No arguments provided for required parameters `typename` and `fields` of function `TypedDict`"
 6 | TypedDict()
   |
-info: rule `too-many-positional-arguments` is enabled by default
 
 ```
 
@@ -137,7 +137,6 @@ error[missing-argument]: No arguments provided for required parameters `typename
 7 | # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 8 | TypedDict("Foo")
   |
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -150,437 +149,406 @@ error[missing-argument]: No argument provided for required parameter `fields` of
  8 | TypedDict("Foo")
    | ^^^^^^^^^^^^^^^^
  9 |
-10 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Lit…
+10 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
    |
-info: rule `missing-argument` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: TypedDict name must match the variable it is assigned to
-  --> src/mdtest_snippet.py:11:18
-   |
-10 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Lit…
-11 | Bad1 = TypedDict(123, {"name": str})
-   |                  ^^^ Expected "Bad1", got variable of type `Literal[123]`
-12 |
-13 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: TypedDict name must match the variable it is assigned to
-  --> src/mdtest_snippet.py:14:27
-   |
-13 | # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
-14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
-   |                           ^^^^^^^^^^^ Expected "BadTypedDict3", got "WrongName"
-15 |
-16 | def f(x: str) -> None:
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: TypedDict name must match the variable it is assigned to
-  --> src/mdtest_snippet.py:18:19
-   |
-16 | def f(x: str) -> None:
-17 |     # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `st…
-18 |     Y = TypedDict(x, {})
-   |                   ^ Expected "Y", got variable of type `str`
-19 |
-20 | def g(x: str) -> None:
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
-  --> src/mdtest_snippet.py:27:26
-   |
-26 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-27 | Bad2 = TypedDict("Bad2", "not a dict")
-   |                          ^^^^^^^^^^^^
-28 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-29 | TypedDict("Bad2", "not a dict")
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
-  --> src/mdtest_snippet.py:29:19
-   |
-27 | Bad2 = TypedDict("Bad2", "not a dict")
-28 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-29 | TypedDict("Bad2", "not a dict")
-   |                   ^^^^^^^^^^^^
-30 |
-31 | def get_fields() -> dict[str, object]:
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
-  --> src/mdtest_snippet.py:35:28
-   |
-34 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
-35 | Bad2b = TypedDict("Bad2b", get_fields())
-   |                            ^^^^^^^^^^^^
-36 |
-37 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Invalid argument to parameter `total` of `TypedDict()`
-  --> src/mdtest_snippet.py:38:47
-   |
-37 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
-38 | Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
-   |                                               ^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `Literal["not a bool"]`
-39 |
-40 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Invalid argument to parameter `closed` of `TypedDict()`
-  --> src/mdtest_snippet.py:41:48
-   |
-40 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
-41 | Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
-   |                                                ^^^ Expected either `True` or `False`, got object of type `Literal[123]`
-42 |
-43 | tup = ("foo", "bar")
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Variadic positional arguments are not supported in `TypedDict()` calls
-  --> src/mdtest_snippet.py:47:18
-   |
-46 | # error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
-47 | Bad5 = TypedDict(*tup)
-   |                  ^^^^
-48 |
-49 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Variadic keyword arguments are not supported in `TypedDict()` calls
-  --> src/mdtest_snippet.py:50:41
-   |
-49 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-50 | Bad6 = TypedDict("Bad6", {"name": str}, **kw)
-   |                                         ^^^^
-51 |
-52 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Variadic positional and keyword arguments are not supported in `TypedDict()` calls
-  --> src/mdtest_snippet.py:53:18
-   |
-52 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
-53 | Bad7 = TypedDict(*tup, "foo", "bar", **kw)
-   |                  ^^^^                ----
-54 |
-55 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Variadic keyword arguments are not supported in `TypedDict()` calls
-  --> src/mdtest_snippet.py:57:28
-   |
-55 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-56 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
-57 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
-   |                            ^^^^
-58 |
-59 | kwargs = {"x": int}
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[unknown-argument]: Argument `random_other_arg` does not match any known parameter of function `TypedDict`
-  --> src/mdtest_snippet.py:57:34
-   |
-55 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
-56 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
-57 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
-   |                                  ^^^^^^^^^^^^^^^^^^^
-58 |
-59 | kwargs = {"x": int}
-   |
-info: rule `unknown-argument` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:62:29
-   |
-61 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-62 | Bad8 = TypedDict("Bad8", {**kwargs})
-   |                             ^^^^^^
-63 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-64 | TypedDict("Bad8", {**kwargs})
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:64:22
-   |
-62 | Bad8 = TypedDict("Bad8", {**kwargs})
-63 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-64 | TypedDict("Bad8", {**kwargs})
-   |                      ^^^^^^
-65 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:67:31
-   |
-65 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-67 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
-   |                               ^^^^^^
-68 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:67:41
-   |
-65 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-67 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
-   |                                         ^^^^^^
-68 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:70:23
-   |
-68 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-70 | TypedDict("Bad81", {**kwargs, **kwargs})
-   |                       ^^^^^^
-71 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-72 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:70:33
-   |
-68 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-70 | TypedDict("Bad81", {**kwargs, **kwargs})
-   |                                 ^^^^^^
-71 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-72 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:73:31
-   |
-71 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-72 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-73 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
-   |                               ^^^^^^
-74 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-75 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-type-form]: List literals are not allowed in this context in a type expression
-  --> src/mdtest_snippet.py:73:46
-   |
-71 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-72 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-73 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
-   |                                              ^^
-74 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-75 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-   |
-info: See the following page for a reference on valid type expressions:
-info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
-  --> src/mdtest_snippet.py:76:23
-   |
-74 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-75 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-76 | TypedDict("Bad82", {**kwargs, "foo": []})
-   |                       ^^^^^^
-77 |
-78 | def get_name() -> str:
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-type-form]: List literals are not allowed in this context in a type expression
-  --> src/mdtest_snippet.py:76:38
-   |
-74 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
-75 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-76 | TypedDict("Bad82", {**kwargs, "foo": []})
-   |                                      ^^
-77 |
-78 | def get_name() -> str:
-   |
-info: See the following page for a reference on valid type expressions:
-info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
-  --> src/mdtest_snippet.py:84:27
-   |
-83 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-84 | Bad9 = TypedDict("Bad9", {name: int})
-   |                           ^^^^ Found `str`
-85 |
-86 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
-  --> src/mdtest_snippet.py:88:29
-   |
-86 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-87 | # error: [invalid-type-form]
-88 | Bad10 = TypedDict("Bad10", {name: 42})
-   |                             ^^^^ Found `str`
-89 |
-90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-type-form]: Int literals are not allowed in this context in a type expression
-  --> src/mdtest_snippet.py:88:35
-   |
-86 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-87 | # error: [invalid-type-form]
-88 | Bad10 = TypedDict("Bad10", {name: 42})
-   |                                   ^^ Did you mean `typing.Literal[42]`?
-89 |
-90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-   |
-info: See the following page for a reference on valid type expressions:
-info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
-
-```
-
-```
-error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
-  --> src/mdtest_snippet.py:92:33
-   |
-90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-91 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-92 | class Bad11(TypedDict("Bad11", {name: 42})): ...
-   |                                 ^^^^ Found `str`
-93 |
-94 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
-   |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
-error[invalid-type-form]: Int literals are not allowed in this context in a type expression
-  --> src/mdtest_snippet.py:92:39
-   |
-90 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
-91 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-92 | class Bad11(TypedDict("Bad11", {name: 42})): ...
-   |                                       ^^ Did you mean `typing.Literal[42]`?
-93 |
-94 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
-   |
-info: See the following page for a reference on valid type expressions:
-info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
 ```
 error[invalid-argument-type]: Invalid argument to parameter `typename` of `TypedDict()`
-  --> src/mdtest_snippet.py:95:23
+  --> src/mdtest_snippet.py:11:18
    |
-94 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
-95 | class Bad12(TypedDict(123, {"field": int})): ...
+10 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+11 | Bad1 = TypedDict(123, {"name": str})
+   |                  ^^^ Expected `str`, found `Literal[123]`
+12 |
+13 | # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", g…
+   |
+
+```
+
+```
+warning[mismatched-type-name]: The name passed to `TypedDict` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:14:27
+   |
+13 | # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", g…
+14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
+   |                           ^^^^^^^^^^^ Expected "BadTypedDict3", got "WrongName"
+15 | reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
+   |
+
+```
+
+```
+warning[mismatched-type-name]: The name passed to `TypedDict` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:19:19
+   |
+17 | def f(x: str) -> None:
+18 |     # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got varia…
+19 |     Y = TypedDict(x, {})
+   |                   ^ Expected "Y", got variable of type `str`
+20 |
+21 | def g(x: str) -> None:
+   |
+
+```
+
+```
+error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
+  --> src/mdtest_snippet.py:28:26
+   |
+27 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+28 | Bad2 = TypedDict("Bad2", "not a dict")
+   |                          ^^^^^^^^^^^^
+29 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+30 | TypedDict("Bad2", "not a dict")
+   |
+
+```
+
+```
+error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
+  --> src/mdtest_snippet.py:30:19
+   |
+28 | Bad2 = TypedDict("Bad2", "not a dict")
+29 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+30 | TypedDict("Bad2", "not a dict")
+   |                   ^^^^^^^^^^^^
+31 |
+32 | def get_fields() -> dict[str, object]:
+   |
+
+```
+
+```
+error[invalid-argument-type]: Expected a dict literal for parameter `fields` of `TypedDict()`
+  --> src/mdtest_snippet.py:36:28
+   |
+35 | # error: [invalid-argument-type] "Expected a dict literal for parameter `fields` of `TypedDict()`"
+36 | Bad2b = TypedDict("Bad2b", get_fields())
+   |                            ^^^^^^^^^^^^
+37 |
+38 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `total` of `TypedDict()`
+  --> src/mdtest_snippet.py:39:47
+   |
+38 | # error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+39 | Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
+   |                                               ^^^^^^^^^^^^ Expected either `True` or `False`, got object of type `Literal["not a bool"]`
+40 |
+41 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `closed` of `TypedDict()`
+  --> src/mdtest_snippet.py:42:48
+   |
+41 | # error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+42 | Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
+   |                                                ^^^ Expected either `True` or `False`, got object of type `Literal[123]`
+43 |
+44 | tup = ("foo", "bar")
+   |
+
+```
+
+```
+error[invalid-argument-type]: Variadic positional arguments are not supported in `TypedDict()` calls
+  --> src/mdtest_snippet.py:48:18
+   |
+47 | # error: [invalid-argument-type] "Variadic positional arguments are not supported in `TypedDict()` calls"
+48 | Bad5 = TypedDict(*tup)
+   |                  ^^^^
+49 |
+50 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Variadic keyword arguments are not supported in `TypedDict()` calls
+  --> src/mdtest_snippet.py:51:41
+   |
+50 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+51 | Bad6 = TypedDict("Bad6", {"name": str}, **kw)
+   |                                         ^^^^
+52 |
+53 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Variadic positional and keyword arguments are not supported in `TypedDict()` calls
+  --> src/mdtest_snippet.py:54:18
+   |
+53 | # error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `TypedDict()` calls"
+54 | Bad7 = TypedDict(*tup, "foo", "bar", **kw)
+   |                  ^^^^                ----
+55 |
+56 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Variadic keyword arguments are not supported in `TypedDict()` calls
+  --> src/mdtest_snippet.py:58:28
+   |
+56 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+57 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
+58 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
+   |                            ^^^^
+59 |
+60 | kwargs = {"x": int}
+   |
+
+```
+
+```
+error[unknown-argument]: Argument `random_other_arg` does not match any known parameter of function `TypedDict`
+  --> src/mdtest_snippet.py:58:34
+   |
+56 | # error: [invalid-argument-type] "Variadic keyword arguments are not supported in `TypedDict()` calls"
+57 | # error: [unknown-argument] "Argument `random_other_arg` does not match any known parameter of function `TypedDict`"
+58 | Bad7b = TypedDict("Bad7b", **kw, random_other_arg=56)
+   |                                  ^^^^^^^^^^^^^^^^^^^
+59 |
+60 | kwargs = {"x": int}
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:63:29
+   |
+62 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+63 | Bad8 = TypedDict("Bad8", {**kwargs})
+   |                             ^^^^^^
+64 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+65 | TypedDict("Bad8", {**kwargs})
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:65:22
+   |
+63 | Bad8 = TypedDict("Bad8", {**kwargs})
+64 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+65 | TypedDict("Bad8", {**kwargs})
+   |                      ^^^^^^
+66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+67 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:68:31
+   |
+66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+67 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+68 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
+   |                               ^^^^^^
+69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+70 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:68:41
+   |
+66 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+67 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+68 | Bad81 = TypedDict("Bad81", {**kwargs, **kwargs})
+   |                                         ^^^^^^
+69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+70 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:71:23
+   |
+69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+70 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+71 | TypedDict("Bad81", {**kwargs, **kwargs})
+   |                       ^^^^^^
+72 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+73 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:71:33
+   |
+69 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+70 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+71 | TypedDict("Bad81", {**kwargs, **kwargs})
+   |                                 ^^^^^^
+72 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+73 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:74:31
+   |
+72 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+73 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+74 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
+   |                               ^^^^^^
+75 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+76 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+   |
+
+```
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:74:46
+   |
+72 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+73 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+74 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
+   |                                              ^^
+75 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+76 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-argument-type]: Keyword splats are not allowed in the `fields` parameter to `TypedDict()`
+  --> src/mdtest_snippet.py:77:23
+   |
+75 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+76 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+77 | TypedDict("Bad82", {**kwargs, "foo": []})
+   |                       ^^^^^^
+78 |
+79 | def get_name() -> str:
+   |
+
+```
+
+```
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:77:38
+   |
+75 | # error: [invalid-argument-type] "Keyword splats are not allowed in the `fields` parameter to `TypedDict()`"
+76 | # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+77 | TypedDict("Bad82", {**kwargs, "foo": []})
+   |                                      ^^
+78 |
+79 | def get_name() -> str:
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
+  --> src/mdtest_snippet.py:85:27
+   |
+84 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+85 | Bad9 = TypedDict("Bad9", {name: int})
+   |                           ^^^^ Found `str`
+86 |
+87 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
+  --> src/mdtest_snippet.py:89:29
+   |
+87 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+88 | # error: [invalid-type-form]
+89 | Bad10 = TypedDict("Bad10", {name: 42})
+   |                             ^^^^ Found `str`
+90 |
+91 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+   |
+
+```
+
+```
+error[invalid-type-form]: Int literals are not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:89:35
+   |
+87 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+88 | # error: [invalid-type-form]
+89 | Bad10 = TypedDict("Bad10", {name: 42})
+   |                                   ^^ Did you mean `typing.Literal[42]`?
+90 |
+91 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-argument-type]: Expected a string-literal key in the `fields` dict of `TypedDict()`
+  --> src/mdtest_snippet.py:93:33
+   |
+91 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+92 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+93 | class Bad11(TypedDict("Bad11", {name: 42})): ...
+   |                                 ^^^^ Found `str`
+94 |
+95 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+   |
+
+```
+
+```
+error[invalid-type-form]: Int literals are not allowed in this context in a type expression
+  --> src/mdtest_snippet.py:93:39
+   |
+91 | # error: [invalid-argument-type] "Expected a string-literal key in the `fields` dict of `TypedDict()`"
+92 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+93 | class Bad11(TypedDict("Bad11", {name: 42})): ...
+   |                                       ^^ Did you mean `typing.Literal[42]`?
+94 |
+95 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+   |
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+```
+
+```
+error[invalid-argument-type]: Invalid argument to parameter `typename` of `TypedDict()`
+  --> src/mdtest_snippet.py:96:23
+   |
+95 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
+96 | class Bad12(TypedDict(123, {"field": int})): ...
    |                       ^^^ Expected `str`, found `Literal[123]`
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

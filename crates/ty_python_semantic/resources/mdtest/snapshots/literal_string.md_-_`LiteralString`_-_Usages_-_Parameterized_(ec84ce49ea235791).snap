@@ -34,7 +34,6 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
 5 |
 6 | # error: [invalid-type-form]
   |
-info: rule `invalid-type-form` is enabled by default
 
 ```
 
@@ -48,6 +47,5 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    |
   |    Did you mean `Literal`?
   |
-info: rule `invalid-type-form` is enabled by default
 
 ```

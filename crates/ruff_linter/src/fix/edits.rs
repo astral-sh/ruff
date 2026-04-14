@@ -214,13 +214,13 @@ pub(crate) fn remove_argument<T: Ranged>(
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
-        .arguments_source_order()
+        .iter_source_order()
         .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
 
     let arg = arguments
-        .arguments_source_order()
+        .iter_source_order()
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
 
@@ -275,7 +275,7 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
     if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
         let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
         Edit::insertion(format!("{argument}, "), keyword.start())
-    } else if let Some(last) = arguments.arguments_source_order().last() {
+    } else if let Some(last) = arguments.iter_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
         let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
             .unwrap_or(last.range());

@@ -48,6 +48,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
  6 |
  7 | # OK: `float` in a type expression means `int | float`,
    |
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

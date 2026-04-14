@@ -96,7 +96,6 @@ error[invalid-assignment]: Object of type `list[bool]` is not assignable to `lis
 info: `list` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -115,7 +114,6 @@ error[invalid-assignment]: Object of type `set[bool]` is not assignable to `set[
 info: `set` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Set`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -134,7 +132,6 @@ error[invalid-assignment]: Object of type `dict[str, bool]` is not assignable to
 info: `dict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -152,7 +149,6 @@ error[invalid-assignment]: Object of type `dict[bool, str]` is not assignable to
    |
 info: `dict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -170,7 +166,6 @@ error[invalid-assignment]: Object of type `dict[bool, bool]` is not assignable t
    |
 info: `dict` is invariant in its first and second type parameters
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -189,7 +184,6 @@ error[invalid-assignment]: Object of type `defaultdict[str, bool]` is not assign
 info: `defaultdict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -207,7 +201,6 @@ error[invalid-assignment]: Object of type `defaultdict[bool, str]` is not assign
    |
 info: `defaultdict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -226,7 +219,6 @@ error[invalid-assignment]: Object of type `OrderedDict[str, bool]` is not assign
 info: `OrderedDict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -244,7 +236,6 @@ error[invalid-assignment]: Object of type `OrderedDict[bool, str]` is not assign
    |
 info: `OrderedDict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -263,7 +254,6 @@ error[invalid-assignment]: Object of type `ChainMap[str, bool]` is not assignabl
 info: `ChainMap` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -281,7 +271,6 @@ error[invalid-assignment]: Object of type `ChainMap[bool, str]` is not assignabl
    |
 info: `ChainMap` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -300,7 +289,6 @@ error[invalid-assignment]: Object of type `deque[bool]` is not assignable to `de
 info: `deque` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -318,7 +306,6 @@ error[invalid-assignment]: Object of type `Counter[bool]` is not assignable to `
    |
 info: `Counter` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -335,7 +322,6 @@ error[invalid-assignment]: Object of type `MutableSequence[bool]` is not assigna
    |
 info: `MutableSequence` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -353,7 +339,6 @@ error[invalid-assignment]: Object of type `MyContainer[bool]` is not assignable 
    |
 info: `MyContainer` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-info: rule `invalid-assignment` is enabled by default
 
 ```
 
@@ -369,6 +354,5 @@ error[invalid-assignment]: Object of type `list[int]` is not assignable to `list
    |             Declared type
 55 | from collections.abc import Sequence
    |
-info: rule `invalid-assignment` is enabled by default
 
 ```

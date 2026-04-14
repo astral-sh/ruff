@@ -70,13 +70,13 @@ pub(crate) fn check(
     encoding: PositionEncoding,
     show_syntax_errors: bool,
 ) -> DiagnosticsMap {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type() else {
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
         return DiagnosticsMap::default();
     };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(

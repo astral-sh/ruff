@@ -29,7 +29,6 @@ error[unresolved-import]: Cannot resolve imported module `aifc`
   |
 info: The stdlib module `aifc` is only available on Python <=3.12
 info: Python 3.13 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```
 
@@ -43,6 +42,5 @@ error[unresolved-import]: Cannot resolve imported module `distutils`
   |
 info: The stdlib module `distutils` is only available on Python <=3.11
 info: Python 3.13 was assumed when resolving modules because it was specified on the command line
-info: rule `unresolved-import` is enabled by default
 
 ```

@@ -42,7 +42,6 @@ error[invalid-return-type]: Return type does not match returned value
 4 |
 5 | # error: [invalid-return-type]
   |
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -57,7 +56,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 8 |     ...
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```
 
@@ -72,6 +70,5 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 13 |     ...
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```

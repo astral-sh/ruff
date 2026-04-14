@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
-use crate::semantic_index::scope::ScopeKind;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     note_py_version_too_old_for_pep_604, report_invalid_argument_number_to_special_form,
@@ -16,6 +15,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
@@ -189,7 +189,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
                         if !self.deferred_state.is_deferred()
-                            && !self.scope.scope(self.db()).in_type_checking_block()
+                            && !self.is_in_type_checking_block(self.scope(), binary)
                         {
                             let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
@@ -1091,18 +1091,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => infer_type_argument(self, slice),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                let union_ty = UnionType::from_elements_leave_aliases(
-                    self.db(),
-                    [
-                        self.infer_subclass_of_type_expression(&binary.left),
-                        self.infer_subclass_of_type_expression(&binary.right),
-                    ],
-                );
-                self.store_expression_type(slice, union_ty);
-
-                union_ty
+                infer_type_argument(self, slice)
             }
             ast::Expr::Tuple(_) => {
                 if !self.in_string_annotation() {
@@ -1193,7 +1186,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
             }
-            // TODO: subscripts, etc.
             _ => {
                 self.infer_expression(slice, TypeContext::default());
                 todo_type!("unsupported type[X] special form")
@@ -1685,8 +1677,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let first_argument = arguments.next();
 
+            let previously_allowed_concatenate = builder
+                .inference_flags
+                .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
             let parameters =
                 first_argument.and_then(|arg| builder.infer_callable_parameter_types(arg));
+            builder.inference_flags.set(
+                InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+                previously_allowed_concatenate,
+            );
 
             let return_type = arguments
                 .next()
@@ -2116,7 +2115,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // store without going through type-expression inference.
                         self.store_expression_type(argument, Type::unknown());
                     } else if i < arguments.len() - 1 {
+                        let previously_allowed_paramspec = self
+                            .inference_flags
+                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                         self.infer_type_expression(argument);
+                        self.inference_flags.set(
+                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                            previously_allowed_paramspec,
+                        );
                     } else {
                         let previously_allowed_paramspec = self
                             .inference_flags
@@ -2133,7 +2139,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(arguments_slice, Type::unknown());
                 }
 
-                Type::unknown()
+                Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
             }
             SpecialFormType::Unpack => {
                 let inner_ty = self.infer_type_expression(arguments_slice);
@@ -2452,6 +2458,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     return Some(Parameters::paramspec(self.db(), tvar));
                 }
+                if parameters_type == Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
+                    // Avoid emitting a confusing error here saying that the first argument to
+                    // `Callable` must be "Concatenate, `...`, a parameter list or a ParamSpec"
+                    // if the first argument *was* in fact `Concatenate` -- it was just used
+                    // incorrectly. We'll have emitted an error elsewhere about the invalid use.
+                    return Some(Parameters::unknown());
+                }
             }
             ast::Expr::StringLiteral(string) => {
                 if let Some(parsed) =
@@ -2494,6 +2507,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         subscript: &ast::ExprSubscript,
     ) -> Parameters<'db> {
+        let previous_concatenate_context = self
+            .inference_flags
+            .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, false);
+
         let arguments_slice = &*subscript.slice;
         let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
             &*tuple.elts
@@ -2511,8 +2528,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Special form `typing.Concatenate` expected at least 2 parameters \
-                            but got {}",
+                        "`typing.Concatenate` requires at least 2 arguments when used in a \
+                        type expression (got {})",
                         arguments.len()
                     ));
                 }
@@ -2523,6 +2540,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
+        let previously_allowed_paramspec = self
+            .inference_flags
+            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
         let prefix_params = prefix_args
             .iter()
             .map(|arg| {
@@ -2530,6 +2550,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .with_annotated_type(self.infer_type_expression(arg))
             })
             .collect();
+        self.inference_flags.set(
+            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+            previously_allowed_paramspec,
+        );
 
         let parameters = self
             .infer_concatenate_tail(last_arg)
@@ -2541,7 +2565,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.store_expression_type(arguments_slice, Type::unknown());
         }
 
-        parameters.unwrap_or_else(Parameters::unknown)
+        let result = parameters.unwrap_or_else(Parameters::unknown);
+
+        self.inference_flags.set(
+            InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
+            previous_concatenate_context,
+        );
+        result
     }
 
     /// Infer the last argument to a `typing.Concatenate` special form, which can be either `...`
@@ -2563,7 +2593,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     previously_allowed_paramspec,
                 );
                 let Type::TypeVar(typevar) = expr_type else {
-                    report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    // `Concatenate` *is* allowed inside `Concatenate`, so avoid emitting here a diagnostic
+                    // saying that the argument is invalid if the inner type is an invalid use of the
+                    // `Concatenate` special form (we'll already have complained about the invalid use
+                    // elsewhere)
+                    if expr_type != Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
+                        report_invalid_concatenate_last_arg(&self.context, expr, expr_type);
+                    }
                     return None;
                 };
                 if !typevar.is_paramspec(self.db()) {
@@ -2603,7 +2639,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             _ => {
                 let ty = self.infer_type_expression(expr);
-                report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                if ty != Type::Dynamic(DynamicType::InvalidConcatenateUnknown) {
+                    report_invalid_concatenate_last_arg(&self.context, expr, ty);
+                }
                 None
             }
         }

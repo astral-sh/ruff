@@ -170,9 +170,9 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07d1f37ff60921c83bdfc7407723bdefe89b44b98a9b772f225c8f9d67141a6"
+checksum = "6a3a1fd6f75306b68087b831f025c712524bcb19aad54e557b1129cfa0a2b207"
 dependencies = [
  "rustversion",
 ]
@@ -692,18 +692,6 @@ name = "condtype"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf0a07a401f374238ab8e2f11a104d2851bf9ce711ec69804834de8af45c7af"
-
-[[package]]
-name = "console"
-version = "0.15.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
-dependencies = [
- "encode_unicode",
- "libc",
- "once_cell",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "console"
@@ -1605,9 +1593,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.13.0"
+version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7714e70437a7dc3ac8eb7e6f8df75fd8eb422675fc7678aff7364301092b1017"
+checksum = "45a8a2b9cb3e0b0c1803dbb0758ffac5de2f425b23c28f518faabd9d805342ff"
 dependencies = [
  "equivalent",
  "hashbrown 0.16.1",
@@ -1621,7 +1609,7 @@ version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25470f23803092da7d239834776d653104d551bc4d7eacaf31e6837854b8e9eb"
 dependencies = [
- "console 0.16.1",
+ "console",
  "portable-atomic",
  "unicode-width",
  "unit-prefix",
@@ -1660,18 +1648,18 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.46.3"
+version = "1.47.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82db8c87c7f1ccecb34ce0c24399b8a73081427f3c7c50a5d597925356115e4"
+checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
 dependencies = [
- "console 0.15.11",
+ "console",
  "once_cell",
  "pest",
  "pest_derive",
  "regex",
  "ron",
  "serde",
- "similar",
+ "similar 2.7.0",
  "tempfile",
 ]
 
@@ -1949,9 +1937,9 @@ dependencies = [
 
 [[package]]
 name = "linux-raw-sys"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df1d3c3b53da64cf5760482273a98e575c651a67eec7f77df96b5b642de8f039"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "litemap"
@@ -2896,7 +2884,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.9"
+version = "0.15.10"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2951,7 +2939,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.18",
  "tikv-jemallocator",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "walkdir",
  "wild",
@@ -2967,7 +2955,7 @@ dependencies = [
  "ruff_annotate_snippets",
  "serde",
  "snapbox",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tryfn",
  "unicode-width",
 ]
@@ -3042,7 +3030,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar",
+ "similar 3.1.0",
  "supports-hyperlinks",
  "tempfile",
  "thiserror 2.0.18",
@@ -3084,10 +3072,10 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar",
+ "similar 3.1.0",
  "strum",
  "tempfile",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
@@ -3157,7 +3145,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.9"
+version = "0.15.10"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3202,14 +3190,14 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar",
+ "similar 3.1.0",
  "smallvec",
  "strum",
  "strum_macros",
  "tempfile",
  "test-case",
  "thiserror 2.0.18",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "typed-arena",
  "unicode-normalization",
  "unicode-width",
@@ -3349,7 +3337,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar",
+ "similar 3.1.0",
  "smallvec",
  "static_assertions",
  "thiserror 2.0.18",
@@ -3475,6 +3463,7 @@ version = "0.2.2"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "dunce",
  "ignore",
  "insta",
  "jod-thread",
@@ -3500,8 +3489,10 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "smallvec",
+ "tempfile",
  "thiserror 2.0.18",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
@@ -3530,7 +3521,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.9"
+version = "0.15.10"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3592,7 +3583,7 @@ dependencies = [
  "shellexpand",
  "strum",
  "tempfile",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "unicode-normalization",
 ]
 
@@ -3608,9 +3599,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-hash"
-version = "2.1.1"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
+checksum = "94300abf3f1ae2e2b8ffb7b58043de3d399c73fa6f4b73826402a5c457614dbe"
 
 [[package]]
 name = "rustc-stable-hash"
@@ -3620,9 +3611,9 @@ checksum = "781442f29170c5c93b7185ad559492601acdc71d5bb0706f5868094f45cfcd08"
 
 [[package]]
 name = "rustix"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "146c9e247ccc180c1f61615433868c99f3de3ae256a30a43b49f67c2d9171f34"
+checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
 dependencies = [
  "bitflags 2.11.0",
  "errno",
@@ -3814,9 +3805,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "1.0.4"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8bbf91e5a4d6315eee45e704372590b30e260ee83af6639d64557f51b067776"
+checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
 dependencies = [
  "serde_core",
 ]
@@ -3894,6 +3885,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
+name = "similar"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04d93e861ede2e497b47833469b8ec9d5c07fa4c78ce7a00f6eb7dd8168b4b3f"
+dependencies = [
+ "bstr",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3919,7 +3919,7 @@ dependencies = [
  "normalize-line-endings",
  "os_pipe",
  "serde_json",
- "similar",
+ "similar 2.7.0",
  "snapbox-macros",
  "wait-timeout",
  "windows-sys 0.60.2",
@@ -4028,9 +4028,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
-version = "3.25.0"
+version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
  "getrandom 0.4.2",
@@ -4245,14 +4245,14 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "1.0.7+spec-1.1.0"
+version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd28d57d8a6f6e458bc0b8784f8fdcc4b99a437936056fa122cb234f18656a96"
+checksum = "81f3d15e84cbcd896376e6730314d59fb5a87f31e4b038454184435cd57defee"
 dependencies = [
  "indexmap",
  "serde_core",
  "serde_spanned",
- "toml_datetime 1.1.0+spec-1.1.0",
+ "toml_datetime 1.1.1+spec-1.1.0",
  "toml_parser",
  "toml_writer",
  "winnow 1.0.0",
@@ -4269,9 +4269,9 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "1.1.0+spec-1.1.0"
+version = "1.1.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97251a7c317e03ad83774a8752a7e81fb6067740609f75ea2b585b569a59198f"
+checksum = "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7"
 dependencies = [
  "serde_core",
 ]
@@ -4290,18 +4290,18 @@ dependencies = [
 
 [[package]]
 name = "toml_parser"
-version = "1.1.0+spec-1.1.0"
+version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2334f11ee363607eb04df9b8fc8a13ca1715a72ba8662a26ac285c98aabb4011"
+checksum = "a2abe9b86193656635d2411dc43050282ca48aa31c2451210f4202550afb7526"
 dependencies = [
  "winnow 1.0.0",
 ]
 
 [[package]]
 name = "toml_writer"
-version = "1.1.0+spec-1.1.0"
+version = "1.1.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d282ade6016312faf3e41e57ebbba0c073e4056dab1232ab1cb624199648f8ed"
+checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tracing"
@@ -4428,13 +4428,14 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tikv-jemallocator",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
  "ty_combine",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_core",
  "ty_python_semantic",
  "ty_server",
  "ty_static",
@@ -4476,7 +4477,7 @@ dependencies = [
  "ruff_text_size",
  "serde",
  "tempfile",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
@@ -4512,6 +4513,7 @@ dependencies = [
  "tracing",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_core",
  "ty_python_semantic",
  "ty_vendored",
 ]
@@ -4574,13 +4576,48 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "strum",
+ "strum_macros",
  "thiserror 2.0.18",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "ty_combine",
  "ty_module_resolver",
+ "ty_python_core",
  "ty_python_semantic",
  "ty_static",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_python_core"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.11.0",
+ "bitvec",
+ "get-size2",
+ "hashbrown 0.16.1",
+ "itertools 0.14.0",
+ "ruff_db",
+ "ruff_index",
+ "ruff_macros",
+ "ruff_memory_usage",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_text_size",
+ "rustc-hash",
+ "salsa",
+ "schemars",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "static_assertions",
+ "tracing",
+ "ty_combine",
+ "ty_module_resolver",
+ "ty_site_packages",
  "ty_vendored",
 ]
 
@@ -4590,14 +4627,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.11.0",
- "bitvec",
  "camino",
  "compact_str",
  "datatest-stable",
  "drop_bomb",
  "get-size2",
  "glob",
- "hashbrown 0.16.1",
  "indexmap",
  "indoc",
  "insta",
@@ -4623,7 +4658,6 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
- "serde_json",
  "smallvec",
  "static_assertions",
  "strum",
@@ -4631,8 +4665,8 @@ dependencies = [
  "test-case",
  "thiserror 2.0.18",
  "tracing",
- "ty_combine",
  "ty_module_resolver",
+ "ty_python_core",
  "ty_site_packages",
  "ty_static",
  "ty_test",
@@ -4666,6 +4700,7 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "smallvec",
+ "strum",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
@@ -4674,6 +4709,7 @@ dependencies = [
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_core",
  "ty_python_semantic",
 ]
 
@@ -4731,9 +4767,10 @@ dependencies = [
  "smallvec",
  "tempfile",
  "thiserror 2.0.18",
- "toml 1.0.7+spec-1.1.0",
+ "toml 1.1.2+spec-1.1.0",
  "tracing",
  "ty_module_resolver",
+ "ty_python_core",
  "ty_python_semantic",
  "ty_static",
  "ty_vendored",
@@ -4769,7 +4806,7 @@ dependencies = [
  "tracing",
  "ty_ide",
  "ty_project",
- "ty_python_semantic",
+ "ty_python_core",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -4911,9 +4948,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.22.0"
+version = "1.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a68d3c8f01c0cfa54a75291d83601161799e4a89a39e0929f4b0354d88757a37"
+checksum = "5ac8b6f42ead25368cf5b098aeb3dc8a1a2c05a3eee8a9a1a68c640edbfc79d9"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",

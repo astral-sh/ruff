@@ -1175,8 +1175,8 @@ class Base:
 class Child(Base, required_arg="value"):
     pass
 
-# The dynamically assigned attribute has Unknown in its type
-reveal_type(Child.config)  # revealed: Unknown | str
+# The dynamically assigned attribute has the inferred type
+reveal_type(Child.config)  # revealed: str
 
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```

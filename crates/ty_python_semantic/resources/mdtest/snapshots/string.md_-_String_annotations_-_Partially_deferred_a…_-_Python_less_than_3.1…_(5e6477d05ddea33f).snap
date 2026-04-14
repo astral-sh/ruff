@@ -71,19 +71,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 56 | X = list["int" | None]
 57 | 
 58 | if TYPE_CHECKING:
-59 |     # TODO: ideally we would not error here, since `if TYPE_CHECKING`
-60 |     # blocks are not executed at runtime. Requires
-61 |     # https://github.com/astral-sh/ty/issues/1553.
-62 |     bar: "int" | "None"  # error: [unsupported-operator]
-63 | 
-64 |     # TODO: same as above
-65 |     # error: [unsupported-operator]
-66 |     def foo(x: "int" | "None"): ...
-67 | 
-68 |     class Bar:
-69 |         # no error because this annotation is resolved inside a scope
-70 |         # fully defined inside an `if TYPE_CHECKING` block
-71 |         def f(x: "int" | "None"): ...
+59 |     bar: "int" | "None"
+60 |     def foo(x: "int" | "None"): ...
+61 | 
+62 |     class Bar:
+63 |         # no error because this annotation is resolved inside a scope
+64 |         # fully defined inside an `if TYPE_CHECKING` block
+65 |         def f(x: "int" | "None"): ...
 ```
 
 # Diagnostics
@@ -105,7 +99,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -126,7 +119,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -147,7 +139,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -168,7 +159,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -185,7 +175,6 @@ error[unsupported-operator]: Unsupported `|` operation
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -200,7 +189,6 @@ error[unresolved-reference]: Name `SomethingUndefined` used when not defined
 37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -215,7 +203,6 @@ error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
 37 |     # error: [unsupported-operator]
 38 |     # error: [unsupported-operator]
    |
-info: rule `unresolved-reference` is enabled by default
 
 ```
 
@@ -236,7 +223,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -257,7 +243,6 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -277,48 +262,5 @@ error[unsupported-operator]: Unsupported `|` operation
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
-
-```
-
-```
-error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:62:10
-   |
-60 |     # blocks are not executed at runtime. Requires
-61 |     # https://github.com/astral-sh/ty/issues/1553.
-62 |     bar: "int" | "None"  # error: [unsupported-operator]
-   |          -----^^^------
-   |          |       |
-   |          |       Has type `Literal["None"]`
-   |          Has type `Literal["int"]`
-63 |
-64 |     # TODO: same as above
-   |
-info: All type expressions are evaluated at runtime by default on Python <3.14
-info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
-
-```
-
-```
-error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:66:16
-   |
-64 |     # TODO: same as above
-65 |     # error: [unsupported-operator]
-66 |     def foo(x: "int" | "None"): ...
-   |                -----^^^------
-   |                |       |
-   |                |       Has type `Literal["None"]`
-   |                Has type `Literal["int"]`
-67 |
-68 |     class Bar:
-   |
-info: All parameter annotations are evaluated at runtime by default on Python <3.14
-info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just certain elements
-info: rule `unsupported-operator` is enabled by default
 
 ```

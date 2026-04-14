@@ -77,7 +77,6 @@ error[invalid-argument-type]: Argument to class `deprecated` is incorrect
   | ^^^^^^^^^^^ Expected `LiteralString`, found `def invalid_deco() -> Unknown`
 4 | def invalid_deco(): ...
   |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -101,7 +100,6 @@ info: Parameter declared here
 1302 |
 1303 |     @final
      |
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -115,7 +113,6 @@ error[missing-argument]: No argument provided for required parameter `message` o
    |  ^^^^^^^^^^^^
 10 | def invalid_deco(): ...
    |
-info: rule `missing-argument` is enabled by default
 
 ```
 
@@ -129,7 +126,6 @@ warning[deprecated]: The function `invalid_deco` is deprecated
    | ^^^^^^^^^^^^ message
 21 | from typing_extensions import deprecated, LiteralString
    |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -143,7 +139,6 @@ warning[deprecated]: The function `valid_deco` is deprecated
    | ^^^^^^^^^^
 30 | from typing_extensions import deprecated
    |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -157,7 +152,6 @@ error[invalid-argument-type]: Argument to class `deprecated` is incorrect
    |             ^^^^^^^^ Expected `LiteralString`, found `str`
 36 | def dubious_deco(): ...
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -171,7 +165,6 @@ error[unknown-argument]: Argument `dsfsdf` does not match any known parameter of
    |                             ^^^^^^^^^^^^^^^^^
 42 | def invalid_deco(): ...
    |
-info: rule `unknown-argument` is enabled by default
 
 ```
 
@@ -184,6 +177,5 @@ warning[deprecated]: The function `valid_deco` is deprecated
 50 | valid_deco()  # error: [deprecated] "some message"
    | ^^^^^^^^^^ some message
    |
-info: rule `deprecated` is enabled by default
 
 ```
