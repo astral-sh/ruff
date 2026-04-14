@@ -25,7 +25,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 error[invalid-legacy-type-variable]: A `TypeVar` cannot be both covariant and contravariant
  --> src/mdtest_snippet.py:4:5
   |
-3 | # error: [invalid-legacy-type-variable]
 4 | T = TypeVar("T", covariant=True, contravariant=True)
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |

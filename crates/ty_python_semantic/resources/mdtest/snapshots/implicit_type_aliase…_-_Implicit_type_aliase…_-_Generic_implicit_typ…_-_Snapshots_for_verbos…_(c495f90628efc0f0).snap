@@ -36,13 +36,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/implicit_type_aliases.md
 error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
  --> src/mdtest_snippet.py:4:21
   |
-3 | # error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
 4 | DoublySpecialized = ListOfInts2[int]
   |                     -----------^^^^^
   |                     |
   |                     Alias to `list[int]`, which is already specialized
-5 |
-6 | ThreeInts = tuple[int, int, int]
   |
 
 ```
@@ -51,13 +48,10 @@ error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
 error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
   --> src/mdtest_snippet.py:13:8
    |
-12 | def f(
 13 |     a: AliasForA[int],  # error: [not-subscriptable]
    |        ---------^^^^^
    |        |
    |        Type is already specialized
-14 |     b: ThreeInts[int],  # error: [not-subscriptable]
-15 | ): ...
    |
 
 ```
@@ -66,13 +60,10 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
 error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
   --> src/mdtest_snippet.py:14:8
    |
-12 | def f(
-13 |     a: AliasForA[int],  # error: [not-subscriptable]
 14 |     b: ThreeInts[int],  # error: [not-subscriptable]
    |        ---------^^^^^
    |        |
    |        Type is already specialized
-15 | ): ...
    |
 
 ```

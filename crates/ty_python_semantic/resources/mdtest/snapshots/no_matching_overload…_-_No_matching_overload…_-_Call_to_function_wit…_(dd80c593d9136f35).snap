@@ -70,19 +70,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_
 error[no-matching-overload]: No overload of function `foo` matches arguments
   --> src/mdtest_snippet.py:49:1
    |
-47 | def foo(a, b, c): ...
-48 |
 49 | foo(Foo(), Foo())  # error: [no-matching-overload]
    | ^^^^^^^^^^^^^^^^^
    |
 info: First overload defined here
  --> src/mdtest_snippet.py:6:5
   |
-5 | @overload
 6 | def foo(a: int, b: int, c: int): ...
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 | @overload
-8 | def foo(a: str, b: int, c: int): ...
   |
 info: Possible overloads for function `foo`:
 info:   (a: int, b: int, c: int) -> Unknown
@@ -109,12 +104,8 @@ info:   (a: int | float, b: int | float, c: int | float) -> Unknown
 info: Overload implementation defined here
   --> src/mdtest_snippet.py:47:5
    |
-45 | @overload
-46 | def foo(a: float, b: float, c: float): ...
 47 | def foo(a, b, c): ...
    |     ^^^^^^^^^^^^
-48 |
-49 | foo(Foo(), Foo())  # error: [no-matching-overload]
    |
 
 ```

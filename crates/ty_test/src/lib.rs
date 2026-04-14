@@ -778,6 +778,12 @@ fn diagnostic_display_config() -> DisplayDiagnosticConfig {
         .color(false)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly)
+        // Surrounding context in source annotations can be confusing in mdtests,
+        // since you may get to see context from the *subsequent* code block (all
+        // code blocks are merged into a single file). It also leads to a lot of
+        // duplication in general. So we just set it to zero here for concise
+        // and clear snapshots.
+        .context(0)
 }
 
 fn render_diagnostic(db: &mut Db, diagnostic: &Diagnostic) -> String {

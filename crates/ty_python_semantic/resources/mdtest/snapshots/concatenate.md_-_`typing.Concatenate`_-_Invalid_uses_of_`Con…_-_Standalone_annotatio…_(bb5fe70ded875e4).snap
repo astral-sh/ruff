@@ -49,11 +49,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
  --> src/mdtest_snippet.py:6:17
   |
-5 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
 6 | def invalid0(x: Concatenate): ...
   |                 ^^^^^^^^^^^
-7 |
-8 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -63,14 +60,11 @@ info:  - as a type argument for a `ParamSpec` parameter
 
 ```
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
-  --> src/mdtest_snippet.py:9:17
-   |
- 8 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
- 9 | def invalid1(x: Concatenate[int]): ...
-   |                 ^^^^^^^^^^^^^^^^
-10 |
-11 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
-   |
+ --> src/mdtest_snippet.py:9:17
+  |
+9 | def invalid1(x: Concatenate[int]): ...
+  |                 ^^^^^^^^^^^^^^^^
+  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -81,11 +75,8 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a parameter annotation
   --> src/mdtest_snippet.py:12:17
    |
-11 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a parameter annotation"
 12 | def invalid2(x: Concatenate[int, ...]) -> None: ...
    |                 ^^^^^^^^^^^^^^^^^^^^^
-13 |
-14 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
    |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -97,11 +88,8 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a return type annotation
   --> src/mdtest_snippet.py:15:19
    |
-14 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
 15 | def invalid3() -> Concatenate[int, ...]: ...
    |                   ^^^^^^^^^^^^^^^^^^^^^
-16 |
-17 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
    |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -113,11 +101,8 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a return type annotation
   --> src/mdtest_snippet.py:18:19
    |
-17 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a return type annotation"
 18 | def invalid4() -> Concatenate[()]: ...
    |                   ^^^^^^^^^^^^^^^
-19 |
-20 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
    |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -129,11 +114,8 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:21:4
    |
-20 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 21 | a: Concatenate
    |    ^^^^^^^^^^^
-22 |
-23 | class Foo[**P]:
    |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -145,12 +127,8 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:25:8
    |
-23 | class Foo[**P]:
-24 |     # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 25 |     b: Concatenate[int, P]
    |        ^^^^^^^^^^^^^^^^^^^
-26 |
-27 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
    |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `typing.Callable`
@@ -162,7 +140,6 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a parameter annotation
   --> src/mdtest_snippet.py:28:38
    |
-27 | # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 28 | def invalid5[**P](x: Foo[Concatenate[P, ...]]) -> None: ...
    |                                      ^
    |

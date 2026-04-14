@@ -32,10 +32,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 warning[redundant-cast]: Value is already of type `Foo2`
   --> src/mdtest_snippet.py:10:5
    |
- 9 | foo: Foo2 = {"x": 1}
 10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
    |     ^^^^^^^^^^^^^^^
-11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
    |
 
 ```
@@ -44,8 +42,6 @@ warning[redundant-cast]: Value is already of type `Foo2`
 warning[redundant-cast]: Value is already of type `Bar2`
   --> src/mdtest_snippet.py:11:5
    |
- 9 | foo: Foo2 = {"x": 1}
-10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
 11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
    |     ^^^^^^^^^^^^^^^
    |

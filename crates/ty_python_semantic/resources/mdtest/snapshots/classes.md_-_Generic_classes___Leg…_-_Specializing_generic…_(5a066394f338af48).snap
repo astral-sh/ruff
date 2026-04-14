@@ -106,11 +106,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1, got 2
   --> src/mdtest_snippet.py:11:20
    |
- 9 | reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
-10 | # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
 11 | reveal_type(C[int, int]())  # revealed: C[Unknown]
    |                    ^^^
-12 | from typing import Union
    |
 
 ```
@@ -119,19 +116,13 @@ error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1,
 error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
   --> src/mdtest_snippet.py:25:21
    |
-24 | # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
 25 | reveal_type(Bounded[str]())  # revealed: Bounded[Unknown]
    |                     ^^^
-26 |
-27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
    |
   ::: src/mdtest_snippet.py:14:1
    |
-12 | from typing import Union
-13 |
 14 | BoundedT = TypeVar("BoundedT", bound=int)
    | -------- Type variable defined here
-15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
    |
 
 ```
@@ -140,19 +131,13 @@ error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int`
 error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
   --> src/mdtest_snippet.py:28:21
    |
-27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
 28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown]
    |                     ^^^^^^^^^
-29 |
-30 | reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
    |
   ::: src/mdtest_snippet.py:14:1
    |
-12 | from typing import Union
-13 |
 14 | BoundedT = TypeVar("BoundedT", bound=int)
    | -------- Type variable defined here
-15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
    |
 
 ```
@@ -161,19 +146,13 @@ error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound
 error[invalid-type-arguments]: Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`
   --> src/mdtest_snippet.py:51:25
    |
-50 | # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
 51 | reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
    |                         ^^^^^^
-52 | WithDefaultU = TypeVar("WithDefaultU", default=int)
    |
   ::: src/mdtest_snippet.py:34:1
    |
-32 | reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
-33 | reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
 34 | ConstrainedT = TypeVar("ConstrainedT", int, str)
    | ------------ Type variable defined here
-35 |
-36 | class Constrained(Generic[ConstrainedT]): ...
    |
 
 ```
@@ -182,10 +161,8 @@ error[invalid-type-arguments]: Type `object` does not satisfy constraints `int`,
 error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3
   --> src/mdtest_snippet.py:60:35
    |
-59 | # error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
 60 | reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
    |                                   ^^^
-61 | from typing_extensions import TypeVar, Generic
    |
 
 ```
@@ -194,22 +171,15 @@ error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: e
 error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
   --> src/mdtest_snippet.py:70:7
    |
-69 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
 70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-71 |
-72 | WithDefaultU = TypeVar("WithDefaultU", default=int)
    |
   ::: src/mdtest_snippet.py:63:1
    |
-61 | from typing_extensions import TypeVar, Generic
-62 |
 63 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
    | ----------------------------------------------------- `WithDefaultT1` defined here
 64 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
    | --------------------------------------------------------------- `WithDefaultT2` defined here
-65 |
-66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
 
 ```
@@ -218,21 +188,15 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
   --> src/mdtest_snippet.py:75:7
    |
-74 | # error: [invalid-generic-class]
 75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-76 | from typing_extensions import TypeVar, Generic
    |
   ::: src/mdtest_snippet.py:63:1
    |
-61 | from typing_extensions import TypeVar, Generic
-62 |
 63 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
    | ----------------------------------------------------- `WithDefaultT1` defined here
 64 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
    | --------------------------------------------------------------- `WithDefaultT2` defined here
-65 |
-66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
    |
 
 ```
@@ -241,17 +205,13 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 error[invalid-generic-class]: Default of `Start2T` cannot reference out-of-scope type variable `StopT`
   --> src/mdtest_snippet.py:85:7
    |
-84 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
 85 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
   ::: src/mdtest_snippet.py:81:1
    |
-79 | StopT = TypeVar("StopT", default=StartT)
-80 | StepT = TypeVar("StepT", default=int | None)
 81 | Start2T = TypeVar("Start2T", default="StopT")
    | --------------------------------------------- `Start2T` defined here
-82 | Stop2T = TypeVar("Stop2T", default=int)
    |
 
 ```

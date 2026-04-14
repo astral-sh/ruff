@@ -91,20 +91,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
 error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
   --> src/mdtest_snippet.py:19:1
    |
-18 | # Single-base definitions
 19 | class MissingArg(RequiresArg): ...  # error: [missing-argument]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-20 | class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
-21 | class Valid(RequiresArg, arg=1): ...
    |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
-12 | class RequiresArg:
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-14 |
-15 | class NoArg:
    |
 
 ```
@@ -113,20 +107,14 @@ info: Parameter declared here
 error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
   --> src/mdtest_snippet.py:20:32
    |
-18 | # Single-base definitions
-19 | class MissingArg(RequiresArg): ...  # error: [missing-argument]
 20 | class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
    |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-21 | class Valid(RequiresArg, arg=1): ...
    |
 info: Function defined here
   --> src/mdtest_snippet.py:13:9
    |
-12 | class RequiresArg:
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-14 |
-15 | class NoArg:
    |
 
 ```
@@ -135,21 +123,14 @@ info: Function defined here
 error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
   --> src/mdtest_snippet.py:25:1
    |
-23 | # error: [missing-argument]
-24 | # error: [unknown-argument]
 25 | class IncorrectArg(RequiresArg, not_arg="foo"):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-26 |     a = 1
-27 |     b = 2
    |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
-12 | class RequiresArg:
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-14 |
-15 | class NoArg:
    |
 
 ```
@@ -158,38 +139,29 @@ info: Parameter declared here
 error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `__init_subclass__`
   --> src/mdtest_snippet.py:25:33
    |
-23 | # error: [missing-argument]
-24 | # error: [unknown-argument]
 25 | class IncorrectArg(RequiresArg, not_arg="foo"):
    |                                 ^^^^^^^^^^^^^
-26 |     a = 1
-27 |     b = 2
    |
 info: Function signature here
   --> src/mdtest_snippet.py:13:9
    |
-12 | class RequiresArg:
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-14 |
-15 | class NoArg:
    |
 
 ```
 
 ```
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:38:5
+  --> src/mdtest_snippet.py:41:7
    |
-37 | class NotCallableInitSubclass:
-38 |     __init_subclass__ = None
-   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
-39 |
-40 | # error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition t…
 41 | class Bad(NotCallableInitSubclass):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
-42 |     a = 1
-43 |     b = 2
+   |
+  ::: src/mdtest_snippet.py:38:5
+   |
+38 |     __init_subclass__ = None
+   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
    |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
@@ -200,20 +172,14 @@ info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-c
 error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
   --> src/mdtest_snippet.py:51:37
    |
-50 | # error: [invalid-argument-type]
 51 | class Invalid(Base, metaclass=type, arg="foo"): ...
    |                                     ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-52 | from typing import Literal, overload
    |
 info: Function defined here
   --> src/mdtest_snippet.py:46:9
    |
-44 |     c = 3
-45 | class Base:
 46 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-47 |
-48 | class Valid(Base, arg=5, metaclass=object): ...
    |
 
 ```
@@ -222,21 +188,14 @@ info: Function defined here
 error[no-matching-overload]: No overload of function `__init_subclass__` matches arguments
   --> src/mdtest_snippet.py:65:1
    |
-64 | # error: [no-matching-overload]
 65 | class InvalidType(Base, mode="b", arg=5):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 |     a = 1
-67 |     b = 2
    |
 info: First overload defined here
   --> src/mdtest_snippet.py:56:9
    |
-54 | class Base:
-55 |     @overload
 56 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
    |
 info: Possible overloads for function `__init_subclass__`:
 info:   (cls, mode: Literal["a"], arg: int) -> None
@@ -244,12 +203,8 @@ info:   (cls, mode: Literal["b"], arg: str) -> None
 info: Overload implementation defined here
   --> src/mdtest_snippet.py:59:9
    |
-57 |     @overload
-58 |     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
 59 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-60 |
-61 | class Valid(Base, mode="a", arg=5): ...
    |
 
 ```
