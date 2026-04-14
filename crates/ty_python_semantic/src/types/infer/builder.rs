@@ -73,9 +73,7 @@ use crate::types::function::{
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::typed_dict::{
-    TypedDictConstructorBindingStrategy, TypedDictConstructorForm,
-};
+use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
@@ -7044,34 +7042,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Prepare `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
-        let typed_dict_binding_strategy =
-            class
-                .filter(|class| class.is_typed_dict(self.db()))
-                .map(|class| {
-                    let typed_dict = TypedDictType::new(class);
-                    let form = TypedDictConstructorForm::from_arguments(arguments);
-                    self.prepare_typed_dict_constructor(
-                        typed_dict,
-                        form,
-                        arguments,
-                        func.as_ref().into(),
-                    )
-                });
+        let has_prepared_typed_dict_constructor = class
+            .filter(|class| class.is_typed_dict(self.db()))
+            .map(|class| {
+                let typed_dict = TypedDictType::new(class);
+                let form = TypedDictConstructorForm::from_arguments(arguments);
+                self.prepare_typed_dict_constructor(
+                    typed_dict,
+                    form,
+                    arguments,
+                    func.as_ref().into(),
+                )
+            })
+            .is_some();
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| match typed_dict_binding_strategy {
-                Some(TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(
-                    dict_literal,
-                )) if expr.node_index().load() == dict_literal => {
-                    builder.try_expression_type(expr).unwrap_or(Type::unknown())
+            &mut |builder, (_, expr, tcx)| {
+                if has_prepared_typed_dict_constructor {
+                    builder.get_or_infer_expression(expr, tcx)
+                } else {
+                    builder.infer_expression(expr, tcx)
                 }
-                Some(
-                    TypedDictConstructorBindingStrategy::ReusePreparedExpressions
-                    | TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(_),
-                ) => builder.get_or_infer_expression(expr, tcx),
-                None => builder.infer_expression(expr, tcx),
             },
             &mut bindings,
             call_expression_tcx,

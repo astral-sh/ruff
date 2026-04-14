@@ -60,15 +60,6 @@ impl<'expr> TypedDictConstructorForm<'expr> {
     }
 }
 
-/// How general call binding should treat arguments after `TypedDict`-specific preparation.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum TypedDictConstructorBindingStrategy {
-    /// Reuse the cached results from `TypedDict`-specific preparation.
-    ReusePreparedExpressions,
-    /// Skip re-inferring the outer positional dict literal with this node index.
-    SkipPreparedPositionalDictLiteral(NodeIndex),
-}
-
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
@@ -358,12 +349,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         form: TypedDictConstructorForm<'expr>,
         arguments: &'expr ast::Arguments,
         error_node: AnyNodeRef<'expr>,
-    ) -> TypedDictConstructorBindingStrategy {
+    ) {
         match form {
             TypedDictConstructorForm::LiteralOnly(argument) => {
                 let target_ty = Type::TypedDict(typed_dict);
                 self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
-                return TypedDictConstructorBindingStrategy::ReusePreparedExpressions;
+                return;
             }
             TypedDictConstructorForm::SinglePositional(argument) => {
                 let target_ty = Type::TypedDict(typed_dict);
@@ -387,6 +378,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
+                self.store_expression_type(&arguments.args[0], Type::unknown());
             }
             TypedDictConstructorForm::KeywordOnly
             | TypedDictConstructorForm::MultiplePositionalArguments => {}
@@ -403,21 +395,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             error_node,
             |expr, _| self.expression_type(expr),
         );
-
-        match form {
-            TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
-                TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(
-                    dict_expr.node_index().load(),
-                )
-            }
-            TypedDictConstructorForm::KeywordOnly
-            | TypedDictConstructorForm::LiteralOnly(_)
-            | TypedDictConstructorForm::SinglePositional(_)
-            | TypedDictConstructorForm::MixedPositionalAndKeywords
-            | TypedDictConstructorForm::MultiplePositionalArguments => {
-                TypedDictConstructorBindingStrategy::ReusePreparedExpressions
-            }
-        }
     }
 
     /// Infer keyword argument values for a `TypedDict` constructor.
