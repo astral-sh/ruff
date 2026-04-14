@@ -1089,12 +1089,16 @@ impl<'src> Lexer<'src> {
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self, first: char) -> TokenKind {
         if first == '0' {
-            if self.cursor.eat_if(|c| matches!(c, 'x' | 'X')).is_some() {
-                self.lex_number_radix(Radix::Hex)
-            } else if self.cursor.eat_if(|c| matches!(c, 'o' | 'O')).is_some() {
-                self.lex_number_radix(Radix::Octal)
-            } else if self.cursor.eat_if(|c| matches!(c, 'b' | 'B')).is_some() {
-                self.lex_number_radix(Radix::Binary)
+            let radix = match self.cursor.rest().as_bytes() {
+                [b'x' | b'X', ..] => Some(Radix::Hex),
+                [b'o' | b'O', ..] => Some(Radix::Octal),
+                [b'b' | b'B', ..] => Some(Radix::Binary),
+                _ => None,
+            };
+
+            if let Some(radix) = radix {
+                self.cursor.skip_bytes(1);
+                self.lex_number_radix(radix)
             } else {
                 self.lex_decimal_number(first)
             }
@@ -1238,16 +1242,17 @@ impl<'src> Lexer<'src> {
     /// like this: '`1_2_3_4`' == '1234'
     fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
         loop {
-            if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                number.push(c);
-            }
-            // Number that contains `_` separators. Remove them from the parsed text.
-            else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
-                // Skip over `_`
-                self.cursor.bump();
-                number.skip_char();
-            } else {
-                break;
+            match self.cursor.rest().as_bytes() {
+                [digit, ..] if radix.is_digit_byte(*digit) => {
+                    self.cursor.skip_bytes(1);
+                    number.push(char::from(*digit));
+                }
+                // Number that contains `_` separators. Remove them from the parsed text.
+                [b'_', digit, ..] if radix.is_digit_byte(*digit) => {
+                    self.cursor.skip_bytes(1);
+                    number.skip_char();
+                }
+                _ => break,
             }
         }
     }
@@ -1806,12 +1811,12 @@ impl Radix {
         }
     }
 
-    const fn is_digit(self, c: char) -> bool {
+    const fn is_digit_byte(self, byte: u8) -> bool {
         match self {
-            Radix::Binary => matches!(c, '0'..='1'),
-            Radix::Octal => matches!(c, '0'..='7'),
-            Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => c.is_ascii_hexdigit(),
+            Radix::Binary => matches!(byte, b'0'..=b'1'),
+            Radix::Octal => matches!(byte, b'0'..=b'7'),
+            Radix::Decimal => byte.is_ascii_digit(),
+            Radix::Hex => byte.is_ascii_hexdigit(),
         }
     }
 }
