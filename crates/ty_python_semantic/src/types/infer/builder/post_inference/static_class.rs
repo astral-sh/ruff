@@ -9,13 +9,11 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
+use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
-    semantic_index::{
-        SemanticIndex, attribute_assignments, definition::DefinitionKind, scope::ScopeId,
-    },
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
@@ -52,6 +50,7 @@ use crate::{
         visitor::find_over_type,
     },
 };
+use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done

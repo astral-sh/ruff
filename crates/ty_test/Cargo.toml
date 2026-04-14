@@ -24,13 +24,14 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
-ty_static = { workspace = true }
 ty_vendored = { workspace = true }
+ty_python_core = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 dunce = { workspace = true }
+indexmap = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 path-slash = { workspace = true }
@@ -39,6 +40,7 @@ rustc-hash = { workspace = true }
 rustc-stable-hash = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }
+similar = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

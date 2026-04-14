@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};

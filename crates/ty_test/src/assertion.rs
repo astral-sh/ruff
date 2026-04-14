@@ -34,150 +34,66 @@
 //! reveal_type(x)
 //! ```
 
-use crate::db::Db;
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::token::Token;
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
-use std::ops::Deref;
 use std::str::FromStr;
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
-pub(crate) struct InlineFileAssertions {
-    comment_ranges: CommentRanges,
-    source: SourceText,
-    lines: LineIndex,
+pub(crate) struct InlineFileAssertions<'s> {
+    by_line: Vec<LineAssertions<'s>>,
 }
 
-impl InlineFileAssertions {
-    pub(crate) fn from_file(db: &Db, file: File) -> Self {
-        let source = source_text(db, file);
-        let lines = line_index(db, file);
-        let parsed = parsed_module(db, file).load(db);
-        let comment_ranges = CommentRanges::from(parsed.tokens());
-        Self {
-            comment_ranges,
+impl<'s> InlineFileAssertions<'s> {
+    pub(crate) fn from_file(
+        source: &'s str,
+        parsed: &ParsedModuleRef,
+        file_index: &LineIndex,
+    ) -> Self {
+        let mut by_line = Vec::new();
+        let mut file_assertions = UnparsedAssertionsIter {
+            tokens: parsed.tokens().iter(),
             source,
-            lines,
         }
-    }
+        .peekable();
 
-    fn line_number(&self, range: &impl Ranged) -> OneIndexed {
-        self.lines.line_index(range.start())
-    }
+        while let Some(ranged_assertion) = file_assertions.next() {
+            let mut collector = AssertionVec::new();
+            let mut line_number = file_index.line_index(ranged_assertion.start());
 
-    fn is_own_line_comment(&self, ranged_assertion: &AssertionWithRange) -> bool {
-        CommentRanges::is_own_line(ranged_assertion.start(), self.source.as_str())
-    }
-}
+            // Collect all own-line comments on consecutive lines; these all apply to the same line of
+            // code. For example:
+            //
+            // ```py
+            // # error: [unbound-name]
+            // # revealed: Unbound
+            // reveal_type(x)
+            // ```
+            //
+            if CommentRanges::is_own_line(ranged_assertion.start(), source) {
+                collector.push(ranged_assertion.into_comment());
+                let mut only_own_line = true;
 
-impl<'a> IntoIterator for &'a InlineFileAssertions {
-    type Item = LineAssertions<'a>;
-    type IntoIter = LineAssertionsIterator<'a>;
+                while let Some(ranged_assertion) = file_assertions.next_if(|next_pragma| {
+                    let next_line_number = line_number.saturating_add(1);
 
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            file_assertions: self,
-            inner: AssertionWithRangeIterator {
-                file_assertions: self,
-                inner: self.comment_ranges.into_iter(),
-            }
-            .peekable(),
-        }
-    }
-}
-
-/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
-#[derive(Debug)]
-struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
-
-impl<'a> Deref for AssertionWithRange<'a> {
-    type Target = UnparsedAssertion<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Ranged for AssertionWithRange<'_> {
-    fn range(&self) -> TextRange {
-        self.1
-    }
-}
-
-impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
-    fn from(value: AssertionWithRange<'a>) -> Self {
-        value.0
-    }
-}
-
-/// Iterator that yields all assertions within a single embedded Python file.
-#[derive(Debug)]
-struct AssertionWithRangeIterator<'a> {
-    file_assertions: &'a InlineFileAssertions,
-    inner: std::iter::Copied<std::slice::Iter<'a, TextRange>>,
-}
-
-impl<'a> Iterator for AssertionWithRangeIterator<'a> {
-    type Item = AssertionWithRange<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let inner_next = self.inner.next()?;
-            let comment = &self.file_assertions.source[inner_next];
-            if let Some(assertion) = UnparsedAssertion::from_comment(comment) {
-                return Some(AssertionWithRange(assertion, inner_next));
-            }
-        }
-    }
-}
-
-impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
-
-/// A vector of [`UnparsedAssertion`]s belonging to a single line.
-///
-/// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
-/// element to avoid most heap vector allocations.
-type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
-
-#[derive(Debug)]
-pub(crate) struct LineAssertionsIterator<'a> {
-    file_assertions: &'a InlineFileAssertions,
-    inner: std::iter::Peekable<AssertionWithRangeIterator<'a>>,
-}
-
-impl<'a> Iterator for LineAssertionsIterator<'a> {
-    type Item = LineAssertions<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let file = self.file_assertions;
-        let ranged_assertion = self.inner.next()?;
-        let mut collector = AssertionVec::new();
-        let mut line_number = file.line_number(&ranged_assertion);
-        // Collect all own-line comments on consecutive lines; these all apply to the same line of
-        // code. For example:
-        //
-        // ```py
-        // # error: [unbound-name]
-        // # revealed: Unbound
-        // reveal_type(x)
-        // ```
-        //
-        if file.is_own_line_comment(&ranged_assertion) {
-            collector.push(ranged_assertion.into());
-            let mut only_own_line = true;
-            while let Some(ranged_assertion) = self.inner.peek() {
-                let next_line_number = line_number.saturating_add(1);
-                if file.line_number(ranged_assertion) == next_line_number {
-                    if !file.is_own_line_comment(ranged_assertion) {
+                    if file_index.line_index(next_pragma.start()) == next_line_number {
+                        line_number = next_line_number;
+                        true
+                    } else {
+                        false
+                    }
+                }) {
+                    if !CommentRanges::is_own_line(ranged_assertion.start(), source) {
                         only_own_line = false;
                     }
-                    line_number = next_line_number;
-                    collector.push(self.inner.next().unwrap().into());
+
+                    collector.push(ranged_assertion.into_comment());
+
                     // If we see an end-of-line comment, it has to be the end of the stack,
                     // otherwise we'd botch this case, attributing all three errors to the `bar`
                     // line:
@@ -191,26 +107,91 @@ impl<'a> Iterator for LineAssertionsIterator<'a> {
                     if !only_own_line {
                         break;
                     }
-                } else {
-                    break;
                 }
+
+                if only_own_line {
+                    // The collected comments apply to the _next_ line in the code.
+                    line_number = line_number.saturating_add(1);
+                }
+            } else {
+                // We have a line-trailing comment; it applies to its own line, and is not grouped.
+                collector.push(ranged_assertion.into_comment());
             }
-            if only_own_line {
-                // The collected comments apply to the _next_ line in the code.
-                line_number = line_number.saturating_add(1);
-            }
-        } else {
-            // We have a line-trailing comment; it applies to its own line, and is not grouped.
-            collector.push(ranged_assertion.into());
+
+            by_line.push(LineAssertions {
+                line_number,
+                assertions: collector,
+            });
         }
-        Some(LineAssertions {
-            line_number,
-            assertions: collector,
-        })
+
+        Self { by_line }
     }
 }
 
-impl std::iter::FusedIterator for LineAssertionsIterator<'_> {}
+impl<'a, 's> IntoIterator for &'a InlineFileAssertions<'s> {
+    type Item = &'a LineAssertions<'s>;
+
+    type IntoIter = std::slice::Iter<'a, LineAssertions<'s>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.by_line.iter()
+    }
+}
+
+impl<'s> IntoIterator for InlineFileAssertions<'s> {
+    type Item = LineAssertions<'s>;
+
+    type IntoIter = std::vec::IntoIter<LineAssertions<'s>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.by_line.into_iter()
+    }
+}
+
+struct UnparsedAssertionsIter<'a, 's> {
+    source: &'s str,
+    tokens: std::slice::Iter<'a, Token>,
+}
+
+impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
+    type Item = AssertionWithRange<'s>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let token = self.tokens.next()?;
+            if !token.kind().is_comment() {
+                continue;
+            }
+
+            let comment_text = &self.source[token.range()];
+            if let Some(assertion) = UnparsedAssertion::from_comment(comment_text) {
+                return Some(AssertionWithRange(assertion, token.range()));
+            }
+        }
+    }
+}
+
+/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
+#[derive(Debug)]
+struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
+
+impl<'a> AssertionWithRange<'a> {
+    fn into_comment(self) -> UnparsedAssertion<'a> {
+        self.0
+    }
+}
+
+impl Ranged for AssertionWithRange<'_> {
+    fn range(&self) -> TextRange {
+        self.1
+    }
+}
+
+/// A vector of [`UnparsedAssertion`]s belonging to a single line.
+///
+/// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
+/// element to avoid most heap vector allocations.
+type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
 
 /// One or more assertions referring to the same line of code.
 #[derive(Debug)]
@@ -225,49 +206,56 @@ pub(crate) struct LineAssertions<'a> {
     pub(crate) assertions: AssertionVec<'a>,
 }
 
-impl<'a> Deref for LineAssertions<'a> {
-    type Target = [UnparsedAssertion<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.assertions
-    }
-}
-
-/// A single diagnostic assertion comment.
+/// A single assertion comment.
 ///
 /// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
 /// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
-/// in the event of an invalid assertion
+/// in the event of an invalid assertion.
 #[derive(Debug)]
 pub(crate) enum UnparsedAssertion<'a> {
     /// A `# revealed:` assertion.
     Revealed(&'a str),
-
     /// An `# error:` assertion.
     Error(&'a str),
+    /// A `# snapshot` assertion
+    Snapshot(&'a str),
+}
+
+impl std::fmt::Display for UnparsedAssertion<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Revealed(expected_type) => {
+                write!(f, "revealed: {expected_type}")
+            }
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Snapshot(assertion) => write!(f, "snapshot: {assertion}"),
+        }
+    }
 }
 
 impl<'a> UnparsedAssertion<'a> {
-    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
-    /// indicating that it is an assertion comment.
+    /// Returns `Some(_)` if the comment starts with `# error`, `# snapshot`, or `# revealed`,
+    /// indicating that it is a assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         let comment = comment.trim().strip_prefix('#')?.trim();
-        let (keyword, body) = comment.split_once(':')?;
-        let keyword = keyword.trim();
 
         // Support other pragma comments coming after `error` or `revealed`, e.g.
         // `# error: [code] # type: ignore` (nested pragma comments)
-        let body = if let Some((before_nested, _)) = body.split_once('#') {
+        let comment = if let Some((before_nested, _)) = comment.split_once('#') {
             before_nested
         } else {
-            body
+            comment
         };
 
+        let (keyword, body) = comment.split_once(':').unwrap_or((comment, ""));
+
+        let keyword = keyword.trim();
         let body = body.trim();
 
         match keyword {
             "revealed" => Some(Self::Revealed(body)),
             "error" => Some(Self::Error(body)),
+            "snapshot" => Some(Self::Snapshot(body)),
             _ => None,
         }
     }
@@ -285,15 +273,13 @@ impl<'a> UnparsedAssertion<'a> {
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
                 .map_err(PragmaParseError::ErrorAssertionParseError),
-        }
-    }
-}
-
-impl std::fmt::Display for UnparsedAssertion<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
-            Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Snapshot(rule) => {
+                if rule.is_empty() {
+                    Ok(ParsedAssertion::Snapshot(None))
+                } else {
+                    Ok(ParsedAssertion::Snapshot(Some(rule)))
+                }
+            }
         }
     }
 }
@@ -306,6 +292,9 @@ pub(crate) enum ParsedAssertion<'a> {
 
     /// An `# error:` assertion.
     Error(ErrorAssertion<'a>),
+
+    /// A `# snapshot: <code?>` assertion.
+    Snapshot(Option<&'a str>),
 }
 
 impl std::fmt::Display for ParsedAssertion<'_> {
@@ -313,6 +302,10 @@ impl std::fmt::Display for ParsedAssertion<'_> {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => assertion.fmt(f),
+            Self::Snapshot(rule) => match rule {
+                Some(code) => write!(f, "snapshot: {code}"),
+                None => write!(f, "snapshot"),
+            },
         }
     }
 }
@@ -504,16 +497,19 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Db;
+    use ruff_db::parsed::parsed_module;
+    use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ty_module_resolver::SearchPathSettings;
-    use ty_python_semantic::{
-        FallibleStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    };
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
 
-    fn get_assertions(source: &str) -> InlineFileAssertions {
+    fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
@@ -527,22 +523,24 @@ mod tests {
 
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        InlineFileAssertions::from_file(&db, file)
+        let parsed = parsed_module(&db, file).load(&db);
+        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
     }
 
-    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions<'_>> {
-        assertions.into_iter().collect()
+    fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {
+        assertions.by_line
     }
 
     #[test]
     fn ty_display() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             reveal_type(1)  # revealed: Literal[1]
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -557,13 +555,14 @@ mod tests {
 
     #[test]
     fn error() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             x  # error:
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -578,14 +577,15 @@ mod tests {
 
     #[test]
     fn prior_line() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             # revealed: Literal[1]
             reveal_type(1)
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -600,15 +600,16 @@ mod tests {
 
     #[test]
     fn stacked_prior_line() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             # revealed: Unbound
             # error: [unbound-name]
             reveal_type(x)
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -624,14 +625,15 @@ mod tests {
 
     #[test]
     fn stacked_mixed() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             # revealed: Unbound
             reveal_type(x) # error: [unbound-name]
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -647,15 +649,16 @@ mod tests {
 
     #[test]
     fn multiple_lines() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             r#"
             # error: [invalid-assignment]
             x: int = "foo"
             y  # error: [unbound-name]
             "#,
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line1, line2] = &as_vec(&assertions)[..] else {
+        let [line1, line2] = &into_vec(assertions)[..] else {
             panic!("expected two lines");
         };
 
@@ -681,15 +684,16 @@ mod tests {
 
     #[test]
     fn multiple_lines_mixed_stack() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             r#"
             # error: [invalid-assignment]
             x: int = reveal_type("foo")  # revealed: str
             y  # error: [unbound-name]
             "#,
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line1, line2] = &as_vec(&assertions)[..] else {
+        let [line1, line2] = &into_vec(assertions)[..] else {
             panic!("expected two lines");
         };
 
@@ -720,13 +724,14 @@ mod tests {
 
     #[test]
     fn error_with_rule() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             x  # error: [unbound-name]
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -741,13 +746,14 @@ mod tests {
 
     #[test]
     fn error_with_rule_and_column() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             "
             x  # error: 1 [unbound-name]
             ",
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -762,14 +768,15 @@ mod tests {
 
     #[test]
     fn error_with_rule_and_message() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             r#"
             # error: [unbound-name] "`x` is unbound"
             x
             "#,
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -787,14 +794,15 @@ mod tests {
 
     #[test]
     fn error_with_message_and_column() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             r#"
             # error: 1 "`x` is unbound"
             x
             "#,
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 
@@ -809,14 +817,15 @@ mod tests {
 
     #[test]
     fn error_with_rule_and_message_and_column() {
-        let assertions = get_assertions(&dedent(
+        let source = dedent(
             r#"
             # error: 1 [unbound-name] "`x` is unbound"
             x
             "#,
-        ));
+        );
+        let assertions = get_assertions(&source);
 
-        let [line] = &as_vec(&assertions)[..] else {
+        let [line] = &into_vec(assertions)[..] else {
             panic!("expected one line");
         };
 

@@ -1033,6 +1033,36 @@ Person("Alice", 30, [], "some notes", email="alice@example.com")
 Person("Bob", email="bob@example.com", notes="other notes")
 ```
 
+#### Inherited metaclass-based transformer
+
+```py
+from typing import Any, dataclass_transform
+
+def field(*, default: Any = ...) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field,))
+class ModelMeta(type): ...
+
+class RegistryMeta(ModelMeta): ...
+class ModelBase(metaclass=RegistryMeta): ...
+
+class Person(ModelBase):
+    name: str
+    age: int = field(default=0)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = ...) -> None
+
+Person("Alice")
+Person("Alice", 30)
+Person(name="Alice", age=30)
+
+# error: [missing-argument]
+Person(age=30)
+
+# error: [unknown-argument]
+Person(name="Alice", extra=1)
+```
+
 #### Base-class-based transformer
 
 ```py

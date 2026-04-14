@@ -2,16 +2,17 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use rustc_hash::FxHashSet;
 
+use ty_python_core::definition::Definition;
+
 use crate::{
     Db, Program,
-    semantic_index::definition::Definition,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         constraints::ConstraintSetBuilder,
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
-            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
@@ -393,6 +394,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Without `names`, this is a value-lookup call, not functional enum creation.
         let names_arg = names_arg?;
+        let name_ty = self.expression_type(name_arg);
+        let name = name_ty
+            .as_string_literal()
+            .map(|name_literal| Name::new(name_literal.value(db)));
+
+        if (name.is_some() || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)))
+            && let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && Some(assigned_name.as_str()) != name.as_deref()
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                base_name,
+                &assigned_name,
+                name.as_deref(),
+                name_ty,
+            );
+        }
+
         let spec = self.infer_enum_spec(
             names_arg,
             start,

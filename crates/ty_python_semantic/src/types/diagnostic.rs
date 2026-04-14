@@ -9,9 +9,6 @@ use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{SemanticIndex, global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
@@ -46,6 +43,9 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::{PlaceTable, ScopedPlaceId};
+use ty_python_core::{SemanticIndex, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -91,12 +91,14 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
+    registry.register_lint(&MISMATCHED_TYPE_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
+    registry.register_lint(&INVALID_NAMED_TUPLE_OVERRIDE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
@@ -731,6 +733,40 @@ declare_lint! {
         summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::stable("0.0.1-alpha.19"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for subclass members that override inherited `NamedTuple` fields.
+    ///
+    /// ## Why is this bad?
+    /// Reusing an inherited `NamedTuple` field name in a subclass creates a
+    /// class where tuple indexing and `repr()` still reflect the original
+    /// field, while attribute access follows the subclass member.
+    ///
+    /// ## Default level
+    /// This rule is a warning by default because these overrides do not make
+    /// the class invalid at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class User(NamedTuple):
+    ///     name: str
+    ///
+    /// class Admin(User):
+    ///     name = "shadowed"  # error: [invalid-named-tuple-override]
+    ///
+    /// admin = Admin("Alice")
+    /// admin.name  # "shadowed"
+    /// admin[0]  # "Alice"
+    /// ```
+    pub(crate) static INVALID_NAMED_TUPLE_OVERRIDE = {
+        summary: "detects subclass members that override inherited `NamedTuple` fields",
+        status: LintStatus::stable("0.0.31"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1456,6 +1492,37 @@ declare_lint! {
         summary: "detects invalid NewType definitions",
         status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for functional typing definitions whose declared name does not match
+    /// the variable they are assigned to.
+    ///
+    /// ## Why is this bad?
+    /// Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,
+    /// `TypedDict`, and `TypeAliasType` all take a name argument that is
+    /// normally expected to match the assigned variable. A mismatch is usually a
+    /// typo and makes later diagnostics harder to understand.
+    ///
+    /// ## Default level
+    /// This rule is a warning by default because ty can usually recover and
+    /// continue understanding the resulting type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType, TypeVar
+    /// from typing_extensions import TypedDict
+    ///
+    /// T = TypeVar("U")  # error: [mismatched-type-name]
+    /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
+    /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
+    /// ```
+    pub(crate) static MISMATCHED_TYPE_NAME = {
+        summary: "detects functional typing definitions whose declared name does not match the assigned variable",
+        status: LintStatus::stable("0.0.30"),
+        default_level: Level::Warn,
     }
 }
 
@@ -3329,6 +3396,31 @@ declare_lint! {
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
+}
+
+pub(crate) fn report_mismatched_type_name<'db>(
+    context: &InferContext<'db, '_>,
+    node: impl Ranged,
+    constructor: &str,
+    expected_name: &str,
+    actual_name: Option<&str>,
+    actual_name_ty: Type<'db>,
+) {
+    if let Some(builder) = context.report_lint(&MISMATCHED_TYPE_NAME, node) {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "The name passed to `{constructor}` must match the variable it is assigned to"
+        ));
+        if let Some(actual_name) = actual_name {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got \"{actual_name}\""
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Expected \"{expected_name}\", got variable of type `{}`",
+                actual_name_ty.display(context.db())
+            ));
+        }
+    }
 }
 
 impl TypeCheckDiagnostics {

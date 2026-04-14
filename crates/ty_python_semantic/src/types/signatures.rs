@@ -17,7 +17,6 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
-use crate::semantic_index::definition::Definition;
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -35,6 +34,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
+use ty_python_core::definition::Definition;
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///

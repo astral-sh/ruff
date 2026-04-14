@@ -1,6 +1,7 @@
+use crate::config::Analysis;
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Severity;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
@@ -13,10 +14,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
+use ty_python_core::Db as _;
+use ty_python_core::program::Program;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
-
-use crate::config::Analysis;
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -153,9 +156,20 @@ impl ty_module_resolver::Db for Db {
 }
 
 #[salsa::db]
-impl SemanticDb for Db {
+impl ty_python_core::Db for Db {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+}
+
+#[salsa::db]
+impl SemanticDb for Db {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if !self.should_check_file(file) {
+            return Vec::new();
+        }
+
+        check_file_unwrap(self, file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

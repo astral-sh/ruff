@@ -4,15 +4,15 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
-    semantic_index::{
-        SemanticIndex, definition::Definition, place::ScopedPlaceId, scope::NodeWithScopeKind,
-    },
     types::{
         KnownClass, Type, binding_type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction},
     },
+};
+use ty_python_core::{
+    SemanticIndex, definition::Definition, place::ScopedPlaceId, scope::NodeWithScopeKind,
 };
 
 /// Check the overloaded functions in this scope.

@@ -51,6 +51,7 @@ ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_module_resolver = { workspace = true }
+ty_python_core = { workspace = true }
 
 dunce = { workspace = true }
 filetime = { workspace = true }

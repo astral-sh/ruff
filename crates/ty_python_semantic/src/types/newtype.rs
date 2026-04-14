@@ -1,11 +1,11 @@
 use crate::Db;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to

@@ -805,7 +805,7 @@ impl<'m> ContextCursor<'m> {
     }
 
     /// Returns true when the cursor sits on a binding statement.
-    /// E.g. naming a parameter, type parameter, or `for` <name>).
+    /// E.g. naming a parameter, type parameter, or `for` `<name>`).
     fn is_in_variable_binding(&self) -> bool {
         self.covering_node.ancestors().any(|node| match node {
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),

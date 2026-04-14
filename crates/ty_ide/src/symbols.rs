@@ -623,7 +623,7 @@ enum ImportModuleKind<'db> {
 /// to augment an `__all__` definition. For example, as found in
 /// `matplotlib`:
 ///
-/// ```ignore
+/// ```python
 /// import numpy as np
 /// __all__ = ['rand', 'randn', 'repmat']
 /// __all__ += np.__all__

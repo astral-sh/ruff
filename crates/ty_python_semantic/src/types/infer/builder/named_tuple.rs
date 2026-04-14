@@ -1,6 +1,5 @@
 use crate::{
     Db,
-    semantic_index::definition::Definition,
     types::{
         ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
         TypeContext, UnionType,
@@ -10,6 +9,7 @@ use crate::{
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
             PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            report_mismatched_type_name,
         },
         extract_fixed_length_iterable_element_types,
         function::KnownFunction,
@@ -19,6 +19,7 @@ use crate::{
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
@@ -312,23 +313,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Extract name.
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
-        } else {
-            // Name is not a string literal; use <unknown> like we do for type() calls.
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `typename` of `{kind}()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db)
-                ));
-            }
-            Name::new_static("<unknown>")
-        };
+        let name = name_type
+            .as_string_literal()
+            .map(|literal| Name::new(literal.value(db)));
+
+        if name.is_none()
+            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Invalid argument to parameter `typename` of `{kind}()`"
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Expected `str`, found `{}`",
+                name_type.display(db)
+            ));
+        } else if let Some(actual_name) = name.as_deref()
+            && let Some(definition) = definition
+            && let Some(assigned_name) = definition.name(db)
+            && assigned_name.as_str() != actual_name
+        {
+            report_mismatched_type_name(
+                &self.context,
+                name_arg,
+                &kind.to_string(),
+                &assigned_name,
+                Some(actual_name),
+                name_type,
+            );
+        }
+
+        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
 
         // Handle fields based on which namedtuple variant.
         let anchor = match definition {

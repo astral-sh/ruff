@@ -17,11 +17,11 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
-use crate::semantic_index::definition::Definition;
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
+use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
@@ -44,7 +44,6 @@ use crate::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
     },
-    semantic_index::{place_table, use_def_map},
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
 use ruff_db::diagnostic::Span;
@@ -52,6 +51,8 @@ use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
+use ty_python_core::definition::Definition;
+use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -1774,7 +1775,16 @@ impl<'db> ClassType<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+            //
+            // The only situation where we ignore the metaclass `__call__` is when the class is an actual enum
+            // (i.e. not a memberless superclass like `Enum`, `StrEnum`, etc.). In this case, we want to fall
+            // back to `Enum.__new__`/`StrEnum.__new__`/... which have more precise signatures for calls like
+            // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
+            // for dynamic Enum creation.
+            let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
+            if !is_actual_enum {
+                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+            }
         }
 
         let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);

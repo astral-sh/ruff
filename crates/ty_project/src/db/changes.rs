@@ -11,7 +11,7 @@ use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
-use ty_python_semantic::{FallibleStrategy, Program};
+use ty_python_core::program::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {

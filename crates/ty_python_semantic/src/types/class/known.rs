@@ -1,10 +1,9 @@
 use crate::{
     Db, Program,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
-    semantic_index::{SemanticIndex, scope::NodeWithScopeKind},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
-        SubclassOfType, Truthiness, Type, binding_type,
+        SubclassOfType, Type, binding_type,
         bound_super::{BoundSuperError, BoundSuperType},
         class::CodeGeneratorKind,
         constraints::{ConstraintSet, ConstraintSetBuilder},
@@ -23,6 +22,7 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.

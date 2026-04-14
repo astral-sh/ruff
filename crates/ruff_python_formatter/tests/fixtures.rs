@@ -513,8 +513,8 @@ fn ensure_unchanged_ast(
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(
-            &format!("{unformatted_ast:#?}"),
-            &format!("{formatted_ast:#?}"),
+            format!("{unformatted_ast:#?}"),
+            format!("{formatted_ast:#?}"),
         )
         .unified_diff()
         .header("Unformatted", "Formatted")

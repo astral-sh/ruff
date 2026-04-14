@@ -22,6 +22,79 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Constructor calls
+
+```py
+from enum import Enum, IntEnum
+
+class Number(Enum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(Number(1))  # revealed: Number
+reveal_type(Number(value=1))  # revealed: Number
+
+class MixedInt(IntEnum):
+    ONE = 1
+    TWO = 2
+
+reveal_type(MixedInt(1))  # revealed: MixedInt
+
+class MixedStr(str, Enum):
+    RED = "red"
+    BLUE = "blue"
+
+reveal_type(MixedStr("red"))  # revealed: MixedStr
+
+class Maybe(Enum):
+    NONE = None
+    SOME = "some"
+
+reveal_type(Maybe(None))  # revealed: Maybe
+
+class Planet(Enum):
+    _value_: int
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    VENUS = (2, 4.869e24, 6.0518e6)
+
+# TODO: `Planet(1)` raises `ValueError` at runtime. `EnumType.__call__` accepts positional
+# arguments only, then forwards them to the enum's `__new__` / `__init__`, so multi-argument
+# enum members still require the full positional member payload (for example `Planet(1, ...)`).
+reveal_type(Planet(1))  # revealed: Planet
+reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
+
+class EmptyEnum(Enum): ...
+
+# TODO: these raise `TypeError` at runtime, but we do not yet emit diagnostics for them.
+reveal_type(EmptyEnum(foo=1))  # revealed: EmptyEnum
+reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
+
+Dynamic = Enum("Dynamic", {"RED": "red", "GREEN": "green"})
+
+reveal_type(Dynamic("red"))  # revealed: Dynamic
+```
+
+## Constructor calls on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class Triple(Enum):
+    XYZ = 1, 2, 3
+    OTHER = 4, 5, 6
+
+reveal_type(Triple(1, 2, 3))  # revealed: Triple
+```
+
 ## Enum members
 
 ### Basic
@@ -639,6 +712,23 @@ reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
 
 reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
 reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
+`auto()` still uses the preceding concrete value even when `1` and `True` compare equal:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+class IntThenTrue(Enum):
+    A = 1
+    B = True
+    C = auto()
+
+# revealed: tuple[Literal["A"], Literal["B"], Literal["C"]]
+reveal_type(enum_members(IntThenTrue))
+
+reveal_type(IntThenTrue.C.value)  # revealed: Literal[2]
 ```
 
 Functional enums also detect duplicate-value aliases in both dict and list-of-tuples forms:
@@ -1279,6 +1369,7 @@ class EnumWithEnumMetaMetaclass(metaclass=EnumMeta):
     YES = 1
 
 reveal_type(EnumWithEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithEnumMetaMetaclass.NO]
+reveal_type(EnumWithEnumMetaMetaclass(0))  # revealed: EnumWithEnumMetaMetaclass
 
 class SubclassOfEnumMeta(EnumMeta): ...
 
@@ -1310,6 +1401,18 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
+Open `EnumMeta`-based classes still reject ordinary calls until they are finalized with members:
+
+```py
+from enum import EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# error: [too-many-positional-arguments]
+Empty(1)
+```
+
 ### Enums with (subclasses of) `EnumType` as metaclass
 
 In Python 3.11, the meta-type was renamed to `EnumType`.
@@ -1317,6 +1420,19 @@ In Python 3.11, the meta-type was renamed to `EnumType`.
 ```toml
 [environment]
 python-version = "3.11"
+```
+
+On Python 3.11+, open `EnumMeta`-based classes also accept the functional-enum calling convention,
+though the inferred result is still imprecise:
+
+```py
+from enum import EnumMeta
+
+class Meta(EnumMeta): ...
+class Empty(metaclass=Meta): ...
+
+# TODO: runtime MRO suggests this should be closer to `type[Empty]`.
+reveal_type(Empty("Dynamic", {"X": 1}))  # revealed: type[Enum]
 ```
 
 ```py
@@ -1388,6 +1504,24 @@ Color = Enum("Color", names="RED GREEN BLUE")
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(Color))
+```
+
+### Name mismatch diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```py
+from enum import Enum
+
+# error: [mismatched-type-name]
+Mismatch = Enum("WrongName", "A B")
+
+def f(name: str) -> None:
+    # error: [mismatched-type-name]
+    DynamicMismatch = Enum(name, "A B")
+
+name = "GoodMatch"
+GoodMatch = Enum(name, "A B")
 ```
 
 ### List/tuple of tuples
@@ -1626,6 +1760,7 @@ Non-literal names should still be recognized as creating an enum class.
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
+    # error: [mismatched-type-name]
     result = Enum(name.title(), "RED BLUE", module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result
@@ -2359,6 +2494,59 @@ class MyEnumBase(Enum):
 # error: [invalid-generic-enum] "Enum class `MyEnum` cannot be generic"
 class MyEnum[T](MyEnumBase):
     A = 1
+```
+
+## Constructor signature
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+The constructor of an enum takes a single `value` argument and returns the enum member corresponding
+to that value:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+# revealed: (value: object) -> Color
+reveal_type(into_regular_callable(Color))
+
+class Priority(IntEnum):
+    HIGH = 1
+    LOW = 2
+
+# revealed: (value: int) -> Priority
+reveal_type(into_regular_callable(Priority))
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+# revealed: (value: str) -> Answer
+reveal_type(into_regular_callable(Answer))
+```
+
+The signature of `Enum`, `IntEnum`, and `StrEnum` is defined by `EnumMeta.__call__`, which allows
+dynamic construction of enums using the functional syntax:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(Enum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(IntEnum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(StrEnum))
 ```
 
 ## References

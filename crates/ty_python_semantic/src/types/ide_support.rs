@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -20,6 +19,8 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
@@ -90,10 +91,10 @@ pub fn definitions_for_name<'db>(
         // If marked as global, skip to global scope
         if is_global {
             let global_scope_id = global_scope(db, file);
-            let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
+            let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
-                let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
+                let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
                 let global_bindings =
                     global_use_def_map.reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
@@ -354,7 +355,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
     {
         let class_scope = ancestor.body_scope(db);
-        let class_place_table = crate::semantic_index::place_table(db, class_scope);
+        let class_place_table = ty_python_core::place_table(db, class_scope);
 
         // Look for class-level declarations and bindings
         if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
@@ -1323,9 +1324,10 @@ mod resolve_definition {
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     use crate::Db;
-    use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
-    use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
-    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::module_docstring;
+    use ty_python_core::definition::{Definition, DefinitionKind};
+    use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
+    use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -1967,7 +1969,7 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
 
             let file_scope_id = scope_id.file_scope_id(db);
             let parsed = parsed_module(db, file).load(db);
-            if !index.is_range_reachable(db, file_scope_id, class_node.node(&parsed).range()) {
+            if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
                 continue;
             }
 

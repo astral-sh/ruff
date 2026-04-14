@@ -820,6 +820,16 @@
             }
           ]
         },
+        "invalid-named-tuple-override": {
+          "title": "detects subclass members that override inherited `NamedTuple` fields",
+          "description": "## What it does\nChecks for subclass members that override inherited `NamedTuple` fields.\n\n## Why is this bad?\nReusing an inherited `NamedTuple` field name in a subclass creates a\nclass where tuple indexing and `repr()` still reflect the original\nfield, while attribute access follows the subclass member.\n\n## Default level\nThis rule is a warning by default because these overrides do not make\nthe class invalid at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass User(NamedTuple):\n    name: str\n\nclass Admin(User):\n    name = \"shadowed\"  # error: [invalid-named-tuple-override]\n\nadmin = Admin(\"Alice\")\nadmin.name  # \"shadowed\"\nadmin[0]  # \"Alice\"\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-newtype": {
           "title": "detects invalid NewType definitions",
           "description": "## What it does\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n```python\nfrom typing import NewType\n\ndef get_name() -> str: ...\n\nFoo = NewType(\"Foo\", int)        # okay\nBar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal\nBaz = NewType(\"Baz\", int | str)  # error: invalid base for `typing.NewType`\n```",
@@ -1064,6 +1074,16 @@
           "title": "reports runtime checks against `TypedDict` classes",
           "description": "## What it does\nReports runtime checks against `TypedDict` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a `TypedDict` class in these contexts raises `TypeError` at runtime.\n\n## Examples\n```python\nfrom typing_extensions import TypedDict\n\nclass Movie(TypedDict):\n    name: str\n    director: str\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, Movie)  # error: [isinstance-against-typed-dict]\n    issubclass(arg2, Movie)  # error: [isinstance-against-typed-dict]\n\ndef g(arg: object):\n    match arg:\n        case Movie():  # error: [isinstance-against-typed-dict]\n            pass\n```\n\n## References\n- [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-type-name": {
+          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

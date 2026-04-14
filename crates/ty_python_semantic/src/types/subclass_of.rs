@@ -1,5 +1,4 @@
 use crate::place::PlaceAndQualifiers;
-use crate::semantic_index::definition::Definition;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
 use crate::types::protocol_class::ProtocolClass;
@@ -12,6 +11,7 @@ use crate::types::{
     TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
