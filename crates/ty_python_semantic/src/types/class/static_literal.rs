@@ -126,6 +126,16 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
+    /// Return `true` if this class inherits from `django.db.models.Model`.
+    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn is_django_model(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db, None).any(|base| {
+            base.into_class()
+                .and_then(|c| c.static_class_literal(db))
+                .is_some_and(|(lit, _)| lit.is_known(db, KnownClass::DjangoModel))
+        })
+    }
+
     /// Returns `true` if this class is a dataclass-like class.
     ///
     /// This covers `@dataclass`-decorated classes, as well as classes created via
@@ -344,7 +354,11 @@ impl<'db> StaticClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+    pub(super) fn node<'ast>(
+        self,
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtClassDef {
         let scope = self.body_scope(db);
         scope.node(db).expect_class().node(module)
     }
@@ -1162,6 +1176,15 @@ impl<'db> StaticClassLiteral<'db> {
                     return Member::definitely_declared(value_ty);
                 }
             }
+        }
+
+        // TODO(astral-sh/ty#1018): This override is needed for instance access because
+        // attribute resolution combines class-body and instance-member results. As a
+        // side-effect, class-level access (e.g. `Article.title`) also returns the
+        // synthesized instance type rather than the descriptor. This is technically
+        // wrong but acceptable until class-vs-instance access can be distinguished.
+        if let Some(ty) = super::django_model::synthesize_django_instance_member(db, self, name) {
+            return Member::definitely_declared(ty);
         }
 
         member
@@ -2257,6 +2280,12 @@ impl<'db> StaticClassLiteral<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
+
+        // Django model fields are synthesized from AST-level field assignments
+        // (e.g. `title = CharField(...)`) rather than inferred from the descriptor type.
+        if let Some(ty) = super::django_model::synthesize_django_instance_member(db, self, name) {
+            return Member::definitely_declared(ty);
+        }
 
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
