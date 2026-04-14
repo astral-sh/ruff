@@ -21,10 +21,6 @@ ruff_linter = { workspace = true, features = ["testing"] }
 ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_workspace = { workspace = true }
-ty_module_resolver = { workspace = true }
-ty_python_core = { workspace = true }
-ty_python_semantic = { workspace = true, features = ["testing"] }
-ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }

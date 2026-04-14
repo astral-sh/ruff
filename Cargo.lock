@@ -3559,10 +3559,6 @@ dependencies = [
  "salsa",
  "serde",
  "tracing",
- "ty_module_resolver",
- "ty_python_core",
- "ty_python_semantic",
- "ty_vendored",
 ]
 
 [[package]]
