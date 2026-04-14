@@ -514,17 +514,12 @@ mod tests {
     use crate::assertion::tests::TestDb;
 
     use super::FailuresByLine;
-    use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_module_resolver::SearchPathSettings;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -567,16 +562,6 @@ mod tests {
         colored::control::set_override(false);
 
         let mut db = TestDb::setup();
-
-        let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("Valid search paths settings"),
-        };
-        Program::init_or_update(&mut db, settings);
-
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

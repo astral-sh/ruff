@@ -40,11 +40,5 @@ thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 
-[dev-dependencies]
-ty_module_resolver = { workspace = true }
-ty_python_core = { workspace = true }
-ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
-ty_vendored = { workspace = true }
-
 [lints]
 workspace = true

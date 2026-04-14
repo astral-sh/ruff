@@ -2063,10 +2063,6 @@ dependencies = [
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
- "ty_module_resolver",
- "ty_python_core",
- "ty_python_semantic",
- "ty_vendored",
 ]
 
 [[package]]

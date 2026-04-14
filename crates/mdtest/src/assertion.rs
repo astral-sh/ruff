@@ -500,18 +500,14 @@ pub(crate) mod tests {
 
     use super::*;
     use ruff_db::Db;
+    use ruff_db::files::Files;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::files::{File, Files};
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_module_resolver::{SearchPathSettings, SearchPaths};
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -542,7 +538,7 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                vendored: VendoredFileSystem::default(),
                 events,
                 files: Files::default(),
             }
@@ -579,34 +575,10 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ty_module_resolver::Db for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
-
-    #[salsa::db]
-    impl ty_python_core::Db for TestDb {
-        fn should_check_file(&self, file: File) -> bool {
-            !file.path(self).is_vendored_path()
-        }
-    }
-
-    #[salsa::db]
     impl salsa::Database for TestDb {}
 
     fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
         let mut db = TestDb::setup();
-
-        let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .unwrap(),
-        };
-        Program::init_or_update(&mut db, settings);
-
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);
