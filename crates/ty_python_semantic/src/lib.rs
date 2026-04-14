@@ -13,6 +13,7 @@ pub use fixes::suppress_all_diagnostics;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,

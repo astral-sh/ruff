@@ -292,7 +292,7 @@ impl Project {
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
-        diagnostics.extend(files.diagnostics().iter().cloned());
+        diagnostics.extend_from_slice(files.diagnostics());
 
         reporter.report_diagnostics(db, diagnostics);
 
@@ -608,7 +608,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
         let db = AssertUnwindSafe(db);
         match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
             Ok(result) => result,
-            Err(diagnostic) => Ok(vec![diagnostic].into_boxed_slice()),
+            Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }
 }
