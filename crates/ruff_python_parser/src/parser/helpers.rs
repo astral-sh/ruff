@@ -47,6 +47,21 @@ pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp
     })
 }
 
+/// Converts a single-token comparison operator to its corresponding [`CmpOp`].
+#[inline]
+pub(super) const fn token_kind_to_single_cmp_op(token: TokenKind) -> Option<CmpOp> {
+    Some(match token {
+        TokenKind::In => CmpOp::In,
+        TokenKind::EqEqual => CmpOp::Eq,
+        TokenKind::NotEqual => CmpOp::NotEq,
+        TokenKind::Less => CmpOp::Lt,
+        TokenKind::LessEqual => CmpOp::LtE,
+        TokenKind::Greater => CmpOp::Gt,
+        TokenKind::GreaterEqual => CmpOp::GtE,
+        _ => return None,
+    })
+}
+
 /// Helper for `parse_decorators` to determine if `expr` is a [`dotted_name`] from the decorator
 /// grammar before Python 3.9.
 ///

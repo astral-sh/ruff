@@ -121,6 +121,12 @@ impl<'src> Lexer<'src> {
         lexer
     }
 
+    /// Returns the length of the source text being lexed.
+    #[inline]
+    pub(crate) fn source_len(&self) -> usize {
+        self.source.len()
+    }
+
     /// Returns the kind of the current token.
     pub(crate) fn current_kind(&self) -> TokenKind {
         self.current_kind

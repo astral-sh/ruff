@@ -270,9 +270,12 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            let Some(operator) = BinaryLikeOperator::try_from_tokens(current_token, self.peek())
-            else {
-                // Not an operator.
+            let operator = if let Some(operator) = BinaryLikeOperator::try_from_token(current_token)
+            {
+                operator
+            } else if let Some(cmp_op) = self.cmp_op_from_current_token(current_token) {
+                BinaryLikeOperator::Comparison(cmp_op)
+            } else {
                 break;
             };
 
@@ -1156,23 +1159,37 @@ impl<'src> Parser<'src> {
     }
 
     /// Bump the appropriate token(s) for the given comparison operator.
+    #[inline]
     fn bump_cmp_op(&mut self, op: CmpOp) {
-        let (first, second) = match op {
-            CmpOp::Eq => (TokenKind::EqEqual, None),
-            CmpOp::NotEq => (TokenKind::NotEqual, None),
-            CmpOp::Lt => (TokenKind::Less, None),
-            CmpOp::LtE => (TokenKind::LessEqual, None),
-            CmpOp::Gt => (TokenKind::Greater, None),
-            CmpOp::GtE => (TokenKind::GreaterEqual, None),
-            CmpOp::Is => (TokenKind::Is, None),
-            CmpOp::IsNot => (TokenKind::Is, Some(TokenKind::Not)),
-            CmpOp::In => (TokenKind::In, None),
-            CmpOp::NotIn => (TokenKind::Not, Some(TokenKind::In)),
-        };
+        match op {
+            CmpOp::Eq => self.bump(TokenKind::EqEqual),
+            CmpOp::NotEq => self.bump(TokenKind::NotEqual),
+            CmpOp::Lt => self.bump(TokenKind::Less),
+            CmpOp::LtE => self.bump(TokenKind::LessEqual),
+            CmpOp::Gt => self.bump(TokenKind::Greater),
+            CmpOp::GtE => self.bump(TokenKind::GreaterEqual),
+            CmpOp::Is => self.bump(TokenKind::Is),
+            CmpOp::In => self.bump(TokenKind::In),
+            CmpOp::IsNot => {
+                self.bump(TokenKind::Is);
+                self.bump(TokenKind::Not);
+            }
+            CmpOp::NotIn => {
+                self.bump(TokenKind::Not);
+                self.bump(TokenKind::In);
+            }
+        }
+    }
 
-        self.bump(first);
-        if let Some(second) = second {
-            self.bump(second);
+    /// Returns the comparison operator starting at the current token.
+    #[inline]
+    fn cmp_op_from_current_token(&mut self, token: TokenKind) -> Option<CmpOp> {
+        if let Some(op) = helpers::token_kind_to_single_cmp_op(token) {
+            Some(op)
+        } else if matches!(token, TokenKind::Is | TokenKind::Not) {
+            helpers::token_kind_to_cmp_op([token, self.peek()])
+        } else {
+            None
         }
     }
 
@@ -1197,8 +1214,9 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let mut comparators = vec![];
-        let mut operators = vec![op];
+        let mut comparators = Vec::with_capacity(1);
+        let mut operators = Vec::with_capacity(1);
+        operators.push(op);
 
         let mut progress = ParserProgress::default();
 
@@ -1218,7 +1236,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            let Some(next_op) = helpers::token_kind_to_cmp_op([next_token, self.peek()]) else {
+            let Some(next_op) = self.cmp_op_from_current_token(next_token) else {
                 break;
             };
 
@@ -2958,15 +2976,16 @@ enum BinaryLikeOperator {
 }
 
 impl BinaryLikeOperator {
-    /// Attempts to convert the two tokens into the corresponding binary-like operator. Returns
+    /// Attempts to convert the current token into the corresponding binary-like operator. Returns
     /// [None] if it's not a binary-like operator.
-    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<BinaryLikeOperator> {
+    #[inline]
+    fn try_from_token(current: TokenKind) -> Option<BinaryLikeOperator> {
         if let Some(bool_op) = current.as_bool_operator() {
             Some(BinaryLikeOperator::Boolean(bool_op))
         } else if let Some(bin_op) = current.as_binary_operator() {
             Some(BinaryLikeOperator::Binary(bin_op))
         } else {
-            helpers::token_kind_to_cmp_op([current, next]).map(BinaryLikeOperator::Comparison)
+            None
         }
     }
 
