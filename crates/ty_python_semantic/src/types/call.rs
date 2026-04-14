@@ -175,7 +175,6 @@ pub(super) enum CallDunderError<'db> {
 
         // List the types on which the dunder was undefined (e.g., the specific
         // members of a union on which the dunder was missing).
-        #[expect(unused)]
         unbound_on: Box<[Type<'db>]>,
     },
 

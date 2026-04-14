@@ -164,8 +164,7 @@ impl<'db> ContextManagerError<'db> {
                     format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
-                //  E.g. hint toward the union variant that doesn't correctly implement enter,
-                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
+                //  E.g. distinguish between a not callable `__enter__` attribute and a wrong signature.
                 CallDunderError::CallError(_, _) => {
                     format!("it does not correctly implement `{name}`")
                 }
@@ -224,6 +223,33 @@ impl<'db> ContextManagerError<'db> {
             with_kw,
             formatted_errors,
         ));
+
+        // Emits a separate info sub-diagnostic for each type that is reported
+        // as unbound in the `PossiblyUnbound` error (e.g., for each member of
+        // a union that does not implement the dunder).
+        let mut emit_unbound_info = |error: &CallDunderError<'db>, name: &str| {
+            if let CallDunderError::PossiblyUnbound { unbound_on, .. } = error {
+                for ty in unbound_on {
+                    diag.info(format_args!(
+                        "`{}` does not implement `{name}`",
+                        ty.display(db)
+                    ));
+                }
+            }
+        };
+
+        match self {
+            Self::Exit { exit_error, .. } => emit_unbound_info(exit_error, exit_method),
+            Self::Enter(enter_error, _) => emit_unbound_info(enter_error, enter_method),
+            Self::EnterAndExit {
+                enter_error,
+                exit_error,
+                ..
+            } => {
+                emit_unbound_info(enter_error, enter_method);
+                emit_unbound_info(exit_error, exit_method);
+            }
+        }
 
         let (alt_mode, alt_enter_method, alt_exit_method, alt_with_kw) = match mode {
             EvaluationMode::Sync => ("async", "__aenter__", "__aexit__", "async with"),
