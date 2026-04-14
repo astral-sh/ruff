@@ -104,10 +104,6 @@ impl<'db> Type<'db> {
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.1.return_type(db)
-    }
-
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
     /// that has no setter, and `None` otherwise.
     pub(crate) fn as_attempt_to_set_property_with_no_setter(
