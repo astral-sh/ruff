@@ -22,8 +22,8 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
-            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE,
+            OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
             report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
@@ -196,7 +196,7 @@ fn check_class_declaration<'db>(
     // annotations) or define methods with these names will raise an `AttributeError` at runtime.
     match class_kind {
         Some(CodeGeneratorKind::NamedTuple) => {
-            if configuration.check_invalid_named_tuple_overrides()
+            if configuration.check_invalid_named_tuple_definitions()
                 && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
                 && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
                 && let Some(bad_definition) = use_def_map(db, class_scope)
@@ -226,11 +226,11 @@ fn check_class_declaration<'db>(
         Some(CodeGeneratorKind::TypedDict) | None => {}
     }
 
-    if configuration.check_invalid_named_tuple_overrides()
+    if configuration.check_invalid_named_tuple_field_overrides()
         && let Some((superclass, overridden_field_declaration)) =
             conflicting_named_tuple_field_in_mro(db, literal, &member.name)
         && let Some(builder) = context.report_lint(
-            &INVALID_NAMED_TUPLE,
+            &INVALID_NAMED_TUPLE_OVERRIDE,
             first_reachable_definition.focus_range(db, context.module()),
         )
     {
@@ -600,10 +600,11 @@ bitflags! {
         const LISKOV_METHODS = 1 << 0;
         const EXPLICIT_OVERRIDE = 1 << 1;
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
-        const INVALID_NAMED_TUPLE_OVERRIDE = 1 << 3;
-        const INVALID_DATACLASS = 1 << 4;
-        const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
-        const INVALID_ENUM_VALUE = 1 << 6;
+        const INVALID_NAMED_TUPLE = 1 << 3;
+        const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 4;
+        const INVALID_DATACLASS = 1 << 5;
+        const FINAL_VARIABLE_OVERRIDDEN = 1 << 6;
+        const INVALID_ENUM_VALUE = 1 << 7;
     }
 }
 
@@ -624,7 +625,10 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE)) {
-            config |= OverrideRulesConfig::INVALID_NAMED_TUPLE_OVERRIDE;
+            config |= OverrideRulesConfig::INVALID_NAMED_TUPLE;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE_OVERRIDE)) {
+            config |= OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
             config |= OverrideRulesConfig::INVALID_DATACLASS;
@@ -653,8 +657,12 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
     }
 
-    const fn check_invalid_named_tuple_overrides(self) -> bool {
-        self.contains(OverrideRulesConfig::INVALID_NAMED_TUPLE_OVERRIDE)
+    const fn check_invalid_named_tuple_definitions(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_NAMED_TUPLE)
+    }
+
+    const fn check_invalid_named_tuple_field_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE)
     }
 
     const fn check_invalid_dataclasses(self) -> bool {

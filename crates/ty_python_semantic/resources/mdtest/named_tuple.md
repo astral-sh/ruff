@@ -1082,26 +1082,26 @@ class User(NamedTuple):
     nickname: str
 
 class AnnotatedAttributeChild(User):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `User`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `id` inherited from `User`"
     id: int
 
 class AnnotatedDefaultChild(User):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `User`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
     name: str = "foo"
 
 class PropertyChild(User):
     @property
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `age` inherited from `User`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `User`"
     def age(self) -> int:
         return super().age or 42
 
 class MethodChild(User):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `nickname` inherited from `User`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `nickname` inherited from `User`"
     def nickname(self) -> str:
         return "Bob"
 
 class PlainAssignmentChild(User):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `User`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
     name = "shadowed"
 
 class DistinctFieldChild(User):
@@ -1125,7 +1125,7 @@ from typing import NamedTuple
 TypingBase = NamedTuple("TypingBase", [("id", int)])
 
 class TypingChild(TypingBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `id` inherited from `TypingBase`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `id` inherited from `TypingBase`"
     id: int = 0
 ```
 
@@ -1141,7 +1141,7 @@ class Intermediate(Base):
     unrelated: bytes
 
 class Sub(Intermediate):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `Base`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `Base`"
     name: int
 ```
 
@@ -1153,11 +1153,11 @@ from typing import NamedTuple
 ShadowTupleBase = NamedTuple("ShadowTupleBase", [("name", str)])
 
 class ShadowingMid(ShadowTupleBase):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
     name = "shadowed"
 
 class ShadowedChild(ShadowingMid):
-    # error: [invalid-named-tuple] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
     name: int
 ```
 
