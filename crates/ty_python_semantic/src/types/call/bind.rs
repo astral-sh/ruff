@@ -5632,12 +5632,12 @@ impl<'db> Binding<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = expand_paramspec_variadics(db, remaining);
+        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
 
         let mut reordered = Vec::with_capacity(remaining.len());
         let mut keyword_only = Vec::new();
         let mut keyword_variadic = Vec::new();
-        for (index, parameter) in remaining.into_iter().enumerate() {
+        for (index, parameter) in remaining.iter().cloned().enumerate() {
             let mut parameter = parameter;
             // Keyword-bound positional-or-keyword parameters can only be overridden by keyword at
             // call time. Once one appears, later positional-or-keyword parameters also become
@@ -5851,65 +5851,6 @@ impl<'db> Binding<'db> {
         self.parameter_tys = Box::from([]);
         self.errors.clear();
     }
-}
-
-/// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
-fn expand_paramspec_variadics<'db>(
-    db: &'db dyn Db,
-    parameters: Vec<Parameter<'db>>,
-) -> Vec<Parameter<'db>> {
-    let mut variadic_index = None;
-    let mut paramspec_callable = None;
-
-    for (index, parameter) in parameters.iter().enumerate() {
-        if !parameter.is_variadic() {
-            continue;
-        }
-
-        let Type::Callable(callable) = parameter.annotated_type() else {
-            continue;
-        };
-        if callable.kind(db) != CallableTypeKind::ParamSpecValue {
-            continue;
-        }
-
-        variadic_index = Some(index);
-        paramspec_callable = Some(callable);
-        break;
-    }
-
-    let Some(variadic_index) = variadic_index else {
-        return parameters;
-    };
-    let Some(paramspec_callable) = paramspec_callable else {
-        return parameters;
-    };
-
-    let Some(keyword_variadic) = parameters.get(variadic_index + 1) else {
-        return parameters;
-    };
-    if !keyword_variadic.is_keyword_variadic() {
-        return parameters;
-    }
-
-    let Type::Callable(keyword_callable) = keyword_variadic.annotated_type() else {
-        return parameters;
-    };
-    if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue
-        || keyword_callable != paramspec_callable
-    {
-        return parameters;
-    }
-
-    let [mapped_signature] = paramspec_callable.signatures(db).overloads.as_slice() else {
-        return parameters;
-    };
-
-    let mut expanded = Vec::with_capacity(parameters.len());
-    expanded.extend_from_slice(&parameters[..variadic_index]);
-    expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-    expanded.extend_from_slice(&parameters[variadic_index + 2..]);
-    expanded
 }
 
 #[derive(Clone, Debug)]

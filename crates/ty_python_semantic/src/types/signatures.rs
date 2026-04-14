@@ -2891,6 +2891,62 @@ impl<'db> Parameters<'db> {
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
+
+    /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
+    pub(crate) fn expand_paramspec_variadics(&self, db: &'db dyn Db) -> Self {
+        let mut variadic_index = None;
+        let mut paramspec_callable = None;
+
+        for (index, parameter) in self.iter().enumerate() {
+            if !parameter.is_variadic() {
+                continue;
+            }
+
+            let Type::Callable(callable) = parameter.annotated_type() else {
+                continue;
+            };
+            if callable.kind(db) != CallableTypeKind::ParamSpecValue {
+                continue;
+            }
+
+            variadic_index = Some(index);
+            paramspec_callable = Some(callable);
+            break;
+        }
+
+        let Some(variadic_index) = variadic_index else {
+            return self.clone();
+        };
+        let Some(paramspec_callable) = paramspec_callable else {
+            return self.clone();
+        };
+
+        let Some(keyword_variadic) = self.get(variadic_index + 1) else {
+            return self.clone();
+        };
+        if !keyword_variadic.is_keyword_variadic() {
+            return self.clone();
+        }
+
+        let Type::Callable(keyword_callable) = keyword_variadic.annotated_type() else {
+            return self.clone();
+        };
+        if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue
+            || keyword_callable != paramspec_callable
+        {
+            return self.clone();
+        }
+
+        let [mapped_signature] = paramspec_callable.signatures(db).overloads.as_slice() else {
+            return self.clone();
+        };
+
+        let mut expanded = Vec::with_capacity(self.len());
+        expanded.extend_from_slice(&self.value[..variadic_index]);
+        expanded.extend_from_slice(mapped_signature.parameters().as_slice());
+        expanded.extend_from_slice(&self.value[variadic_index + 2..]);
+        Parameters::new(db, expanded)
+    }
 }
 
 impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
