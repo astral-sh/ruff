@@ -3558,7 +3558,6 @@ dependencies = [
  "rustc-hash",
  "salsa",
  "serde",
- "tracing",
 ]
 
 [[package]]
