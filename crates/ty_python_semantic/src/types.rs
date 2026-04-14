@@ -14,7 +14,8 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -96,7 +97,7 @@ pub use special_form::SpecialFormType;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index};
+use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
 
 mod bool;
 mod bound_super;
@@ -7393,9 +7394,18 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                if let Some(definition) = bindings.callable_type().definition(db)
-                    && let Some(definition_range) = definition.focus_range(db)
-                {
+                // Prefer the attribute's own binding site on the class over the definition of
+                // the attribute's *type*. Without this, `__await__ = 1` would highlight
+                // `class int:` in typeshed instead of the user's assignment. See astral-sh/ty#3250.
+                let definition_range =
+                    class_attribute_first_binding_range(db, context_expression_type, "__await__")
+                        .or_else(|| {
+                            bindings
+                                .callable_type()
+                                .definition(db)
+                                .and_then(|def| def.focus_range(db))
+                        });
+                if let Some(definition_range) = definition_range {
                     diag.annotate(
                         Annotation::secondary(definition_range.into())
                             .message("attribute defined here"),
@@ -7435,6 +7445,35 @@ impl<'db> AwaitError<'db> {
             }
         }
     }
+}
+
+/// Walk the MRO of `context_type` and return the focus range of the first binding
+/// named `name` found in any class body scope.
+fn class_attribute_first_binding_range<'db>(
+    db: &'db dyn Db,
+    context_type: Type<'db>,
+    name: &str,
+) -> Option<FileRange> {
+    let class = context_type.nominal_class(db)?;
+    for base in class.iter_mro(db) {
+        let ClassBase::Class(class_type) = base else {
+            continue;
+        };
+        let Some((literal, _)) = class_type.static_class_literal(db) else {
+            continue;
+        };
+        let scope = literal.body_scope(db);
+        if let Some(symbol) = place_table(db, scope).symbol_id(name)
+            && let Some(binding) = use_def_map(db, scope)
+                .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
+                .next()
+            && let Some(definition) = binding.binding.definition()
+        {
+            let module = parsed_module(db, definition.file(db)).load(db);
+            return Some(definition.focus_range(db, &module));
+        }
+    }
+    None
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
