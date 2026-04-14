@@ -30,19 +30,33 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
     }
 }
 
-/// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
-pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp> {
-    Some(match tokens {
-        [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
-        [TokenKind::Is, _] => CmpOp::Is,
-        [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
-        [TokenKind::In, _] => CmpOp::In,
-        [TokenKind::EqEqual, _] => CmpOp::Eq,
-        [TokenKind::NotEqual, _] => CmpOp::NotEq,
-        [TokenKind::Less, _] => CmpOp::Lt,
-        [TokenKind::LessEqual, _] => CmpOp::LtE,
-        [TokenKind::Greater, _] => CmpOp::Gt,
-        [TokenKind::GreaterEqual, _] => CmpOp::GtE,
+/// Converts a single-token comparison operator to its corresponding [`CmpOp`].
+#[inline]
+pub(super) fn token_kind_to_single_cmp_op(token: TokenKind) -> Option<CmpOp> {
+    Some(match token {
+        TokenKind::In => CmpOp::In,
+        TokenKind::EqEqual => CmpOp::Eq,
+        TokenKind::NotEqual => CmpOp::NotEq,
+        TokenKind::Less => CmpOp::Lt,
+        TokenKind::LessEqual => CmpOp::LtE,
+        TokenKind::Greater => CmpOp::Gt,
+        TokenKind::GreaterEqual => CmpOp::GtE,
+        _ => return None,
+    })
+}
+
+/// Converts comparison operators that require lookahead to their corresponding [`CmpOp`].
+#[inline]
+pub(super) fn token_kind_to_lookahead_cmp_op(current: TokenKind, next: TokenKind) -> Option<CmpOp> {
+    Some(match current {
+        TokenKind::Is => {
+            if matches!(next, TokenKind::Not) {
+                CmpOp::IsNot
+            } else {
+                CmpOp::Is
+            }
+        }
+        TokenKind::Not if matches!(next, TokenKind::In) => CmpOp::NotIn,
         _ => return None,
     })
 }
