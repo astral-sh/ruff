@@ -56,36 +56,40 @@ impl<'db> Mro<'db> {
         class_literal: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, StaticMroError<'db>> {
-        /// Possibly add `Generic` to the resolved bases list.
-        ///
-        /// This function is called in two cases:
-        /// - If we encounter a subscripted `Generic` in the original bases list
-        ///   (`Generic[T]` or similar)
-        /// - If the class has PEP-695 type parameters,
-        ///   `Generic` is [implicitly appended] to the bases list at runtime
-        ///
-        /// Whether or not `Generic` is added to the bases list depends on:
-        /// - Whether `Protocol` is present in the original bases list
-        /// - Whether any of the bases yet to be visited in the original bases list
-        ///   is a generic alias (which would therefore have `Generic` in its MRO)
-        ///
-        /// This function emulates the behavior of `typing._GenericAlias.__mro_entries__` at
-        /// <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
-        ///
-        /// [implicitly inherits]: https://docs.python.org/3/reference/compound_stmts.html#generic-classes
-        fn maybe_add_generic<'db>(
-            resolved_bases: &mut Vec<ClassBase<'db>>,
-            original_bases: &[Type<'db>],
-            remaining_bases: &[Type<'db>],
-        ) {
+        // This emulates the intent of `typing._GenericAlias.__mro_entries__` at
+        // https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500
+        // CPython's check there ("any remaining base is a `_GenericAlias`") is a runtime-faithful
+        // proxy for "already provides `Generic`" — at runtime, non-subscripted classes never have
+        // `Generic` in their MRO. In typeshed, however, protocol-based classes such as
+        // `contextlib.AbstractContextManager` do have `Generic` in their MRO, so we read `Generic`
+        // directly out of typeshed's MRO rather than relying on the syntactic proxy. See
+        // astral-sh/ty#2052.
+        let maybe_add_generic = |resolved_bases: &mut Vec<ClassBase<'db>>,
+                                 original_bases: &[Type<'db>],
+                                 remaining_bases: &[Type<'db>]| {
             if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
                 return;
             }
-            if remaining_bases.iter().any(Type::is_generic_alias) {
+            if remaining_bases.iter().any(|base| {
+                // A subscripted `Generic[...]` later in the bases list must not suppress the
+                // `Generic` we'd otherwise add here: the second occurrence has its own
+                // `maybe_add_generic` call, and if it is redundant we want to report
+                // `duplicate-base` for it (see `generics/legacy/classes.md`).
+                if matches!(
+                    base,
+                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                ) {
+                    return false;
+                }
+                ClassBase::try_from_type(db, *base, Some(ClassLiteral::Static(class_literal)))
+                    .is_some_and(|cb| {
+                        !cb.has_cyclic_mro(db) && cb.mro(db, None).contains(&ClassBase::Generic)
+                    })
+            }) {
                 return;
             }
             resolved_bases.push(ClassBase::Generic);
-        }
+        };
 
         let class = class_literal.apply_optional_specialization(db, specialization);
 

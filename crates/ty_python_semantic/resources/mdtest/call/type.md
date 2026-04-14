@@ -649,12 +649,13 @@ class Cyclic(Cyclic): ...  # error: [cyclic-class-definition]
 CyclicChild = type("CyclicChild", (Cyclic,), {})
 ```
 
-## `inconsistent-mro` errors with autofixes
+## `Generic[]` alongside a base that already provides `Generic`
 
-A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
-`Generic[]` is not the last base class. We provide an autofix for this common error:
-
-<!-- snapshot-diagnostics -->
+A class that lists `Generic[]` before another base whose MRO already contains `Generic` (either
+because that base is itself generic, or because it inherits from `Protocol`) does not produce an
+`inconsistent-mro` error, even if `Generic[]` is not at the end of the base list. Previously this
+pattern produced a false-positive `inconsistent-mro` and suggested an autofix moving `Generic[]` to
+the end of the bases; see <https://github.com/astral-sh/ty/issues/2052>.
 
 ```py
 from typing import Generic, TypeVar
@@ -662,11 +663,11 @@ from typing import Generic, TypeVar
 K = TypeVar("K")
 V = TypeVar("V")
 
-class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+class Foo1(Generic[K, V], dict): ...
 
 # fmt: off
 
-class Foo2(  # error: [inconsistent-mro]
+class Foo2(
     # comment1
     Generic[K, V],  # comment2
     # comment3
@@ -674,9 +675,9 @@ class Foo2(  # error: [inconsistent-mro]
     # comment5
 ): ...
 
-class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+class Foo3(Generic[K, V], dict, metaclass=type): ...
 
-class Foo4(  # error: [inconsistent-mro]
+class Foo4(
     # comment1
     Generic[K, V],  # comment2
     # comment3

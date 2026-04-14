@@ -627,6 +627,62 @@ class Sub(Intermediate[T], Base): ...
 reveal_mro(Sub)
 ```
 
+## MROs of classes that combine `Generic[T]` with an unsubscripted generic base
+
+Regression test for <https://github.com/astral-sh/ty/issues/2052>. When a class explicitly lists
+`Generic[T]` alongside a base that already has `Generic` in its MRO — whether because it is a
+protocol-based class like `contextlib.AbstractContextManager`, or an unsubscripted reference to a
+user-defined generic class — we must not append another `Generic` to the resolved bases. Appending
+it produces a spurious `inconsistent-mro` error even though the class is valid at runtime.
+
+```py
+from contextlib import AbstractContextManager
+from typing import Generic, TypeVar
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+# Original reproducer from astral-sh/ty#2052: both orderings must be accepted.
+class A(Generic[T], AbstractContextManager): ...
+class B(AbstractContextManager, Generic[T]): ...
+
+# revealed: (<class 'A[Unknown]'>, <class 'AbstractContextManager[Unknown, bool | None]'>, <class 'ABC'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(A)
+# revealed: (<class 'B[Unknown]'>, <class 'AbstractContextManager[Unknown, bool | None]'>, <class 'ABC'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(B)
+
+# Typeshed-independent variant: an unsubscripted reference to a user-defined generic base.
+class Parent(Generic[S]): ...
+class Child(Generic[T], Parent): ...
+
+# revealed: (<class 'Child[Unknown]'>, <class 'Parent[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Child)
+
+# Guard: a *second* subscripted `Generic[...]` in the bases list must not be treated as
+# "already provides `Generic`" — otherwise we would silently drop the `duplicate-base`
+# diagnostic for this misuse.
+class Dup(Generic[T], Generic[S]): ...  # error: [duplicate-base]
+```
+
+PEP-695 syntax exercises the same `maybe_add_generic` path via the implicit `Generic` insertion for
+classes with type parameter lists.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from contextlib import AbstractContextManager
+from ty_extensions import reveal_mro
+
+class E[U](AbstractContextManager): ...
+
+# revealed: (<class 'E[Unknown]'>, <class 'AbstractContextManager[Unknown, bool | None]'>, <class 'ABC'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(E)
+```
+
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
 
 <!-- snapshot-diagnostics -->
