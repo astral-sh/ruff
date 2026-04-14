@@ -32,25 +32,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/enums.md
 warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
  --> src/mdtest_snippet.py:4:17
   |
-3 | # error: [mismatched-type-name]
 4 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-5 |
-6 | def f(name: str) -> None:
   |
 
 ```
 
 ```
 warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:8:28
-   |
- 6 | def f(name: str) -> None:
- 7 |     # error: [mismatched-type-name]
- 8 |     DynamicMismatch = Enum(name, "A B")
-   |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
- 9 |
-10 | name = "GoodMatch"
-   |
+ --> src/mdtest_snippet.py:8:28
+  |
+8 |     DynamicMismatch = Enum(name, "A B")
+  |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
+  |
 
 ```

@@ -27,15 +27,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/expression/yield_and_yie
 
 ```
 error[invalid-yield]: Send type does not match annotation
- --> src/mdtest_snippet.py:6:16
+ --> src/mdtest_snippet.py:8:16
   |
-4 |     x = yield 1
-5 |
-6 | def outer() -> Generator[int, str, None]:
-  |                ------------------------- Function annotated with send type `str` here
-7 |     # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
 8 |     yield from inner()
   |                ^^^^^^^ generator with send type `int`, expected `str`
+  |
+ ::: src/mdtest_snippet.py:6:16
+  |
+6 | def outer() -> Generator[int, str, None]:
+  |                ------------------------- Function annotated with send type `str` here
   |
 
 ```
