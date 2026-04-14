@@ -229,6 +229,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
     }
 
+    /// Returns the mutable type slot for the argument at `index`, if present.
+    pub(crate) fn type_at_mut(&mut self, index: usize) -> Option<&mut CallArgumentTypes<'db>> {
+        self.types.get_mut(index)
+    }
+
     /// Create a new [`CallArguments`] starting from the specified index.
     pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
