@@ -174,7 +174,7 @@ info: Revealed type is `int`
 `# snapshot:` follows the same placement rules as other inline assertions.
 
 To insert or rewrite inline snapshots automatically, run mdtest with
-`MDTEST_UPDATE_SNAPSHOTS` set. For example:
+`MDTEST_UPDATE_SNAPSHOTS=1` set. For example:
 
 ```sh
 MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diagnostics/missing_argument.md
