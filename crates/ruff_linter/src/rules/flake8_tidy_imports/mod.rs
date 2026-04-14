@@ -271,7 +271,7 @@ mod tests {
             is_stub: false,
         };
 
-        let (diagnostics, fixed) = test_contents(
+        let (diagnostics, fixed, _) = test_contents(
             &source_kind,
             Path::new("flake8_tidy_imports/TID254_fix.py"),
             &LinterSettings {
@@ -315,7 +315,7 @@ mod tests {
             is_stub: false,
         };
 
-        let (diagnostics, fixed) = test_contents(
+        let (diagnostics, fixed, _) = test_contents(
             &source_kind,
             Path::new("flake8_tidy_imports/TID254_dotted.py"),
             &LinterSettings {
@@ -357,7 +357,7 @@ mod tests {
             is_stub: false,
         };
 
-        let (diagnostics, fixed) = test_contents(
+        let (diagnostics, fixed, _) = test_contents(
             &source_kind,
             Path::new("flake8_tidy_imports/TID254_exclude.py"),
             &LinterSettings {
@@ -400,7 +400,7 @@ mod tests {
             is_stub: false,
         };
 
-        let (diagnostics, fixed) = test_contents(
+        let (diagnostics, fixed, _) = test_contents(
             &source_kind,
             Path::new("flake8_tidy_imports/TID254_ban_lazy.py"),
             &LinterSettings {

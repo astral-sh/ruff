@@ -938,7 +938,7 @@ mod tests {
     fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
         let source_notebook = Notebook::from_path(&notebook_path(path))?;
         let source_kind = SourceKind::ipy_notebook(source_notebook);
-        let (_, transformed) = test_contents(
+        let (_, transformed, _) = test_contents(
             &source_kind,
             path,
             &LinterSettings::for_rule(Rule::UnusedImport),

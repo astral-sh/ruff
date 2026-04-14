@@ -240,7 +240,7 @@ fn run_test(
                 .as_system_path()
                 .expect("mdtest files are on the system")
                 .as_std_path();
-            let mut diagnostics = test_contents(&source_kind, path, &settings.linter).0;
+            let (mut diagnostics, _, parsed) = test_contents(&source_kind, path, &settings.linter);
 
             diagnostics.sort_by(|left, right| {
                 left.rendering_sort_key(db)

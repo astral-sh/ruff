@@ -15,10 +15,10 @@ use ruff_db::diagnostic::{
 use ruff_notebook::Notebook;
 #[cfg(test)]
 use ruff_notebook::NotebookError;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions};
+use ruff_python_parser::{ParseError, ParseOptions, Parsed};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
@@ -174,7 +174,7 @@ pub(crate) fn assert_notebook_path(
     let source_notebook = Notebook::from_path(path.as_ref())?;
 
     let source_kind = SourceKind::ipy_notebook(source_notebook);
-    let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
+    let (messages, transformed, _) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = Notebook::from_path(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_ipy_notebook();
 
@@ -228,7 +228,7 @@ pub fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
-) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
+) -> (Vec<Diagnostic>, Cow<'a, SourceKind>, Parsed<ModModule>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
     let options =
@@ -425,7 +425,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         }))
         .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
-    (messages, transformed)
+    (messages, transformed, parsed)
 }
 
 fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) -> String {

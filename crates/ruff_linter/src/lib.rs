@@ -84,7 +84,7 @@ mod tests {
             .expect("Source code should be valid")
             .expect("Notebook to contain python code");
 
-        let (diagnostics, fixed) = test_contents(
+        let (diagnostics, fixed, _) = test_contents(
             &source_kind,
             Path::new("ruff_linter/rules/quick_test"),
             &LinterSettings::for_rule(rule),
