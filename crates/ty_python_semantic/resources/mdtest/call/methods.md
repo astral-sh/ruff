@@ -763,7 +763,7 @@ from typing import Any
 
 class Meta(type):
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...], *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], /, *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
         return {}
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any):
@@ -788,7 +788,7 @@ class MyNamespace(dict[str, Any]):
 
 class Meta(type):
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> dict[str, Any]:
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], /, **kwargs: Any) -> dict[str, Any]:
         return {}
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
@@ -809,7 +809,7 @@ class MyNamespace(dict[str, Any]):
 
 class Meta(type):
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> MyNamespace:
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], /, **kwargs: Any) -> MyNamespace:
         return MyNamespace()
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
