@@ -48,33 +48,25 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
  --> src/mdtest_snippet.py:7:8
   |
-5 | def f(
-6 |     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
 7 |     x: tuple[*tuple[int, ...], *tuple[str, ...]],
   |        ^^^^^^----------------^^----------------^
   |              |                 |
   |              |                 Later unpacked variadic tuple
   |              First unpacked variadic tuple
-8 |     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
-9 |     x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
   |
 
 ```
 
 ```
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
-  --> src/mdtest_snippet.py:9:9
-   |
- 7 |     x: tuple[*tuple[int, ...], *tuple[str, ...]],
- 8 |     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
- 9 |     x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
-   |         ^^^^^^-----------------------^^-----------------------^
-   |               |                        |
-   |               |                        Later unpacked variadic tuple
-   |               First unpacked variadic tuple
-10 |     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
-11 |     y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
-   |
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
+  |         ^^^^^^-----------------------^^-----------------------^
+  |               |                        |
+  |               |                        Later unpacked variadic tuple
+  |               First unpacked variadic tuple
+  |
 
 ```
 
@@ -82,15 +74,11 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
   --> src/mdtest_snippet.py:10:8
    |
- 8 |     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
- 9 |     x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
 10 |     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
    |        ^^^^^^----------------^^^^^^^^^^^^----------------^
    |              |                           |
    |              |                           Later unpacked variadic tuple
    |              First unpacked variadic tuple
-11 |     y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
-12 |     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
    |
 
 ```
@@ -99,15 +87,11 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
   --> src/mdtest_snippet.py:11:9
    |
- 9 |     x2: tuple[Unpack[tuple[int, ...]], Unpack[tuple[str, ...]]],
-10 |     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
 11 |     y2: tuple[Unpack[tuple[int, ...]], str, int, Unpack[tuple[str, ...]]],  # error: [invalid-type-form]
    |         ^^^^^^-----------------------^^^^^^^^^^^^-----------------------^
    |               |                                  |
    |               |                                  Later unpacked variadic tuple
    |               First unpacked variadic tuple
-12 |     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
-13 |     z: tuple[*tuple[int, ...], *tuple[str]],
    |
 
 ```
@@ -116,15 +100,11 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
   --> src/mdtest_snippet.py:23:6
    |
-21 |     reveal_type(z2)  # revealed: tuple[*tuple[int, ...], str]
-22 |
 23 | T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
    |      ^^^^^^^^^^^---^^^^^^^---^
    |                 |         |
    |                 |         Later unpacked variadic tuple
    |                 First unpacked variadic tuple
-24 |
-25 | def func3(t: tuple[*Ts]):
    |
 
 ```
@@ -133,8 +113,6 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a `tuple` specialization
   --> src/mdtest_snippet.py:27:9
    |
-25 | def func3(t: tuple[*Ts]):
-26 |     t5: tuple[*tuple[str], *Ts]  # OK
 27 |     t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
    |         ^^^^^^----------------^^---^
    |               |                 |

@@ -31,8 +31,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 error[invalid-argument-type]: Argument to function `foo` is incorrect
  --> src/mdtest_snippet.py:3:13
   |
-1 | import package
-2 |
 3 | package.foo("hello")  # error: [invalid-argument-type]
   |             ^^^^^^^ Expected `int`, found `Literal["hello"]`
   |
@@ -41,7 +39,6 @@ info: Function defined here
   |
 1 | def foo(x: int) -> int:
   |     ^^^ ------ Parameter declared here
-2 |     return x * x
   |
 
 ```

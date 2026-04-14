@@ -21,7 +21,6 @@ def _(source: str):
 error[invalid-assignment]: Object of type `str` is not assignable to `bytes`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: str):
 2 |     target: bytes = source  # snapshot
   |             -----   ^^^^^^ Incompatible value of type `str`
   |             |
@@ -42,13 +41,10 @@ def _(source: str | None):
 error[invalid-assignment]: Object of type `str | None` is not assignable to `str`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: str | None):
 2 |     target: str = source  # snapshot
   |             ---   ^^^^^^ Incompatible value of type `str | None`
   |             |
   |             Declared type
-3 | def _(source: int):
-4 |     target: str | None = source  # snapshot
   |
 ```
 
@@ -63,14 +59,10 @@ def _(source: int):
 error[invalid-assignment]: Object of type `int` is not assignable to `str | None`
  --> src/mdtest_snippet.py:4:13
   |
-2 |     target: str = source  # snapshot
-3 | def _(source: int):
 4 |     target: str | None = source  # snapshot
   |             ----------   ^^^^^^ Incompatible value of type `int`
   |             |
   |             Declared type
-5 | def _(source: str | None):
-6 |     target: bytes | None = source  # snapshot
   |
 ```
 
@@ -85,8 +77,6 @@ def _(source: str | None):
 error[invalid-assignment]: Object of type `str | None` is not assignable to `bytes | None`
  --> src/mdtest_snippet.py:6:13
   |
-4 |     target: str | None = source  # snapshot
-5 | def _(source: str | None):
 6 |     target: bytes | None = source  # snapshot
   |             ------------   ^^^^^^ Incompatible value of type `str | None`
   |             |
@@ -111,16 +101,13 @@ def _(source: Intersection[P, Q]):
 
 ```snapshot
 error[invalid-assignment]: Object of type `P & Q` is not assignable to `int`
-  --> src/mdtest_snippet.py:8:13
-   |
- 7 | def _(source: Intersection[P, Q]):
- 8 |     target: int = source  # snapshot
-   |             ---   ^^^^^^ Incompatible value of type `P & Q`
-   |             |
-   |             Declared type
- 9 | def _(source: P):
-10 |     target: Intersection[P, Q] = source  # snapshot
-   |
+ --> src/mdtest_snippet.py:8:13
+  |
+8 |     target: int = source  # snapshot
+  |             ---   ^^^^^^ Incompatible value of type `P & Q`
+  |             |
+  |             Declared type
+  |
 ```
 
 Assigning a non-intersection to an intersection:
@@ -134,14 +121,10 @@ def _(source: P):
 error[invalid-assignment]: Object of type `P` is not assignable to `P & Q`
   --> src/mdtest_snippet.py:10:13
    |
- 8 |     target: int = source  # snapshot
- 9 | def _(source: P):
 10 |     target: Intersection[P, Q] = source  # snapshot
    |             ------------------   ^^^^^^ Incompatible value of type `P`
    |             |
    |             Declared type
-11 | def _(source: Intersection[P, R]):
-12 |     target: Intersection[P, Q] = source  # snapshot
    |
 ```
 
@@ -156,8 +139,6 @@ def _(source: Intersection[P, R]):
 error[invalid-assignment]: Object of type `P & R` is not assignable to `P & Q`
   --> src/mdtest_snippet.py:12:13
    |
-10 |     target: Intersection[P, Q] = source  # snapshot
-11 | def _(source: Intersection[P, R]):
 12 |     target: Intersection[P, Q] = source  # snapshot
    |             ------------------   ^^^^^^ Incompatible value of type `P & R`
    |             |
@@ -178,13 +159,10 @@ def _(source: tuple[int, str, bool]):
 error[invalid-assignment]: Object of type `tuple[int, str, bool]` is not assignable to `tuple[int, bytes, bool]`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: tuple[int, str, bool]):
 2 |     target: tuple[int, bytes, bool] = source  # snapshot
   |             -----------------------   ^^^^^^ Incompatible value of type `tuple[int, str, bool]`
   |             |
   |             Declared type
-3 | def _(source: tuple[int, str]):
-4 |     target: tuple[int, str, bool] = source  # snapshot
   |
 ```
 
@@ -199,8 +177,6 @@ def _(source: tuple[int, str]):
 error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to `tuple[int, str, bool]`
  --> src/mdtest_snippet.py:4:13
   |
-2 |     target: tuple[int, bytes, bool] = source  # snapshot
-3 | def _(source: tuple[int, str]):
 4 |     target: tuple[int, str, bool] = source  # snapshot
   |             ---------------------   ^^^^^^ Incompatible value of type `tuple[int, str]`
   |             |
@@ -225,14 +201,10 @@ target: Callable[[int, bytes], bool] = source  # snapshot
 error[invalid-assignment]: Object of type `def source(x: int, y: str) -> None` is not assignable to `(int, bytes, /) -> bool`
  --> src/mdtest_snippet.py:6:9
   |
-4 |     raise NotImplementedError
-5 |
 6 | target: Callable[[int, bytes], bool] = source  # snapshot
   |         ----------------------------   ^^^^^^ Incompatible value of type `def source(x: int, y: str) -> None`
   |         |
   |         Declared type
-7 | def _(source: Callable[[int, str], bool]):
-8 |     target: Callable[[int, bytes], bool] = source  # snapshot
   |
 ```
 
@@ -245,17 +217,13 @@ def _(source: Callable[[int, str], bool]):
 
 ```snapshot
 error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assignable to `(int, bytes, /) -> bool`
-  --> src/mdtest_snippet.py:8:13
-   |
- 6 | target: Callable[[int, bytes], bool] = source  # snapshot
- 7 | def _(source: Callable[[int, str], bool]):
- 8 |     target: Callable[[int, bytes], bool] = source  # snapshot
-   |             ----------------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
-   |             |
-   |             Declared type
- 9 | def _(source: Callable[[int, bytes], None]):
-10 |     target: Callable[[int, bytes], bool] = source  # snapshot
-   |
+ --> src/mdtest_snippet.py:8:13
+  |
+8 |     target: Callable[[int, bytes], bool] = source  # snapshot
+  |             ----------------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
+  |             |
+  |             Declared type
+  |
 ```
 
 Assigning a `Callable` to a `Callable` with wrong return type:
@@ -269,14 +237,10 @@ def _(source: Callable[[int, bytes], None]):
 error[invalid-assignment]: Object of type `(int, bytes, /) -> None` is not assignable to `(int, bytes, /) -> bool`
   --> src/mdtest_snippet.py:10:13
    |
- 8 |     target: Callable[[int, bytes], bool] = source  # snapshot
- 9 | def _(source: Callable[[int, bytes], None]):
 10 |     target: Callable[[int, bytes], bool] = source  # snapshot
    |             ----------------------------   ^^^^^^ Incompatible value of type `(int, bytes, /) -> None`
    |             |
    |             Declared type
-11 | def _(source: Callable[[int, str], bool]):
-12 |     target: Callable[[int], bool] = source  # snapshot
    |
 ```
 
@@ -291,14 +255,10 @@ def _(source: Callable[[int, str], bool]):
 error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assignable to `(int, /) -> bool`
   --> src/mdtest_snippet.py:12:13
    |
-10 |     target: Callable[[int, bytes], bool] = source  # snapshot
-11 | def _(source: Callable[[int, str], bool]):
 12 |     target: Callable[[int], bool] = source  # snapshot
    |             ---------------------   ^^^^^^ Incompatible value of type `(int, str, /) -> bool`
    |             |
    |             Declared type
-13 | class Number:
-14 |     def __init__(self, value: int): ...
    |
 ```
 
@@ -315,8 +275,6 @@ target: Callable[[str], Any] = Number  # snapshot
 error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable to `(str, /) -> Any`
   --> src/mdtest_snippet.py:16:9
    |
-14 |     def __init__(self, value: int): ...
-15 |
 16 | target: Callable[[str], Any] = Number  # snapshot
    |         --------------------   ^^^^^^ Incompatible value of type `<class 'Number'>`
    |         |
@@ -345,19 +303,13 @@ class Child1(Parent):
 error[invalid-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.py:7:9
   |
-5 | class Child1(Parent):
-6 |     # snapshot
 7 |     def method(self, x: bytes) -> bool:
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
-8 |         raise NotImplementedError
-9 | class Child2(Parent):
   |
  ::: src/mdtest_snippet.py:2:9
   |
-1 | class Parent:
 2 |     def method(self, x: str) -> bool:
   |         ---------------------------- `Parent.method` defined here
-3 |         raise NotImplementedError
   |
 info: This violates the Liskov Substitution Principle
 ```
@@ -375,19 +327,13 @@ class Child2(Parent):
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:11:9
    |
- 9 | class Child2(Parent):
-10 |     # snapshot
 11 |     def method(self, x: str) -> None:
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
-12 |         raise NotImplementedError
-13 | class Child3(Parent):
    |
   ::: src/mdtest_snippet.py:2:9
    |
- 1 | class Parent:
  2 |     def method(self, x: str) -> bool:
    |         ---------------------------- `Parent.method` defined here
- 3 |         raise NotImplementedError
    |
 info: This violates the Liskov Substitution Principle
 ```
@@ -405,18 +351,13 @@ class Child3(Parent):
 error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:15:9
    |
-13 | class Child3(Parent):
-14 |     # snapshot
 15 |     def method(self, y: str):
    |         ^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
-16 |         raise NotImplementedError
    |
   ::: src/mdtest_snippet.py:2:9
    |
- 1 | class Parent:
  2 |     def method(self, x: str) -> bool:
    |         ---------------------------- `Parent.method` defined here
- 3 |         raise NotImplementedError
    |
 info: This violates the Liskov Substitution Principle
 ```
@@ -442,13 +383,10 @@ def _(source: Person):
 error[invalid-assignment]: Object of type `Person` is not assignable to `Other`
   --> src/mdtest_snippet.py:10:13
    |
- 9 | def _(source: Person):
 10 |     target: Other = source  # snapshot
    |             -----   ^^^^^^ Incompatible value of type `Person`
    |             |
    |             Declared type
-11 | class PersonWithAge(TypedDict):
-12 |     name: str
    |
 ```
 
@@ -467,13 +405,10 @@ def _(source: Person):
 error[invalid-assignment]: Object of type `Person` is not assignable to `PersonWithAge`
   --> src/mdtest_snippet.py:16:13
    |
-15 | def _(source: Person):
 16 |     target: PersonWithAge = source  # snapshot
    |             -------------   ^^^^^^ Incompatible value of type `Person`
    |             |
    |             Declared type
-17 | class Person(TypedDict):
-18 |     name: str
    |
 ```
 
@@ -491,7 +426,6 @@ def _(source: Person):
 error[invalid-assignment]: Object of type `Person` is not assignable to `dict[str, Any]`
   --> src/mdtest_snippet.py:21:13
    |
-20 | def _(source: Person):
 21 |     target: dict[str, Any] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `Person`
    |             |
@@ -517,16 +451,13 @@ def _(source: DoesNotHaveCheck):
 
 ```snapshot
 error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable to `SupportsCheck`
-  --> src/mdtest_snippet.py:9:13
-   |
- 8 | def _(source: DoesNotHaveCheck):
- 9 |     target: SupportsCheck = source  # snapshot
-   |             -------------   ^^^^^^ Incompatible value of type `DoesNotHaveCheck`
-   |             |
-   |             Declared type
-10 | class CheckWithWrongSignature:
-11 |     def check(self, x: int, y: bytes) -> bool:
-   |
+ --> src/mdtest_snippet.py:9:13
+  |
+9 |     target: SupportsCheck = source  # snapshot
+  |             -------------   ^^^^^^ Incompatible value of type `DoesNotHaveCheck`
+  |             |
+  |             Declared type
+  |
 ```
 
 Incompatible types for protocol members:
@@ -544,13 +475,10 @@ def _(source: CheckWithWrongSignature):
 error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assignable to `SupportsCheck`
   --> src/mdtest_snippet.py:15:13
    |
-14 | def _(source: CheckWithWrongSignature):
 15 |     target: SupportsCheck = source  # snapshot
    |             -------------   ^^^^^^ Incompatible value of type `CheckWithWrongSignature`
    |             |
    |             Declared type
-16 | class SupportsName(Protocol):
-17 |     @property
    |
 ```
 
@@ -571,7 +499,6 @@ def _(source: DoesNotHaveName):
 error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to `SupportsName`
   --> src/mdtest_snippet.py:23:13
    |
-22 | def _(source: DoesNotHaveName):
 23 |     target: SupportsName = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `DoesNotHaveName`
    |             |
@@ -603,7 +530,6 @@ def _(source: HasName):
 error[invalid-assignment]: Object of type `HasName` is not assignable to `StringOrName`
   --> src/mdtest_snippet.py:13:13
    |
-12 | def _(source: HasName):
 13 |     target: StringOrName = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `HasName`
    |             |
@@ -626,8 +552,6 @@ target: Callable[[tuple[int, bytes]], bool] = source  # snapshot
 error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> bool` is not assignable to `(tuple[int, bytes], /) -> bool`
  --> src/mdtest_snippet.py:6:9
   |
-4 |     return False
-5 |
 6 | target: Callable[[tuple[int, bytes]], bool] = source  # snapshot
   |         -----------------------------------   ^^^^^^ Incompatible value of type `def source(x: tuple[int, str]) -> bool`
   |         |
@@ -656,7 +580,6 @@ def _(source: Incompatible):
 error[invalid-assignment]: Object of type `Incompatible` is not assignable to `SupportsCheck`
   --> src/mdtest_snippet.py:12:13
    |
-11 | def _(source: Incompatible):
 12 |     target: SupportsCheck = source  # snapshot
    |             -------------   ^^^^^^ Incompatible value of type `Incompatible`
    |             |
@@ -685,7 +608,6 @@ def _(source: HasNeither):
 error[invalid-assignment]: Object of type `HasNeither` is not assignable to `SupportsFoo | SupportsBar`
   --> src/mdtest_snippet.py:12:13
    |
-11 | def _(source: HasNeither):
 12 |     target: SupportsFoo | SupportsBar = source  # snapshot
    |             -------------------------   ^^^^^^ Incompatible value of type `HasNeither`
    |             |
@@ -704,7 +626,6 @@ def _(source: int):
 error[invalid-assignment]: Object of type `int` is not assignable to `str | bytes | bool | None`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: int):
 2 |     target: str | bytes | bool | None = source  # snapshot
   |             -------------------------   ^^^^^^ Incompatible value of type `int`
   |             |
@@ -732,7 +653,6 @@ def _(source: Intersection[DoesNotSupportFoo1, DoesNotSupportFoo2]):
 error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFoo2` is not assignable to `SupportsFoo`
   --> src/mdtest_snippet.py:11:13
    |
-10 | def _(source: Intersection[DoesNotSupportFoo1, DoesNotSupportFoo2]):
 11 |     target: SupportsFoo = source  # snapshot
    |             -----------   ^^^^^^ Incompatible value of type `DoesNotSupportFoo1 & DoesNotSupportFoo2`
    |             |
@@ -768,7 +688,6 @@ def _(source: IncompatibleFoo):
 error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to `SupportsFooAndBar`
   --> src/mdtest_snippet.py:16:13
    |
-15 | def _(source: IncompatibleFoo):
 16 |     target: SupportsFooAndBar = source  # snapshot
    |             -----------------   ^^^^^^ Incompatible value of type `IncompatibleFoo`
    |             |
@@ -789,7 +708,6 @@ def _(source: list[str]):
 error[invalid-assignment]: Object of type `list[str]` is not assignable to `Iterable[bytes]`
  --> src/mdtest_snippet.py:4:13
   |
-3 | def _(source: list[str]):
 4 |     target: Iterable[bytes] = source  # snapshot
   |             ---------------   ^^^^^^ Incompatible value of type `list[str]`
   |             |
@@ -813,17 +731,13 @@ del c.attr  # snapshot
 error[invalid-assignment]: Cannot delete read-only property `attr` on object of type `C`
  --> src/mdtest_snippet.py:7:5
   |
-6 | c = C()
 7 | del c.attr  # snapshot
   |     ^^^^^^ Attempted deletion of `C.attr` here
   |
  ::: src/mdtest_snippet.py:3:9
   |
-1 | class C:
-2 |     @property
 3 |     def attr(self) -> int:
   |         ---- Property `C.attr` defined here with no deleter
-4 |         return 1
   |
 ```
 
@@ -841,13 +755,10 @@ def _(source: list[bool]):
 error[invalid-assignment]: Object of type `list[bool]` is not assignable to `list[int]`
  --> src/mdtest_snippet.py:2:13
   |
-1 | def _(source: list[bool]):
 2 |     target: list[int] = source  # snapshot
   |             ---------   ^^^^^^ Incompatible value of type `list[bool]`
   |             |
   |             Declared type
-3 | from collections import ChainMap, Counter, OrderedDict, defaultdict, deque
-4 | from collections.abc import MutableSequence, MutableMapping, MutableSet
   |
 info: `list` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
@@ -904,13 +815,10 @@ def _(source: MutableSequence[bool]):
 error[invalid-assignment]: Object of type `set[bool]` is not assignable to `set[int]`
  --> src/mdtest_snippet.py:7:13
   |
-6 | def _(source: set[bool]):
 7 |     target: set[int] = source  # snapshot
   |             --------   ^^^^^^ Incompatible value of type `set[bool]`
   |             |
   |             Declared type
-8 |
-9 | def _(source: dict[str, bool]):
   |
 info: `set` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Set`
@@ -920,13 +828,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `dict[str, bool]` is not assignable to `dict[str, int]`
   --> src/mdtest_snippet.py:10:13
    |
- 9 | def _(source: dict[str, bool]):
 10 |     target: dict[str, int] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `dict[str, bool]`
    |             |
    |             Declared type
-11 |
-12 | def _(source: dict[bool, str]):
    |
 info: `dict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
@@ -936,13 +841,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `dict[bool, str]` is not assignable to `dict[int, str]`
   --> src/mdtest_snippet.py:13:13
    |
-12 | def _(source: dict[bool, str]):
 13 |     target: dict[int, str] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `dict[bool, str]`
    |             |
    |             Declared type
-14 |
-15 | def _(source: dict[bool, bool]):
    |
 info: `dict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -951,13 +853,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `dict[bool, bool]` is not assignable to `dict[int, int]`
   --> src/mdtest_snippet.py:16:13
    |
-15 | def _(source: dict[bool, bool]):
 16 |     target: dict[int, int] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `dict[bool, bool]`
    |             |
    |             Declared type
-17 |
-18 | def _(source: defaultdict[str, bool]):
    |
 info: `dict` is invariant in its first and second type parameters
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -966,13 +865,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `defaultdict[str, bool]` is not assignable to `defaultdict[str, int]`
   --> src/mdtest_snippet.py:19:13
    |
-18 | def _(source: defaultdict[str, bool]):
 19 |     target: defaultdict[str, int] = source  # snapshot
    |             ---------------------   ^^^^^^ Incompatible value of type `defaultdict[str, bool]`
    |             |
    |             Declared type
-20 |
-21 | def _(source: defaultdict[bool, str]):
    |
 info: `defaultdict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
@@ -982,13 +878,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `defaultdict[bool, str]` is not assignable to `defaultdict[int, str]`
   --> src/mdtest_snippet.py:22:13
    |
-21 | def _(source: defaultdict[bool, str]):
 22 |     target: defaultdict[int, str] = source  # snapshot
    |             ---------------------   ^^^^^^ Incompatible value of type `defaultdict[bool, str]`
    |             |
    |             Declared type
-23 |
-24 | def _(source: OrderedDict[str, bool]):
    |
 info: `defaultdict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -997,13 +890,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `OrderedDict[str, bool]` is not assignable to `OrderedDict[str, int]`
   --> src/mdtest_snippet.py:25:13
    |
-24 | def _(source: OrderedDict[str, bool]):
 25 |     target: OrderedDict[str, int] = source  # snapshot
    |             ---------------------   ^^^^^^ Incompatible value of type `OrderedDict[str, bool]`
    |             |
    |             Declared type
-26 |
-27 | def _(source: OrderedDict[bool, str]):
    |
 info: `OrderedDict` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
@@ -1013,13 +903,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `OrderedDict[bool, str]` is not assignable to `OrderedDict[int, str]`
   --> src/mdtest_snippet.py:28:13
    |
-27 | def _(source: OrderedDict[bool, str]):
 28 |     target: OrderedDict[int, str] = source  # snapshot
    |             ---------------------   ^^^^^^ Incompatible value of type `OrderedDict[bool, str]`
    |             |
    |             Declared type
-29 |
-30 | def _(source: ChainMap[str, bool]):
    |
 info: `OrderedDict` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -1028,13 +915,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `ChainMap[str, bool]` is not assignable to `ChainMap[str, int]`
   --> src/mdtest_snippet.py:31:13
    |
-30 | def _(source: ChainMap[str, bool]):
 31 |     target: ChainMap[str, int] = source  # snapshot
    |             ------------------   ^^^^^^ Incompatible value of type `ChainMap[str, bool]`
    |             |
    |             Declared type
-32 |
-33 | def _(source: ChainMap[bool, str]):
    |
 info: `ChainMap` is invariant in its second type parameter
 info: Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type
@@ -1044,13 +928,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `ChainMap[bool, str]` is not assignable to `ChainMap[int, str]`
   --> src/mdtest_snippet.py:34:13
    |
-33 | def _(source: ChainMap[bool, str]):
 34 |     target: ChainMap[int, str] = source  # snapshot
    |             ------------------   ^^^^^^ Incompatible value of type `ChainMap[bool, str]`
    |             |
    |             Declared type
-35 |
-36 | def _(source: deque[bool]):
    |
 info: `ChainMap` is invariant in its first type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -1059,13 +940,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `deque[bool]` is not assignable to `deque[int]`
   --> src/mdtest_snippet.py:37:13
    |
-36 | def _(source: deque[bool]):
 37 |     target: deque[int] = source  # snapshot
    |             ----------   ^^^^^^ Incompatible value of type `deque[bool]`
    |             |
    |             Declared type
-38 |
-39 | def _(source: Counter[bool]):
    |
 info: `deque` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
@@ -1075,13 +953,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `Counter[bool]` is not assignable to `Counter[int]`
   --> src/mdtest_snippet.py:40:13
    |
-39 | def _(source: Counter[bool]):
 40 |     target: Counter[int] = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `Counter[bool]`
    |             |
    |             Declared type
-41 |
-42 | def _(source: MutableSequence[bool]):
    |
 info: `Counter` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -1090,12 +965,10 @@ info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#
 error[invalid-assignment]: Object of type `MutableSequence[bool]` is not assignable to `MutableSequence[int]`
   --> src/mdtest_snippet.py:43:13
    |
-42 | def _(source: MutableSequence[bool]):
 43 |     target: MutableSequence[int] = source  # snapshot
    |             --------------------   ^^^^^^ Incompatible value of type `MutableSequence[bool]`
    |             |
    |             Declared type
-44 | from typing import Generic, TypeVar
    |
 info: `MutableSequence` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -1119,13 +992,10 @@ def _(source: MyContainer[bool]):
 error[invalid-assignment]: Object of type `MyContainer[bool]` is not assignable to `MyContainer[int]`
   --> src/mdtest_snippet.py:52:13
    |
-51 | def _(source: MyContainer[bool]):
 52 |     target: MyContainer[int] = source  # snapshot
    |             ----------------   ^^^^^^ Incompatible value of type `MyContainer[bool]`
    |             |
    |             Declared type
-53 | def _(source: list[int]):
-54 |     target: list[str] = source  # snapshot
    |
 info: `MyContainer` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
@@ -1142,13 +1012,10 @@ def _(source: list[int]):
 error[invalid-assignment]: Object of type `list[int]` is not assignable to `list[str]`
   --> src/mdtest_snippet.py:54:13
    |
-52 |     target: MyContainer[int] = source  # snapshot
-53 | def _(source: list[int]):
 54 |     target: list[str] = source  # snapshot
    |             ---------   ^^^^^^ Incompatible value of type `list[int]`
    |             |
    |             Declared type
-55 | from collections.abc import Sequence
    |
 ```
 

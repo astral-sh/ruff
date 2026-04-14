@@ -28,11 +28,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 error[not-iterable]: Object of type `NotIterable` is not iterable
  --> src/mdtest_snippet.py:6:10
   |
-4 |     __iter__: None = None
-5 |
 6 | for x in NotIterable():  # error: [not-iterable]
   |          ^^^^^^^^^^^^^
-7 |     pass
   |
 info: Its `__iter__` attribute has type `None`, which is not callable
 

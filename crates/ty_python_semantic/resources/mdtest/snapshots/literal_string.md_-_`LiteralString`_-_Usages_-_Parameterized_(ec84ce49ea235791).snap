@@ -28,11 +28,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/literal_stri
 error[invalid-type-form]: `LiteralString` expects no type parameter
  --> src/mdtest_snippet.py:4:4
   |
-3 | # error: [invalid-type-form]
 4 | a: LiteralString[str]
   |    ^^^^^^^^^^^^^^^^^^
-5 |
-6 | # error: [invalid-type-form]
   |
 
 ```
@@ -41,7 +38,6 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
 error[invalid-type-form]: `LiteralString` expects no type parameter
  --> src/mdtest_snippet.py:7:4
   |
-6 | # error: [invalid-type-form]
 7 | b: LiteralString["foo"]
   |    -------------^^^^^^^
   |    |

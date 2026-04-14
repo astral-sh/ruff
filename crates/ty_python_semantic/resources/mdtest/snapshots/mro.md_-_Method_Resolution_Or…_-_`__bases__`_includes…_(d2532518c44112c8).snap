@@ -49,11 +49,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 warning[unsupported-base]: Unsupported class base
   --> src/mdtest_snippet.py:17:11
    |
-16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 17 | class Foo(x): ...
    |           ^ Has type `<class 'A'> | <class 'B'>`
-18 |
-19 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
    |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `Foo` due to this base
 info: Only class objects or `Any` are supported as class bases
@@ -64,8 +61,6 @@ info: Only class objects or `Any` are supported as class bases
 warning[unsupported-base]: Unsupported class base
   --> src/mdtest_snippet.py:28:13
    |
-26 |         class C: ...
-27 |
 28 |     class D(C): ...  # error: [unsupported-base]
    |             ^ Has type `<class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:23:15'> | <class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:26:15'>`
    |

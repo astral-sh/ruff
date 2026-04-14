@@ -26,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unary/not.md
 error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
  --> src/mdtest_snippet.py:5:1
   |
-4 | # error: [unsupported-bool-conversion]
 5 | not NotBoolable()
   | ^^^^^^^^^^^^^^^^^
   |

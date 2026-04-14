@@ -24,8 +24,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 error[invalid-base]: Invalid base for class created via `type()`
  --> src/mdtest_snippet.py:3:16
   |
-1 | from typing_extensions import TypedDict
-2 |
 3 | X = type("X", (TypedDict,), {})  # error: [invalid-base]
   |                ^^^^^^^^^ Has type `<special-form 'typing.TypedDict'>`
   |

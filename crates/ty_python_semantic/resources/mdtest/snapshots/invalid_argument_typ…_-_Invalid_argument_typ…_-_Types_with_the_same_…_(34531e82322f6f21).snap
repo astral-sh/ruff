@@ -34,16 +34,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argu
 error[invalid-argument-type]: Argument to function `needs_a_foo` is incorrect
  --> src/main.py:5:13
   |
-3 | class Foo: ...
-4 |
 5 | needs_a_foo(Foo())  # error: [invalid-argument-type]
   |             ^^^^^ Expected `module.Foo`, found `main.Foo`
   |
 info: Function defined here
  --> src/module.py:3:5
   |
-1 | class Foo: ...
-2 |
 3 | def needs_a_foo(x: Foo): ...
   |     ^^^^^^^^^^^ ------ Parameter declared here
   |

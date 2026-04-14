@@ -32,8 +32,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 error[invalid-super-argument]: Argument is not a valid class
   --> src/mdtest_snippet.py:11:5
    |
- 9 |         class A: ...
-10 |
 11 |     super(A, A())  # error: [invalid-super-argument]
    |     ^^^^^^^^^^^^^ Argument has type `<class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:6:15'> | <class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:9:15'>`
    |

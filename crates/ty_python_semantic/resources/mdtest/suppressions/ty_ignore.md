@@ -26,8 +26,6 @@ a = test + 3  # ty: ignore[possibly-unresolved-reference]
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
  --> src/mdtest_snippet.py:3:15
   |
-1 | test = 10
-2 | # snapshot
 3 | a = test + 3  # ty: ignore[possibly-unresolved-reference]
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
@@ -51,11 +49,8 @@ print(a)
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
  --> src/mdtest_snippet.py:3:15
   |
-1 | # snapshot: unused-ignore-comment
-2 | # error: [unresolved-reference]
 3 | a = test + 3  # ty: ignore[possibly-unresolved-reference]
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-4 | print(a)
   |
 help: Remove the unused suppression comment
 1 | # snapshot: unused-ignore-comment
@@ -87,7 +82,6 @@ a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unused-ignore-comment'
  --> src/mdtest_snippet.py:2:44
   |
-1 | # snapshot
 2 | a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
   |                                            ^^^^^^^^^^^^^^^^^^^^^
   |
@@ -110,11 +104,8 @@ a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
 warning[unused-ignore-comment]: Unused `ty: ignore` directive
  --> src/mdtest_snippet.py:2:13
   |
-1 | # snapshot
 2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 | # snapshot
-4 | # snapshot
   |
 help: Remove the unused suppression comment
 1 | # snapshot
@@ -135,12 +126,8 @@ a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-refere
 warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment'
  --> src/mdtest_snippet.py:5:26
   |
-3 | # snapshot
-4 | # snapshot
 5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
   |                          ^^^^^^^^^^^^^^^^^^
-6 | # snapshot
-7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
   |
 help: Remove the unused suppression code
 2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
@@ -155,12 +142,8 @@ help: Remove the unused suppression code
 warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
  --> src/mdtest_snippet.py:5:64
   |
-3 | # snapshot
-4 | # snapshot
 5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
   |                                                                ^^^^^^^^^^^^^^^^^^^^
-6 | # snapshot
-7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
   |
 help: Remove the unused suppression code
 2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
@@ -181,8 +164,6 @@ a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-z
 warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'
  --> src/mdtest_snippet.py:7:26
   |
-5 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
-6 | # snapshot
 7 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
@@ -315,7 +296,6 @@ a = 10 + 4  # ty: ignore[division-by-zer]
 warning[ignore-comment-unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
  --> src/mdtest_snippet.py:2:26
   |
-1 | # snapshot
 2 | a = 10 + 4  # ty: ignore[division-by-zer]
   |                          ^^^^^^^^^^^^^^^
   |

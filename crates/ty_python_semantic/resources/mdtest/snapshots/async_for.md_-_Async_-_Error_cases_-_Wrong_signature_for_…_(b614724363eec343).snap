@@ -33,11 +33,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
   --> src/mdtest_snippet.py:11:20
    |
- 9 | async def foo():
-10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
-12 |         reveal_type(x)  # revealed: int
    |
 info: Its `__aiter__` method returns an object of type `AsyncIterator`, which has an invalid `__anext__` method
 info: Expected signature for `__anext__` is `def __anext__(self): ...`

@@ -27,14 +27,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
  --> src/mdtest_snippet.py:4:1
   |
-2 | y: str
-3 |
 4 | x, y = ("a", "b")  # error: [invalid-assignment]
   | -      ^^^^^^^^^^ Incompatible value of type `Literal["a"]`
   | |
   | Declared type `int`
-5 |
-6 | x, y = (0, 0)  # error: [invalid-assignment]
   |
 
 ```
@@ -43,8 +39,6 @@ error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `i
 error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str`
  --> src/mdtest_snippet.py:6:4
   |
-4 | x, y = ("a", "b")  # error: [invalid-assignment]
-5 |
 6 | x, y = (0, 0)  # error: [invalid-assignment]
   |    -   ^^^^^^ Incompatible value of type `Literal[0]`
   |    |

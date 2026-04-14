@@ -33,7 +33,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/binary/custom.md
 error[unsupported-operator]: Unsupported `+` operation
  --> src/mod2.py:6:1
   |
-5 | # error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
 6 | A() + mod1.A()
   | ---^^^--------
   | |     |

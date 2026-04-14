@@ -33,11 +33,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/new_types.md
 warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
  --> src/mdtest_snippet.py:5:18
   |
-4 | # error: [mismatched-type-name]
 5 | UserId = NewType("Id", int)
   |                  ^^^^ Expected "UserId", got "Id"
-6 | reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
-7 | reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
   |
 
 ```
@@ -46,11 +43,8 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
 warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
   --> src/mdtest_snippet.py:11:26
    |
- 9 | Id = int
-10 | # error: [mismatched-type-name]
 11 | UsesExistingId = NewType("Id", "Id")
    |                          ^^^^ Expected "UsesExistingId", got "Id"
-12 | UsesExistingId(1)
    |
 
 ```

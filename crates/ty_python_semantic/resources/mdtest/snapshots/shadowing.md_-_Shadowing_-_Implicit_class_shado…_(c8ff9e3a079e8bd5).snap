@@ -24,8 +24,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
 error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<class 'C'>`
  --> src/mdtest_snippet.py:3:1
   |
-1 | class C: ...
-2 |
 3 | C = 1  # error: [invalid-assignment]
   | -   ^ Incompatible value of type `Literal[1]`
   | |
