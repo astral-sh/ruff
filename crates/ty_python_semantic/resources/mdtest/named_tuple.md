@@ -1072,8 +1072,8 @@ alice = SuperUser(1, "Alice", 3)
 
 Any subclass member that reuses an inherited `NamedTuple` field name is rejected. This is a
 special-cased `NamedTuple` diagnostic rather than a Liskov-substitution check: at runtime, these
-overrides can make attribute access disagree with tuple indexing and `repr`, and modeling all of
-those split views precisely would add a lot of complexity for a pattern that is usually a mistake.
+overrides can make attribute access disagree with tuple indexing and `repr`, and this pattern is
+usually a mistake.
 
 ```py
 from typing import NamedTuple
@@ -1117,19 +1117,36 @@ james.title = "Boss"
 james.nickname = "Bob"
 ```
 
-This broad rule also means we do not need to model cases where the subclass would expose one value
-through `obj.x` but a different value through `obj[0]` and `repr(obj)`.
+Even though we reject the override, normal attribute lookup still follows the subclass member while
+tuple indexing preserves the inherited field view:
+
+```py
+from typing import NamedTuple
+
+class Parent(NamedTuple):
+    age: int | None
+
+class Child(Parent):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `Parent`"
+    age: int = 42
+
+reveal_type(Child(age=None)[0])  # revealed: int | None
+reveal_type(Child(age=None).age)  # revealed: int
+```
 
 The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
 
 ```py
 from typing import NamedTuple
 
-TypingBase = NamedTuple("TypingBase", [("id", int)])
+TypingBase = NamedTuple("TypingBase", [("age", int | None)])
 
 class TypingChild(TypingBase):
-    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `id` inherited from `TypingBase`"
-    id: int = 0
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `TypingBase`"
+    age: int = 42
+
+reveal_type(TypingChild(age=None)[0])  # revealed: int | None
+reveal_type(TypingChild(age=None).age)  # revealed: int
 ```
 
 The same check applies through deeper inheritance chains:

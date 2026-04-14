@@ -2258,6 +2258,17 @@ impl<'db> StaticClassLiteral<'db> {
         // - `typing.Final`
         // - Proper diagnostics
 
+        // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
+        // as instance attributes here causes inherited fields to leak through after a subclass
+        // shadows the name with a normal class attribute.
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into(), None)
+            && self
+                .own_fields(db, None, CodeGeneratorKind::NamedTuple)
+                .contains_key(name)
+        {
+            return Member::unbound();
+        }
+
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
 
