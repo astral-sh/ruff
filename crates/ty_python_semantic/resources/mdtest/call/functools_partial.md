@@ -1106,7 +1106,7 @@ reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
 
 ### Generic function with multiple type variables
 
-TODO: preserve uninferred type variables in the resulting partial signature.
+Unresolved type variables remain generic in the resulting partial signature.
 
 ```py
 from functools import partial
@@ -1119,7 +1119,7 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
-reveal_type(p)  # revealed: partial[(b: Unknown) -> tuple[Literal[1], Unknown]]
+reveal_type(p)  # revealed: partial[[U](b: U) -> tuple[Literal[1], U]]
 ```
 
 ### Callable object (class with `__call__`)
@@ -1189,7 +1189,8 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 
 ### Overriding keyword-bound generic args at call time
 
-TODO: preserve the override branch when a keyword-bound generic is rebound at call time.
+Bound keyword arguments can specialize a generic for the defaulted call path while still leaving an
+override branch available when the same keyword is supplied later:
 
 ```py
 from functools import partial
@@ -1201,11 +1202,9 @@ def pair(a: T, b: T) -> tuple[T, T]:
     return (a, b)
 
 p = partial(pair, b=1)
-reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
+reveal_type(p)  # revealed: partial[Overload[(a: int, *, b: int = 1) -> tuple[int, int], [T](a: T, *, b: T) -> tuple[T, T]]]
 p("x")  # error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-p("x", b="y")
+reveal_type(p("x", b="y"))  # revealed: tuple[Literal["x", "y"], Literal["x", "y"]]
 ```
 
 ## Assignability and partial object behavior

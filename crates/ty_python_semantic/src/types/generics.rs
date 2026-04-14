@@ -1740,17 +1740,50 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
+        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Specialization<'db> {
+        self.build_specialization_with(generic_context, |_, _| None, choose)
+    }
+
+    /// Build a specialization that preserves selected uninferred type variables as themselves.
+    ///
+    /// This is useful for constructing reusable callables like `functools.partial(...)`, where
+    /// type variables that can still be inferred by future calls should remain generic, while
+    /// uninferred type variables that can no longer be inferred should still resolve via defaults.
+    pub(crate) fn build_preserving_unmapped_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        mut preserve_unmapped: impl FnMut(BoundTypeVarInstance<'db>) -> bool,
+        choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Specialization<'db> {
+        self.build_specialization_with(
+            generic_context,
+            |_, variable| preserve_unmapped(variable).then_some(Type::TypeVar(variable)),
+            choose,
+        )
+    }
+
+    fn build_specialization_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        mut unmapped: impl FnMut(
+            BoundTypeVarIdentity<'db>,
+            BoundTypeVarInstance<'db>,
+        ) -> Option<Type<'db>>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, Type<'db>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = generic_context
             .variables_inner(self.db)
             .iter()
-            .map(|(identity, variable)| {
-                let mapped_ty = self.types.get(identity).copied()?;
-                // The typevar was inferred — present both bounds as the inferred type.
-                let chosen = choose(*variable, mapped_ty, mapped_ty);
-                Some(chosen.unwrap_or(mapped_ty))
-            });
+            .map(
+                |(identity, variable)| match self.types.get(identity).copied() {
+                    Some(mapped_ty) => {
+                        // The typevar was inferred — present both bounds as the inferred type.
+                        Some(choose(*variable, mapped_ty, mapped_ty).unwrap_or(mapped_ty))
+                    }
+                    None => unmapped(*identity, *variable),
+                },
+            );
 
         generic_context.specialize_recursive(self.db, types)
     }

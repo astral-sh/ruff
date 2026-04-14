@@ -2902,11 +2902,13 @@ impl<'db> CallableBinding<'db> {
             let Some(bound_overload) = self.overloads().get(index) else {
                 continue;
             };
-            let signature =
-                bound_overload.partially_applied_signature(db, signature_arguments.as_ref());
-            let dedup_key = signature.clone().with_definition(None);
-            if seen_overloads.insert(dedup_key) {
-                new_overloads.push(signature);
+            for signature in
+                bound_overload.partially_applied_signatures(db, signature_arguments.as_ref())
+            {
+                let dedup_key = signature.clone().with_definition(None);
+                if seen_overloads.insert(dedup_key) {
+                    new_overloads.push(signature);
+                }
             }
         }
 
@@ -4770,6 +4772,46 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.errors.extend(specialization_errors);
 
+        let parameters = self.signature.parameters();
+        let mut remove_positionally_bound = vec![false; parameters.len()];
+        for ((argument, _), argument_matches) in
+            self.arguments.iter().zip(self.argument_matches.iter())
+        {
+            if !matches!(
+                argument,
+                Argument::Positional | Argument::Synthetic | Argument::Variadic
+            ) {
+                continue;
+            }
+
+            for (parameter_index, _) in argument_matches.iter() {
+                let parameter = &parameters[parameter_index];
+                if parameter.is_positional()
+                    && !parameter.is_variadic()
+                    && !parameter.is_keyword_variadic()
+                {
+                    remove_positionally_bound[parameter_index] = true;
+                }
+            }
+        }
+
+        let future_inferable_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
+            .variables(self.db)
+            .filter(|typevar| {
+                let typevar_identity = typevar.typevar(self.db).identity(self.db);
+                parameters
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| !remove_positionally_bound[*index])
+                    .any(|(_, parameter)| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar(self.db, typevar_identity)
+                    })
+            })
+            .map(|typevar| typevar.identity(self.db))
+            .collect();
+
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, lower_bound, upper_bound) and returns Some(ty) to
         // override the default solution, or None to keep it.
@@ -4819,7 +4861,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
-        let partial_specialization = specialization;
+        let partial_specialization = builder.build_preserving_unmapped_with(
+            generic_context,
+            |typevar| future_inferable_typevars.contains(&typevar.identity(self.db)),
+            maybe_promote,
+        );
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
@@ -5534,17 +5580,12 @@ impl<'db> Binding<'db> {
         });
     }
 
-    /// Returns the callable signature produced by partially applying this bound overload.
-    ///
-    /// For example, starting from `(a: int, b: str, c: bool) -> bytes`,
-    /// `partial(f, 1, c=True)` should expose `(b: str, *, c: bool = True) -> bytes`:
-    /// the positionally bound `a` is removed, the keyword-bound `c` stays as a defaulted
-    /// parameter, and `c` becomes keyword-only in the reduced signature.
-    fn partially_applied_signature(
+    /// Returns the callable signature(s) produced by partially applying this bound overload.
+    fn partially_applied_signatures(
         &self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-    ) -> Signature<'db> {
+    ) -> SmallVec<[Signature<'db>; 2]> {
         let parameters = self.signature.parameters().as_slice();
         let mut remove_positionally_bound = vec![false; parameters.len()];
         let mut keyword_defaults = vec![None; parameters.len()];
@@ -5594,19 +5635,72 @@ impl<'db> Binding<'db> {
 
         let signature_specialization =
             self.partial_signature_specialization(db, &remove_positionally_bound);
+        let mut signatures = smallvec![self.build_partially_applied_signature(
+            db,
+            signature_specialization,
+            &remove_positionally_bound,
+            &keyword_defaults,
+            &keyword_bound,
+            &[],
+        )];
+
+        if let Some((override_specialization, required_override_parameters)) = self
+            .keyword_override_partial_signature_branch(
+                db,
+                arguments,
+                signature_specialization,
+                &remove_positionally_bound,
+                &keyword_bound,
+            )
+        {
+            signatures.push(self.build_partially_applied_signature(
+                db,
+                Some(override_specialization),
+                &remove_positionally_bound,
+                &keyword_defaults,
+                &keyword_bound,
+                &required_override_parameters,
+            ));
+        }
+
+        signatures
+    }
+
+    /// Builds one callable signature exposed by a `functools.partial` object.
+    ///
+    /// The base branch keeps the bound keyword defaults on the reduced parameter list. Override
+    /// branches can instead require selected keyword-bound parameters to be supplied again so later
+    /// calls may re-infer the surviving type variables from those overrides.
+    ///
+    /// For example, starting from `(a: int, b: str, c: bool) -> bytes`,
+    /// `partial(f, 1, c=True)` should expose `(b: str, *, c: bool = True) -> bytes`:
+    /// the positionally bound `a` is removed, the keyword-bound `c` stays as a defaulted
+    /// parameter, and `c` becomes keyword-only in the reduced signature.
+    fn build_partially_applied_signature(
+        &self,
+        db: &'db dyn Db,
+        signature_specialization: Option<Specialization<'db>>,
+        remove_positionally_bound: &[bool],
+        keyword_defaults: &[Option<Type<'db>>],
+        keyword_bound: &[bool],
+        required_override_parameters: &[usize],
+    ) -> Signature<'db> {
         let signature = signature_specialization.map_or_else(
             || self.signature.clone(),
             |specialization| self.signature.apply_specialization(db, specialization),
         );
-
         let parameters = signature.parameters().as_slice();
-        let return_ty = self.partial_specialization.map_or_else(
+        let return_ty = signature_specialization.map_or_else(
             || self.unspecialized_return_type(db),
             |specialization| {
                 self.unspecialized_return_type(db)
-                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
+                    .apply_specialization(db, specialization)
             },
         );
+        let required_override_parameters = required_override_parameters
+            .iter()
+            .copied()
+            .collect::<FxHashSet<_>>();
 
         let mut remaining = Vec::with_capacity(parameters.len());
         let mut first_keyword_bound_positional_or_keyword = None;
@@ -5615,10 +5709,14 @@ impl<'db> Binding<'db> {
                 continue;
             }
 
-            let parameter = keyword_defaults[index].map_or_else(
-                || parameter.clone(),
-                |default_ty| parameter.clone().with_default_type(default_ty),
-            );
+            let parameter = if required_override_parameters.contains(&index) {
+                parameter.clone().without_default_type()
+            } else {
+                keyword_defaults[index].map_or_else(
+                    || parameter.clone(),
+                    |default_ty| parameter.clone().with_default_type(default_ty),
+                )
+            };
 
             if first_keyword_bound_positional_or_keyword.is_none()
                 && keyword_bound[index]
@@ -5664,6 +5762,137 @@ impl<'db> Binding<'db> {
         signature
             .with_parameters(Parameters::new(db, reordered))
             .with_return_type(return_ty)
+    }
+
+    /// Returns an additional reduced signature for later keyword overrides, when needed.
+    ///
+    /// `functools.partial` allows keyword-bound arguments to be supplied again at call time. If a
+    /// bound keyword specialized a type variable that still appears in the reduced signature, we
+    /// expose a second branch that restores that type variable and makes the overridden keyword
+    /// required again.
+    fn keyword_override_partial_signature_branch(
+        &self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        signature_specialization: Option<Specialization<'db>>,
+        remove_positionally_bound: &[bool],
+        keyword_bound: &[bool],
+    ) -> Option<(Specialization<'db>, Vec<usize>)> {
+        let base_specialization = signature_specialization?;
+        let generic_context = self.signature.generic_context?;
+
+        let overridable_typevars = self.keyword_override_partial_typevars(
+            db,
+            arguments,
+            remove_positionally_bound,
+            keyword_bound,
+        );
+        if overridable_typevars.is_empty() {
+            return None;
+        }
+
+        let required_override_parameters: Vec<_> = self
+            .signature
+            .parameters()
+            .iter()
+            .enumerate()
+            .filter(|(index, parameter)| {
+                keyword_bound[*index]
+                    && overridable_typevars.iter().any(|typevar| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar(db, typevar.identity)
+                    })
+            })
+            .map(|(index, _)| index)
+            .collect();
+        if required_override_parameters.is_empty() {
+            return None;
+        }
+
+        let override_specialization = generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                Some(if overridable_typevars.contains(&typevar.identity(db)) {
+                    Type::TypeVar(typevar)
+                } else {
+                    base_specialization
+                        .get(db, typevar)
+                        .unwrap_or(Type::TypeVar(typevar))
+                })
+            }),
+        );
+
+        if override_specialization == base_specialization {
+            return None;
+        }
+
+        Some((override_specialization, required_override_parameters))
+    }
+
+    /// Finds type variables specialized only by overridable keyword-bound arguments.
+    ///
+    /// Type variables constrained by any positional argument, or by a keyword bound to a parameter
+    /// that no longer survives in the reduced signature, stay frozen on the default branch.
+    fn keyword_override_partial_typevars(
+        &self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        remove_positionally_bound: &[bool],
+        keyword_bound: &[bool],
+    ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        let Some(generic_context) = self.signature.generic_context else {
+            return FxHashSet::default();
+        };
+
+        let mut overridable = FxHashSet::default();
+        let mut frozen = FxHashSet::default();
+        for ((argument, _), argument_matches) in arguments.iter().zip(self.argument_matches.iter())
+        {
+            for (parameter_index, _) in argument_matches.iter() {
+                if remove_positionally_bound[parameter_index] {
+                    continue;
+                }
+
+                let Some(parameter) = self.signature.parameters().get(parameter_index) else {
+                    continue;
+                };
+                let referenced_typevars = generic_context.variables(db).filter(|typevar| {
+                    parameter
+                        .annotated_type()
+                        .references_typevar(db, typevar.typevar(db).identity(db))
+                });
+
+                match argument {
+                    Argument::Keyword(_) | Argument::Keywords if keyword_bound[parameter_index] => {
+                        overridable.extend(referenced_typevars.map(|typevar| typevar.identity(db)));
+                    }
+                    _ => {
+                        frozen.extend(referenced_typevars.map(|typevar| typevar.identity(db)));
+                    }
+                }
+            }
+        }
+
+        if overridable.is_empty() {
+            return overridable;
+        }
+
+        let Some(partial_specialization) = self.partial_specialization else {
+            return FxHashSet::default();
+        };
+
+        overridable
+            .into_iter()
+            .filter(|typevar_identity| {
+                !frozen.contains(typevar_identity)
+                    && generic_context
+                        .variables(db)
+                        .find(|typevar| typevar.identity(db) == *typevar_identity)
+                        .and_then(|typevar| partial_specialization.get(db, typevar))
+                        .is_some_and(|ty| !matches!(ty, Type::TypeVar(mapped) if mapped.identity(db) == *typevar_identity))
+            })
+            .collect()
     }
 
     /// Returns the specialization used for the callable signature exposed by a partial object.
