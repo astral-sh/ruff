@@ -1,3 +1,4 @@
+use crate::{is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::parsed_module;
@@ -14,7 +15,6 @@ use rustc_hash::FxHashSet;
 use salsa::Setter as _;
 use std::collections::BTreeMap;
 use thiserror::Error;
-use ty_python_semantic::{is_unused_ignore_comment_lint, suppress_all};
 
 use crate::Db;
 
@@ -79,7 +79,6 @@ pub fn suppress_all_diagnostics(
     }
 
     let mut fixed_count = 0usize;
-    let project = db.project();
 
     // Try to suppress all lint-diagnostics in the given file.
     for (&file, file_diagnostics) in &mut by_file {
@@ -215,8 +214,7 @@ pub fn suppress_all_diagnostics(
         } else {
             // If there are any other file level diagnostics, call `check_file` to re-compute them
             // with updated ranges.
-            let diagnostics = project.check_file(db, file);
-            *file_diagnostics = diagnostics;
+            *file_diagnostics = db.check_file(file);
         }
 
         fixed_count += fixable_diagnostics.len();
@@ -404,16 +402,12 @@ mod tests {
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_python_ast::name::Name;
+    use ruff_db::system::SystemPath;
     use rustc_hash::FxHashMap;
-    use ty_python_semantic::UNUSED_IGNORE_COMMENT;
-    use ty_python_semantic::lint::Level;
 
-    use crate::db::tests::TestDb;
-    use crate::metadata::options::Rules;
-    use crate::metadata::value::RangedValue;
-    use crate::{Db, ProjectMetadata, suppress_all_diagnostics};
+    use super::suppress_all_diagnostics;
+    use crate::Db as _;
+    use crate::db::tests::TestDbBuilder;
 
     #[test]
     fn simple_suppression() {
@@ -657,27 +651,20 @@ class B(A):
     fn suppress_all_in(source: &str) -> String {
         use std::fmt::Write as _;
 
-        let mut metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("."));
-        metadata.options.rules = Some(Rules::from_iter([(
-            RangedValue::cli(UNUSED_IGNORE_COMMENT.name.to_string()),
-            RangedValue::cli(Level::Warn),
-        )]));
-
-        let mut db = TestDb::new(metadata);
-        db.init_program().unwrap();
-
-        db.write_file(
-            "test.py",
-            ruff_python_trivia::textwrap::dedent(source).trim(),
-        )
-        .unwrap();
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "test.py",
+                ruff_python_trivia::textwrap::dedent(source).trim(),
+            )
+            .build()
+            .unwrap();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
         let parsed_before = parsed_module(&db, file);
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
-        let diagnostics = db.project().check_file(&db, file);
+        let diagnostics = db.check_file(file);
         let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes =
@@ -693,7 +680,7 @@ class B(A):
         let parsed = parsed_module(&db, file);
         let parsed = parsed.load(&db);
 
-        let diagnostics_after_applying_fixes = db.project().check_file(&db, file);
+        let diagnostics_after_applying_fixes = db.check_file(file);
 
         let mut output = String::new();
 

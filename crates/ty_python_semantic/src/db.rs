@@ -1,11 +1,14 @@
 use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-use ty_python_core::Db as SemanticIndexDb;
+use ty_python_core::Db as PythonCoreDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SemanticIndexDb {
+pub trait Db: PythonCoreDb {
+    fn check_file(&self, file: File) -> Vec<Diagnostic>;
+
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
@@ -26,7 +29,7 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::default_lint_registry;
+    use crate::{check_file_unwrap, default_lint_registry};
     use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
@@ -127,6 +130,14 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
+        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+            if !self.should_check_file(file) {
+                return Vec::new();
+            }
+
+            check_file_unwrap(self, file)
+        }
+
         fn rule_selection(&self, _file: File) -> &RuleSelection {
             &self.rule_selection
         }
