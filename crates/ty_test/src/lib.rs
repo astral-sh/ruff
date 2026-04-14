@@ -44,9 +44,10 @@ mod parser;
 /// Only tests whose names contain this filter string will be executed.
 const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 
-/// If set, updates the content of inline snapshots.
+/// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
+/// If set to a value other than "0", runs tests that include external dependencies.
 const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
 
 /// Run `path` as a markdown test suite with given `title`.
@@ -795,8 +796,9 @@ fn render_diagnostics(db: &mut Db, diagnostics: &[Diagnostic]) -> String {
 }
 
 fn is_update_inline_snapshots_enabled() -> bool {
-    let is_enabled: std::sync::LazyLock<_> =
-        std::sync::LazyLock::new(|| std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some());
+    let is_enabled: std::sync::LazyLock<_> = std::sync::LazyLock::new(|| {
+        std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some_and(|v| v != "0")
+    });
     *is_enabled
 }
 
@@ -883,7 +885,7 @@ fn validate_inline_snapshot(
                 failures.push(
                     line,
                     vec![Failure::new(format!(
-                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}` to insert one automatically",
+                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
                     ))],
                 );
             }
@@ -903,7 +905,7 @@ fn validate_inline_snapshot(
             failures.push(
                 failure_line,
                 vec![Failure::new(format_args!(
-                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}` to update the `snapshot` block",
+                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
                     )).with_diff(snapshot_code_block.expected.to_string(), actual)],
                 );
         }
