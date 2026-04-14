@@ -424,6 +424,10 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, signature.return_ty);
 }
 
+/// Describes how a `functools.partial(...)` call binds one overload's parameters.
+///
+/// `call/bind.rs` computes this from argument matching. Signature rewriting then consumes this
+/// summary to synthesize the reduced callable that a partial object exposes.
 #[derive(Clone, Debug)]
 pub(crate) struct PartialApplication<'db> {
     positionally_bound: Box<[bool]>,
@@ -432,6 +436,8 @@ pub(crate) struct PartialApplication<'db> {
 }
 
 impl<'db> PartialApplication<'db> {
+    /// Creates an empty partial-application summary for a signature with `parameter_count`
+    /// parameters.
     pub(crate) fn new(parameter_count: usize) -> Self {
         Self {
             positionally_bound: vec![false; parameter_count].into_boxed_slice(),
@@ -440,10 +446,13 @@ impl<'db> PartialApplication<'db> {
         }
     }
 
+    /// Marks the parameter at `parameter_index` as consumed by a positional binding.
     pub(crate) fn bind_positionally(&mut self, parameter_index: usize) {
         self.positionally_bound[parameter_index] = true;
     }
 
+    /// Marks the parameter at `parameter_index` as bound by keyword and records the synthesized
+    /// default type that should appear in the reduced signature, if any.
     pub(crate) fn bind_by_keyword(
         &mut self,
         parameter_index: usize,
@@ -453,6 +462,8 @@ impl<'db> PartialApplication<'db> {
         self.keyword_defaults[parameter_index] = default_ty;
     }
 
+    /// Returns `true` if the parameter at `parameter_index` is removed from the reduced signature
+    /// because it was already supplied positionally to `functools.partial(...)`.
     pub(crate) fn is_positionally_bound(&self, parameter_index: usize) -> bool {
         self.positionally_bound[parameter_index]
     }
