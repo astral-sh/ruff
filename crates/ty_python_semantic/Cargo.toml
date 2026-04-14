@@ -50,7 +50,6 @@ tracing = { workspace = true }
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_parser = { workspace = true }
 test-case = { workspace = true }
-ty_static = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 

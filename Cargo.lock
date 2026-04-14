@@ -4666,7 +4666,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_python_core",
  "ty_site_packages",
- "ty_static",
  "ty_test",
  "ty_vendored",
 ]
@@ -4746,6 +4745,7 @@ dependencies = [
  "camino",
  "colored 3.1.1",
  "dunce",
+ "indexmap",
  "insta",
  "memchr",
  "path-slash",
@@ -4762,6 +4762,7 @@ dependencies = [
  "rustc-stable-hash",
  "salsa",
  "serde",
+ "similar 3.1.0",
  "smallvec",
  "tempfile",
  "thiserror 2.0.18",
@@ -4770,7 +4771,6 @@ dependencies = [
  "ty_module_resolver",
  "ty_python_core",
  "ty_python_semantic",
- "ty_static",
  "ty_vendored",
 ]
 
