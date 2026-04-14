@@ -21,10 +21,24 @@ pub const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 /// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
+/// Switch mdtest output format to GitHub Actions annotations.
+///
+/// If set (to any value), mdtest will output errors in GitHub Actions format.
+const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
+
 mod assertion;
 mod diagnostic;
 pub mod matcher;
 pub mod parser;
+
+/// Determine the output format from the `MDTEST_GITHUB_ANNOTATIONS_FORMAT` environment variable.
+pub fn output_format() -> OutputFormat {
+    if std::env::var(MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
+        OutputFormat::GitHub
+    } else {
+        OutputFormat::Cli
+    }
+}
 
 /// Defines the format in which mdtest should print an error to the terminal
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

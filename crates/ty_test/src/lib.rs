@@ -3,10 +3,9 @@ use crate::db::Db;
 use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
-pub use mdtest::OutputFormat;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
-use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -44,8 +43,9 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
-    output_format: OutputFormat,
 ) -> anyhow::Result<()> {
+    let output_format = output_format();
+
     let suite = parser::parse::<MarkdownTestConfig>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
