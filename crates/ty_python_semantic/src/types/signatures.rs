@@ -13,7 +13,7 @@
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
@@ -28,6 +28,7 @@ use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
@@ -423,6 +424,48 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, signature.return_ty);
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct PartialApplication<'db> {
+    positionally_bound: Box<[bool]>,
+    keyword_defaults: Box<[Option<Type<'db>>]>,
+    keyword_bound: Box<[bool]>,
+}
+
+impl<'db> PartialApplication<'db> {
+    pub(crate) fn new(parameter_count: usize) -> Self {
+        Self {
+            positionally_bound: vec![false; parameter_count].into_boxed_slice(),
+            keyword_defaults: vec![None; parameter_count].into_boxed_slice(),
+            keyword_bound: vec![false; parameter_count].into_boxed_slice(),
+        }
+    }
+
+    pub(crate) fn bind_positionally(&mut self, parameter_index: usize) {
+        self.positionally_bound[parameter_index] = true;
+    }
+
+    pub(crate) fn bind_by_keyword(
+        &mut self,
+        parameter_index: usize,
+        default_ty: Option<Type<'db>>,
+    ) {
+        self.keyword_bound[parameter_index] = true;
+        self.keyword_defaults[parameter_index] = default_ty;
+    }
+
+    pub(crate) fn is_positionally_bound(&self, parameter_index: usize) -> bool {
+        self.positionally_bound[parameter_index]
+    }
+
+    fn keyword_default(&self, parameter_index: usize) -> Option<Type<'db>> {
+        self.keyword_defaults[parameter_index]
+    }
+
+    fn is_keyword_bound(&self, parameter_index: usize) -> bool {
+        self.keyword_bound[parameter_index]
+    }
+}
+
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
@@ -776,6 +819,136 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
+    }
+
+    /// Returns the callable signature produced by partially applying this signature.
+    pub(crate) fn partially_apply(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+        unspecialized_return_ty: Type<'db>,
+    ) -> Self {
+        let signature_specialization =
+            self.partial_application_specialization(db, partial_application, specialization);
+        let signature = signature_specialization.map_or_else(
+            || self.clone(),
+            |specialization| self.apply_specialization(db, specialization),
+        );
+
+        let parameters = signature.parameters().as_slice();
+        let return_ty = specialization.map_or_else(
+            || unspecialized_return_ty,
+            |specialization| {
+                unspecialized_return_ty
+                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
+            },
+        );
+
+        let mut remaining = Vec::with_capacity(parameters.len());
+        let mut first_keyword_bound_positional_or_keyword = None;
+        for (index, parameter) in parameters.iter().enumerate() {
+            if partial_application.is_positionally_bound(index) {
+                continue;
+            }
+
+            let parameter = partial_application.keyword_default(index).map_or_else(
+                || parameter.clone(),
+                |default_ty| parameter.clone().with_default_type(default_ty),
+            );
+
+            if first_keyword_bound_positional_or_keyword.is_none()
+                && partial_application.is_keyword_bound(index)
+                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
+            {
+                first_keyword_bound_positional_or_keyword = Some(remaining.len());
+            }
+
+            remaining.push(parameter);
+        }
+
+        // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
+        // below can separate them, which would otherwise prevent expansion.
+        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
+
+        let mut reordered = Vec::with_capacity(remaining.len());
+        let mut keyword_only = Vec::new();
+        let mut keyword_variadic = Vec::new();
+        for (index, parameter) in remaining.iter().cloned().enumerate() {
+            let parameter = if first_keyword_bound_positional_or_keyword
+                .is_some_and(|first_bound_index| index >= first_bound_index)
+                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
+            {
+                parameter.positional_or_keyword_to_keyword_only()
+            } else {
+                parameter
+            };
+
+            if parameter.is_keyword_variadic() {
+                keyword_variadic.push(parameter);
+            } else if parameter.is_keyword_only() {
+                keyword_only.push(parameter);
+            } else {
+                reordered.push(parameter);
+            }
+        }
+
+        reordered.extend(keyword_only);
+        reordered.extend(keyword_variadic);
+
+        signature
+            .with_parameters(Parameters::new(db, reordered))
+            .with_return_type(return_ty)
+    }
+
+    /// Returns the specialization used for the callable signature exposed by a partial object.
+    ///
+    /// Surviving type variables that still appear in the reduced parameter list may need a more
+    /// specific specialization than the plain return-type view.
+    fn partial_application_specialization(
+        &self,
+        db: &'db dyn Db,
+        partial_application: &PartialApplication<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Specialization<'db>> {
+        let specialization = specialization?;
+        let Some(generic_context) = self.generic_context else {
+            return Some(specialization);
+        };
+
+        let promoted_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
+            .variables(db)
+            .filter(|typevar| {
+                self.parameters
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| !partial_application.is_positionally_bound(*index))
+                    .any(|(_, parameter)| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar(db, typevar.typevar(db).identity(db))
+                    })
+            })
+            .map(|typevar| typevar.identity(db))
+            .collect();
+
+        if promoted_typevars.is_empty() {
+            return Some(specialization);
+        }
+
+        Some(generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                let ty = specialization
+                    .get(db, typevar)
+                    .unwrap_or(Type::TypeVar(typevar));
+                Some(if promoted_typevars.contains(&typevar.identity(db)) {
+                    ty.promote(db)
+                } else {
+                    ty
+                })
+            }),
+        ))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {

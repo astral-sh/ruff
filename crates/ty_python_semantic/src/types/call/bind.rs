@@ -46,7 +46,7 @@ use crate::types::generics::{
 };
 use crate::types::known_instance::{FieldInstance, FunctoolsPartialInstance};
 use crate::types::signatures::{
-    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
+    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, PartialApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -2902,8 +2902,14 @@ impl<'db> CallableBinding<'db> {
             let Some(bound_overload) = self.overloads().get(index) else {
                 continue;
             };
-            let signature =
-                bound_overload.partially_applied_signature(db, signature_arguments.as_ref());
+            let partial_application =
+                bound_overload.partial_application(signature_arguments.as_ref());
+            let signature = bound_overload.signature.partially_apply(
+                db,
+                &partial_application,
+                bound_overload.partial_specialization,
+                bound_overload.unspecialized_return_type(db),
+            );
             let dedup_key = signature.clone().with_definition(None);
             if seen_overloads.insert(dedup_key) {
                 new_overloads.push(signature);
@@ -5534,21 +5540,10 @@ impl<'db> Binding<'db> {
         });
     }
 
-    /// Returns the callable signature produced by partially applying this bound overload.
-    ///
-    /// For example, starting from `(a: int, b: str, c: bool) -> bytes`,
-    /// `partial(f, 1, c=True)` should expose `(b: str, *, c: bool = True) -> bytes`:
-    /// the positionally bound `a` is removed, the keyword-bound `c` stays as a defaulted
-    /// parameter, and `c` becomes keyword-only in the reduced signature.
-    fn partially_applied_signature(
-        &self,
-        db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
-    ) -> Signature<'db> {
+    /// Collects the parameter-level effects of a `functools.partial(...)` application.
+    fn partial_application(&self, arguments: &CallArguments<'_, 'db>) -> PartialApplication<'db> {
         let parameters = self.signature.parameters().as_slice();
-        let mut remove_positionally_bound = vec![false; parameters.len()];
-        let mut keyword_defaults = vec![None; parameters.len()];
-        let mut keyword_bound = vec![false; parameters.len()];
+        let mut partial_application = PartialApplication::new(parameters.len());
 
         for ((argument, argument_ty), argument_matches) in
             arguments.iter().zip(&self.argument_matches)
@@ -5562,13 +5557,13 @@ impl<'db> Binding<'db> {
                             && !parameter.is_variadic()
                             && !parameter.is_keyword_variadic()
                         {
-                            remove_positionally_bound[parameter_index] = true;
+                            partial_application.bind_positionally(parameter_index);
                         }
                     }
                 }
                 Argument::Keyword(_) | Argument::Keywords => {
                     for (parameter_index, matched_ty) in argument_matches.iter() {
-                        if remove_positionally_bound[parameter_index] {
+                        if partial_application.is_positionally_bound(parameter_index) {
                             continue;
                         }
 
@@ -5580,140 +5575,20 @@ impl<'db> Binding<'db> {
                             continue;
                         }
 
-                        keyword_bound[parameter_index] = true;
-                        if parameter.annotated_type() != Type::Never {
-                            keyword_defaults[parameter_index] =
-                                Some(matched_ty.unwrap_or_else(|| {
+                        partial_application.bind_by_keyword(
+                            parameter_index,
+                            (parameter.annotated_type() != Type::Never).then(|| {
+                                matched_ty.unwrap_or_else(|| {
                                     argument_ty.get_default().unwrap_or_else(Type::unknown)
-                                }));
-                        }
+                                })
+                            }),
+                        );
                     }
                 }
             }
         }
 
-        let signature_specialization =
-            self.partial_signature_specialization(db, &remove_positionally_bound);
-        let signature = signature_specialization.map_or_else(
-            || self.signature.clone(),
-            |specialization| self.signature.apply_specialization(db, specialization),
-        );
-
-        let parameters = signature.parameters().as_slice();
-        let return_ty = self.partial_specialization.map_or_else(
-            || self.unspecialized_return_type(db),
-            |specialization| {
-                self.unspecialized_return_type(db)
-                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
-            },
-        );
-
-        let mut remaining = Vec::with_capacity(parameters.len());
-        let mut first_keyword_bound_positional_or_keyword = None;
-        for (index, parameter) in parameters.iter().enumerate() {
-            if remove_positionally_bound[index] {
-                continue;
-            }
-
-            let parameter = keyword_defaults[index].map_or_else(
-                || parameter.clone(),
-                |default_ty| parameter.clone().with_default_type(default_ty),
-            );
-
-            if first_keyword_bound_positional_or_keyword.is_none()
-                && keyword_bound[index]
-                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
-            {
-                first_keyword_bound_positional_or_keyword = Some(remaining.len());
-            }
-
-            remaining.push(parameter);
-        }
-
-        // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
-        // below can separate them, which would otherwise prevent expansion.
-        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
-
-        let mut reordered = Vec::with_capacity(remaining.len());
-        let mut keyword_only = Vec::new();
-        let mut keyword_variadic = Vec::new();
-        for (index, parameter) in remaining.iter().cloned().enumerate() {
-            let mut parameter = parameter;
-            // Keyword-bound positional-or-keyword parameters can only be overridden by keyword at
-            // call time. Once one appears, later positional-or-keyword parameters also become
-            // keyword-only to match `inspect.signature(functools.partial(...))`.
-            if first_keyword_bound_positional_or_keyword
-                .is_some_and(|first_bound_index| index >= first_bound_index)
-                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
-            {
-                parameter = parameter.positional_or_keyword_to_keyword_only();
-            }
-
-            if parameter.is_keyword_variadic() {
-                keyword_variadic.push(parameter);
-            } else if parameter.is_keyword_only() {
-                keyword_only.push(parameter);
-            } else {
-                reordered.push(parameter);
-            }
-        }
-
-        reordered.extend(keyword_only);
-        reordered.extend(keyword_variadic);
-
-        signature
-            .with_parameters(Parameters::new(db, reordered))
-            .with_return_type(return_ty)
-    }
-
-    /// Returns the specialization used for the callable signature exposed by a partial object.
-    ///
-    /// Surviving type variables that still appear in the reduced parameter list may need a more
-    /// specific specialization than the plain return-type view.
-    fn partial_signature_specialization(
-        &self,
-        db: &'db dyn Db,
-        remove_positionally_bound: &[bool],
-    ) -> Option<Specialization<'db>> {
-        let specialization = self.partial_specialization?;
-        let Some(generic_context) = self.signature.generic_context else {
-            return Some(specialization);
-        };
-
-        let promoted_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
-            .variables(db)
-            .filter(|typevar| {
-                self.signature
-                    .parameters()
-                    .iter()
-                    .enumerate()
-                    .filter(|(index, _)| !remove_positionally_bound[*index])
-                    .any(|(_, parameter)| {
-                        parameter
-                            .annotated_type()
-                            .references_typevar(db, typevar.typevar(db).identity(db))
-                    })
-            })
-            .map(|typevar| typevar.identity(db))
-            .collect();
-
-        if promoted_typevars.is_empty() {
-            return Some(specialization);
-        }
-
-        Some(generic_context.specialize_recursive(
-            db,
-            generic_context.variables(db).map(|typevar| {
-                let ty = specialization
-                    .get(db, typevar)
-                    .unwrap_or(Type::TypeVar(typevar));
-                Some(if promoted_typevars.contains(&typevar.identity(db)) {
-                    ty.promote(db)
-                } else {
-                    ty
-                })
-            }),
-        ))
+        partial_application
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
