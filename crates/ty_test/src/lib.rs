@@ -8,6 +8,7 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
+use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
@@ -29,6 +30,7 @@ use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    fix_all_diagnostics,
 };
 
 mod assertion;
@@ -224,9 +226,9 @@ impl OutputFormat {
             OutputFormat::Cli => {
                 let _ = writeln!(
                     assertion_buf,
-                    "  {file_line} {message}",
+                    "{file_line} {message}",
                     file_line = format!("{file}:{line}").cyan(),
-                    message = failure.message()
+                    message = Indented(failure.message()),
                 );
                 if let Some((expected, actual)) = failure.diff() {
                     let _ = render_diff(assertion_buf, actual, expected);
@@ -261,6 +263,51 @@ impl OutputFormat {
                 println!("::error file={fixture_path}::{inconsistency}");
             }
         }
+    }
+}
+
+/// Indents every line except the first when formatting `T` by four spaces.
+///
+/// ## Examples
+/// Wrapping the message part indents the `error[...]` diagnostic frame by four spaces:
+///
+/// ```text
+/// crates/ty_python_semantic/resources/mdtest/mro.md:465 Fixing the diagnostics caused a fatal error:
+///        error[internal-error]: Applying fixes introduced a syntax error. Reverting changes.
+///        --> src/mdtest_snippet.py:1:1
+///        info: This indicates a bug in ty.
+/// ```
+struct Indented<T>(T);
+
+impl<T> std::fmt::Display for Indented<T>
+where
+    T: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut w = IndentingWriter {
+            f,
+            at_line_start: false,
+        };
+        write!(&mut w, "{}", self.0)
+    }
+}
+
+struct IndentingWriter<'a, 'b> {
+    f: &'a mut std::fmt::Formatter<'b>,
+    at_line_start: bool,
+}
+
+impl Write for IndentingWriter<'_, '_> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        for part in s.split_inclusive('\n') {
+            if self.at_line_start {
+                self.f.write_str("    ")?;
+            }
+            self.f.write_str(part)?;
+            self.at_line_start = part.ends_with('\n');
+        }
+
+        Ok(())
     }
 }
 
@@ -506,9 +553,7 @@ fn run_test(
     db.update_analysis_options(configuration.analysis.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
-    // When snapshot testing is enabled, this is populated with
-    // all diagnostics. Otherwise it remains empty.
-    let mut snapshot_diagnostics = vec![];
+    let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
@@ -549,14 +594,7 @@ fn run_test(
                 }),
             };
 
-            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-            // since they make snapshots very noisy!
-            if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
-                    diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                }));
-            }
+            all_diagnostics.extend(diagnostics);
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
             match pull_types_result {
@@ -629,14 +667,26 @@ fn run_test(
         failures.push(failure);
     }
 
-    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
-        panic!(
-            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
-            test.name()
+    if test.should_snapshot_diagnostics() {
+        if all_diagnostics.is_empty() {
+            panic!(
+                "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+                test.name()
+            );
+        }
+
+        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+        // since they make snapshots very noisy!
+        let snapshot = create_diagnostic_snapshot(
+            db,
+            relative_fixture_path,
+            test,
+            all_diagnostics.iter().filter(|diagnostic| {
+                diagnostic.id() != DiagnosticId::RevealedType
+                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+            }),
         );
-    } else if !snapshot_diagnostics.is_empty() {
-        let snapshot =
-            create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
+
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
@@ -647,6 +697,42 @@ fn run_test(
             },
             { insta::assert_snapshot!(name, snapshot) }
         );
+    }
+
+    // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
+    // But don't try to run fixes for tests that are expected to panic.
+    if test.should_expect_panic().is_err() {
+        let token_source = CancellationTokenSource::new();
+        let result = fix_all_diagnostics(db, all_diagnostics, &token_source.token())
+            .expect("to succeed because fixing is never cancelled");
+
+        tracing::debug!("Fixed {} diagnostics", result.count);
+
+        let mut fatals = result.diagnostics;
+        fatals.retain(|diagnostic| diagnostic.id() == DiagnosticId::InternalError);
+
+        for diagnostic in fatals {
+            let ty_file = diagnostic.expect_primary_span().expect_ty_file();
+
+            let test_file = test_files
+                .iter()
+                .find(|test_file| test_file.file == ty_file)
+                .unwrap_or(&test_files[0]);
+
+            let mut by_line = matcher::FailuresByLine::default();
+            by_line.push(
+                OneIndexed::from_zero_indexed(0),
+                vec![Failure::new(format_args!(
+                    "Fixing the diagnostics caused a fatal error:\n{}",
+                    render_diagnostic(db, &diagnostic)
+                ))],
+            );
+            let failure = FileFailures {
+                backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                by_line,
+            };
+            failures.push(failure);
+        }
     }
 
     if failures.is_empty() {
@@ -977,11 +1063,11 @@ fn try_apply_markdown_edits(
     }
 }
 
-fn create_diagnostic_snapshot(
+fn create_diagnostic_snapshot<'d>(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = Diagnostic>,
+    diagnostics: impl IntoIterator<Item = &'d Diagnostic>,
 ) -> String {
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
