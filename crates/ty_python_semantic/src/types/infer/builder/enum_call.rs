@@ -365,7 +365,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_arg = name_arg?;
 
         let Some(names_arg) = names_arg else {
-            self.infer_expression(name_arg, TypeContext::default());
+            for arg in args {
+                self.infer_expression(arg, TypeContext::default());
+            }
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
