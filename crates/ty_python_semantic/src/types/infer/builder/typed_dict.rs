@@ -36,13 +36,19 @@ pub(super) enum TypedDictConstructorForm<'expr> {
     MixedLiteralAndKeywords(&'expr ast::ExprDict),
     /// // Ex) `TD(other, y=2)`
     MixedPositionalAndKeywords,
+    /// // Ex) `TD(arg1, arg2)`
+    MultiplePositionalArguments,
 }
 
 impl<'expr> TypedDictConstructorForm<'expr> {
     /// Return the constructor form for `arguments`.
     pub(super) fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
         let [argument] = &arguments.args[..] else {
-            return Self::KeywordOnly;
+            return if arguments.args.is_empty() {
+                Self::KeywordOnly
+            } else {
+                Self::MultiplePositionalArguments
+            };
         };
 
         match (argument, arguments.keywords.is_empty()) {
@@ -392,7 +398,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
             }
-            TypedDictConstructorForm::KeywordOnly => {}
+            TypedDictConstructorForm::KeywordOnly
+            | TypedDictConstructorForm::MultiplePositionalArguments => {}
         }
 
         if !arguments.keywords.is_empty() {
@@ -416,7 +423,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             TypedDictConstructorForm::KeywordOnly
             | TypedDictConstructorForm::LiteralOnly(_)
             | TypedDictConstructorForm::SinglePositional(_)
-            | TypedDictConstructorForm::MixedPositionalAndKeywords => {
+            | TypedDictConstructorForm::MixedPositionalAndKeywords
+            | TypedDictConstructorForm::MultiplePositionalArguments => {
                 TypedDictConstructorBindingStrategy::ReusePreparedExpressions
             }
         }

@@ -292,6 +292,20 @@ reveal_type(eve3a)  # revealed: Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
+Constructor calls with multiple positional arguments should be rejected, including for empty
+`TypedDict`s:
+
+```py
+class Empty(TypedDict):
+    pass
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Empty` constructor: expected 1, got 2"
+Empty({}, {})
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Person` constructor: expected 1, got 2"
+Person({}, {})
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py

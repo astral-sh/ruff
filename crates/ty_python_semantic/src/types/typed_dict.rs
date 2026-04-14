@@ -13,8 +13,8 @@ use ruff_text_size::Ranged;
 use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
-    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
-    report_missing_typed_dict_key,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
+    report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
 use super::infer::infer_deferred_types;
 use super::{
@@ -1185,6 +1185,22 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) {
     let db = context.db();
+    let typed_dict_ty = Type::TypedDict(typed_dict);
+
+    if arguments.args.len() > 1 {
+        if let Some(builder) =
+            context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &arguments.args[1])
+        {
+            builder.into_diagnostic(format_args!(
+                "Too many positional arguments to TypedDict `{}` constructor: expected 1, got {}",
+                typed_dict_ty.display(db),
+                arguments.args.len(),
+            ));
+        }
+        // TODO: Consider validating the first positional argument too, without producing
+        // duplicate TypedDict diagnostics for invalid multi-positional calls.
+        return;
+    }
 
     // Check for a single positional argument, and whether it's a dict literal.
     let has_single_positional_arg = arguments.args.len() == 1;
@@ -1273,15 +1289,14 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let target_ty = Type::TypedDict(typed_dict);
-        let arg_ty = expression_type_fn(arg, TypeContext::new(Some(target_ty)));
+        let arg_ty = expression_type_fn(arg, TypeContext::new(Some(typed_dict_ty)));
 
-        if !arg_ty.is_assignable_to(db, target_ty) {
+        if !arg_ty.is_assignable_to(db, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
                 builder.into_diagnostic(format_args!(
                     "Argument of type `{}` is not assignable to `{}`",
                     arg_ty.display(db),
-                    target_ty.display(db),
+                    typed_dict_ty.display(db),
                 ));
             }
         }
