@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
@@ -13,8 +13,8 @@ use ruff_text_size::Ranged;
 use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
-    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
-    report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, PARAMETER_ALREADY_ASSIGNED,
+    TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
 use super::infer::infer_deferred_types;
 use super::{
@@ -1174,6 +1174,56 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
     ))
 }
 
+fn report_duplicate_typed_dict_constructor_key<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    key: &str,
+    duplicate_node: AnyNodeRef<'ast>,
+    original_node: AnyNodeRef<'ast>,
+) {
+    let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, duplicate_node) else {
+        return;
+    };
+
+    let typed_dict_display = Type::TypedDict(typed_dict).display(context.db());
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Multiple values provided for key \"{key}\" in TypedDict `{typed_dict_display}` constructor",
+    ));
+    diagnostic.annotate(
+        context
+            .secondary(original_node)
+            .message(format_args!("first value provided here")),
+    );
+}
+
+fn record_guaranteed_typed_dict_constructor_key<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
+    key: Name,
+    duplicate_node: AnyNodeRef<'ast>,
+) {
+    match guaranteed_keys.entry(key) {
+        Entry::Vacant(entry) => {
+            entry.insert(Some(duplicate_node));
+        }
+        Entry::Occupied(mut entry) => match *entry.get() {
+            Some(original_node) => {
+                report_duplicate_typed_dict_constructor_key(
+                    context,
+                    typed_dict,
+                    entry.key().as_str(),
+                    duplicate_node,
+                    original_node,
+                );
+            }
+            None => {
+                entry.insert(Some(duplicate_node));
+            }
+        },
+    }
+}
+
 /// Validates a `TypedDict` constructor call.
 ///
 /// This handles keyword-only construction, a single positional mapping argument, and mixed
@@ -1383,12 +1433,7 @@ fn validate_from_keywords<'db, 'ast>(
     let items = typed_dict.items(db);
     debug_assert_eq!(arguments.keywords.len(), unpacked_keyword_types.len());
 
-    // Collect keys from explicit keyword arguments
-    let mut provided_keys: OrderSet<Name> = arguments
-        .keywords
-        .iter()
-        .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.clone()))
-        .collect();
+    let mut guaranteed_keys = BTreeMap::new();
 
     // Validate that each key is assigned a type that is compatible with the key's value type
     for (keyword, unpacked_type) in arguments
@@ -1396,8 +1441,18 @@ fn validate_from_keywords<'db, 'ast>(
         .iter()
         .zip(unpacked_keyword_types.iter().copied())
     {
+        let keyword_node: AnyNodeRef<'ast> = keyword.into();
+
         if let Some(arg_name) = &keyword.arg {
             // Explicit keyword argument: e.g., `name="Alice"`
+            record_guaranteed_typed_dict_constructor_key(
+                context,
+                typed_dict,
+                &mut guaranteed_keys,
+                arg_name.id.clone(),
+                keyword_node,
+            );
+
             let value_tcx = items
                 .get(arg_name.id.as_str())
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
@@ -1430,12 +1485,12 @@ fn validate_from_keywords<'db, 'ast>(
             if unpacked_type.is_never() || unpacked_type.is_dynamic() {
                 for (key_name, field) in typed_dict.items(db) {
                     if field.is_required() {
-                        provided_keys.insert(key_name.clone());
+                        guaranteed_keys.entry(key_name.clone()).or_insert(None);
                     }
                 }
             } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type)
             {
-                provided_keys.extend(validate_extracted_typed_dict_keys(
+                for key_name in validate_extracted_typed_dict_keys(
                     context,
                     typed_dict,
                     &unpacked_keys,
@@ -1446,12 +1501,20 @@ fn validate_from_keywords<'db, 'ast>(
                     },
                     full_object_ty_annotation(unpacked_type),
                     &OrderSet::new(),
-                ));
+                ) {
+                    record_guaranteed_typed_dict_constructor_key(
+                        context,
+                        typed_dict,
+                        &mut guaranteed_keys,
+                        key_name,
+                        keyword_node,
+                    );
+                }
             }
         }
     }
 
-    provided_keys
+    guaranteed_keys.into_keys().collect()
 }
 
 /// Validates a `TypedDict` dictionary literal assignment,

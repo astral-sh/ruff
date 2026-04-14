@@ -920,6 +920,28 @@ def f(maybe: MaybeName) -> NeedsName:
     return NeedsName(**maybe)
 ```
 
+Guaranteed duplicate keys from unpacking should be rejected, matching runtime `TypeError`s:
+
+```py
+from typing import TypedDict
+
+class DuplicateHasName(TypedDict):
+    name: str
+
+class DuplicateNeedsName(TypedDict):
+    name: str
+
+def duplicate_name_keys(
+    left: DuplicateHasName,
+    right: DuplicateHasName,
+) -> DuplicateNeedsName:
+    # error: [parameter-already-assigned]
+    DuplicateNeedsName(**left, name="x")
+
+    # error: [parameter-already-assigned]
+    return DuplicateNeedsName(**left, **right)
+```
+
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
 behavior when passing all keys as explicit keyword arguments:
 
