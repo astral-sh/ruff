@@ -29,6 +29,25 @@ p = partial(f, b="hello")
 reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello") -> bool]
 ```
 
+### Leading parameter bound by keyword
+
+Binding a positional-or-keyword parameter by keyword makes it defaulted and keyword-only in the
+reduced signature, and later positional-or-keyword parameters become keyword-only too:
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, a=1)
+reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
+reveal_type(p(b="hello"))  # revealed: bool
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+p("hello")
+```
+
 ### Mixed positional and keyword binding
 
 ```py
@@ -110,6 +129,18 @@ def f(a: int, *args: str) -> bool:
     return True
 
 p = partial(f, 1)
+reveal_type(p)  # revealed: partial[(*args: str) -> bool]
+```
+
+### Variadic partially bound
+
+```py
+from functools import partial
+
+def f(a: int, *args: str) -> bool:
+    return True
+
+p = partial(f, 1, "hello")
 reveal_type(p)  # revealed: partial[(*args: str) -> bool]
 ```
 
@@ -220,6 +251,20 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, 1, a=2)  # error: [parameter-already-assigned]
+```
+
+### Parameter already assigned with keyword variadic fallback
+
+```py
+from functools import partial
+
+def f(a: int, **kwargs: str) -> bool:
+    return True
+
+# error: [invalid-argument-type]
+# error: [parameter-already-assigned]
+p = partial(f, 1, a="hello")
+reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ```
 
 ### Too-many-positional is reported at partial construction
@@ -366,6 +411,30 @@ reveal_type(box.callback)  # revealed: partial[() -> int]
 target: Callable[[], int] = box.callback
 ```
 
+### Bound method returning `Self`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from functools import partial
+from typing import Self
+
+class Builder:
+    def clone_with(self, value: int) -> Self:
+        return self
+
+class Fancy(Builder):
+    pass
+
+fancy = Fancy()
+p = partial(fancy.clone_with, 1)
+reveal_type(p)  # revealed: partial[() -> Fancy]
+reveal_type(p())  # revealed: Fancy
+```
+
 ### Overloaded functions
 
 ```py
@@ -395,11 +464,10 @@ def zero_arg(x: int) -> int:
 def one_arg(x: int, y: str) -> int:
     return x + len(y)
 
-def test_union_partial(
-    f: Callable[[int], int] | Callable[[int, str], int],
-) -> None:
+def test_union_partial(flag: bool) -> None:
+    f = zero_arg if flag else one_arg
     p = partial(f, 1)
-    reveal_type(p)  # revealed: partial[() -> int] | partial[(str, /) -> int]
+    reveal_type(p)  # revealed: partial[() -> int] | partial[(y: str) -> int]
 
     bad: Callable[[bytes, bytes], int] = p  # error: [invalid-assignment]
 ```
@@ -464,38 +532,22 @@ bound = partial(invoke, flag=1, func=pre)
 reveal_type(bound(cfg="x"))  # revealed: int
 ```
 
-### Partial assignability with a keyword-bound middle parameter
-
-```py
-from functools import partial
-from typing import Any, Protocol
-
-class Conv(Protocol):
-    def __call__(self, __x: Any, *, _target_: str = "set", CBuildsFn: type[Any]) -> Any: ...
-
-class ConfigFromTuple:
-    def __init__(self, _args_: tuple[Any, ...], _target_: str, CBuildsFn: type[Any]) -> None: ...
-
-p = partial(ConfigFromTuple, _target_="set")
-# TODO: should preserve the keyword-bound middle parameter in the reduced signature.
-reveal_type(p)  # revealed: partial[Unknown]
-
-conversion: dict[type, Conv] = {}
-conversion[set] = p
-```
-
 ### Overloaded stdlib callable narrowed by bound args
 
-`partial(reduce, operator.mul)` should keep the narrowed return type from the bound reducer:
+`partial(reduce, mul)` should keep the narrowed return type from the bound reducer:
 
 ```py
 from functools import partial, reduce
-import operator
 
-prod = partial(reduce, operator.mul)
+def mul(x: int, y: int, /) -> int:
+    return x * y
+
+prod = partial(reduce, mul)
 shape: list[int] = [1, 2, 3]
 
-reveal_type(prod(shape))  # revealed: Any
+# revealed: partial[Overload[(iterable: Iterable[int], initial: int, /) -> int, (iterable: Iterable[int], /) -> int]]
+reveal_type(prod)
+reveal_type(prod(shape))  # revealed: int
 ```
 
 ### Overloaded stdlib callable with keyword-only binding
@@ -621,6 +673,9 @@ reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
 
 ### Fallback for starred args with variable-length tuple
 
+We intentionally fall back here instead of enumerating possible tuple lengths; this matches the
+existing treatment of variable-length tuple splats in ordinary calls.
+
 ```py
 from functools import partial
 
@@ -670,6 +725,12 @@ reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float
 
 ### Fallback for kwargs splat with dict
 
+We intentionally fall back for a plain `dict`, even if a literal key is visible at the call site,
+because we don't track the key set precisely the way we do for direct keyword arguments or
+`TypedDict`. In particular, we don't know whether a required parameter like `b` will be supplied by
+the mapping, so we can't safely choose between a reduced signature where `b` remains required and
+one where `b` becomes a defaulted keyword-only parameter.
+
 ```py
 from functools import partial
 
@@ -682,6 +743,10 @@ reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Fallback for kwargs splat with optional TypedDict keys
+
+Optional `TypedDict` keys have the same ambiguity: a key like `b` may or may not be present at
+runtime, so we can't safely decide whether the reduced signature should keep `b` required or mark it
+as already bound with a default.
 
 ```py
 from functools import partial
@@ -1173,6 +1238,29 @@ def returns_partial() -> partial[bool]:
     return p  # OK -- partial[(b: str) -> bool] is assignable to partial[bool]
 ```
 
+### Assignability with a keyword-bound middle parameter
+
+```py
+from functools import partial
+from typing import Any, Protocol
+
+class Conv(Protocol):
+    def __call__(self, __x: Any, *, _target_: str = "set", CBuildsFn: type[Any]) -> Any: ...
+
+def build(
+    _args_: tuple[Any, ...],
+    _target_: str,
+    CBuildsFn: type[Any],
+) -> None:
+    pass
+
+p = partial(build, _target_="set")
+reveal_type(p)  # revealed: partial[(_args_: tuple[Any, ...], *, _target_: str = "set", CBuildsFn: type[Any]) -> None]
+
+conversion: dict[type, Conv] = {}
+conversion[set] = p
+```
+
 ### Assignability to a stub-style function alias
 
 ```py
@@ -1201,7 +1289,7 @@ def f(a: str) -> str: ...
 def f(a: int | str) -> int | str:
     return a
 
-def make_partial(x):
+def make_partial(x: int | str):
     p = partial(f, x)
     reveal_type(p)  # revealed: partial[Overload[() -> int, () -> str]]
     return p
