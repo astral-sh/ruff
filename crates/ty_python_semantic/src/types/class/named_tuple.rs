@@ -447,11 +447,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     /// Returns the field declared directly on this dynamic named tuple, if any.
-    pub(crate) fn own_field(self, db: &'db dyn Db, name: &Name) -> Option<NamedTupleField<'db>> {
-        self.fields(db)
-            .iter()
-            .find(|field| field.name == *name)
-            .cloned()
+    pub(crate) fn field(self, db: &'db dyn Db, name: &Name) -> Option<&'db NamedTupleField<'db>> {
+        self.fields(db).iter().find(|field| field.name == *name)
     }
 
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {

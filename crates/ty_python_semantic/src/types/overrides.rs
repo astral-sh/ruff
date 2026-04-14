@@ -111,7 +111,7 @@ fn conflicting_named_tuple_field_in_mro<'db>(
                     }
                 }
                 ClassLiteral::DynamicNamedTuple(namedtuple) => {
-                    if namedtuple.own_field(db, field_name).is_some() {
+                    if namedtuple.field(db, field_name).is_some() {
                         return Some((superclass, namedtuple.definition(db)));
                     }
                 }
