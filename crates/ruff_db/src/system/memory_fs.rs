@@ -131,7 +131,7 @@ impl MemoryFileSystem {
                 Entry::File(file) => {
                     String::from_utf8(file.content.to_vec()).map_err(|_| invalid_utf8())
                 }
-                Entry::Directory(_) => Err(is_a_directory()),
+                Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
             }
         }
 
@@ -281,7 +281,7 @@ impl MemoryFileSystem {
                         entry.remove();
                         Ok(())
                     }
-                    Entry::Directory(_) => Err(is_a_directory()),
+                    Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
                 },
                 btree_map::Entry::Vacant(_) => Err(not_found()),
             }
@@ -336,7 +336,7 @@ impl MemoryFileSystem {
             // Skip the directory path itself
             for (maybe_child, _) in by_path.range(normalized.clone()..).skip(1) {
                 if maybe_child.starts_with(&normalized) {
-                    return Err(directory_not_empty());
+                    return Err(io::Error::from(io::ErrorKind::DirectoryNotEmpty));
                 } else if !maybe_child.as_str().starts_with(normalized.as_str()) {
                     break;
                 }
@@ -348,7 +348,7 @@ impl MemoryFileSystem {
                         entry.remove();
                         Ok(())
                     }
-                    Entry::File(_) => Err(not_a_directory()),
+                    Entry::File(_) => Err(io::Error::from(io::ErrorKind::NotADirectory)),
                 },
                 btree_map::Entry::Vacant(_) => Err(not_found()),
             }
@@ -367,7 +367,7 @@ impl MemoryFileSystem {
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
         if entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         };
 
         // Collect the entries into a vector to avoid deadlocks when the
@@ -458,18 +458,6 @@ fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
 }
 
-fn is_a_directory() -> std::io::Error {
-    std::io::Error::from(std::io::ErrorKind::IsADirectory)
-}
-
-fn not_a_directory() -> std::io::Error {
-    std::io::Error::from(std::io::ErrorKind::NotADirectory)
-}
-
-fn directory_not_empty() -> std::io::Error {
-    std::io::Error::from(std::io::ErrorKind::DirectoryNotEmpty)
-}
-
 fn invalid_utf8() -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::InvalidData,
@@ -492,7 +480,7 @@ fn create_dir_all(
         });
 
         if entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
     }
 
@@ -507,7 +495,7 @@ fn get_or_create_file<'a>(
         let parent_entry = paths.get(parent).ok_or_else(not_found)?;
 
         if parent_entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
     }
 
@@ -520,7 +508,7 @@ fn get_or_create_file<'a>(
 
     match entry {
         Entry::File(file) => Ok(file),
-        Entry::Directory(_) => Err(is_a_directory()),
+        Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
     }
 }
 
