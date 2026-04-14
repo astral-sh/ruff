@@ -1760,9 +1760,16 @@ from enum import Enum
 # This is invalid at runtime but should not panic.
 Enum("Color")  # error: [missing-argument]
 
+# This is invalid at runtime but should not panic.
+Enum(value="Color")  # error: [missing-argument]
+
 # error: [missing-argument]
 # error: [invalid-argument-type]
 Enum(123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(value=123)
 
 # error: [missing-argument]
 # error: [invalid-argument-type]
