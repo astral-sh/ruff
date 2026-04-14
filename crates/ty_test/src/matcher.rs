@@ -163,6 +163,9 @@ pub(super) fn match_file(
     }
 
     if failures.is_empty() {
+        // We need to re-sort the diagnostics because matching uses `swap_remove` internally, which can change ordering.
+        snapshot_diagnostics
+            .sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
         Ok(snapshot_diagnostics)
     } else {
         Err(failures)
@@ -405,8 +408,8 @@ impl Matcher {
                 let Some(rule) = rule else {
                     // Similar to `error:` with the same diagnostic code. Match the first diagnostic even if this
                     // is ambiguous (and somewhat problematic because we use swap_remove in many places).
-                    if let Some(first) = unmatched.pop() {
-                        return Some(first.clone());
+                    if unmatched.len() > 0 {
+                        return Some(unmatched.swap_remove(0).clone());
                     }
 
                     return None;
