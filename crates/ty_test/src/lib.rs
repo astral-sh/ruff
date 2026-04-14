@@ -31,10 +31,7 @@ mod config;
 mod db;
 mod external_dependencies;
 
-/// Filter which tests to run in mdtest.
-///
-/// Only tests whose names contain this filter string will be executed.
-const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+use mdtest::MDTEST_TEST_FILTER;
 
 /// If set to a value other than "0", runs tests that include external dependencies.
 const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";

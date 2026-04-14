@@ -11,6 +11,11 @@ use std::fmt::{Display, Write};
 use matcher::Failure;
 use parser::BacktickOffsets;
 
+/// Filter which tests to run in mdtest.
+///
+/// Only tests whose names contain this filter string will be executed.
+pub const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+
 /// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
