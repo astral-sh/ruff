@@ -273,15 +273,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     /// Look up an instance member defined directly on this class (not inherited).
     ///
-    /// For dynamic namedtuples, instance members are the field names.
-    /// If fields are unknown (dynamic), returns `Any` for any attribute.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        for field in self.fields(db) {
-            if field.name == name {
-                return Member::definitely_declared(field.ty);
-            }
-        }
-
+    /// `NamedTuple` fields are exposed via synthesized descriptors on the class rather than
+    /// instance attributes. If fields are unknown (dynamic), return `Any` for any attribute.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
         if !self.has_known_fields(db) {
             return Member::definitely_declared(Type::any());
         }
