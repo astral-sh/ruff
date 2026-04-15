@@ -34,15 +34,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 error[unsupported-operator]: Unsupported `<` operation
  --> src/mdtest_snippet.py:7:5
   |
-5 |     # Prefix `int` vs. prefix `str` are not comparable.
-6 |     # error: [unsupported-operator]
 7 |     prefix_int_var_str < prefix_str_var_int
   |     ------------------^^^------------------
   |     |                    |
   |     |                    Has type `tuple[str, *tuple[int, ...]]`
   |     Has type `tuple[int, *tuple[str, ...]]`
-8 | def _(
-9 |     prefix_int_var_int: tuple[int, *tuple[int, ...]],
   |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 

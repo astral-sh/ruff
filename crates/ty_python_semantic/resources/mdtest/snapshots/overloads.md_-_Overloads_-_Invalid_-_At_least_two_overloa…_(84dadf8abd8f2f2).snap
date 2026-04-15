@@ -38,12 +38,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 error[invalid-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.py:5:5
   |
-3 | @overload
-4 | # error: [invalid-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
-6 | def func(x: int | str) -> int | str:
-7 |     return x
   |
 
 ```
@@ -52,8 +48,6 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 error[invalid-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.pyi:5:5
   |
-3 | @overload
-4 | # error: [invalid-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
   |

@@ -29,7 +29,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assi
 error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `str`
  --> src/mdtest_snippet.py:4:4
   |
-3 |   # error: [invalid-assignment]
 4 |   x: str = (
   |  ____---___^
   | |    |

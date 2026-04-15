@@ -23,14 +23,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Invalid default for type parameter `U`
- --> src/mdtest_snippet.py:1:9
+ --> src/mdtest_snippet.py:3:15
+  |
+3 |     def f[U = T](self): ...
+  |               ^ `T` is a type parameter bound in an outer scope
+  |
+ ::: src/mdtest_snippet.py:1:9
   |
 1 | class C[T]:
   |         - `T` defined here
-2 |     # error: [invalid-type-variable-default]
-3 |     def f[U = T](self): ...
-  |               ^ `T` is a type parameter bound in an outer scope
-4 |     def g[U = int](self): ...  # OK
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
 

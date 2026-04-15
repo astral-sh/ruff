@@ -86,15 +86,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:19:8
    |
-17 | def f(
-18 |     # error: [unsupported-operator]
 19 |     a: int | "Foo",
    |        ---^^^-----
    |        |     |
    |        |     Has type `Literal["Foo"]`
    |        Has type `<class 'int'>`
-20 |     # error: [unsupported-operator]
-21 |     b: int | "memoryview" | bytes,
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -106,15 +102,11 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:21:8
    |
-19 |     a: int | "Foo",
-20 |     # error: [unsupported-operator]
 21 |     b: int | "memoryview" | bytes,
    |        ---^^^------------
    |        |     |
    |        |     Has type `Literal["memoryview"]`
    |        Has type `<class 'int'>`
-22 |     # error: [unsupported-operator]
-23 |     c: "TD" | None,
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -126,15 +118,11 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:23:8
    |
-21 |     b: int | "memoryview" | bytes,
-22 |     # error: [unsupported-operator]
 23 |     c: "TD" | None,
    |        ----^^^----
    |        |      |
    |        |      Has type `None`
    |        Has type `Literal["TD"]`
-24 |     # error: [unsupported-operator]
-25 |     d: "P" | None,
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -146,15 +134,11 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:25:8
    |
-23 |     c: "TD" | None,
-24 |     # error: [unsupported-operator]
 25 |     d: "P" | None,
    |        ---^^^----
    |        |     |
    |        |     Has type `None`
    |        Has type `Literal["P"]`
-26 |     # fine: `TypeVar.__or__` accepts strings at runtime
-27 |     e: T | "Foo",
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -166,12 +150,8 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:33:8
    |
-31 |     g: UsesMeta | "Foo",
-32 |     # error: [unsupported-operator]
 33 |     h: None | None,
    |        ^^^^^^^^^^^ Both operands have type `None`
-34 |     # error: [unresolved-reference] "SomethingUndefined"
-35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -182,12 +162,8 @@ info: Python 3.13 was assumed when inferring types because it was specified on t
 error[unresolved-reference]: Name `SomethingUndefined` used when not defined
   --> src/mdtest_snippet.py:36:8
    |
-34 |     # error: [unresolved-reference] "SomethingUndefined"
-35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
 36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |        ^^^^^^^^^^^^^^^^^^
-37 |     # error: [unsupported-operator]
-38 |     # error: [unsupported-operator]
    |
 
 ```
@@ -196,12 +172,8 @@ error[unresolved-reference]: Name `SomethingUndefined` used when not defined
 error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
   --> src/mdtest_snippet.py:36:29
    |
-34 |     # error: [unresolved-reference] "SomethingUndefined"
-35 |     # error: [unresolved-reference] "SomethingAlsoUndefined"
 36 |     i: SomethingUndefined | SomethingAlsoUndefined,
    |                             ^^^^^^^^^^^^^^^^^^^^^^
-37 |     # error: [unsupported-operator]
-38 |     # error: [unsupported-operator]
    |
 
 ```
@@ -210,15 +182,11 @@ error[unresolved-reference]: Name `SomethingAlsoUndefined` used when not defined
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:39:8
    |
-37 |     # error: [unsupported-operator]
-38 |     # error: [unsupported-operator]
 39 |     j: list["int" | None] | "bytes",
    |        ------------------^^^-------
    |        |                    |
    |        |                    Has type `Literal["bytes"]`
    |        Has type `<class 'list[int | None]'>`
-40 | ):
-41 |     reveal_type(a)  # revealed: int | Foo
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -230,15 +198,11 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:39:13
    |
-37 |     # error: [unsupported-operator]
-38 |     # error: [unsupported-operator]
 39 |     j: list["int" | None] | "bytes",
    |             -----^^^----
    |             |       |
    |             |       Has type `None`
    |             Has type `Literal["int"]`
-40 | ):
-41 |     reveal_type(a)  # revealed: int | Foo
    |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
@@ -250,14 +214,11 @@ help: Put quotes around the whole union rather than just certain elements
 error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:56:10
    |
-55 | # error: [unsupported-operator]
 56 | X = list["int" | None]
    |          -----^^^----
    |          |       |
    |          |       Has type `None`
    |          Has type `Literal["int"]`
-57 |
-58 | if TYPE_CHECKING:
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line

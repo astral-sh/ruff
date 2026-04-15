@@ -25,8 +25,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, int]`
  --> src/mdtest_snippet.py:4:5
   |
-2 |     # error: [invalid-assignment]
-3 |     # error: [invalid-assignment]
 4 |     config["retries"] = 3.0
   |     ^^^^^^^^^^^^^^^^^^^^---
   |                         |
@@ -40,8 +38,6 @@ info: The full type of the subscripted object is `dict[str, int] | dict[str, str
 error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, str]`
  --> src/mdtest_snippet.py:4:5
   |
-2 |     # error: [invalid-assignment]
-3 |     # error: [invalid-assignment]
 4 |     config["retries"] = 3.0
   |     ^^^^^^^^^^^^^^^^^^^^---
   |                         |

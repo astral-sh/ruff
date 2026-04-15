@@ -26,13 +26,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/builtins.md
 error[call-non-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:2:11
   |
-1 | def _():
 2 |     raise NotImplemented()  # error: [call-non-callable]
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
-3 |
-4 | def _():
   |
 
 ```
@@ -41,7 +38,6 @@ error[call-non-callable]: `NotImplemented` is not callable
 error[call-non-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:5:11
   |
-4 | def _():
 5 |     raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |           |

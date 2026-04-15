@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.m
 error[unsupported-operator]: Unsupported `|` operation
  --> src/mdtest_snippet.py:2:12
   |
-1 | # error: [unsupported-operator]
 2 | IntOrStr = int | str
   |            ---^^^---
   |            |     |

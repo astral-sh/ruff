@@ -77,7 +77,7 @@ impl Diagnostics {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
-            for diagnostic in &self.items {
+            for diagnostic in &*self.items {
                 let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
                     db,
                     diagnostic,

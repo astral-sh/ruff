@@ -117,7 +117,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 report_named_tuple_field_with_leading_underscore(
                     context,
                     class,
-                    &field_name,
+                    field_name,
                     field.first_declaration,
                 );
             }
@@ -127,12 +127,13 @@ pub(crate) fn check_static_class_definitions<'db>(
                     default_ty: Some(_)
                 }
             ) {
-                field_with_default_encountered = Some((field_name, field.first_declaration));
+                field_with_default_encountered =
+                    Some((field_name.clone(), field.first_declaration));
             } else if let Some(field_with_default) = field_with_default_encountered.as_ref() {
                 report_namedtuple_field_without_default_after_field_with_default(
                     context,
                     class,
-                    (&field_name, field.first_declaration),
+                    (field_name, field.first_declaration),
                     field_with_default,
                 );
             }

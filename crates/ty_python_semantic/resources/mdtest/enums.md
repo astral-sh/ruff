@@ -1752,6 +1752,38 @@ Color = Enum()
 reveal_type(Color)  # revealed: Enum
 ```
 
+### Missing `names` argument
+
+```py
+from enum import Enum
+
+# This is invalid at runtime but should not panic.
+Enum("Color")  # error: [missing-argument]
+
+# This is invalid at runtime but should not panic.
+Enum(value="Color")  # error: [missing-argument]
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(value=123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", start="0")
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", type=1)
+
+# error: [missing-argument]
+# error: [unknown-argument]
+Enum("Color", bad_kwarg=True)
+```
+
 ### Non-literal name
 
 Non-literal names should still be recognized as creating an enum class.
@@ -2494,6 +2526,59 @@ class MyEnumBase(Enum):
 # error: [invalid-generic-enum] "Enum class `MyEnum` cannot be generic"
 class MyEnum[T](MyEnumBase):
     A = 1
+```
+
+## Constructor signature
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+The constructor of an enum takes a single `value` argument and returns the enum member corresponding
+to that value:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+# revealed: (value: object) -> Color
+reveal_type(into_regular_callable(Color))
+
+class Priority(IntEnum):
+    HIGH = 1
+    LOW = 2
+
+# revealed: (value: int) -> Priority
+reveal_type(into_regular_callable(Priority))
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+# revealed: (value: str) -> Answer
+reveal_type(into_regular_callable(Answer))
+```
+
+The signature of `Enum`, `IntEnum`, and `StrEnum` is defined by `EnumMeta.__call__`, which allows
+dynamic construction of enums using the functional syntax:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from ty_extensions import into_regular_callable
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(Enum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(IntEnum))
+
+# revealed: Overload[[_EnumMemberT](value: Any, names: None = None) -> _EnumMemberT, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
+reveal_type(into_regular_callable(StrEnum))
 ```
 
 ## References
