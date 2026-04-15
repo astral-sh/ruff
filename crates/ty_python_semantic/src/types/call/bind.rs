@@ -799,6 +799,43 @@ impl<'db> Bindings<'db> {
         Some((bound_call_arguments, partial_bindings))
     }
 
+    /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
+    ///
+    /// Wrapped unions and intersections keep their original callable structure by partially
+    /// applying each callable item independently. A single wrapped callable instead exposes one
+    /// reduced callable whose overload set is merged before being wrapped as `partial[...]`.
+    fn functools_partial_type<'a>(
+        &self,
+        db: &'db dyn Db,
+        wrapped_callable_ty: Type<'db>,
+        partial_overload: &mut Binding<'db>,
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Type<'db> {
+        if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
+            return self.map_item_types(db, |partial_item| {
+                partial_item
+                    .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                    .map(|callable| {
+                        callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
+                    })
+            });
+        }
+
+        let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
+            .iter_callable_items()
+            .filter_map(|partial_item| {
+                partial_item.functools_partial_callable(db, partial_overload, bound_call_arguments)
+            })
+            .collect();
+
+        if partial_callables.is_empty() {
+            Type::Never
+        } else {
+            CallableTypes::from_elements(partial_callables)
+                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+        }
+    }
+
     fn map_with<F>(self, f: &F) -> Self
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,
@@ -2467,77 +2504,11 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownClass::FunctoolsPartial) => {
-                            // `partial(...)` receives the wrapped callable as its first explicit
-                            // argument (after constructor receiver handling).
-                            let func_ty = match overload.parameter_types() {
-                                [Some(func_ty), ..] => *func_ty,
-                                _ => continue,
-                            };
-                            let fallback_return_type = KnownClass::FunctoolsPartial
-                                .to_specialized_instance(db, &[Type::unknown()]);
-
-                            let Some((bound_call_arguments, partial_bindings)) =
-                                Self::functools_partial_matched_bindings(
-                                    db,
-                                    func_ty,
-                                    call_arguments,
-                                )
-                            else {
-                                continue;
-                            };
-
-                            // Reuse call-binding machinery to resolve which wrapped overloads are
-                            // compatible with bound arguments and to surface binding diagnostics.
-                            let partial_bindings = match partial_bindings.check_types(
-                                db,
-                                &ConstraintSetBuilder::new(),
-                                &bound_call_arguments,
-                                TypeContext::default(),
-                                &[],
-                            ) {
-                                Ok(bindings) => bindings,
-                                Err(CallError(_, bindings)) => *bindings,
-                            };
-                            let new_return_type = if func_ty.is_union() || func_ty.is_intersection()
+                            if let Some(new_return_type) =
+                                overload.functools_partial_return_type(db, call_arguments)
                             {
-                                partial_bindings.map_item_types(db, |partial_item| {
-                                    partial_item
-                                        .functools_partial_callable(
-                                            db,
-                                            overload,
-                                            &bound_call_arguments,
-                                        )
-                                        .map(|callable| {
-                                            callable.into_precise_functools_partial_instance(
-                                                db, func_ty,
-                                            )
-                                        })
-                                })
-                            } else {
-                                let partial_callables: SmallVec<[CallableType<'db>; 1]> =
-                                    partial_bindings
-                                        .iter_callable_items()
-                                        .filter_map(|partial_item| {
-                                            partial_item.functools_partial_callable(
-                                                db,
-                                                overload,
-                                                &bound_call_arguments,
-                                            )
-                                        })
-                                        .collect();
-
-                                if partial_callables.is_empty() {
-                                    Type::Never
-                                } else {
-                                    CallableTypes::from_elements(partial_callables)
-                                        .into_precise_functools_partial_instance(db, func_ty)
-                                }
-                            };
-                            if new_return_type.is_never() {
-                                overload.set_return_type(fallback_return_type);
-                                continue;
+                                overload.set_return_type(new_return_type);
                             }
-                            overload.set_return_type(new_return_type);
                         }
 
                         Some(KnownClass::Tuple) if overload_index == 1 => {
@@ -5436,6 +5407,46 @@ impl<'db> Binding<'db> {
     /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    /// Returns the reduced callable type exposed by this `functools.partial(...)` overload.
+    fn functools_partial_return_type<'a>(
+        &mut self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Type<'db>> {
+        // `partial(...)` receives the wrapped callable as its first explicit argument (after
+        // constructor receiver handling).
+        let func_ty = match self.parameter_types() {
+            [Some(func_ty), ..] => *func_ty,
+            _ => return None,
+        };
+        let fallback_return_type =
+            KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
+
+        let (bound_call_arguments, partial_bindings) =
+            Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
+
+        // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
+        // bound arguments and to surface binding diagnostics.
+        let partial_bindings = match partial_bindings.check_types(
+            db,
+            &ConstraintSetBuilder::new(),
+            &bound_call_arguments,
+            TypeContext::default(),
+            &[],
+        ) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
+        };
+        let new_return_type =
+            partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
+
+        Some(if new_return_type.is_never() {
+            fallback_return_type
+        } else {
+            new_return_type
+        })
     }
 
     /// `functools.partial(...)` is allowed to leave required parameters unbound.
