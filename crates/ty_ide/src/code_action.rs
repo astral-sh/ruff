@@ -128,16 +128,8 @@ mod tests {
     fn add_ignore_trailing_whitespace() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  "#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
-        info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:1:5
-          |
-        1 | b = a / 10  
-          |     ^
-          |
-          - b = a / 10  
-        1 + b = a / 10  # ty:ignore[unresolved-reference]
-        ");
+        // Not an inline snapshot because of trailing whitespace.
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE));
     }
 
     #[test]

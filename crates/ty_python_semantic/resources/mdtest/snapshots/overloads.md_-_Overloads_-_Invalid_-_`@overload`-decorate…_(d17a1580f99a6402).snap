@@ -53,16 +53,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 warning[useless-overload-body]: Useless body for `@overload`-decorated function `foo`
   --> src/mdtest_snippet.py:23:5
    |
-21 | @overload
-22 | def foo(x: int) -> int:
 23 |     return x  # error: [useless-overload-body]
    |     ^^^^^^^^ This statement will never be executed
-24 |
-25 | @overload
    |
 info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
-info: rule `useless-overload-body` is enabled by default
 
 ```
 
@@ -70,15 +65,10 @@ info: rule `useless-overload-body` is enabled by default
 warning[useless-overload-body]: Useless body for `@overload`-decorated function `foo`
   --> src/mdtest_snippet.py:29:5
    |
-27 |     """Docstring"""
-28 |     pass
 29 |     print("oh no, a string")  # error: [useless-overload-body]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^ This statement will never be executed
-30 |
-31 | def foo(x):
    |
 info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
-info: rule `useless-overload-body` is enabled by default
 
 ```

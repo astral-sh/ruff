@@ -534,7 +534,7 @@ class Base: ...
 # error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[object, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
 # error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
@@ -545,11 +545,29 @@ type("Foo", (1, 2), {})
 type("Foo", (Base,), {b"attr": 1})
 ```
 
+Assigned calls still preserve list-literal base information after reporting the invalid `bases`
+argument:
+
+```py
+class Base:
+    attr: int = 1
+
+# error: [invalid-argument-type]
+FromList = type("FromList", [Base], {})
+reveal_type(FromList().attr)  # revealed: int
+
+bases = (Base,)
+
+# error: [invalid-argument-type]
+FromStarredList = type("FromStarredList", [*bases], {})
+reveal_type(FromStarredList().attr)  # revealed: int
+```
+
 ## `type[...]` as base class
 
-`type[...]` (SubclassOf) types cannot be used as base classes. When a `type[...]` is used in the
-bases tuple, we emit a diagnostic and insert `Unknown` into the MRO. This gives exactly one
-diagnostic about the unsupported base, rather than cascading errors:
+`type[...]` (SubclassOf) types are valid class bases, but the exact class is not known, so the MRO
+cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
+This gives exactly one diagnostic rather than cascading errors:
 
 ```py
 from ty_extensions import reveal_mro
@@ -569,6 +587,18 @@ def f(x: type[Base]):
 
     # Attributes from `Unknown` are accessible without further errors
     reveal_type(child.base_attr)  # revealed: Unknown
+```
+
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
+unknowable MRO is already inherent to `Any`/`Unknown`:
+
+```py
+from typing import Any
+
+def g(x: type[Any]):
+    # No diagnostic: `Any` base is fine as-is
+    Child = type("Child", (x,), {})
+    reveal_type(Child)  # revealed: <class 'Child'>
 ```
 
 ## MRO errors
@@ -1145,8 +1175,8 @@ class Base:
 class Child(Base, required_arg="value"):
     pass
 
-# The dynamically assigned attribute has Unknown in its type
-reveal_type(Child.config)  # revealed: Unknown | str
+# The dynamically assigned attribute has the inferred type
+reveal_type(Child.config)  # revealed: str
 
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
@@ -1241,5 +1271,5 @@ def f(flag: bool):
     # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
     # because the early-return guard only matches `ClassLiteral`, not union members.
     MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
-    reveal_type(MyClass)  # revealed: type | Unknown
+    reveal_type(MyClass)  # revealed: type | int
 ```

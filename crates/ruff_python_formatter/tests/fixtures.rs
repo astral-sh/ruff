@@ -27,12 +27,19 @@ use std::{fmt, fs};
 
 mod normalizer;
 
+fn snapshot_input_file_for_test(root: &str, test_name: &str) -> String {
+    format!(
+        "crates/ruff_python_formatter/{}/{}",
+        root.trim_start_matches("./"),
+        test_name
+    )
+}
+
 #[expect(clippy::needless_pass_by_value)]
 fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
-    let test_name = input_path
-        .strip_prefix("./resources/test/fixtures/black")
-        .unwrap_or(input_path)
-        .as_str();
+    let root = "./resources/test/fixtures/black";
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let options_path = input_path.with_extension("options.json");
 
@@ -168,7 +175,7 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
 
         let mut settings = insta::Settings::clone_current();
         settings.set_omit_expression(true);
-        settings.set_input_file(input_path);
+        settings.set_input_file(snapshot_input_file);
         settings.set_prepend_module_to_snapshot(false);
         settings.set_snapshot_suffix(test_name);
         let _settings = settings.bind_to_scope();
@@ -180,10 +187,9 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
 
 #[expect(clippy::needless_pass_by_value)]
 fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
-    let test_name = input_path
-        .strip_prefix("./resources/test/fixtures/ruff")
-        .unwrap_or(input_path)
-        .as_str();
+    let root = "./resources/test/fixtures/ruff";
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
     let options_path = input_path.with_extension("options.json");
@@ -295,7 +301,7 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
 
     let mut settings = insta::Settings::clone_current();
     settings.set_omit_expression(true);
-    settings.set_input_file(input_path);
+    settings.set_input_file(snapshot_input_file);
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_suffix(test_name);
     let _settings = settings.bind_to_scope();
@@ -477,9 +483,16 @@ fn ensure_unchanged_ast(
     formatted_unsupported_syntax_errors
         .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
 
+    // Sort the errors by location to ensure the snapshot output is stable.
+    let mut formatted_unsupported_syntax_errors = formatted_unsupported_syntax_errors
+        .into_values()
+        .collect::<Vec<_>>();
+    formatted_unsupported_syntax_errors
+        .sort_by_key(|error| (error.range().start(), error.range().end()));
+
     let file = SourceFileBuilder::new(input_path.file_name().unwrap(), formatted_code).finish();
     let diagnostics = formatted_unsupported_syntax_errors
-        .values()
+        .iter()
         .map(|error| {
             let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, error);
             let span = Span::from(file.clone()).with_range(error.range());
@@ -500,8 +513,8 @@ fn ensure_unchanged_ast(
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(
-            &format!("{unformatted_ast:#?}"),
-            &format!("{formatted_ast:#?}"),
+            format!("{unformatted_ast:#?}"),
+            format!("{formatted_ast:#?}"),
         )
         .unified_diff()
         .header("Unformatted", "Formatted")

@@ -56,23 +56,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/del.md
 error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `Movie`
   --> src/mdtest_snippet.py:21:7
    |
-19 | # Required keys cannot be deleted.
-20 | # error: [invalid-argument-type]
 21 | del m["name"]
    |       ^^^^^^
-22 |
-23 | # In a partial TypedDict (`total=False`), all keys can be deleted.
    |
 info: Field defined here
  --> src/mdtest_snippet.py:4:5
   |
-3 | class Movie(TypedDict):
 4 |     name: str
   |     --------- `name` declared as required here; consider making it `NotRequired`
-5 |     year: int
   |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -80,23 +73,16 @@ info: rule `invalid-argument-type` is enabled by default
 error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `MixedMovie`
   --> src/mdtest_snippet.py:31:11
    |
-29 | # But required keys in mixed `TypedDict` still cannot be deleted.
-30 | # error: [invalid-argument-type]
 31 | del mixed["name"]
    |           ^^^^^^
-32 |
-33 | # And keys that don't exist cannot be deleted.
    |
 info: Field defined here
   --> src/mdtest_snippet.py:12:5
    |
-11 | class MixedMovie(TypedDict):
 12 |     name: str
    |     --------- `name` declared as required here; consider making it `NotRequired`
-13 |     year: NotRequired[int]
    |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
-info: rule `invalid-argument-type` is enabled by default
 
 ```
 
@@ -104,11 +90,8 @@ info: rule `invalid-argument-type` is enabled by default
 error[invalid-argument-type]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
   --> src/mdtest_snippet.py:35:11
    |
-33 | # And keys that don't exist cannot be deleted.
-34 | # error: [invalid-argument-type]
 35 | del mixed["non_existent"]
    |           ^^^^^^^^^^^^^^
    |
-info: rule `invalid-argument-type` is enabled by default
 
 ```

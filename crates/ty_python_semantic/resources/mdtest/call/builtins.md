@@ -32,29 +32,36 @@ str(b"M\x00\xfc\x00s\x00l\x00i\x00", encoding="utf-16", errors="ignore")
 
 str(bytearray.fromhex("4d c3 bc 73 6c 69"), "utf-8")
 str(bytearray(), "utf-8")
+str(memoryview(b"hello world"), "utf-8")
 
 str(encoding="utf-8", object=b"M\xc3\xbcsli")
 str(b"", errors="replace")
-str(encoding="utf-8")
-str(errors="replace")
 ```
 
 ### Invalid calls
 
 ```py
-# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `bytes | bytearray`, found `Literal[1]`"
-# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `str`, found `Literal[2]`"
+# These are valid at runtime, but the typeshed signature for `str.__new__` requires `object`
+# when `encoding` or `errors` are provided.
+# error: [no-matching-overload]
+str(encoding="utf-8")
+
+# error: [no-matching-overload]
+str(errors="replace")
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
 str(1, 2)
 
 # error: [no-matching-overload]
 str(o=1)
 
 # First argument is not a bytes-like object:
-# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `bytes | bytearray`, found `Literal["Müsli"]`"
+# error: [invalid-argument-type]
 str("Müsli", "utf-8")
 
 # Second argument is not a valid encoding:
-# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `str`, found `Literal[b"utf-8"]`"
+# error: [invalid-argument-type]
 str(b"M\xc3\xbcsli", b"utf-8")
 ```
 

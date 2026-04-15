@@ -39,8 +39,7 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     reveal_type(b1)  # revealed: Literal[Color.RED]
-    # TODO should be `Literal[MissingT.MISSING]`
-    reveal_type(b2)  # revealed: @Todo(functional `Enum` syntax)
+    reveal_type(b2)  # revealed: MissingT
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -48,6 +47,10 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-type-form]
 invalid3: Literal[(3, 4)]
+# error: [invalid-type-form]
+invalid4: Literal[-3.14]
+# error: [invalid-type-form]
+invalid5: Literal[-3j]
 
 hello = "hello"
 invalid4: Literal[
@@ -329,7 +332,7 @@ from other import Literal
 #
 # ?
 #
-# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
+# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in a type expression"
 a1: Literal[26]
 
 def f():
@@ -352,7 +355,7 @@ def f():
 ```py
 from typing import Literal
 
-# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a parameter annotation"
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```

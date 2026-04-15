@@ -132,10 +132,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             _ => None,
         };
 
-        let chmod_args = itertools::join(
-            call.arguments.arguments_source_order().filter_map(args),
-            ", ",
-        );
+        let chmod_args = itertools::join(call.arguments.iter_source_order().filter_map(args), ", ");
 
         let replacement = if is_pathlib_path_call(checker, path_arg) {
             format!("{path_code}.chmod({chmod_args})")

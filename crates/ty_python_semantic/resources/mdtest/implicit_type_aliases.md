@@ -347,14 +347,10 @@ if TYPE_CHECKING:
         def f(obj: X):
             reveal_type(obj)  # revealed: int | str
 
-    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
-    # if a whole *scope* is inside the `if TYPE_CHECKING` block
-    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
-    Y = int | str  # error: [unsupported-operator]
+    Y = int | str
 
     def g(obj: Y):
-        # TODO: should be `int | str`
-        reveal_type(obj)  # revealed: Unknown
+        reveal_type(obj)  # revealed: int | str
 
 Y = list["int | str"]
 
@@ -678,10 +674,7 @@ def _(doubly_specialized: DoublySpecialized):
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
 List = list[int][int]
 
-# TODO: one error would be enough here
-#
 # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 WorseList = list[int][0]
 
 def _(doubly_specialized: List, doubly_specialized_2: WorseList):
@@ -783,7 +776,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [not-subscriptable] "Cannot subscript non-generic type"
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
@@ -796,7 +789,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
 # error: [unbound-type-variable]
 # error: [unbound-type-variable]
 x: (list[T] | set[T])[int]
@@ -808,8 +801,6 @@ def _():
 
 ### Snapshots for verbose diagnostics
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -818,19 +809,57 @@ python-version = "3.12"
 ```py
 type ListOfInts2 = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+# snapshot: not-subscriptable
 DoublySpecialized = ListOfInts2[int]
+```
 
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
+ --> src/mdtest_snippet.py:4:21
+  |
+4 | DoublySpecialized = ListOfInts2[int]
+  |                     -----------^^^^^
+  |                     |
+  |                     Alias to `list[int]`, which is already specialized
+  |
+```
+
+```py
 ThreeInts = tuple[int, int, int]
 
+# snapshot: not-subscriptable
+three_ints: ThreeInts[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | three_ints: ThreeInts[int]
+  |             ---------^^^^^
+  |             |
+  |             Type is already specialized
+  |
+```
+
+```py
 class A[T]: ...
 
 AliasForA = A[int]
 
-def f(
-    a: AliasForA[int],  # error: [not-subscriptable]
-    b: ThreeInts[int],  # error: [not-subscriptable]
-): ...
+# snapshot: not-subscriptable
+alias_for_a: AliasForA[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+  --> src/mdtest_snippet.py:14:14
+   |
+14 | alias_for_a: AliasForA[int]
+   |              ---------^^^^^
+   |              |
+   |              Type is already specialized
+   |
 ```
 
 ### Multiple definitions
@@ -1582,7 +1611,7 @@ errors:
 ```py
 AliasForStr = "str"
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a parameter annotation"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 

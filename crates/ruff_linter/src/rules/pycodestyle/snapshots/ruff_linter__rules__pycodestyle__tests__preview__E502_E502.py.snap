@@ -248,20 +248,59 @@ help: Remove redundant backslash
 82 + x = ("abc" 
 83 |     "xyz")
 84 |
-85 |
+85 | x = [
 
 E502 [*] Redundant backslash
-  --> E502.py:87:14
+  --> E502.py:86:11
    |
-86 | def foo():
-87 |     x = (a + \
-   |              ^
-88 |         2)
+85 | x = [
+86 |     "a" + \
+   |           ^
+87 | f"""
+88 | b
    |
 help: Remove redundant backslash
+83 |     "xyz")
 84 |
-85 |
-86 | def foo():
+85 | x = [
+   -     "a" + \
+86 +     "a" + 
+87 | f"""
+88 | b
+89 | """ + \
+
+E502 [*] Redundant backslash
+  --> E502.py:89:7
+   |
+87 | f"""
+88 | b
+89 | """ + \
+   |       ^
+90 |     "c"
+91 | ]
+   |
+help: Remove redundant backslash
+86 |     "a" + \
+87 | f"""
+88 | b
+   - """ + \
+89 + """ + 
+90 |     "c"
+91 | ]
+92 |
+
+E502 [*] Redundant backslash
+  --> E502.py:95:14
+   |
+94 | def foo():
+95 |     x = (a + \
+   |              ^
+96 |         2)
+   |
+help: Remove redundant backslash
+92 |
+93 |
+94 | def foo():
    -     x = (a + \
-87 +     x = (a + 
-88 |         2)
+95 +     x = (a + 
+96 |         2)

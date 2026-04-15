@@ -2041,6 +2041,96 @@ p = Point<CURSOR>(1, 2)
         "#);
     }
 
+    #[test]
+    fn goto_definition_attribute_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    a: str
+                    a: str
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:6
+          |
+        6 | test = Test()
+        7 |
+        8 | test.a
+          |      ^ Clicking here
+          |
+        info: Found 2 definitions
+         --> main.py:3:5
+          |
+        2 | class Test:
+        3 |     a: str
+          |     -
+        4 |     a: str
+          |     -
+        5 |
+        6 | test = Test()
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_property_getter_and_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    @property
+                    def a(self) -> str:
+                        return ""
+
+                    @a.setter
+                    def a(self, value: str) -> None:
+                        pass
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+          --> main.py:13:6
+           |
+        11 | test = Test()
+        12 |
+        13 | test.a
+           |      ^ Clicking here
+           |
+        info: Found 2 definitions
+         --> main.py:4:9
+          |
+        2 | class Test:
+        3 |     @property
+        4 |     def a(self) -> str:
+          |         -
+        5 |         return ""
+          |
+         ::: main.py:8:9
+          |
+        7 |     @a.setter
+        8 |     def a(self, value: str) -> None:
+          |         -
+        9 |         pass
+          |
+        "#);
+    }
+
     /// Goto-definition works when accessing type attributes on class objects.
     #[test]
     fn goto_definition_for_type_attributes_on_class_objects() {
@@ -2188,7 +2278,7 @@ while True:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -2224,7 +2314,7 @@ for x in range(10):
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |

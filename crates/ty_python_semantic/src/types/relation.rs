@@ -11,9 +11,10 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    CallableType, ClassBase, ClassType, CycleDetector, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -278,7 +279,8 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_),
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::PropertyDunderDelete(_),
             )
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
@@ -321,13 +323,17 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             given: assuming,
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
     }
@@ -419,13 +425,17 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
             constraints,
             inferable,
             relation,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target)
     }
@@ -447,17 +457,51 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    pub(crate) fn is_equivalent_to_with_materialization_visitor(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> bool {
+        self.when_equivalent_to_with_materialization_visitor(
+            db,
+            other,
+            &ConstraintSetBuilder::new(),
+            materialization_visitor,
+        )
+        .is_always_satisfied(db)
+    }
+
     pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        self.when_equivalent_to_with_materialization_visitor(
+            db,
+            other,
+            constraints,
+            &materialization_visitor,
+        )
+    }
+
+    pub(crate) fn when_equivalent_to_with_materialization_visitor<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
+            relation_visitor: &relation_visitor,
+            disjointness_visitor: &disjointness_visitor,
+            materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
@@ -490,12 +534,16 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
-            disjointness_visitor: &IsDisjointVisitor::default(constraints),
-            relation_visitor: &HasRelationToVisitor::default(constraints),
+            disjointness_visitor: &disjointness_visitor,
+            relation_visitor: &relation_visitor,
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
     }
@@ -538,6 +586,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
@@ -546,6 +595,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -554,6 +604,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -561,6 +612,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -569,6 +621,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -595,6 +648,78 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.relation_visitor
             .visit((source, target, self.relation), work)
+    }
+
+    /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
+    ///
+    /// This does not include all types that are subtypes of `builtins.type`! The semantic
+    /// distinction that matters here is not whether `target` is a subtype of `type`, but whether
+    /// it constrains the class or the metaclass of its inhabitants.
+    ///
+    /// The type `type[C]` and the type `ABCMeta` are both subtypes of `builtins.type`, but they
+    /// constrain their inhabitants in different domains. `type[C]` constrains in the regular-class
+    /// domain (it describes a regular class object and all its subclasses). A metaclass instance
+    /// like `ABCMeta` constrains in the metaclass domain: its inhabitants can be class objects
+    /// that are unrelated to each other in the regular-class domain (they do not inherit each
+    /// other or any other common base), but they are all constrained to have a metaclass that
+    /// inherits from `ABCMeta`.
+    fn is_metaclass_instance(db: &'db dyn Db, target: Type<'db>) -> bool {
+        target.as_nominal_instance().is_some_and(|instance| {
+            KnownClass::Type
+                .try_to_class_literal(db)
+                .is_some_and(|type_class| {
+                    instance
+                        .class(db)
+                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
+                })
+        })
+    }
+
+    /// Can we check `target`s relation to a `type[T]` in either the metaclass-instance domain (it
+    /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
+    /// `.to_instance()`)?
+    fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
+        Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some()
+    }
+
+    /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
+    /// projected into the ordinary instance/object domain via `.to_instance()`, or is a plain
+    /// metaclass object type.
+    ///
+    /// In the former case, we unwrap the source from `type[T]` to `T`, push the target down
+    /// through `A.to_instance()`, and compare those types. This is the right interpretation for
+    /// targets like `type[S]`: they constrain class objects via the instances they create, not via
+    /// their metaclasses.
+    ///
+    /// For a metaclass instance type (see `is_metaclass_instance` for definition),
+    /// `A.to_instance()` is too lossy: it collapses to `object`, because we have no precise
+    /// instance-space representation for "all class objects whose metaclass inhabits `A`". For
+    /// these types which constrain in the metaclass space, we instead need to resolve `type[T]` to
+    /// the metaclass of the upper bound of `T`, and compare in the metaclass-instance domain
+    /// directly.
+    ///
+    /// If `A` has no `.to_instance()` projection and is not a metaclass instance type, it won't
+    /// pass the `can_check_typevar_subclass_relation_to_target` guard, and this helper does not
+    /// decide the relation; it will fall through to other type-pair branches.
+    fn check_typevar_subclass_relation_to_target(
+        &self,
+        db: &'db dyn Db,
+        source_subclass: SubclassOfType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source_subclass
+            .into_type_var()
+            .when_some_and(db, self.constraints, |source_i| {
+                if Self::is_metaclass_instance(db, target) {
+                    self.check_type_pair(db, source_subclass.to_metaclass_instance(db), target)
+                } else {
+                    target
+                        .to_instance(db)
+                        .when_some_and(db, self.constraints, |target_i| {
+                            self.check_type_pair(db, Type::TypeVar(source_i), target_i)
+                        })
+                }
+            })
     }
 
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
@@ -657,6 +782,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 );
             }
         }
+
+        let should_expand_intersection = |intersection: IntersectionType<'db>| {
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| match element {
+                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                    _ => false,
+                })
+        };
 
         match (source, target) {
             // Everything is a subtype of `object`.
@@ -804,36 +940,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
-            // of `A`, and vice versa.
+            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype
+            // of an instance of `A`. If `A` is a metaclass instance (instance of a specific
+            // subclass of `type`), we instead compare in the metaclass-instance domain, since
+            // collapsing `A` through `to_instance()` would erase it to `object` (we have no
+            // precise representation for "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
-                if !subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
-                    .is_never_satisfied(db) =>
+                if subclass_of.is_type_var()
+                    && Self::can_check_typevar_subclass_relation_to_target(db, target) =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
-                subclass_of
-                    .into_type_var()
-                    .zip(target.to_instance(db))
-                    .when_some_and(db, self.constraints, |(source_i, target_i)| {
-                        self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                    })
+                self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
             }
 
+            // And vice versa. (No special metaclass handling is needed in this direction, since
+            // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
-                if !subclass_of
-                    .into_type_var()
-                    .zip(source.to_instance(db))
-                    .when_some_and(db, self.constraints, |(target_i, source_i)| {
-                        self.check_type_pair(db, source_i, Type::TypeVar(target_i))
-                    })
-                    .is_never_satisfied(db) =>
+                if subclass_of.is_type_var() && source.to_instance(db).is_some() =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
                     .into_type_var()
                     .zip(source.to_instance(db))
@@ -944,25 +1067,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .or(db, self.constraints, || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
-                    // to be a newtype of a union, or for an intersection to contain a newtype of a union; this
-                    // requires special handling.
+                    // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
+                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
+                    // constraints that exposes a union; this requires special handling.
                     match source {
-                        Type::Intersection(intersection) => {
-                            if intersection.positive(db).iter().any(|&element| {
-                                element.as_new_type().is_some_and(|newtype| {
-                                    newtype.concrete_base_type(db).is_union()
-                                })
-                            }) {
-                                let mapped = intersection.map_positive(db, |&t| match t {
-                                    Type::NewTypeInstance(newtype) => {
-                                        newtype.concrete_base_type(db)
-                                    }
-                                    _ => t,
-                                });
-                                self.check_type_pair(db, mapped, target)
-                            } else {
-                                self.never()
-                            }
+                        Type::Intersection(intersection)
+                            if should_expand_intersection(intersection) =>
+                        {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
                         }
                         Type::NewTypeInstance(newtype) => {
                             let concrete_base = newtype.concrete_base_type(db);
@@ -1030,11 +1146,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                intersection.positive_elements_or_object(db).when_any(
-                    db,
-                    self.constraints,
-                    |elem_ty| self.check_type_pair(db, elem_ty, target),
-                )
+                intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, self.constraints, |elem_ty| {
+                        self.check_type_pair(db, elem_ty, target)
+                    })
+                    .or(db, self.constraints, || {
+                        if should_expand_intersection(intersection) {
+                            self.check_type_pair(
+                                db,
+                                intersection.with_expanded_typevars_and_newtypes(db),
+                                target,
+                            )
+                        } else {
+                            self.never()
+                        }
+                    })
             }
 
             // `Never` is the bottom type, the empty set.
@@ -1527,7 +1654,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         check_optional_methods(source.getter(db), target.getter(db)).and(
             db,
             self.constraints,
-            || check_optional_methods(source.setter(db), target.setter(db)),
+            || {
+                check_optional_methods(source.setter(db), target.setter(db)).and(
+                    db,
+                    self.constraints,
+                    || check_optional_methods(source.deleter(db), target.deleter(db)),
+                )
+            },
         )
     }
 
@@ -1537,6 +1670,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1547,6 +1681,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 }
@@ -1563,10 +1698,14 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
-    fn as_relation_checker(&self) -> TypeRelationChecker<'_, 'c, 'db> {
+    fn as_relation_checker<'a>(
+        &'a self,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    ) -> TypeRelationChecker<'a, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
@@ -1574,6 +1713,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor,
         }
     }
 
@@ -1591,11 +1731,18 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_checker = self.as_relation_checker();
-        relation_checker
+        // Recursive materialization fallbacks depend on the comparison root, so each directional
+        // pass needs fresh materialization caches. Nested equivalence checks still share the
+        // materialization-equivalence recursion guard to avoid re-entering the same comparison.
+        let left_to_right_materialization_visitor =
+            self.materialization_visitor.for_new_materialization_root();
+        self.as_relation_checker(&left_to_right_materialization_visitor)
             .check_type_pair(db, left, right)
             .and(db, self.constraints, || {
-                relation_checker.check_type_pair(db, right, left)
+                let right_to_left_materialization_visitor =
+                    self.materialization_visitor.for_new_materialization_root();
+                self.as_relation_checker(&right_to_left_materialization_visitor)
+                    .check_type_pair(db, right, left)
             })
     }
 }
@@ -1613,6 +1760,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // any other more "low-level" method.
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
@@ -1621,6 +1769,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         inferable: InferableTypeVars<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             constraints,
@@ -1628,6 +1777,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: ConstraintSet::from_bool(constraints, false),
             disjointness_visitor,
             relation_visitor,
+            materialization_visitor,
         }
     }
 
@@ -1642,6 +1792,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1651,6 +1802,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
+            materialization_visitor: self.materialization_visitor,
         }
     }
 
@@ -1745,15 +1897,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if !subclass_of
-                    .into_type_var()
-                    .zip(other.to_instance(db))
-                    .when_none_or(db, self.constraints, |(this_instance, other_instance)| {
-                        self.check_type_pair(db, Type::TypeVar(this_instance), other_instance)
-                    })
-                    .is_always_satisfied(db) =>
+                if subclass_of.is_type_var() && other.to_instance(db).is_some() =>
             {
-                // TODO: The repetition here isn't great, but we need the fallthrough logic.
                 subclass_of
                     .into_type_var()
                     .zip(other.to_instance(db))
@@ -1879,6 +2024,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(right)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(left)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(right)),
             ) => self.check_property_instance_pair(db, left, right),
 
             // any single-valued type is disjoint from another single-valued type
@@ -2389,7 +2538,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         };
 
         check_optional_methods(left.getter(db), right.getter(db)).or(db, self.constraints, || {
-            check_optional_methods(left.setter(db), right.setter(db))
+            check_optional_methods(left.setter(db), right.setter(db)).or(
+                db,
+                self.constraints,
+                || check_optional_methods(left.deleter(db), right.deleter(db)),
+            )
         })
     }
 }

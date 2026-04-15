@@ -1,5 +1,5 @@
+use crate::fix::edits::fresh_binding_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{SemanticModel, analyze::typing::is_mutable_expr};
 
@@ -128,21 +128,4 @@ fn generate_dict_comprehension(
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.expr(&dict_comp.into())
-}
-
-/// Return a fresh binding name derived from `base` that does not shadow an
-/// existing non-builtin symbol in the current semantic scope.
-fn fresh_binding_name(semantic: &SemanticModel<'_>, base: &str) -> Name {
-    if semantic.is_available(base) {
-        return Name::new(base);
-    }
-
-    let mut index = 0;
-    loop {
-        let candidate = format!("{base}_{index}");
-        if semantic.is_available(&candidate) {
-            return Name::new(candidate);
-        }
-        index += 1;
-    }
 }

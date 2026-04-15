@@ -3,13 +3,13 @@
 use std::num::NonZeroUsize;
 
 use anyhow::Context as _;
-pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
+use edit::DocumentKey;
+pub use logging::{LogLevel, init_logging};
 use lsp_types::CodeActionKind;
-pub use server::{ConnectionSender, MainLoopSender, Server};
-pub use session::{Client, ClientOptions, DocumentQuery, DocumentSnapshot, GlobalOptions, Session};
-pub use workspace::{Workspace, Workspaces};
+pub use server::{ConnectionInitializer, Server};
+use session::{ClientOptions, Session};
 
-use crate::server::ConnectionInitializer;
+pub use edit::{PositionEncoding, TextDocument};
 
 mod edit;
 mod fix;
@@ -50,7 +50,7 @@ pub fn run(preview: Option<bool>) -> Result<()> {
 
     let (connection, io_threads) = ConnectionInitializer::stdio();
 
-    let server_result = Server::new(worker_threads, connection, preview)
+    let server_result = Server::new(worker_threads, connection, preview, false)
         .context("Failed to start server")?
         .run();
 

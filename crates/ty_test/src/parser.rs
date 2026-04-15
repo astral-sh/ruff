@@ -1,20 +1,20 @@
 use std::{
     borrow::Cow,
-    collections::hash_map::Entry,
     fmt::{Formatter, LowerHex, Write},
     hash::Hash,
 };
 
 use anyhow::bail;
+use indexmap::{IndexMap, map::Entry};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::config::MarkdownTestConfig;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 
 /// Parse the Markdown `source` as a test suite with given `title`.
@@ -214,9 +214,30 @@ struct EmbeddedFileId;
 /// Holds information about the start and the end of a code block in a Markdown file.
 ///
 /// The start is the offset of the first triple-backtick in the code block, and the end is the
-/// offset of the (start of the) closing triple-backtick.
+/// offset immediately after the closing triple-backtick.
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct BacktickOffsets(TextRange);
+
+impl Ranged for BacktickOffsets {
+    fn range(&self) -> TextRange {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone)]
-pub(crate) struct BacktickOffsets(TextSize, TextSize);
+pub(crate) struct InlineSnapshotBlock<'s> {
+    /// The expected snapshot content.
+    pub(crate) expected: &'s str,
+
+    /// The range of the inline snapshot block, including both fences.
+    pub(crate) range: BacktickOffsets,
+}
+
+impl Ranged for InlineSnapshotBlock<'_> {
+    fn range(&self) -> TextRange {
+        self.range.0
+    }
+}
 
 /// Holds information about the position and length of all code blocks that are part of
 /// a single embedded file in a Markdown file. This is used to reconstruct absolute line
@@ -264,8 +285,8 @@ impl EmbeddedFileSourceMap {
             start_line_and_line_count: dimensions
                 .into_iter()
                 .map(|d| {
-                    let start_line = md_index.line_index(d.0).get();
-                    let end_line = md_index.line_index(d.1).get();
+                    let start_line = md_index.line_index(d.start()).get();
+                    let end_line = md_index.line_index(d.end()).get();
                     let code_line_count = (end_line - start_line) - 1;
                     (start_line, code_line_count)
                 })
@@ -352,7 +373,8 @@ pub(crate) struct EmbeddedFile<'s> {
     path: EmbeddedFilePath<'s>,
     pub(crate) lang: &'s str,
     pub(crate) code: Cow<'s, str>,
-    pub(crate) backtick_offsets: Vec<BacktickOffsets>,
+    /// The checkable code blocks
+    pub(crate) python_code_blocks: Vec<CodeBlock<'s>>,
 }
 
 impl EmbeddedFile<'_> {
@@ -363,11 +385,16 @@ impl EmbeddedFile<'_> {
             return;
         }
 
-        self.backtick_offsets.push(backtick_offsets);
-
         let existing_code = self.code.to_mut();
         existing_code.push('\n');
+        let start_offset = existing_code.text_len();
         existing_code.push_str(new_code);
+
+        self.python_code_blocks.push(CodeBlock {
+            backticks: backtick_offsets,
+            embedded_start_offset: start_offset,
+            inline_snapshot_block: None,
+        });
     }
 
     pub(crate) fn relative_path(&self) -> &str {
@@ -384,6 +411,34 @@ impl EmbeddedFile<'_> {
         } else {
             project_root.join(relative_path)
         }
+    }
+
+    pub(crate) fn is_checkable(&self) -> bool {
+        matches!(self.lang, "py" | "python" | "pyi")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CodeBlock<'s> {
+    /// The offsets of the code block's code fences in the markdown source.
+    backticks: BacktickOffsets,
+    /// The offset in the concatenated file source at which this code block starts.
+    embedded_start_offset: TextSize,
+    /// The code block's associated inline snapshot block (capture the expected rendered diagnostics output).
+    inline_snapshot_block: Option<InlineSnapshotBlock<'s>>,
+}
+
+impl<'s> CodeBlock<'s> {
+    pub(crate) fn backtick_offsets(&self) -> BacktickOffsets {
+        self.backticks
+    }
+
+    pub(crate) fn embedded_start_offset(&self) -> TextSize {
+        self.embedded_start_offset
+    }
+
+    pub(crate) fn inline_snapshot_block(&self) -> Option<&InlineSnapshotBlock<'s>> {
+        self.inline_snapshot_block.as_ref()
     }
 }
 
@@ -441,7 +496,7 @@ struct Parser<'s> {
     stack: SectionStack,
 
     /// Names of embedded files in current active section.
-    current_section_files: FxHashMap<EmbeddedFilePath<'s>, EmbeddedFileId>,
+    current_section_files: IndexMap<EmbeddedFilePath<'s>, EmbeddedFileId, FxBuildHasher>,
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
@@ -469,7 +524,7 @@ impl<'s> Parser<'s> {
             preceding_blank_lines: 0,
             explicit_path: None,
             stack: SectionStack::new(root_section_id),
-            current_section_files: FxHashMap::default(),
+            current_section_files: IndexMap::default(),
             current_section_has_config: false,
             file_has_dependencies: false,
         }
@@ -634,17 +689,20 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            let backtick_offset_end = self.cursor.offset() - "```".text_len();
+                            let backtick_offset_end = self.cursor.offset();
 
                             self.process_code_block(
                                 lang,
                                 code,
-                                BacktickOffsets(backtick_offset_start, backtick_offset_end),
+                                BacktickOffsets(TextRange::new(
+                                    backtick_offset_start,
+                                    backtick_offset_end,
+                                )),
                             )?;
                         } else {
                             let code_block_start = self.cursor.token_len();
                             let line = self.source.count_lines(TextRange::up_to(code_block_start));
-                            bail!("Unterminated code block at line {line}.");
+                            bail!("Unterminated code block on line {line}.");
                         }
 
                         self.explicit_path = None;
@@ -740,6 +798,10 @@ impl<'s> Parser<'s> {
             return Ok(());
         }
 
+        if lang == "snapshot" {
+            return self.process_inline_snapshot(code, backtick_offsets);
+        }
+
         if let Some(explicit_path) = self.explicit_path {
             let expected_extension = if lang == "python" { "py" } else { lang };
 
@@ -749,9 +811,9 @@ impl<'s> Parser<'s> {
                     .extension()
                     .is_none_or(|extension| extension.eq_ignore_ascii_case(expected_extension))
             {
-                let backtick_start = self.line_index(backtick_offsets.0);
+                let backtick_start = self.line_number(backtick_offsets.start());
                 bail!(
-                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start}`"
+                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block on line `{backtick_start}`"
                 );
             }
         }
@@ -798,8 +860,13 @@ impl<'s> Parser<'s> {
                     section,
                     lang,
                     code: Cow::Borrowed(code),
-                    backtick_offsets: vec![backtick_offsets],
+                    python_code_blocks: vec![CodeBlock {
+                        backticks: backtick_offsets,
+                        embedded_start_offset: TextSize::new(0),
+                        inline_snapshot_block: None,
+                    }],
                 });
+
                 entry.insert(index);
             }
             Entry::Occupied(entry) => {
@@ -833,7 +900,7 @@ impl<'s> Parser<'s> {
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
             .values()
-            .any(|id| self.files[*id].backtick_offsets.len() > 1)
+            .any(|id| self.files[*id].python_code_blocks.len() > 1)
     }
 
     fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
@@ -857,6 +924,50 @@ impl<'s> Parser<'s> {
         current_section.config = config;
 
         self.current_section_has_config = true;
+
+        Ok(())
+    }
+
+    fn process_inline_snapshot(
+        &mut self,
+        code: &'s str,
+        offsets: BacktickOffsets,
+    ) -> anyhow::Result<()> {
+        let Some((_, current_file)) = self.current_section_files.last() else {
+            let backtick_start = line_number(offsets.start(), self.source);
+
+            bail!(
+                "`snapshot` code block on line {backtick_start} must follow a Python code block, but section has no files."
+            );
+        };
+
+        let file = &mut self.files[*current_file];
+
+        if !file.is_checkable() {
+            let backtick_start = line_number(offsets.start(), self.source);
+
+            bail!(
+                "`snapshot` code block on line {backtick_start} must follow a `python` code block in the same section but it follows a `{}` block.",
+                file.lang
+            );
+        }
+
+        let code_block = file.python_code_blocks.last_mut().unwrap();
+
+        if let Some(existing_block) = &code_block.inline_snapshot_block {
+            let code_block_start = line_number(code_block.embedded_start_offset(), self.source);
+            let backtick_start = line_number(offsets.start(), self.source);
+            let existing_start = line_number(existing_block.range.start(), self.source);
+
+            bail!(
+                "Python code block on line `{code_block_start}` has more than one `snapshot` block: first on line {existing_start} and another on line {backtick_start}.",
+            );
+        }
+
+        code_block.inline_snapshot_block = Some(InlineSnapshotBlock {
+            expected: code,
+            range: offsets,
+        });
 
         Ok(())
     }
@@ -900,9 +1011,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn line_index(&self, char_index: TextSize) -> u32 {
-        self.source.count_lines(TextRange::up_to(char_index))
+    fn line_number(&self, char_index: TextSize) -> u32 {
+        line_number(char_index, self.source)
     }
+}
+
+fn line_number(char_index: TextSize, source: &str) -> u32 {
+    source.count_lines(TextRange::up_to(char_index)) + 1
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1445,7 +1560,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block at line `5`"
+            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block on line `6`"
         );
     }
 
@@ -1508,7 +1623,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at line 2.");
+        assert_eq!(err.to_string(), "Unterminated code block on line 2.");
     }
 
     #[test]
@@ -1528,7 +1643,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at line 10.");
+        assert_eq!(err.to_string(), "Unterminated code block on line 10.");
     }
 
     #[test]

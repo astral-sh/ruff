@@ -41,7 +41,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -87,7 +86,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -135,7 +133,6 @@ def foo() -> str:
             }),
         )?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -143,6 +140,104 @@ def foo() -> str:
     let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn unsupported_editor_python_version() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let main = SystemPath::new("src/main.py");
+    let python_home = "base/bin";
+    let base_python = if cfg!(target_os = "windows") {
+        "base/bin/python.exe"
+    } else {
+        "base/bin/python"
+    };
+    let python = if cfg!(target_os = "windows") {
+        "venv/Scripts/python.exe"
+    } else {
+        "venv/bin/python"
+    };
+    let site_packages_foo = if cfg!(target_os = "windows") {
+        "venv/Lib/site-packages/foo.py"
+    } else {
+        "venv/lib/python3.16/site-packages/foo.py"
+    };
+    // The import proves we still use the editor-selected environment for module resolution even
+    // when we ignore its unsupported reported Python version.
+    let foo_content = "\
+import foo
+import sys
+from typing_extensions import reveal_type
+
+reveal_type(sys.version_info[:2])
+";
+
+    let builder = TestServerBuilder::new()?;
+    let python_home = builder.file_path(python_home);
+    let sys_prefix = builder.file_path("venv");
+    let python_uri = builder.file_uri(python);
+
+    let workspace_options: ClientOptions = serde_json::from_value(json!({
+        "pythonExtension": {
+            "activeEnvironment": {
+                "executable": {
+                    "uri": python_uri,
+                    "sysPrefix": sys_prefix,
+                },
+                "version": {
+                    "major": 3,
+                    "minor": 16,
+                    "patch": 0,
+                    "sysVersion": "3.16.0",
+                }
+            }
+        }
+    }))?;
+
+    let mut server = builder
+        .with_workspace(workspace_root, Some(workspace_options))?
+        .with_file(main, foo_content)?
+        .with_file(base_python, "")?
+        .with_file(python, "")?
+        .with_file(
+            "venv/pyvenv.cfg",
+            format!("version_info = 3.16.0\nhome = {python_home}\n"),
+        )?
+        .with_file(site_packages_foo, "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(main, None);
+
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "kind": "full",
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 12
+            },
+            "end": {
+              "line": 4,
+              "character": 32
+            }
+          },
+          "severity": 3,
+          "code": "revealed-type",
+          "source": "ty",
+          "message": "Revealed type: `tuple[Literal[3], Literal[14]]`"
+        }
+      ]
+    }
+    "#);
 
     Ok(())
 }
@@ -188,7 +283,6 @@ def foo() -> str:
 unresolved-reference="warn"
         "#,
         )?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 

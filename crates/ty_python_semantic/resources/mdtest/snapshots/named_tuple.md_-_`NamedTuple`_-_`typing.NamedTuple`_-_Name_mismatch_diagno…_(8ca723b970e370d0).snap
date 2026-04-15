@@ -1,0 +1,35 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: named_tuple.md - `NamedTuple` - `typing.NamedTuple` - Name mismatch diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import NamedTuple
+2 | from ty_extensions import is_subtype_of
+3 | 
+4 | # error: [mismatched-type-name]
+5 | Mismatch = NamedTuple("WrongName", [("x", int)])
+6 | reveal_type(Mismatch)  # revealed: <class 'WrongName'>
+7 | reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
+```
+
+# Diagnostics
+
+```
+warning[mismatched-type-name]: The name passed to `NamedTuple` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:5:23
+  |
+5 | Mismatch = NamedTuple("WrongName", [("x", int)])
+  |                       ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
+  |
+
+```

@@ -2,11 +2,13 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::fix::edits::fresh_binding_name;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -211,6 +213,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                 indentation,
                                 checker.stylist(),
                                 checker.locator(),
+                                checker.semantic(),
                             ));
                         }
                     }
@@ -229,6 +232,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                 indentation,
                                 checker.stylist(),
                                 checker.locator(),
+                                checker.semantic(),
                             ));
                         }
                     }
@@ -246,6 +250,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                             indentation,
                             checker.stylist(),
                             checker.locator(),
+                            checker.semantic(),
                         ));
                     }
                 }
@@ -266,6 +271,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                                     indentation,
                                     checker.stylist(),
                                     checker.locator(),
+                                    checker.semantic(),
                                 ));
                             }
                         }
@@ -293,19 +299,23 @@ fn generate_fix(
     stmt_indentation: &str,
     stylist: &Stylist,
     locator: &Locator,
+    semantic: &SemanticModel,
 ) -> Fix {
+    let msg_name = fresh_binding_name(semantic, "msg");
     Fix::unsafe_edits(
         Edit::insertion(
             if locator.contains_line_break(exc_arg.range()) {
                 format!(
-                    "msg = ({line_ending}{stmt_indentation}{indentation}{}{line_ending}{stmt_indentation}){line_ending}{stmt_indentation}",
+                    "{} = ({line_ending}{stmt_indentation}{indentation}{}{line_ending}{stmt_indentation}){line_ending}{stmt_indentation}",
+                    msg_name,
                     locator.slice(exc_arg.range()),
                     line_ending = stylist.line_ending().as_str(),
                     indentation = stylist.indentation().as_str(),
                 )
             } else {
                 format!(
-                    "msg = {}{}{}",
+                    "{} = {}{}{}",
+                    msg_name,
                     locator.slice(exc_arg.range()),
                     stylist.line_ending().as_str(),
                     stmt_indentation,
@@ -314,7 +324,7 @@ fn generate_fix(
             stmt.start(),
         ),
         [Edit::range_replacement(
-            String::from("msg"),
+            msg_name.to_string(),
             exc_arg.range(),
         )],
     )

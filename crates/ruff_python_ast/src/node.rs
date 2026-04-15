@@ -271,7 +271,7 @@ impl ast::PatternArguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for pattern_or_keyword in self.patterns_source_order() {
+        for pattern_or_keyword in self.iter_source_order() {
             match pattern_or_keyword {
                 crate::PatternOrKeyword::Pattern(pattern) => visitor.visit_pattern(pattern),
                 crate::PatternOrKeyword::Keyword(keyword) => {
@@ -326,7 +326,7 @@ impl ast::Arguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for arg_or_keyword in self.arguments_source_order() {
+        for arg_or_keyword in self.iter_source_order() {
             match arg_or_keyword {
                 ArgOrKeyword::Arg(arg) => visitor.visit_expr(arg),
                 ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),

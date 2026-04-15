@@ -8,14 +8,16 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
 use ty_module_resolver::SearchPathSettings;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    AnalysisSettings, FallibleStrategy, Program, ProgramSettings, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
+use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
+use ty_python_core::Db as _;
 
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
@@ -251,9 +253,20 @@ impl ty_module_resolver::Db for CorpusDb {
 }
 
 #[salsa::db]
-impl ty_python_semantic::Db for CorpusDb {
+impl ty_python_core::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+}
+
+#[salsa::db]
+impl ty_python_semantic::Db for CorpusDb {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if self.should_check_file(file) {
+            check_file_unwrap(self, file)
+        } else {
+            Vec::new()
+        }
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -270,6 +283,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
+    }
+
+    fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+        Box::new(self.clone())
     }
 }
 

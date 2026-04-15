@@ -28,19 +28,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Invalid use of type variable `T2`
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:8:25
   |
-3 | T1 = TypeVar("T1")
-4 | T2 = TypeVar("T2", default=T1)
-  | ------------------------------ `T2` defined here
-5 |
-6 | class Foo(Generic[T1]):
-7 |     # error: [invalid-type-variable-default] "Invalid use of type variable `T2`: default of `T2` refers to out-of-scope type variable …
 8 |     def method(self, x: T2) -> T2:
   |                         ^^ Default of `T2` references out-of-scope type variable `T1`
-9 |         return x
+  |
+ ::: src/mdtest_snippet.py:4:1
+  |
+4 | T2 = TypeVar("T2", default=T1)
+  | ------------------------------ `T2` defined here
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
-info: rule `invalid-type-variable-default` is enabled by default
 
 ```

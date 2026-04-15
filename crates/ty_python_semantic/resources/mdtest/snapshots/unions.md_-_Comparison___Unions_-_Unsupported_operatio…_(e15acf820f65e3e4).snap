@@ -39,17 +39,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/unions.md
 error[unsupported-operator]: Unsupported `in` operation
   --> src/mdtest_snippet.py:10:14
    |
- 8 |     cc: tuple[str] | tuple[str, str],
- 9 | ):
 10 |     result = 1 in x  # error: "Operator `in` is not supported"
    |              -^^^^-
    |              |    |
    |              |    Has type `list[int] | Literal[1]`
    |              Has type `Literal[1]`
-11 |     reveal_type(result)  # revealed: bool
    |
 info: Operation fails because operator `in` is not supported between two objects of type `Literal[1]`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -57,16 +53,12 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `in` operation
   --> src/mdtest_snippet.py:13:15
    |
-11 |     reveal_type(result)  # revealed: bool
-12 |
 13 |     result2 = y in x  # error: [unsupported-operator]
    |               -^^^^-
    |               |
    |               Both operands have type `list[int] | Literal[1]`
-14 |     reveal_type(result)  # revealed: bool
    |
 info: Operation fails because operator `in` is not supported between objects of type `list[int]` and `Literal[1]`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -74,18 +66,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:16:15
    |
-14 |     reveal_type(result)  # revealed: bool
-15 |
 16 |     result3 = aa < cc  # error: [unsupported-operator]
    |               --^^^--
    |               |    |
    |               |    Has type `tuple[str] | tuple[str, str]`
    |               Has type `tuple[int]`
-17 |     result4 = cc < aa  # error: [unsupported-operator]
-18 |     result5 = bb < cc  # error: [unsupported-operator]
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -93,16 +80,13 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:17:15
    |
-16 |     result3 = aa < cc  # error: [unsupported-operator]
 17 |     result4 = cc < aa  # error: [unsupported-operator]
    |               --^^^--
    |               |    |
    |               |    Has type `tuple[int]`
    |               Has type `tuple[str] | tuple[str, str]`
-18 |     result5 = bb < cc  # error: [unsupported-operator]
    |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
-info: rule `unsupported-operator` is enabled by default
 
 ```
 
@@ -110,8 +94,6 @@ info: rule `unsupported-operator` is enabled by default
 error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:18:15
    |
-16 |     result3 = aa < cc  # error: [unsupported-operator]
-17 |     result4 = cc < aa  # error: [unsupported-operator]
 18 |     result5 = bb < cc  # error: [unsupported-operator]
    |               --^^^--
    |               |    |
@@ -119,6 +101,5 @@ error[unsupported-operator]: Unsupported `<` operation
    |               Has type `tuple[int] | tuple[int, int]`
    |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
-info: rule `unsupported-operator` is enabled by default
 
 ```

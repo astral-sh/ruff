@@ -30,19 +30,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 error[invalid-await]: `PossiblyUnbound` is not awaitable
  --> src/mdtest_snippet.py:9:11
   |
-8 | async def main() -> None:
 9 |     await PossiblyUnbound()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^^^^
   |
  ::: src/mdtest_snippet.py:5:13
   |
-3 | class PossiblyUnbound:
-4 |     if datetime.today().weekday() == 0:
 5 |         def __await__(self):
   |             --------------- method defined here
-6 |             yield
   |
 info: `__await__` may be missing
-info: rule `invalid-await` is enabled by default
 
 ```

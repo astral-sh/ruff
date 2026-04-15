@@ -202,7 +202,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = {x: y for x in y if x in filtered}
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
     }) {
@@ -480,7 +480,7 @@ enum DictComprehensionType {
 }
 
 fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
-    any_over_expr(expr, &|expr| match expr {
+    any_over_expr(expr, |expr| match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
             .iter()
             .any(|expr| has_post_loop_references(checker, expr, loop_end)),

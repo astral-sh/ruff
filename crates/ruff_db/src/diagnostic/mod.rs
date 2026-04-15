@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
@@ -369,9 +370,8 @@ impl Diagnostic {
 
     /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
     /// configured applicability level.
-    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
-        self.fix()
-            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
+        self.fix().is_some_and(|fix| fix.applies(fix_applicability))
     }
 
     pub fn documentation_url(&self) -> Option<&str> {
@@ -705,7 +705,7 @@ impl SubDiagnostic {
         }
     }
 
-    pub(crate) fn severity(&self) -> SubDiagnosticSeverity {
+    pub fn severity(&self) -> SubDiagnosticSeverity {
         self.inner.severity
     }
 }
@@ -1333,6 +1333,19 @@ impl SubDiagnosticSeverity {
             SubDiagnosticSeverity::Error => AnnotateLevel::Error,
             SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
         }
+    }
+}
+
+impl Display for SubDiagnosticSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            SubDiagnosticSeverity::Help => "help",
+            SubDiagnosticSeverity::Info => "info",
+            SubDiagnosticSeverity::Warning => "warning",
+            SubDiagnosticSeverity::Error => "error",
+            SubDiagnosticSeverity::Fatal => "fatal",
+        };
+        f.write_str(s)
     }
 }
 

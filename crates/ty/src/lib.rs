@@ -22,12 +22,14 @@ use ruff_db::diagnostic::{
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
+use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
+use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -133,8 +135,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
-    let mode = if args.add_ignore {
-        MainLoopMode::AddIgnore
+    let mode = if args.fix {
+        MainLoopMode::Fix(FixMode::ApplyFixes)
+    } else if args.add_ignore {
+        MainLoopMode::Fix(FixMode::AddIgnore)
     } else {
         MainLoopMode::Check
     };
@@ -372,7 +376,7 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
 
-                            self.write_diagnostics(db, &result)?;
+                            self.write_diagnostics(db, &result, None)?;
 
                             if self.cancellation_token.is_cancelled() {
                                 Err(Canceled)
@@ -380,23 +384,42 @@ impl MainLoop {
                                 Ok(result)
                             }
                         }
-                        MainLoopMode::AddIgnore => {
-                            if let Ok(result) =
-                                suppress_all_diagnostics(db, result, &self.cancellation_token)
-                            {
-                                self.write_diagnostics(db, &result.diagnostics)?;
+                        MainLoopMode::Fix(mode) => {
+                            let result = match mode {
+                                FixMode::AddIgnore => {
+                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
+                                }
+                                FixMode::ApplyFixes => fix_all_diagnostics(
+                                    db,
+                                    result,
+                                    Applicability::Safe,
+                                    &self.cancellation_token,
+                                ),
+                            };
+
+                            if let Ok(result) = result {
+                                let fixed_diagnostics = match mode {
+                                    FixMode::AddIgnore => None,
+                                    FixMode::ApplyFixes => Some(result.count),
+                                };
+                                self.write_diagnostics(db, &result.diagnostics, fixed_diagnostics)?;
 
                                 let terminal_settings = db.project().settings(db).terminal();
                                 let is_human_readable =
                                     terminal_settings.output_format.is_human_readable();
 
                                 if is_human_readable {
-                                    writeln!(
-                                        self.printer.stream_for_failure_summary(),
-                                        "Added {} ignore comment{}",
-                                        result.count,
-                                        if result.count > 1 { "s" } else { "" }
-                                    )?;
+                                    match mode {
+                                        FixMode::AddIgnore => {
+                                            writeln!(
+                                                self.printer.stream_for_failure_summary(),
+                                                "Added {} ignore comment{}",
+                                                result.count,
+                                                if result.count > 1 { "s" } else { "" }
+                                            )?;
+                                        }
+                                        FixMode::ApplyFixes => {}
+                                    }
                                 }
 
                                 Ok(result.diagnostics)
@@ -457,12 +480,13 @@ impl MainLoop {
         &self,
         db: &ProjectDatabase,
         diagnostics: &[Diagnostic],
+        fixed_diagnostics: Option<usize>,
     ) -> anyhow::Result<()> {
         let terminal_settings = db.project().settings(db).terminal();
         let is_human_readable = terminal_settings.output_format.is_human_readable();
 
         match diagnostics {
-            [] if is_human_readable => {
+            [] if is_human_readable && fixed_diagnostics.is_none_or(|fixed| fixed == 0) => {
                 writeln!(
                     self.printer.stream_for_success_summary(),
                     "{}",
@@ -491,12 +515,21 @@ impl MainLoop {
                 }
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {
-                    writeln!(
-                        self.printer.stream_for_failure_summary(),
-                        "Found {} diagnostic{}",
-                        diagnostics_count,
-                        if diagnostics_count > 1 { "s" } else { "" }
-                    )?;
+                    if let Some(fixed) = fixed_diagnostics {
+                        let total = fixed + diagnostics_count;
+                        writeln!(
+                            self.printer.stream_for_failure_summary(),
+                            "Found {total} diagnostic{} ({fixed} fixed, {diagnostics_count} remaining).",
+                            if total == 1 { "" } else { "s" }
+                        )?;
+                    } else {
+                        writeln!(
+                            self.printer.stream_for_failure_summary(),
+                            "Found {} diagnostic{}",
+                            diagnostics_count,
+                            if diagnostics_count > 1 { "s" } else { "" }
+                        )?;
+                    }
                 }
             }
         }
@@ -508,7 +541,13 @@ impl MainLoop {
 #[derive(Copy, Clone, Debug)]
 enum MainLoopMode {
     Check,
+    Fix(FixMode),
+}
+
+#[derive(Copy, Clone, Debug)]
+enum FixMode {
     AddIgnore,
+    ApplyFixes,
 }
 
 fn exit_status_from_diagnostics(

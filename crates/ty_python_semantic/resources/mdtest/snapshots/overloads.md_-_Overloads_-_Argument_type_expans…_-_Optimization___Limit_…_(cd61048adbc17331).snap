@@ -81,8 +81,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
 error[no-matching-overload]: No overload of function `f` matches arguments
   --> src/mdtest_snippet.py:8:9
    |
- 6 |           # error: [no-matching-overload]
- 7 |           # revealed: Unknown
  8 | /         f(
  9 | |             A(),
 10 | |             a1=a,
@@ -117,23 +115,18 @@ error[no-matching-overload]: No overload of function `f` matches arguments
 39 | |             a30=a,
 40 | |         )
    | |_________^
-41 |       )
    |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
-  --> src/overloaded.pyi:8:5
-   |
- 7 | @overload
- 8 | def f() -> None: ...
-   |     ^^^^^^^^^^^
- 9 | @overload
-10 | def f(**kwargs: int) -> C: ...
-   |
+ --> src/overloaded.pyi:8:5
+  |
+8 | def f() -> None: ...
+  |     ^^^^^^^^^^^
+  |
 info: Possible overloads for function `f`:
 info:   () -> None
 info:   (**kwargs: int) -> C
 info:   (x: A, /, **kwargs: int) -> A
 info:   (x: B, /, **kwargs: int) -> B
-info: rule `no-matching-overload` is enabled by default
 
 ```

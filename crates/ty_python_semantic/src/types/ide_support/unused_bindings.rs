@@ -1,12 +1,15 @@
 use crate::Db;
-use crate::semantic_index::definition::{DefinitionKind, DefinitionState};
-use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::{get_loop_header, semantic_index};
+use crate::reachability::is_reachable;
+use crate::types::function::FunctionDecorators;
+use crate::types::infer::function_known_decorator_flags;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::place::ScopedPlaceId;
+use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -42,7 +45,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
 
 fn function_scope_is_overload_declaration(
     db: &dyn Db,
-    index: &crate::semantic_index::SemanticIndex<'_>,
+    index: &SemanticIndex<'_>,
     file_scope_id: FileScopeId,
 ) -> bool {
     let scope = index.scope(file_scope_id);
@@ -51,8 +54,7 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    crate::types::infer::function_known_decorator_flags(db, definition)
-        .contains(crate::types::FunctionDecorators::OVERLOAD)
+    function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -111,8 +113,8 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
 
                 let loop_header = get_loop_header(db, loop_header_definition.loop_token());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
-                    if use_def_map.is_reachable(db, live_binding.reachability_constraint) {
-                        loop_header_used_definition_ids.insert(live_binding.binding);
+                    if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
+                        loop_header_used_definition_ids.insert(live_binding.binding());
                     }
                 }
 

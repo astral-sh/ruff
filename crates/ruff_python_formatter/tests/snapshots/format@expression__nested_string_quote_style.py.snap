@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/nested_string_quote_style.py
 ---
 ## Input
 ```python
@@ -392,18 +393,6 @@ t"{('implicit concatenation', ["'single'", '"double"'])}"
 
 ### Unsupported Syntax Errors
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
-  --> nested_string_quote_style.py:30:24
-   |
-28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
-29 | t'"double" quotes and {'nested string with "double" quotes'}'
-30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
-   |                        ^
-31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
-32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
-   |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
   --> nested_string_quote_style.py:28:24
    |
 26 | f"'single' quotes and {'nested string'}"
@@ -412,6 +401,18 @@ error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python
    |                        ^
 29 | t'"double" quotes and {'nested string with "double" quotes'}'
 30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:30:24
+   |
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |                        ^
+31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
+32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
    |
 warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
 
@@ -519,18 +520,6 @@ t"{('implicit concatenation', ["'single'", '"double"'])}"
 
 ### Unsupported Syntax Errors
 error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
-  --> nested_string_quote_style.py:30:24
-   |
-28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
-29 | t'"double" quotes and {'nested string with "double" quotes'}'
-30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
-   |                        ^
-31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
-32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
-   |
-warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
-
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
   --> nested_string_quote_style.py:28:24
    |
 26 | f"'single' quotes and {'nested string'}"
@@ -539,5 +528,17 @@ error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python
    |                        ^
 29 | t'"double" quotes and {'nested string with "double" quotes'}'
 30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |
+warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.
+
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  --> nested_string_quote_style.py:30:24
+   |
+28 | f'"double" quotes and {'nested string with "double" quotes'}'  # syntax error pre-3.12
+29 | t'"double" quotes and {'nested string with "double" quotes'}'
+30 | f"'single' quotes and {"nested string with 'single' quotes"}'"  # syntax error pre-3.12
+   |                        ^
+31 | t"'single' quotes and {"nested string with 'single' quotes"}'"
+32 | f'"double" quotes and {"nested string with 'single' quotes"}'  # syntax error pre-3.12
    |
 warning: Only accept new syntax errors if they are also present in the input. The formatter should not introduce syntax errors.

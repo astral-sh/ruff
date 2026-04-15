@@ -38,8 +38,6 @@ error[unresolved-import]: Cannot resolve imported module `....foo`
   |
 1 | from ....foo import add  # error: [unresolved-import]
   |          ^^^
-2 |
-3 | stat = add(10, 15)
   |
 help: The module can be resolved if the number of leading dots is reduced
 help: Did you mean `...foo`?
@@ -47,6 +45,5 @@ info: Searched in the following paths during module resolution:
 info:   1. /src (first-party code)
 info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
 info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-info: rule `unresolved-import` is enabled by default
 
 ```

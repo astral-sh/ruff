@@ -110,8 +110,8 @@ help: Assign to variable; remove string literal
 30 | def f_msg_defined():
 31 |     msg = "hello"
    -     raise RuntimeError("This is an example exception")
-32 +     msg = "This is an example exception"
-33 +     raise RuntimeError(msg)
+32 +     msg_0 = "This is an example exception"
+33 +     raise RuntimeError(msg_0)
 34 |
 35 |
 36 | def f_msg_in_nested_scope():
@@ -149,8 +149,8 @@ help: Assign to variable; remove string literal
 44 |
 45 |     def nested():
    -         raise RuntimeError("This is an example exception")
-46 +         msg = "This is an example exception"
-47 +         raise RuntimeError(msg)
+46 +         msg_0 = "This is an example exception"
+47 +         raise RuntimeError(msg_0)
 48 |
 49 |
 50 | def f_fix_indentation_check(foo):
@@ -347,4 +347,25 @@ help: Assign to variable; remove `.format()` string
 94 |
 95 |
 96 | def raise_typing_cast_exception():
+note: This is an unsafe fix and may change runtime behavior
+
+EM101 [*] Exception must not use a string literal, assign to variable first
+   --> EM.py:118:28
+    |
+116 |     msg = "."
+117 |     try:
+118 |         raise RuntimeError("!")
+    |                            ^^^
+119 |     except RuntimeError:
+120 |         return msg
+    |
+help: Assign to variable; remove string literal
+115 | def f():
+116 |     msg = "."
+117 |     try:
+    -         raise RuntimeError("!")
+118 +         msg_0 = "!"
+119 +         raise RuntimeError(msg_0)
+120 |     except RuntimeError:
+121 |         return msg
 note: This is an unsafe fix and may change runtime behavior

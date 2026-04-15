@@ -27,13 +27,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 error[not-iterable]: Object of type `NotAsyncIterable` is not async-iterable
  --> src/mdtest_snippet.py:5:20
   |
-3 | async def foo():
-4 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
 5 |     async for x in NotAsyncIterable():
   |                    ^^^^^^^^^^^^^^^^^^
-6 |         reveal_type(x)  # revealed: Unknown
   |
 info: It has no `__aiter__` method
-info: rule `not-iterable` is enabled by default
 
 ```

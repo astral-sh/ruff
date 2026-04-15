@@ -10,21 +10,23 @@ use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
+use smallvec::SmallVec;
 
-use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
-    failures: Vec<String>,
+    failures: Vec<Failure>,
     lines: Vec<LineFailures>,
 }
 
 impl FailuresByLine {
-    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -33,7 +35,7 @@ impl FailuresByLine {
         })
     }
 
-    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<Failure>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
@@ -42,8 +44,40 @@ impl FailuresByLine {
         });
     }
 
-    fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.lines.is_empty()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct Failure {
+    message: String,
+    /// Optional diff that is shown alongside the error message.
+    /// The tuple represents the (expected, actual) values for the diff.
+    diff: Option<(String, String)>,
+}
+
+impl Failure {
+    pub(super) fn new(message: impl std::fmt::Display) -> Self {
+        Self {
+            message: message.to_string(),
+            diff: None,
+        }
+    }
+
+    pub(super) fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub(super) fn diff(&self) -> Option<(&str, &str)> {
+        self.diff
+            .as_ref()
+            .map(|(expected, actual)| (expected.as_str(), actual.as_str()))
+    }
+
+    pub(super) fn with_diff(mut self, expected: String, actual: String) -> Self {
+        self.diff = Some((expected, actual));
+        self
     }
 }
 
@@ -57,21 +91,25 @@ pub(super) fn match_file(
     db: &Db,
     file: File,
     diagnostics: &[Diagnostic],
-) -> Result<(), FailuresByLine> {
+) -> Result<Vec<Diagnostic>, FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
-    let assertions = InlineFileAssertions::from_file(db, file);
+    let source = source_text(db, file);
+    let parsed = parsed_module(db, file).load(db);
+    let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index(db, file));
+
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
+
+    let mut line_diagnostics = diagnostics.iter_lines();
 
     // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
     let mut line_assertions = assertions.into_iter();
-    let mut line_diagnostics = diagnostics.iter_lines();
-
     let mut current_assertions = line_assertions.next();
     let mut current_diagnostics = line_diagnostics.next();
 
     let matcher = Matcher::from_file(db, file);
     let mut failures = FailuresByLine::default();
+    let mut snapshot_diagnostics: Vec<Diagnostic> = Vec::new();
 
     loop {
         match (&current_assertions, &current_diagnostics) {
@@ -81,18 +119,22 @@ pub(super) fn match_file(
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
                         // iterators.
-                        matcher
-                            .match_line(diagnostics, assertions)
-                            .unwrap_or_else(|messages| {
+                        match matcher.match_line(diagnostics, assertions) {
+                            Ok(inline_diagnostics) => {
+                                snapshot_diagnostics.extend(inline_diagnostics);
+                            }
+                            Err(messages) => {
                                 failures.push(assertions.line_number, messages);
-                            });
+                            }
+                        }
+
                         current_assertions = line_assertions.next();
                         current_diagnostics = line_diagnostics.next();
                     }
                     Ordering::Less => {
                         // We have assertions on an earlier line than diagnostics; report these
                         // assertions as all unmatched, and advance the assertions iterator.
-                        failures.push(assertions.line_number, unmatched(assertions));
+                        failures.push(assertions.line_number, unmatched(&assertions.assertions));
                         current_assertions = line_assertions.next();
                     }
                     Ordering::Greater => {
@@ -106,7 +148,7 @@ pub(super) fn match_file(
             (Some(assertions), None) => {
                 // We've exhausted diagnostics but still have assertions; report these assertions
                 // as unmatched and advance the assertions iterator.
-                failures.push(assertions.line_number, unmatched(assertions));
+                failures.push(assertions.line_number, unmatched(&assertions.assertions));
                 current_assertions = line_assertions.next();
             }
             (None, Some(diagnostics)) => {
@@ -121,22 +163,25 @@ pub(super) fn match_file(
     }
 
     if failures.is_empty() {
-        Ok(())
+        // We need to re-sort the diagnostics because matching uses `swap_remove` internally, which can change ordering.
+        snapshot_diagnostics
+            .sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
+        Ok(snapshot_diagnostics)
     } else {
         Err(failures)
     }
 }
 
 trait Unmatched {
-    fn unmatched(&self) -> String;
+    fn unmatched(&self) -> Failure;
 }
 
-fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
+fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<Failure> {
     unmatched.iter().map(Unmatched::unmatched).collect()
 }
 
 trait UnmatchedWithColumn {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String;
+    fn unmatched_with_column(&self, column: OneIndexed) -> Failure;
 }
 
 // This is necessary since we only parse assertions lazily,
@@ -147,33 +192,33 @@ trait UnmatchedWithColumn {
 // being invalid if we detect that they'll be unmatched before parsing them.
 // That's perhaps not the best user experience.
 impl Unmatched for UnparsedAssertion<'_> {
-    fn unmatched(&self) -> String {
-        format!("{} {self}", "unmatched assertion:".red())
+    fn unmatched(&self) -> Failure {
+        Failure::new(format_args!("{} {self}", "unmatched assertion:".red()))
     }
 }
 
 impl Unmatched for ParsedAssertion<'_> {
-    fn unmatched(&self) -> String {
-        format!("{} {self}", "unmatched assertion:".red())
+    fn unmatched(&self) -> Failure {
+        Failure::new(format_args!("{} {self}", "unmatched assertion:".red()))
     }
 }
 
 fn maybe_add_undefined_reveal_clarification(
     diagnostic: &Diagnostic,
     original: std::fmt::Arguments,
-) -> String {
+) -> Failure {
     if diagnostic.id().is_lint_named("undefined-reveal") {
-        format!(
+        Failure::new(format_args!(
             "{} add a `# revealed` assertion on this line (original diagnostic: {original})",
             "used built-in `reveal_type`:".yellow()
-        )
+        ))
     } else {
-        format!("{} {original}", "unexpected error:".red())
+        Failure::new(format_args!("{} {original}", "unexpected error:".red()))
     }
 }
 
 impl Unmatched for &Diagnostic {
-    fn unmatched(&self) -> String {
+    fn unmatched(&self) -> Failure {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(
@@ -186,7 +231,7 @@ impl Unmatched for &Diagnostic {
 }
 
 impl UnmatchedWithColumn for &Diagnostic {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+    fn unmatched_with_column(&self, column: OneIndexed) -> Failure {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(
@@ -275,30 +320,42 @@ impl Matcher {
     fn match_line<'a, 'b>(
         &self,
         diagnostics: &'a [&'a Diagnostic],
-        assertions: &'a [UnparsedAssertion<'b>],
-    ) -> Result<(), Vec<String>>
+        assertions: &LineAssertions,
+    ) -> Result<SmallVec<[Diagnostic; 2]>, Vec<Failure>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
         let mut unmatched = diagnostics.to_vec();
-        for assertion in assertions {
+        let mut snapshot_diagnostics: SmallVec<[Diagnostic; 2]> = SmallVec::new();
+        for assertion in &assertions.assertions {
             match assertion.parse() {
-                Ok(assertion) => {
-                    if !self.matches(&assertion, &mut unmatched) {
+                Ok(assertion) => match self.matches(&assertion, &mut unmatched) {
+                    Some(diagnostic) => {
+                        if matches!(assertion, ParsedAssertion::Snapshot(_)) {
+                            snapshot_diagnostics.push(diagnostic);
+                        }
+                    }
+                    None => {
                         failures.push(assertion.unmatched());
                     }
-                }
+                },
                 Err(error) => {
-                    failures.push(format!("{} {}", "invalid assertion:".red(), error));
+                    failures.push(Failure::new(format_args!(
+                        "{} {}",
+                        "invalid assertion:".red(),
+                        error
+                    )));
                 }
             }
         }
+
         for diagnostic in unmatched {
             failures.push(diagnostic.unmatched_with_column(self.column(diagnostic)));
         }
+
         if failures.is_empty() {
-            Ok(())
+            Ok(snapshot_diagnostics)
         } else {
             Err(failures)
         }
@@ -318,15 +375,19 @@ impl Matcher {
 
     /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
     ///
-    /// If so, return `true` and remove the matched diagnostics from `unmatched`. Otherwise, return
-    /// `false`.
+    /// If so, return `Some` and remove the matched diagnostics from `unmatched`. Otherwise, return
+    /// `None`. If  the assertion is a `snapshot` assertion, return the diagnostic.
     ///
     /// An `Error` assertion can only match one diagnostic; even if it could match more than one,
     /// we short-circuit after the first match.
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&Diagnostic>) -> bool {
+    fn matches(
+        &self,
+        assertion: &ParsedAssertion,
+        unmatched: &mut Vec<&Diagnostic>,
+    ) -> Option<Diagnostic> {
         match assertion {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
@@ -341,76 +402,110 @@ impl Matcher {
                     });
                     lint_name_matches && column_matches && message_matches
                 });
-                if let Some(position) = position {
-                    unmatched.swap_remove(position);
-                    true
+                position.map(|position| unmatched.swap_remove(position).clone())
+            }
+            ParsedAssertion::Snapshot(rule) => {
+                let Some(rule) = rule else {
+                    // Similar to `error:` with the same diagnostic code. Match the first diagnostic even if this
+                    // is ambiguous (and somewhat problematic because we use swap_remove in many places).
+                    if !unmatched.is_empty() {
+                        return Some(unmatched.swap_remove(0).clone());
+                    }
+
+                    return None;
+                };
+
+                if *rule == DiagnosticId::RevealedType.as_str() {
+                    match_reveal_type_diagnostic(None, None, unmatched)
                 } else {
-                    false
+                    unmatched
+                        .iter()
+                        .position(|diagnostic| {
+                            diagnostic.id().is_lint_named(rule) || diagnostic.id().as_str() == *rule
+                        })
+                        .map(|position| unmatched.swap_remove(position).clone())
                 }
             }
             ParsedAssertion::Revealed(expected_type) => {
                 let expected_type = discard_todo_metadata(expected_type);
                 let expected_reveal_type_message = format!("`{expected_type}`");
 
-                let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
-                    if diagnostic.id() != DiagnosticId::RevealedType {
-                        return false;
-                    }
-                    let primary_message = diagnostic.primary_message();
-                    let Some(primary_annotation) =
-                        (diagnostic.primary_annotation()).and_then(|a| a.get_message())
-                    else {
-                        return false;
-                    };
-
-                    let primary_annotation = normalize_paths(primary_annotation);
-
-                    // reveal_type, reveal_protocol_interface
-                    if matches!(
-                        primary_message,
-                        "Revealed type" | "Revealed protocol interface"
-                    ) && primary_annotation == expected_reveal_type_message
-                    {
-                        return true;
-                    }
-
-                    // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
-                    if matches!(
-                        primary_message,
-                        "Assignability holds" | "Subtyping holds" | "Revealed MRO"
-                    ) && primary_annotation == expected_type
-                    {
-                        return true;
-                    }
-
-                    false
-                };
-
-                let mut matched_revealed_type = None;
-                let mut matched_undefined_reveal = None;
-                for (index, diagnostic) in unmatched.iter().enumerate() {
-                    if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
-                        matched_revealed_type = Some(index);
-                    } else if matched_undefined_reveal.is_none()
-                        && diagnostic.id().is_lint_named("undefined-reveal")
-                    {
-                        matched_undefined_reveal = Some(index);
-                    }
-                    if matched_revealed_type.is_some() && matched_undefined_reveal.is_some() {
-                        break;
-                    }
-                }
-                let mut idx = 0;
-                unmatched.retain(|_| {
-                    let retain =
-                        Some(idx) != matched_revealed_type && Some(idx) != matched_undefined_reveal;
-                    idx += 1;
-                    retain
-                });
-                matched_revealed_type.is_some()
+                match_reveal_type_diagnostic(
+                    Some(&expected_type),
+                    Some(&expected_reveal_type_message),
+                    unmatched,
+                )
             }
         }
     }
+}
+
+fn match_reveal_type_diagnostic(
+    expected_reveal_type: Option<&str>,
+    expected_reveal_type_message: Option<&str>,
+    unmatched: &mut Vec<&Diagnostic>,
+) -> Option<Diagnostic> {
+    let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
+        if diagnostic.id() != DiagnosticId::RevealedType {
+            return false;
+        }
+
+        let primary_message = diagnostic.primary_message();
+        let Some(primary_annotation) =
+            (diagnostic.primary_annotation()).and_then(|a| a.get_message())
+        else {
+            return false;
+        };
+
+        let primary_annotation = normalize_paths(primary_annotation);
+
+        // reveal_type, reveal_protocol_interface
+        if matches!(
+            primary_message,
+            "Revealed type" | "Revealed protocol interface"
+        ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
+            primary_annotation == expected_reveal_type_message
+        }) {
+            return true;
+        }
+
+        // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
+        if matches!(
+            primary_message,
+            "Assignability holds" | "Subtyping holds" | "Revealed MRO"
+        ) && expected_reveal_type
+            .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)
+        {
+            return true;
+        }
+
+        false
+    };
+
+    // Try to match against any reveal-type diagnostic.
+    // If the `undefined-reveal` diagnostic is present, we also match against it.
+    let mut matched_revealed_type = None;
+    let mut matched_undefined_reveal = false;
+    let mut i = 0;
+
+    while i < unmatched.len() {
+        let diagnostic = &unmatched[i];
+
+        if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
+            matched_revealed_type = Some(unmatched.swap_remove(i).clone());
+        } else if !matched_undefined_reveal && diagnostic.id().is_lint_named("undefined-reveal") {
+            unmatched.swap_remove(i);
+            matched_undefined_reveal = true;
+        } else {
+            i += 1;
+        }
+
+        if matched_revealed_type.is_some() && matched_undefined_reveal {
+            break;
+        }
+    }
+
+    matched_revealed_type
 }
 
 #[cfg(test)]
@@ -424,9 +519,9 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
     use ty_module_resolver::SearchPathSettings;
-    use ty_python_semantic::{
-        FallibleStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    };
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -465,7 +560,7 @@ mod tests {
     fn get_result(
         source: &str,
         expected_diagnostics: Vec<ExpectedDiagnostic>,
-    ) -> Result<(), FailuresByLine> {
+    ) -> Result<Vec<Diagnostic>, FailuresByLine> {
         colored::control::set_override(false);
 
         let mut db = crate::db::Db::setup();
@@ -489,7 +584,7 @@ mod tests {
         super::match_file(&db, file, &diagnostics)
     }
 
-    fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {
+    fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {
         let Err(failures) = result else {
             panic!("expected a failure");
         };
@@ -505,13 +600,20 @@ mod tests {
             .collect();
         let failures: Vec<(OneIndexed, Vec<String>)> = failures
             .iter()
-            .map(|(idx, msgs)| (idx, msgs.to_vec()))
+            .map(|(idx, msgs)| {
+                (
+                    idx,
+                    msgs.iter()
+                        .map(|failure| failure.message().to_string())
+                        .collect(),
+                )
+            })
             .collect();
 
         assert_eq!(failures, expected);
     }
 
-    fn assert_ok(result: &Result<(), FailuresByLine>) {
+    fn assert_ok(result: &Result<Vec<Diagnostic>, FailuresByLine>) {
         assert!(result.is_ok(), "{result:?}");
     }
 

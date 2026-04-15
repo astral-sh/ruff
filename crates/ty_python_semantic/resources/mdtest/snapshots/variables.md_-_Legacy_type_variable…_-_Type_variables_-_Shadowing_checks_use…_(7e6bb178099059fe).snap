@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: variables.md - Legacy type variables - Type variables - Shadowing checks use the binding name
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Generic, TypeVar
+ 2 | 
+ 3 | S = TypeVar("S")
+ 4 | T = TypeVar("T")
+ 5 | 
+ 6 | # This recovers as the `Q` binding for source-level name resolution.
+ 7 | # error: [mismatched-type-name]
+ 8 | Q = TypeVar("T")
+ 9 | 
+10 | class Outer(Generic[Q]):
+11 |     class Ok(Generic[S]): ...
+12 |     # error: [shadowed-type-variable]
+13 |     # error: [shadowed-type-variable]
+14 |     class Bad(Generic[Q]): ...
+```
+
+# Diagnostics
+
+```
+warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | Q = TypeVar("T")
+  |             ^^^ Expected "Q", got "T"
+  |
+
+```
+
+```
+error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
+  --> src/mdtest_snippet.py:14:11
+   |
+14 |     class Bad(Generic[Q]): ...
+   |           ^^^^^^^^^^^^^^^ `Q` used in class definition here
+   |
+  ::: src/mdtest_snippet.py:10:7
+   |
+10 | class Outer(Generic[Q]):
+   |       ----------------- Type variable `Q` is bound in this enclosing scope
+   |
+
+```
+
+```
+error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
+  --> src/mdtest_snippet.py:14:11
+   |
+14 |     class Bad(Generic[Q]): ...
+   |           ^^^^^^^^^^^^^^^ `Q` used in class definition here
+   |
+  ::: src/mdtest_snippet.py:10:7
+   |
+10 | class Outer(Generic[Q]):
+   |       ----------------- Type variable `Q` is bound in this enclosing scope
+   |
+
+```

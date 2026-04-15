@@ -45,6 +45,17 @@ reveal_type(bob["age"])  # revealed: int | None
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
+Functional `TypedDict`s with non-identifier keys should synthesize `__init__` without turning those
+keys into invalid named parameters:
+
+```py
+from typing import TypedDict
+
+Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+reveal_type(Config.__init__)
+```
+
 If a dict literal is inferred against a union containing both a `TypedDict` and a plain `dict`,
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
@@ -281,6 +292,20 @@ reveal_type(eve3a)  # revealed: Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
+Constructor calls with multiple positional arguments should be rejected, including for empty
+`TypedDict`s:
+
+```py
+class Empty(TypedDict):
+    pass
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Empty` constructor: expected 1, got 2"
+Empty({}, {})
+
+# error: [too-many-positional-arguments] "Too many positional arguments to TypedDict `Person` constructor: expected 1, got 2"
+Person({}, {})
+```
+
 Also, the value types ​​declared in a `TypedDict` affect generic call inference:
 
 ```py
@@ -408,6 +433,157 @@ accepts_person({"name": "Alice", "age": 30})
 house.owner = {"name": "Alice", "age": 30}
 ```
 
+TypedDict constructor validation should not duplicate diagnostics emitted by argument inference:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+# error: [unresolved-reference] "Name `missing` used when not defined"
+TD(x=missing)
+```
+
+TypedDict constructor validation should respect string-valued constants used as keys in positional
+dict literals:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+
+Record({VALUE_KEY: "x"})
+```
+
+TypedDict constructor validation should combine positional dict literals with keyword arguments:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+    y: str
+
+# error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+TD({"x": "foo"}, y="bar")
+```
+
+TypedDict constructor validation should preserve string-valued constant keys in mixed calls:
+
+```py
+from typing import Final, TypedDict
+
+VALUE_KEY: Final = "value"
+
+class Record(TypedDict):
+    value: str
+    count: int
+
+Record({VALUE_KEY: "x"}, count=1)
+
+# error: [invalid-argument-type] "Invalid argument to key "value" with declared type `str` on TypedDict `Record`: value of type `Literal[1]`"
+Record({VALUE_KEY: 1}, count=1)
+```
+
+Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
+preserve shared required keys:
+
+```py
+from typing import TypedDict
+
+class ChildWithOptionalCount(TypedDict, total=False):
+    count: int
+
+ChildWithOptionalCount({"count": "wrong"}, count=1)
+
+class Base(TypedDict):
+    name: str
+
+class ChildKwargs(TypedDict):
+    name: str
+    count: int
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+def _(
+    base: Base,
+    maybe_name: MaybeName,
+):
+    ChildKwargs(base, count=1)
+    ChildKwargs(**base, count=1)
+
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ChildKwargs` constructor"
+    ChildKwargs(**maybe_name, count=1)
+```
+
+TypedDict positional arguments in mixed constructors should validate their declared keys:
+
+```py
+from typing import TypedDict
+
+class Target(TypedDict):
+    a: int
+    b: int
+
+class Source(TypedDict):
+    a: int
+
+class BadSource(TypedDict):
+    a: str
+
+class MaybeSource(TypedDict, total=False):
+    a: int
+
+class WiderSource(TypedDict):
+    a: int
+    extra: str
+
+class WiderBadSource(TypedDict):
+    a: str
+    extra: str
+
+def _(
+    source: Source,
+    bad: BadSource,
+    maybe: MaybeSource,
+    wide: WiderSource,
+    wide_bad: WiderBadSource,
+    cond: bool,
+):
+    Target(source, b=2)
+    Target(source if cond else {"a": 1}, b=2)
+    Target(source if cond else {"a": 1, "b": 0}, b=2)
+    Target(source if cond else {"a": 1, "b": "shadowed"}, b=2)
+    Target(wide, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(bad, b=2)
+
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `Target`: value of type `str`"
+    Target(wide_bad, b=2)
+
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `Target` constructor"
+    Target(maybe, b=2)
+```
+
+Mixed constructors should stay lenient for non-`TypedDict` positional mappings once the keyword
+arguments cover the full schema:
+
+```py
+from typing import TypedDict
+
+class FullFromKeywords(TypedDict):
+    a: int
+
+def _(mapping: dict[str, str]):
+    FullFromKeywords(mapping, a=1)
+```
+
 All of these are missing the required `age` field:
 
 ```py
@@ -523,6 +699,45 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+## Mixed positional and unpacked keyword constructors
+
+These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
+validate normally and produce ordinary diagnostics:
+
+```py
+from typing import Any, TypedDict
+from typing_extensions import Never
+
+class MixedTarget(TypedDict):
+    x: int
+    y: int
+
+class MaybeY(TypedDict, total=False):
+    y: int
+
+def _(target: MixedTarget, maybe_y: MaybeY, kwargs: Any, never_kwargs: Never, cond: bool):
+    MixedTarget(target, **maybe_y)
+    MixedTarget(maybe_y if cond else {}, **kwargs)
+    MixedTarget(maybe_y if cond else {}, **never_kwargs)
+
+    # error: [missing-typed-dict-key] "Missing required key 'y' in TypedDict `MixedTarget` constructor"
+    MixedTarget({"x": 1}, **maybe_y)
+
+class TD(TypedDict):
+    a: int
+
+def _(td: TD):
+    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
+    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
+    TD({"a": "foo"}, **{"a": 1})
+
+    TD({"a": "foo"}, a=1)
+    TD({"a": "foo"}, **td)
+
+def _(x: Any):
+    TD({"a": "foo"}, **x)
+```
+
 ## Union of `TypedDict`
 
 When assigning to a union of `TypedDict` types, the type will be narrowed based on the dictionary
@@ -613,6 +828,15 @@ class Person(TypedDict):
 alice_bad: Person = {"name": None}  # type: ignore
 Person(name=None, age=30)  # type: ignore
 Person(name="Alice", age=30, extra=True)  # type: ignore
+
+class NamedPerson(TypedDict):
+    name: str
+
+class IgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore
+
+class SpecificallyIgnoredNamedPerson(NamedPerson):
+    name: int  # type: ignore[ty:invalid-typed-dict-field]
 ```
 
 ## Positional dictionary constructor pattern
@@ -678,6 +902,44 @@ def copy_person(p: PersonBase) -> PersonAlias:
 
 def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
+```
+
+Optional source keys should not satisfy required constructor keys when unpacking:
+
+```py
+from typing import TypedDict
+
+class MaybeName(TypedDict, total=False):
+    name: str
+
+class NeedsName(TypedDict):
+    name: str
+
+def f(maybe: MaybeName) -> NeedsName:
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
+    return NeedsName(**maybe)
+```
+
+Guaranteed duplicate keys from unpacking should be rejected, matching runtime `TypeError`s:
+
+```py
+from typing import TypedDict
+
+class DuplicateHasName(TypedDict):
+    name: str
+
+class DuplicateNeedsName(TypedDict):
+    name: str
+
+def duplicate_name_keys(
+    left: DuplicateHasName,
+    right: DuplicateHasName,
+) -> DuplicateNeedsName:
+    # error: [parameter-already-assigned]
+    DuplicateNeedsName(**left, name="x")
+
+    # error: [parameter-already-assigned]
+    return DuplicateNeedsName(**left, **right)
 ```
 
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
@@ -1513,9 +1775,11 @@ RecursiveKey = list["RecursiveKey | None"]
 class Person(TypedDict):
     name: str
     age: int | None
+    leg: str
 
 class Animal(TypedDict):
     name: str
+    log: str
 
 class Movie(TypedDict):
     name: str
@@ -1562,6 +1826,10 @@ def _(
 
     # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
     reveal_type(being["age"])  # revealed: int | None | Unknown
+
+    # error: [invalid-key]
+    # error: [invalid-key]
+    reveal_type(being["legs"])  # revealed: Unknown
 ```
 
 ### Writing
@@ -1611,7 +1879,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal`"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -2092,6 +2360,140 @@ bad_child1 = Child(c=[1])
 bad_child2 = Child(b="test")
 ```
 
+## Incompatible field overrides
+
+Overriding an inherited `TypedDict` field must preserve the compatibility rules from the typing
+spec. We reject both direct overwrites and incompatible merges from multiple bases.
+
+Mutable fields are invariant, so they cannot be overwritten with a different type, even if the new
+type is a subtype of the old one:
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired, ReadOnly, Required
+
+class Base(TypedDict):
+    value: int
+
+class BadSubtype(Base):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
+
+FunctionalBase = TypedDict("FunctionalBase", {"value": int})
+
+class BadFunctionalSubtype(FunctionalBase):
+    # error: [invalid-typed-dict-field] "Inherited mutable field type `int` is incompatible with `bool`"
+    value: bool
+
+class L(TypedDict):
+    value: int
+
+class R(TypedDict):
+    value: bool
+
+class BadMerge(L, R):  # error: [invalid-typed-dict-field] "Inherited mutable field type `bool` is incompatible with `int`"
+    pass
+
+class R2(TypedDict):
+    value: int
+    other: str
+
+class GoodMerge(L, R2):
+    pass
+```
+
+Read-only fields, on the other hand, can be overwritten with a compatible read-only type (a
+subtype):
+
+```py
+class ReadOnlyBase(TypedDict):
+    value: ReadOnly[int]
+
+class ReadOnlySubtype(ReadOnlyBase):
+    value: ReadOnly[bool]
+
+class BadReadOnlySubtype(ReadOnlyBase):
+    # error: [invalid-typed-dict-field] "Inherited read-only field type `int` is not assignable from `object`"
+    value: ReadOnly[object]
+```
+
+Read-only fields can be made mutable in a subtype, but not the other way around:
+
+```py
+named_dict: ReadOnlyBase = {"value": 1}
+named_dict["value"] = 2  # error: [invalid-assignment]
+
+class MutableSubtype(ReadOnlyBase):
+    value: int
+
+album: MutableSubtype = {"value": 1}
+album["value"] = 2  # no error here
+
+class MutableBase(TypedDict):
+    value: int
+
+class BadReadOnlySubtype(MutableBase):
+    # error: [invalid-typed-dict-field] "Mutable inherited fields cannot be redeclared as read-only"
+    value: ReadOnly[int]
+```
+
+Read-only, non-required fields can be made required in a subtype, but not the other way around:
+
+```py
+class OptionalName(TypedDict):
+    name: ReadOnly[NotRequired[str]]
+
+optional_name: OptionalName = {}
+
+class RequiredName(OptionalName):
+    name: ReadOnly[Required[str]]
+
+required_name: RequiredName = {"name": "Flood"}
+bad_required_name: RequiredName = {}  # error: [missing-typed-dict-key]
+
+class RequiredName(TypedDict):
+    name: ReadOnly[Required[str]]
+
+class BadOptionalName(RequiredName):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
+    name: ReadOnly[NotRequired[str]]
+```
+
+This is not allowed for mutable fields, however (in either direction):
+
+```py
+class MutableNotRequired(TypedDict):
+    value: NotRequired[int]
+
+class BadNonRequiredSubtype(MutableNotRequired):
+    # error: [invalid-typed-dict-field] "Mutable inherited `NotRequired` fields cannot be redeclared as required"
+    value: Required[int]
+
+class MutableRequired(TypedDict):
+    value: Required[int]
+
+class BadRequiredSubtype(MutableRequired):
+    # error: [invalid-typed-dict-field] "Required inherited fields cannot be redeclared as `NotRequired`"
+    value: NotRequired[int]
+```
+
+Inconsistencies are reported only once per field, even if they occur multiple times in the
+hierarchy:
+
+```py
+class P1(TypedDict):
+    value: str
+
+class P2(TypedDict):
+    value: str
+
+class P3(TypedDict):
+    value: str
+
+class Child(P1, P2, P3):
+    value: bytes  # error: [invalid-typed-dict-field]
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
@@ -2177,6 +2579,32 @@ static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
 ```
 
+### Validation of generic `TypedDict`s
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class L[T](TypedDict):
+    value: T
+
+class R[T](TypedDict):
+    value: T
+
+class Merge(L[int], R[int]): ...
+class MergeGeneric[T](L[T], R[T]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `str` is incompatible with `int`"
+class BadMerge(L[int], R[str]): ...
+
+# error: [invalid-typed-dict-field] "Inherited mutable field type `T@BadMergeGeneric` is incompatible with `int`"
+class BadMergeGeneric[T](L[int], R[T]): ...
+```
+
 ## Recursive `TypedDict`
 
 `TypedDict`s can also be recursive, allowing for nested structures:
@@ -2211,6 +2639,32 @@ def _(node: Node, person: Person):
     _: Node = person
 
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
+```
+
+TypedDict constructor calls should also use field type context when inferring nested values:
+
+```py
+from typing import TypedDict
+
+class Comparison(TypedDict):
+    field: str
+    value: object
+
+class Logical(TypedDict):
+    primary: Comparison
+    conditions: list[Comparison]
+
+logical_from_literal = Logical(
+    primary=Comparison(field="a", value="b"),
+    conditions=[Comparison(field="c", value="d")],
+)
+logical_from_dict_call = Logical(dict(primary=dict(field="a", value="b"), conditions=[dict(field="c", value="d")]))
+
+# error: [missing-typed-dict-key]
+missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[dict(field="c", value="d")])
+
+# error: [missing-typed-dict-key]
+missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
 ```
 
 ## Function/assignment syntax
@@ -2373,6 +2827,23 @@ partial_no_year = PartialWithRequired(name="The Matrix")
 reveal_type(partial_no_year)  # revealed: PartialWithRequired
 ```
 
+## Function syntax with invalid qualifiers
+
+All type qualifiers except for `ReadOnly`, `Required` and `NotRequired` are rejected:
+
+```py
+from typing_extensions import ClassVar, Final, TypedDict
+from dataclasses import InitVar
+
+TD1 = TypedDict("TD1", {"x": ClassVar[int]})  # error: [invalid-type-form]
+TD2 = TypedDict("TD2", {"x": Final[int]})  # error: [invalid-type-form]
+TD3 = TypedDict("TD3", {"x": InitVar[int]})  # error: [invalid-type-form]
+
+class TD4(TypedDict("TD4", {"x": ClassVar[int]})): ...  # error: [invalid-type-form]
+class TD5(TypedDict("TD5", {"x": Final[int]})): ...  # error: [invalid-type-form]
+class TD6(TypedDict("TD6", {"x": InitVar[int]})): ...  # error: [invalid-type-form]
+```
+
 ## Function syntax with `closed`
 
 The `closed` keyword is accepted but not yet fully supported:
@@ -2398,7 +2869,8 @@ def f(closed: bool) -> None:
 The `extra_items` keyword is accepted and validated as an annotation expression:
 
 ```py
-from typing_extensions import ReadOnly, TypedDict
+from typing_extensions import ReadOnly, TypedDict, NotRequired, Required, ClassVar, Final
+from dataclasses import InitVar
 
 # extra_items is accepted (no error)
 MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
@@ -2415,10 +2887,24 @@ class Foo(TypedDict("T", {}, extra_items="Foo | None")): ...
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
 
-# Type qualifiers like ReadOnly are valid in extra_items (annotation expression, not type expression):
+# The `ReadOnly` type qualifier is valid in `extra_items` (annotation expression, not type expression):
 TD2 = TypedDict("TD2", {}, extra_items=ReadOnly[int])
 
 class Bar(TypedDict("TD3", {}, extra_items=ReadOnly[int])): ...
+
+# But all other qualifiers are rejected:
+
+TD4 = TypedDict("TD4", {}, extra_items=Required[int])  # error: [invalid-type-form]
+TD5 = TypedDict("TD5", {}, extra_items=NotRequired[int])  # error: [invalid-type-form]
+TD6 = TypedDict("TD6", {}, extra_items=ClassVar[int])  # error: [invalid-type-form]
+TD7 = TypedDict("TD7", {}, extra_items=InitVar[int])  # error: [invalid-type-form]
+TD8 = TypedDict("TD8", {}, extra_items=Final[int])  # error: [invalid-type-form]
+
+class TD9(TypedDict("TD9", {}, extra_items=Required[int])): ...  # error: [invalid-type-form]
+class TD10(TypedDict("TD10", {}, extra_items=NotRequired[int])): ...  # error: [invalid-type-form]
+class TD11(TypedDict("TD11", {}, extra_items=ClassVar[int])): ...  # error: [invalid-type-form]
+class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [invalid-type-form]
+class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
 ```
 
 ## Function syntax with forward references
@@ -2538,14 +3024,15 @@ TypedDict()
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 TypedDict("Foo")
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Bad1", got variable of type `Literal[123]`"
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+# error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
+reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [invalid-argument-type] "TypedDict name must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:
@@ -2772,42 +3259,75 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
-### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations
+### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations or return annotations
 
-```py
+```pyi
 from typing_extensions import Required, NotRequired, ReadOnly
 
 def bad(
-    # error: [invalid-type-form] "`Required` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in parameter annotations"
     a: Required[int],
-    # error: [invalid-type-form] "`NotRequired` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in parameter annotations"
     b: NotRequired[int],
-    # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
+    # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in parameter annotations"
     c: ReadOnly[int],
 ): ...
+
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in return type annotations"
+def bad2() -> Required[int]: ...
+
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in return type annotations"
+def bad2() -> NotRequired[int]: ...
+
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in return type annotations"
+def bad2() -> ReadOnly[int]: ...
 ```
 
-### `Required` and `NotRequired` not allowed outside `TypedDict`
+### `Required`, `NotRequired` and `ReadOnly` require exactly one argument
 
 ```py
-from typing_extensions import Required, NotRequired, TypedDict
+from typing_extensions import TypedDict, ReadOnly, Required, NotRequired
+
+class Foo(TypedDict):
+    a: Required  # error: [invalid-type-form] "`Required` may not be used without a type argument"
+    b: Required[()]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 0"
+    c: Required[int, str]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 2"
+    d: NotRequired  # error: [invalid-type-form] "`NotRequired` may not be used without a type argument"
+    e: NotRequired[()]  # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 0"
+    # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 2"
+    f: NotRequired[int, str]
+    g: ReadOnly  # error: [invalid-type-form] "`ReadOnly` may not be used without a type argument"
+    h: ReadOnly[()]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 0"
+    i: ReadOnly[int, str]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 2"
+```
+
+### `Required`, `NotRequired` and `ReadOnly` are not allowed outside `TypedDict`
+
+```py
+from typing_extensions import Required, NotRequired, TypedDict, ReadOnly
 
 # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
 x: Required[int]
 # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
 y: NotRequired[str]
+# error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+z: ReadOnly[str]
 
 class MyClass:
     # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
     x: Required[int]
     # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
     y: NotRequired[str]
+    # error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+    z: ReadOnly[str]
 
 def f():
     # error: [invalid-type-form] "`Required` is only allowed in TypedDict fields"
     x: Required[int] = 1
     # error: [invalid-type-form] "`NotRequired` is only allowed in TypedDict fields"
     y: NotRequired[str] = ""
+    # error: [invalid-type-form] "`ReadOnly` is only allowed in TypedDict fields"
+    z: ReadOnly[str]
 
 # fine
 MyFunctionalTypedDict = TypedDict("MyFunctionalTypedDict", {"not-an-identifier": Required[int]})
@@ -2955,6 +3475,26 @@ If the key uses single quotes, the autofix preserves that quoting style:
 def write_to_non_existing_key_single_quotes(person: Person):
     # error: [invalid-key]
     person['nane'] = "Alice"  # fmt: skip
+```
+
+Field override diagnostics should point at the incompatible child declaration and show inherited
+declarations as separate notes:
+
+```py
+class MovieBase(TypedDict):
+    name: str
+
+class BadMovie(MovieBase):
+    name: int  # error: [invalid-typed-dict-field]
+
+class LeftBase(TypedDict):
+    value: int
+
+class RightBase(TypedDict):
+    value: str
+
+class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
+    pass
 ```
 
 ## Import aliases
@@ -4199,7 +4739,8 @@ e: MovieFunctional = {"name": "Blade Runner", "year": 1982}  # error: [invalid-k
 always implicitly non-required.
 
 ```py
-from typing_extensions import TypedDict, ReadOnly, Required, NotRequired
+from typing_extensions import TypedDict, ReadOnly, Required, NotRequired, ClassVar, Final
+from dataclasses import InitVar
 
 # OK
 class A(TypedDict, extra_items=int):
@@ -4209,12 +4750,24 @@ class A(TypedDict, extra_items=int):
 class B(TypedDict, extra_items=ReadOnly[int]):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not valid in a TypedDict `extra_items` argument"
 class C(TypedDict, extra_items=Required[int]):
     name: str
 
-# TODO: should be error: [invalid-typed-dict-header]
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not valid in a TypedDict `extra_items` argument"
 class D(TypedDict, extra_items=NotRequired[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=ClassVar[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=Final[int]):
+    name: str
+
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not valid in a TypedDict `extra_items` argument"
+class D(TypedDict, extra_items=InitVar[int]):
     name: str
 ```
 
@@ -4224,6 +4777,62 @@ It is an error to specify both `closed` and `extra_items`:
 # TODO: should be error: [invalid-typed-dict-header]
 class E(TypedDict, closed=True, extra_items=int):
     name: str
+```
+
+### Forward references in `extra_items`
+
+Stringified forward references are understood:
+
+`a.py`:
+
+```py
+from typing import TypedDict
+
+class F(TypedDict, extra_items="F | None"): ...
+```
+
+While invalid syntax in forward annotations is rejected:
+
+`b.py`:
+
+```py
+from typing import TypedDict
+
+# error: [invalid-syntax-in-forward-annotation]
+class G(TypedDict, extra_items="not a type expression"): ...
+```
+
+In non-stub files, forward references in `extra_items` must be stringified:
+
+`c.py`:
+
+```py
+from typing import TypedDict
+
+# error: [unresolved-reference] "Name `H` used when not defined"
+class H(TypedDict, extra_items=H | None): ...
+```
+
+but stringification is unnecessary in stubs:
+
+`stub.pyi`:
+
+```pyi
+from typing import TypedDict
+
+class I(TypedDict, extra_items=I | None): ...
+```
+
+The `extra_items` keyword is not parsed as an annotation expression for non-TypedDict classes:
+
+`d.py`:
+
+```py
+class TypedDict:  # not typing.TypedDict!
+    def __init_subclass__(cls, extra_items: int): ...
+
+class Foo(TypedDict, extra_items=42): ...  # fine
+class Bar(TypedDict, extra_items=int): ...  # error: [invalid-argument-type]
 ```
 
 ### Writing to an undeclared literal key of an `extra_items` TypedDict is allowed, if the type is assignable

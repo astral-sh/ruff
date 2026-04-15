@@ -188,7 +188,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     }
 
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
-    if any_over_expr(arg, &|expr| {
+    if any_over_expr(arg, |expr| {
         expr.as_name_expr()
             .is_some_and(|expr| expr.id == list_name.id)
     }) {
@@ -222,7 +222,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = [x for x in y if x in filtered]
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             expr.as_name_expr()
                 .is_some_and(|expr| expr.id == list_name.id)
         })

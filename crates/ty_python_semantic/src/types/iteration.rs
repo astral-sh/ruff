@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, EvaluationMode, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -13,6 +13,56 @@ use crate::{
 };
 use ruff_python_ast as ast;
 use std::borrow::Cow;
+use ty_python_core::EvaluationMode;
+
+/// Extract the element types from an expression with a statically known fixed-length iteration.
+///
+/// List and tuple literals are expanded directly so we preserve precise element types, including
+/// recursively unpacking starred elements whose iterables are also fixed-length.
+pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
+    db: &'db dyn Db,
+    iterable: &ast::Expr,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    fn extend_fixed_length_iterable<'db>(
+        db: &'db dyn Db,
+        iterable: &ast::Expr,
+        expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
+        element_types: &mut Vec<Type<'db>>,
+    ) -> Option<()> {
+        let elements = match iterable {
+            ast::Expr::List(list) => Some(&list.elts),
+            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+            _ => None,
+        };
+
+        if let Some(elements) = elements {
+            for element in elements {
+                if let ast::Expr::Starred(starred) = element {
+                    extend_fixed_length_iterable(
+                        db,
+                        starred.value.as_ref(),
+                        expression_type,
+                        element_types,
+                    )?;
+                } else {
+                    element_types.push(expression_type(element));
+                }
+            }
+            return Some(());
+        }
+
+        let iterable_type = expression_type(iterable);
+        let spec = iterable_type.try_iterate(db).ok()?;
+        let tuple = spec.as_fixed_length()?;
+        element_types.extend(tuple.all_elements().iter().copied());
+        Some(())
+    }
+
+    let mut element_types = Vec::new();
+    extend_fixed_length_iterable(db, iterable, &mut expression_type, &mut element_types)?;
+    Some(element_types.into_boxed_slice())
+}
 
 impl<'db> Type<'db> {
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.

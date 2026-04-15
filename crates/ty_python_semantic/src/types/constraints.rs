@@ -876,6 +876,50 @@ pub struct TypeVarId;
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+enum NestedSubstitutionSide {
+    Lower,
+    Upper,
+}
+
+/// Identifies one nested-typevar substitution that has been applied while saturating a single
+/// BDD path.
+///
+/// We intentionally key this by the constraint that we substitute _into_ and the typevar that we
+/// substitute _for_, but not by the replacement type. For the pathological cases that matter for
+/// performance, the same nested substitution shape can keep producing ever-deeper replacement
+/// types (for instance, repeated `Iterable[...]` wrapping). Recording only the substitution site
+/// lets [`PathAssignments`] apply that substitution at most once per path, which preserves the
+/// initial cross-typevar relationship without repeatedly unfolding the same pattern.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+struct NestedSubstitution {
+    substituted_into: ConstraintId,
+    substituted_typevar: TypeVarId,
+    side: NestedSubstitutionSide,
+}
+
+/// A constraint derived from the sequent map, optionally annotated with the nested substitution
+/// step that produced it.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+struct DerivedConstraint {
+    constraint: ConstraintId,
+    nested_substitution: Option<NestedSubstitution>,
+}
+
+fn nested_substitution<'db>(
+    db: &'db dyn Db,
+    builder: &ConstraintSetBuilder<'db>,
+    substituted_into: ConstraintId,
+    substituted_typevar: BoundTypeVarInstance<'db>,
+    side: NestedSubstitutionSide,
+) -> NestedSubstitution {
+    NestedSubstitution {
+        substituted_into,
+        substituted_typevar: builder.typevar_id(db, substituted_typevar),
+        side,
+    }
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -4164,7 +4208,7 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
+    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<DerivedConstraint>>,
     /// Sequents of the form `C → D`
     single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
 }
@@ -4309,6 +4353,18 @@ impl SequentMap {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
+        self.add_pair_implication_with_provenance(db, builder, ante1, ante2, post, None);
+    }
+
+    fn add_pair_implication_with_provenance<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        post: ConstraintId,
+        nested_substitution: Option<NestedSubstitution>,
+    ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = builder.constraint_data(post);
         let when = post_data
@@ -4323,11 +4379,15 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
+        let derived = DerivedConstraint {
+            constraint: post,
+            nested_substitution,
+        };
         if self
             .pair_implications
             .entry(Self::pair_key(ante1, ante2))
             .or_default()
-            .insert(post)
+            .insert(derived)
         {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
@@ -4801,12 +4861,19 @@ impl SequentMap {
                             constrained_data.lower,
                             new_upper,
                         );
-                        self.add_pair_implication(
+                        self.add_pair_implication_with_provenance(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
+                            Some(nested_substitution(
+                                db,
+                                builder,
+                                constrained_constraint,
+                                bound_typevar,
+                                NestedSubstitutionSide::Upper,
+                            )),
                         );
                     }
                 }
@@ -4858,12 +4925,19 @@ impl SequentMap {
                             new_lower,
                             constrained_data.upper,
                         );
-                        self.add_pair_implication(
+                        self.add_pair_implication_with_provenance(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
+                            Some(nested_substitution(
+                                db,
+                                builder,
+                                constrained_constraint,
+                                bound_typevar,
+                                NestedSubstitutionSide::Lower,
+                            )),
                         );
                     }
                 }
@@ -4947,12 +5021,19 @@ impl SequentMap {
                                 constrained_data.lower,
                                 new_upper,
                             );
-                            self.add_pair_implication(
+                            self.add_pair_implication_with_provenance(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
+                                Some(nested_substitution(
+                                    db,
+                                    builder,
+                                    constrained_constraint,
+                                    nested_typevar,
+                                    NestedSubstitutionSide::Upper,
+                                )),
                             );
                         }
                     }
@@ -4984,12 +5065,19 @@ impl SequentMap {
                                 new_lower,
                                 constrained_data.upper,
                             );
-                            self.add_pair_implication(
+                            self.add_pair_implication_with_provenance(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
+                                Some(nested_substitution(
+                                    db,
+                                    builder,
+                                    constrained_constraint,
+                                    nested_typevar,
+                                    NestedSubstitutionSide::Lower,
+                                )),
                             );
                         }
                     }
@@ -5230,7 +5318,7 @@ impl SequentMap {
                             "{} ∧ {} → {}",
                             ante1.display(self.db, self.builder),
                             ante2.display(self.db, self.builder),
-                            post.display(self.db, self.builder),
+                            post.constraint.display(self.db, self.builder),
                         )?;
                     }
                 }
@@ -5269,6 +5357,8 @@ impl SequentMap {
 pub(crate) struct PathAssignments {
     map: SequentMap,
     assignments: FxIndexMap<ConstraintAssignment, usize>,
+    /// Nested substitutions that we have already applied on the current root→terminal path.
+    nested_substitutions: FxIndexSet<NestedSubstitution>,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -5284,6 +5374,7 @@ impl PathAssignments {
         Self {
             map: SequentMap::default(),
             assignments: FxIndexMap::default(),
+            nested_substitutions: FxIndexSet::default(),
             discovered,
         }
     }
@@ -5322,6 +5413,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
+        let nested_substitutions_start = self.nested_substitutions.len();
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -5363,6 +5455,8 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
+        self.nested_substitutions
+            .truncate(nested_substitutions_start);
         result
     }
 
@@ -5528,11 +5622,26 @@ impl PathAssignments {
         let mut new_constraints = Vec::new();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
             for post in posts {
-                if self.assignment_holds(ante1.when_true())
-                    && self.assignment_holds(ante2.when_true())
+                if !self.assignment_holds(ante1.when_true())
+                    || !self.assignment_holds(ante2.when_true())
                 {
-                    new_constraints.push(*post);
+                    continue;
                 }
+
+                // Nested-typevar sequents are the mechanism that preserves cross-typevar facts when
+                // we later existentially quantify away one of the typevars. However, once we've
+                // applied a particular substitution site on the current path, reapplying it with a
+                // newly derived replacement type does not add fundamentally new information — it
+                // just keeps unfolding the same pattern one layer deeper. Skipping repeated
+                // applications here prevents those infinite-looking expansion chains while still
+                // keeping the first derived relationship.
+                if let Some(nested_substitution) = post.nested_substitution
+                    && !self.nested_substitutions.insert(nested_substitution)
+                {
+                    continue;
+                }
+
+                new_constraints.push(post.constraint);
             }
         }
 

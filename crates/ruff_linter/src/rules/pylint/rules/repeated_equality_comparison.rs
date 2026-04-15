@@ -264,7 +264,7 @@ fn to_allowed_value<'a>(
 
     // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
     // respected by type checkers when enforced via equality.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {

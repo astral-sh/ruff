@@ -6,58 +6,9 @@ use ruff_text_size::Ranged;
 
 use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
+use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for f-strings in type annotation positions.
-    ///
-    /// ## Why is this bad?
-    /// Static analysis tools like ty can't analyze type annotations that use f-string notation.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def test(): -> f"int":
-    ///     ...
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def test(): -> "int":
-    ///     ...
-    /// ```
-    pub(crate) static FSTRING_TYPE_ANNOTATION = {
-        summary: "detects F-strings in type annotation positions",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for byte-strings in type annotation positions.
-    ///
-    /// ## Why is this bad?
-    /// Static analysis tools like ty can't analyze type annotations that use byte-string notation.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def test(): -> b"int":
-    ///     ...
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def test(): -> "int":
-    ///     ...
-    /// ```
-    pub(crate) static BYTE_STRING_TYPE_ANNOTATION = {
-        summary: "detects byte strings in type annotation positions",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
-    }
-}
 
 declare_lint! {
     /// ## What it does
@@ -174,6 +125,7 @@ declare_lint! {
 /// Parses the given expression as a string annotation.
 pub(crate) fn parse_string_annotation(
     context: &InferContext,
+    inference_flags: InferenceFlags,
     string_expr: &ast::ExprStringLiteral,
 ) -> Option<Parsed<ModExpression>> {
     let file = context.file();
@@ -189,7 +141,10 @@ pub(crate) fn parse_string_annotation(
         if prefix.is_raw() {
             if let Some(builder) = context.report_lint(&RAW_STRING_TYPE_ANNOTATION, string_literal)
             {
-                builder.into_diagnostic("Type expressions cannot use raw string literal");
+                builder.into_diagnostic(format_args!(
+                    "Raw string literals are not allowed in {}s",
+                    inference_flags.type_expression_context()
+                ));
             }
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
@@ -200,9 +155,13 @@ pub(crate) fn parse_string_annotation(
                     if let Some(builder) =
                         context.report_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION, string_literal)
                     {
-                        builder.into_diagnostic(format_args!(
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Syntax error in forward annotation: {}",
                             parse_error.error
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `typing.Literal[\"{}\"]`?",
+                            string_literal.as_str()
                         ));
                     }
                 }
@@ -212,7 +171,10 @@ pub(crate) fn parse_string_annotation(
         {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escape sequences.
-            builder.into_diagnostic("Type expressions cannot contain escape characters");
+            builder.into_diagnostic(format_args!(
+                "Escape characters are not allowed in {}s",
+                inference_flags.type_expression_context()
+            ));
         }
     } else if let Some(builder) =
         context.report_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, string_expr)

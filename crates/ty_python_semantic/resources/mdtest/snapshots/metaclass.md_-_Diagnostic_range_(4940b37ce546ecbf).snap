@@ -26,13 +26,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/metaclass.md
 error[invalid-metaclass]: Metaclass type `int` is not callable
  --> src/mdtest_snippet.py:3:13
   |
-1 | def _(n: int):
-2 |     # error: [invalid-metaclass]
 3 |     class B(metaclass=n):
   |             ^^^^^^^^^^^
-4 |         x = 1
-5 |         y = 2
   |
-info: rule `invalid-metaclass` is enabled by default
 
 ```

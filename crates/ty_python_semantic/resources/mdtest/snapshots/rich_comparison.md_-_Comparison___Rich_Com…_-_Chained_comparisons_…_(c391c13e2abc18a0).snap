@@ -37,14 +37,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/ric
 error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:12:1
    |
-11 | # error: [unsupported-bool-conversion]
 12 | 10 < Comparable() < 20
    | ^^^^^^^^^^^^^^^^^
-13 | # error: [unsupported-bool-conversion]
-14 | 10 < Comparable() < Comparable()
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```
 
@@ -52,14 +48,9 @@ info: rule `unsupported-bool-conversion` is enabled by default
 error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:14:1
    |
-12 | 10 < Comparable() < 20
-13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
    | ^^^^^^^^^^^^^^^^^
-15 |
-16 | Comparable() < Comparable()  # fine
    |
 info: `__bool__` on `NotBoolable` must be callable
-info: rule `unsupported-bool-conversion` is enabled by default
 
 ```
