@@ -5163,19 +5163,9 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 let existing_keys = items.keys().map(Name::as_str);
 
-                let suggestion = did_you_mean(existing_keys, key).filter(|suggestion| {
-                    full_object_ty.is_none_or(|full_object_ty| {
-                        full_object_ty
-                            .subscript(
-                                db,
-                                Type::string_literal(db, suggestion),
-                                ast::ExprContext::Store,
-                            )
-                            .is_ok()
-                    })
-                });
-
-                if let Some(suggestion) = suggestion {
+                if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
+                    && let Some(suggestion) = did_you_mean(existing_keys, key)
+                {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(
                             "{quote}{suggestion}{quote}",
