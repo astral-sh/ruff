@@ -113,11 +113,11 @@ mod tests {
     #[test]
     fn reports_statement_after_return() -> anyhow::Result<()> {
         let source = dedent(
-            "
+            r#"
             def f():
                 return 1
-                print(\"dead\")
-            ",
+                print("dead")
+            "#,
         );
 
         let snippets = collect_unreachable_snippets(&source)?;
