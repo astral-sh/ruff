@@ -9,6 +9,35 @@ use crate::Db;
 use crate::types::Type;
 use crate::types::tuple::TupleLength;
 
+/// Identifies a parameter, either by name or by position.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ParameterDescription {
+    Named(Name),
+    /// 0-based index
+    Index(usize),
+}
+
+impl ParameterDescription {
+    pub(crate) fn new(index: usize, name: Option<&Name>) -> Self {
+        match name {
+            Some(name) => Self::Named(name.clone()),
+            None => Self::Index(index),
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(name) => write!(f, "parameter `{name}`"),
+            Self::Index(0) => f.write_str("the first parameter"),
+            Self::Index(1) => f.write_str("the second parameter"),
+            Self::Index(2) => f.write_str("the third parameter"),
+            Self::Index(n) => write!(f, "parameter {}", n + 1),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ErrorContext<'db> {
     /// No additional context is available.
@@ -33,7 +62,7 @@ pub(crate) enum ErrorContext<'db> {
     IncompatibleParameterTypes {
         source: Type<'db>,
         target: Type<'db>,
-        name: Option<Name>,
+        parameter: ParameterDescription,
     },
     ParameterNameMismatch {
         source_name: Name,
@@ -106,22 +135,14 @@ impl<'db> ErrorContext<'db> {
             Self::IncompatibleParameterTypes {
                 source,
                 target,
-                name,
+                parameter,
             } => {
                 // reversed order due to covariance
-                if let Some(name) = name {
-                    format!(
-                        "parameter `{name}` has an incompatible type: `{target}` is not assignable to `{source}`",
-                        source = source.display(db),
-                        target = target.display(db),
-                    )
-                } else {
-                    format!(
-                        "incompatible parameter types: `{target}` is not assignable to `{source}`",
-                        source = source.display(db),
-                        target = target.display(db),
-                    )
-                }
+                format!(
+                    "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
+                    source = source.display(db),
+                    target = target.display(db),
+                )
             }
             Self::ParameterNameMismatch {
                 source_name,

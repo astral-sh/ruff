@@ -229,7 +229,7 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
   |             |
   |             Declared type
   |
-info: incompatible parameter types: `bytes` is not assignable to `str`
+info: the second parameter has an incompatible type: `bytes` is not assignable to `str`
 ```
 
 Assigning a `Callable` to a `Callable` with wrong return type:
@@ -287,7 +287,7 @@ error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable t
    |         |
    |         Declared type
    |
-info: incompatible parameter types: `str` is not assignable to `int`
+info: the first parameter has an incompatible type: `str` is not assignable to `int`
 ```
 
 ## Function assignability and overrides
@@ -323,6 +323,35 @@ info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 ```
 
+We call out the correct (target) parameter if they are listed in a different order:
+
+```py
+class ParentXY:
+    def method(self, *, x: str, y: int) -> bool:
+        raise NotImplementedError
+
+class ChildYX(ParentXY):
+    # snapshot
+    def method(self, *, y: int, x: bytes) -> bool:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.py:15:9
+   |
+15 |     def method(self, *, y: int, x: bytes) -> bool:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentXY.method`
+   |
+  ::: src/mdtest_snippet.py:10:9
+   |
+10 |     def method(self, *, x: str, y: int) -> bool:
+   |         --------------------------------------- `ParentXY.method` defined here
+   |
+info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
+info: This violates the Liskov Substitution Principle
+```
+
 Wrong return type:
 
 ```py
@@ -334,9 +363,9 @@ class Child2(Parent):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/mdtest_snippet.py:11:9
+  --> src/mdtest_snippet.py:19:9
    |
-11 |     def method(self, x: str) -> None:
+19 |     def method(self, x: str) -> None:
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
    |
   ::: src/mdtest_snippet.py:2:9
@@ -359,9 +388,9 @@ class Child3(Parent):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/mdtest_snippet.py:15:9
+  --> src/mdtest_snippet.py:23:9
    |
-15 |     def method(self, y: str):
+23 |     def method(self, y: str):
    |         ^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
    |
   ::: src/mdtest_snippet.py:2:9
@@ -581,7 +610,7 @@ error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> boo
   |         |
   |         Declared type
   |
-info: incompatible parameter types: `tuple[int, bytes]` is not assignable to `tuple[int, str]`
+info: the first parameter has an incompatible type: `tuple[int, bytes]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `bytes` is not assignable to `str`
 ```
 

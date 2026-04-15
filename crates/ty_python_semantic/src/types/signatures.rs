@@ -28,9 +28,9 @@ use crate::types::relation::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
-    TypeContext, TypeMapping, UnionBuilder, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1250,7 +1250,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
 
-        let mut check_types = |target_ty: Type<'db>, source_ty: Type<'db>, name: Option<&Name>| {
+        let mut check_types = |target_ty: Type<'db>,
+                               source_ty: Type<'db>,
+                               target_name: Option<&Name>,
+                               target_index: usize| {
             match (target_ty, source_ty) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
@@ -1275,11 +1278,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db) {
-                let name = name.cloned();
+                let parameter = ParameterDescription::new(target_index, target_name);
                 self.provide_context(|| ErrorContext::IncompatibleParameterTypes {
                     source: source_ty,
                     target: target_ty,
-                    name,
+                    parameter,
                 });
             }
             !result
@@ -1393,6 +1396,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // Here, `fn` is positional-only parameter because of the `/` while `x` is a
                     // positional-or-keyword parameter.
 
+                    let mut target_index = 0usize;
                     loop {
                         let Some(EitherOrBoth::Both(source_param, target_param)) =
                             parameters.next()
@@ -1422,6 +1426,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -1452,6 +1457,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -1459,6 +1465,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                             _ => return self.never(),
                         }
+                        target_index += 1;
                     }
 
                     let (mut source_params, mut target_params) = parameters.into_remaining();
@@ -1562,6 +1569,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
+                    let mut target_index = 0usize;
                     loop {
                         let Some(next_parameter) = parameters.next() else {
                             break;
@@ -1599,6 +1607,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1625,6 +1634,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1639,6 +1649,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1648,10 +1659,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             else {
                                                 break;
                                             };
+                                            target_index += 1;
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1665,6 +1678,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                             }
                         }
+                        target_index += 1;
                     }
 
                     let (source_params, _) = parameters.into_remaining();
@@ -1723,6 +1737,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
 
                     if target.parameters.kind() != ParametersKind::Gradual {
+                        let mut target_index = 0usize;
                         loop {
                             let Some(next_parameter) = parameters.next() else {
                                 break;
@@ -1761,6 +1776,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1788,6 +1804,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -1797,6 +1814,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     }
                                 }
                             }
+                            target_index += 1;
                         }
                     }
 
@@ -1870,13 +1888,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let target_prefix_params =
                         &target.parameters.value[..target.parameters.len().saturating_sub(2)];
 
-                    for (source_param, target_param) in
-                        source_prefix_params.iter().zip(target_prefix_params.iter())
+                    for (target_index, (source_param, target_param)) in source_prefix_params
+                        .iter()
+                        .zip(target_prefix_params.iter())
+                        .enumerate()
                     {
                         if !check_types(
                             target_param.annotated_type(),
                             source_param.annotated_type(),
                             target_param.name(),
+                            target_index,
                         ) {
                             return result;
                         }
@@ -1892,9 +1913,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let source_prefix_params =
                         &source.parameters.value[..source.parameters.len().saturating_sub(2)];
 
-                    for param in source_prefix_params
+                    for (target_index, param) in source_prefix_params
                         .iter()
                         .zip_longest(target.parameters.iter())
+                        .enumerate()
                     {
                         match param {
                             EitherOrBoth::Left(_) => {
@@ -1926,6 +1948,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         target_param.annotated_type(),
                                         source_param.annotated_type(),
                                         target_param.name(),
+                                        target_index,
                                     ) {
                                         return result;
                                     }
@@ -1953,6 +1976,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
+                    let mut target_index = 0usize;
                     loop {
                         let Some(parameter) = parameters.next() else {
                             break;
@@ -1989,6 +2013,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -1998,6 +2023,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             target_param.annotated_type(),
                                             source_param.annotated_type(),
                                             target_param.name(),
+                                            target_index,
                                         ) {
                                             return result;
                                         }
@@ -2007,10 +2033,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             else {
                                                 break;
                                             };
+                                            target_index += 1;
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
                                                 target_param.name(),
+                                                target_index,
                                             ) {
                                                 return result;
                                             }
@@ -2025,6 +2053,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                             }
                         }
+                        target_index += 1;
                     }
                 }
 
@@ -2055,6 +2084,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Collect all the standard parameters that have only been matched against a variadic
         // parameter which means that the keyword variant is still unmatched.
         let mut target_keywords = Vec::new();
+        let mut target_index = 0usize;
 
         loop {
             let Some(next_parameter) = parameters.next() else {
@@ -2124,6 +2154,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2154,6 +2185,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2168,6 +2200,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2205,10 +2238,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         break;
                                     }
                                 }
+                                target_index += 1;
                                 if !check_types(
                                     target_parameter.annotated_type(),
                                     source_param.annotated_type(),
                                     target_parameter.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -2221,6 +2256,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 target_param.annotated_type(),
                                 source_param.annotated_type(),
                                 target_param.name(),
+                                target_index,
                             ) {
                                 return result;
                             }
@@ -2267,6 +2303,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         _ => return self.never(),
                     }
+                    target_index += 1;
                 }
             }
         }
@@ -2333,6 +2370,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     target_param.annotated_type(),
                                     source_param.annotated_type(),
                                     target_param.name(),
+                                    target_index,
                                 ) {
                                     return result;
                                 }
@@ -2346,6 +2384,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_param.annotated_type(),
                             source_keyword_variadic,
                             target_param.name(),
+                            target_index,
                         ) {
                             return result;
                         }
@@ -2363,6 +2402,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_param.annotated_type(),
                         source_keyword_variadic,
                         target_param.name(),
+                        target_index,
                     ) {
                         return result;
                     }
