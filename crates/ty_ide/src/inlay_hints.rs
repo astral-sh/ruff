@@ -169,6 +169,7 @@ impl InlayHint {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
+        allow_edits: bool,
     ) -> Self {
         let label_parts = vec![
             InlayHintLabelPart::new(name).with_target(navigation_target),
@@ -179,7 +180,14 @@ impl InlayHint {
             position,
             kind: InlayHintKind::CallArgumentName,
             label: InlayHintLabel { parts: label_parts },
-            text_edits: vec![],
+            text_edits: if allow_edits {
+                vec![InlayHintTextEdit {
+                    range: TextRange::new(position, position),
+                    new_text: format!("{name}="),
+                }]
+            } else {
+                vec![]
+            },
         }
     }
 
@@ -402,6 +410,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
+        allow_edits: bool,
     ) {
         if !self.settings.call_argument_names {
             return;
@@ -411,7 +420,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
+        let inlay_hint =
+            InlayHint::call_argument_name(position, name, navigation_target, allow_edits);
 
         self.hints.push(inlay_hint);
     }
@@ -496,10 +506,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                     if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
                         && !arg_matches_name(&arg_or_keyword, name)
                     {
+                        // Starred args like `*t` cannot be given a keyword name (`b=*t` is
+                        // invalid syntax), so we show the hint but suppress the text edit.
                         self.add_call_argument_name(
                             arg_or_keyword.range().start(),
                             name,
                             parameter_label_offset.map(NavigationTarget::from),
+                            !arg_or_keyword.is_variadic(),
                         );
                     }
                     self.visit_expr(arg_or_keyword.value());
@@ -2004,7 +2017,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class A:
             def __init__(self, y):
@@ -2042,18 +2055,17 @@ mod tests {
           |
 
         ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        1 + from ty_extensions import Unknown
-        2 |
-        3 | class A:
-        4 |     def __init__(self, y):
-        5 |         self.x = int(1)
-          -         self.y = y
-        6 +         self.y: Unknown = y
-        7 |
-        8 | a = A(2)
-        9 | a.y = int(3)
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from ty_extensions import Unknown
+
+        class A:
+            def __init__(self, y):
+                self.x = int(1)
+                self.y: Unknown = y
+
+        a = A(y=2)
+        a.y = int(3)
         ");
     }
 
@@ -3386,17 +3398,18 @@ mod tests {
            |
 
         ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        4  |         self.x = x
-        5  |         self.y = y
-        6  |
-           - x = MyClass([42], ("a", "b"))
-           - y = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        7  + x: MyClass[int, str] = MyClass([42], ("a", "b"))
-        8  + y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        9  | a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
-        10 | c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class MyClass[T, U]:
+            def __init__(self, x: list[T], y: tuple[U, U]):
+                self.x = x
+                self.y = y
+
+        x: MyClass[int, str] = MyClass(x=[42], y=("a", "b"))
+        y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass(x=[42], y=("a", "b")), MyClass(x=[42], y=("a", "b")))
+        a, b = MyClass(x=[42], y=("a", "b")), MyClass(x=[42], y=("a", "b"))
+        c, d = (MyClass(x=[42], y=("a", "b")), MyClass(x=[42], y=("a", "b")))
         "#);
     }
 
@@ -3434,7 +3447,7 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         foo([x=]1)
@@ -3451,6 +3464,13 @@ mod tests {
         3 | foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        foo(x=1)
         ");
     }
 
@@ -3465,7 +3485,7 @@ mod tests {
             foo(y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         x = 1
@@ -3485,6 +3505,16 @@ mod tests {
         6 | foo([x=]y)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        x = 1
+        y = 2
+        foo(x)
+        foo(x=y)
         ");
     }
 
@@ -3503,7 +3533,7 @@ mod tests {
             foo(val.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         class MyClass:
@@ -3527,6 +3557,20 @@ mod tests {
         10 | foo([x=]val.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        val = MyClass()
+
+        foo(val.x)
+        foo(x=val.y)
         ");
     }
 
@@ -3546,7 +3590,7 @@ mod tests {
             foo(x.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         class MyClass:
@@ -3570,6 +3614,20 @@ mod tests {
         10 | foo([x=]x.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        x = MyClass()
+
+        foo(x.x)
+        foo(x=x.y)
         ");
     }
 
@@ -3590,7 +3648,7 @@ mod tests {
             foo(val.y())",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         class MyClass:
@@ -3616,6 +3674,22 @@ mod tests {
         12 | foo([x=]val.y())
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> int:
+                return 1
+            def y() -> int:
+                return 2
+        val = MyClass()
+
+        foo(val.x())
+        foo(x=val.y())
         ");
     }
 
@@ -3638,7 +3712,7 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from typing import List
 
@@ -3666,6 +3740,24 @@ mod tests {
         14 | foo([x=]val.y()[1])
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import List
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> List[int]:
+                return 1
+            def y() -> List[int]:
+                return 2
+        val = MyClass()
+
+        foo(val.x()[0])
+        foo(x=val.y()[1])
         ");
     }
 
@@ -3756,18 +3848,16 @@ mod tests {
           |
 
         ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        1 |
-        2 | def foo(x: int): pass
-          - x = [1]
-          - y = [2]
-        3 + x: list[int] = [1]
-        4 + y: list[int] = [2]
-        5 |
-        6 | foo(x[0])
-        7 | foo(y[0])
-        ");
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        x: list[int] = [1]
+        y: list[int] = [2]
+
+        foo(x[0])
+        foo(x=y[0])
+        "#);
     }
 
     #[test]
@@ -3842,7 +3932,7 @@ mod tests {
         );
 
         // `*t` fills both `b` and `c`, so no hint is shown for it
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(a: str, b: int, c: int, d: str): ...
         t: tuple[int, int] = (23, 42)
@@ -3860,6 +3950,14 @@ mod tests {
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(a: str, b: int, c: int, d: str): ...
+        t: tuple[int, int] = (23, 42)
+        foo(a='foo', *t, d='bar')
         ");
     }
 
@@ -3873,7 +3971,7 @@ mod tests {
             foo('foo', *t, 'bar')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(a: str, b: int, c: str): ...
         t: tuple[int] = (42,)
@@ -3917,6 +4015,14 @@ mod tests {
         4 | foo([a=]'foo', [b=]*t, [c=]'bar')
           |                         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(a: str, b: int, c: str): ...
+        t: tuple[int] = (42,)
+        foo(a='foo', *t, c='bar')
         ");
     }
 
@@ -3928,7 +4034,7 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int, /, y: int): pass
         foo(1, [y=]2)
@@ -3945,6 +4051,13 @@ mod tests {
         3 | foo(1, [y=]2)
           |         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int, /, y: int): pass
+        foo(1, y=2)
         ");
     }
 
@@ -3988,7 +4101,7 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class Foo:
             def __init__(self, x: int): pass
@@ -4020,6 +4133,15 @@ mod tests {
         5 | f = Foo([x=]1)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            def __init__(self, x: int): pass
+        Foo(x=1)
+        f = Foo(x=1)
         ");
     }
 
@@ -4033,7 +4155,7 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class Foo:
             def __new__(cls, x: int): pass
@@ -4065,6 +4187,15 @@ mod tests {
         5 | f = Foo([x=]1)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            def __new__(cls, x: int): pass
+        Foo(x=1)
+        f = Foo(x=1)
         ");
     }
 
@@ -4079,7 +4210,7 @@ mod tests {
             Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class MetaFoo:
             def __call__(self, x: int): pass
@@ -4099,6 +4230,16 @@ mod tests {
         6 | Foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class MetaFoo:
+            def __call__(self, x: int): pass
+        class Foo(metaclass=MetaFoo):
+            pass
+        Foo(x=1)
         ");
     }
 
@@ -4128,7 +4269,7 @@ mod tests {
             Foo().bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class Foo:
             def bar(self, y: int): pass
@@ -4146,6 +4287,14 @@ mod tests {
         4 | Foo().bar([y=]2)
           |            ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            def bar(self, y: int): pass
+        Foo().bar(y=2)
         ");
     }
 
@@ -4159,7 +4308,7 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class Foo:
             @classmethod
@@ -4178,6 +4327,15 @@ mod tests {
         5 | Foo.bar([y=]2)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            @classmethod
+            def bar(cls, y: int): pass
+        Foo.bar(y=2)
         ");
     }
 
@@ -4191,7 +4349,7 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class Foo:
             @staticmethod
@@ -4210,6 +4368,15 @@ mod tests {
         5 | Foo.bar([y=]2)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            @staticmethod
+            def bar(y: int): pass
+        Foo.bar(y=2)
         ");
     }
 
@@ -4222,7 +4389,7 @@ mod tests {
             foo('abc')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int | str): pass
         foo([x=]1)
@@ -4253,6 +4420,14 @@ mod tests {
         4 | foo([x=]'abc')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int | str): pass
+        foo(x=1)
+        foo(x='abc')
         ");
     }
 
@@ -4264,7 +4439,7 @@ mod tests {
             foo(1, 'hello', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, [y=]'hello', [z=]True)
@@ -4307,6 +4482,13 @@ mod tests {
         3 | foo([x=]1, [y=]'hello', [z=]True)
           |                          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int, y: str, z: bool): pass
+        foo(x=1, y='hello', z=True)
         ");
     }
 
@@ -4318,7 +4500,7 @@ mod tests {
             foo(1, z=True, y='hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, z=True, y='hello')
@@ -4335,6 +4517,13 @@ mod tests {
         3 | foo([x=]1, z=True, y='hello')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int, y: str, z: bool): pass
+        foo(x=1, z=True, y='hello')
         ");
     }
 
@@ -4348,7 +4537,7 @@ mod tests {
             foo(1, 'custom', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int, y: str = 'default', z: bool = False): pass
         foo([x=]1)
@@ -4432,6 +4621,15 @@ mod tests {
         5 | foo([x=]1, [y=]'custom', [z=]True)
           |                           ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int, y: str = 'default', z: bool = False): pass
+        foo(x=1)
+        foo(x=1, y='custom')
+        foo(x=1, y='custom', z=True)
         ");
     }
 
@@ -4450,7 +4648,7 @@ mod tests {
             baz(foo(5), bar(bar('test')), True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int) -> int:
             return x * 2
@@ -4539,6 +4737,20 @@ mod tests {
         10 | baz([a=]foo([x=]5), [b=]bar([y=]bar([y=]'test')), [c=]True)
            |                                                    ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int) -> int:
+            return x * 2
+
+        def bar(y: str) -> str:
+            return y
+
+        def baz(a: int, b: str, c: bool): pass
+
+        baz(a=foo(x=5), b=bar(y=bar(y='test')), c=True)
         ");
     }
 
@@ -4555,7 +4767,7 @@ mod tests {
             A().foo(42).bar('test').baz()",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         class A:
             def foo(self, value: int) -> 'A':
@@ -4590,6 +4802,18 @@ mod tests {
         8 | A().foo([value=]42).bar([name=]'test').baz()
           |                          ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class A:
+            def foo(self, value: int) -> 'A':
+                return self
+            def bar(self, name: str) -> 'A':
+                return self
+            def baz(self): pass
+        A().foo(value=42).bar(name='test').baz()
         ");
     }
 
@@ -4604,7 +4828,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: str) -> str:
             return x
@@ -4624,6 +4848,15 @@ mod tests {
         5 | bar(y=foo([x=]'test'))
           |            ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: str) -> str:
+            return x
+        def bar(y: int): pass
+        bar(y=foo(x='test'))
         ");
     }
 
@@ -4637,7 +4870,7 @@ mod tests {
             bar(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         foo[: (x) -> Unknown] = lambda x: x * 2
         bar[: (a, b) -> Unknown] = lambda a, b: a + b
@@ -4669,6 +4902,15 @@ mod tests {
         3 | bar[: (a, b) -> Unknown] = lambda a, b: a + b
           |                 ^^^^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        foo = lambda x: x * 2
+        bar = lambda a, b: a + b
+        foo(x=5)
+        bar(a=1, b=2)
         ");
     }
 
@@ -4998,7 +5240,7 @@ mod tests {
             foo(1, 'pos', 3.14, e=42, f='custom')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
         foo(1, 'pos', [c=]3.14, [d=]False, e=42)
@@ -5042,6 +5284,14 @@ mod tests {
         4 | foo(1, 'pos', [c=]3.14, e=42, f='custom')
           |                ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+        foo(1, 'pos', c=3.14, d=False, e=42)
+        foo(1, 'pos', c=3.14, e=42, f='custom')
         ");
     }
 
@@ -5061,7 +5311,7 @@ mod tests {
             pass",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from foo import bar
 
@@ -5079,6 +5329,14 @@ mod tests {
         4 | bar([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from foo import bar
+
+        bar(x=1)
         ");
     }
 
@@ -5099,7 +5357,7 @@ mod tests {
             foo('hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from typing import overload
 
@@ -5138,6 +5396,22 @@ mod tests {
         12 | foo([x=]'hello')
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import overload
+
+        @overload
+        def foo(x: int) -> str: ...
+        @overload
+        def foo(x: str) -> int: ...
+        def foo(x):
+            return x
+
+        foo(x=42)
+        foo(x='hello')
         ");
     }
 
@@ -5231,7 +5505,7 @@ mod tests {
         // Neither overload matches via type checking (list[Unknown] is neither int nor str),
         // so `matching_overloads()` returns empty. The arity-based fallback picks the first
         // overload (1 matched arg out of 1 required), and we should see the `x=` hint.
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from typing import overload
 
@@ -5257,6 +5531,21 @@ mod tests {
         11 | f([x=][])
            |    ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import overload
+
+        @overload
+        def f(x: int) -> str: ...
+        @overload
+        def f(x: str, y: str) -> int: ...
+        def f(x):
+            return x
+
+        f(x=[])
         ");
     }
 
@@ -5288,7 +5577,7 @@ mod tests {
             bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(x: int): pass
         def bar(y: int): pass
@@ -5307,6 +5596,15 @@ mod tests {
         4 | foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        def bar(y: int): pass
+        foo(x=1)
+        bar(2)
         ");
     }
 
@@ -5318,7 +5616,7 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(_x: int, y: int): pass
         foo(1, [y=]2)
@@ -5335,6 +5633,13 @@ mod tests {
         3 | foo(1, [y=]2)
           |         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(_x: int, y: int): pass
+        foo(1, y=2)
         ");
     }
 
@@ -5350,7 +5655,7 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         def foo(
             x: int,
@@ -5384,6 +5689,17 @@ mod tests {
         7 | foo([x=]1, [y=]2)
           |             ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(
+            x: int,
+            y: int
+        ): ...
+
+        foo(x=1, y=2)
         ");
     }
 
@@ -5817,7 +6133,16 @@ mod tests {
         6 | Y[: <NewType pseudo-class 'N'>] = N
           |                            ^
           |
-        ");
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import NewType
+
+        N = NewType(name='N', tp=str)
+
+        Y = N
+        "#);
     }
 
     #[test]
@@ -5914,7 +6239,14 @@ mod tests {
         4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
-        ");
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import Protocol, TypeVar
+        T = TypeVar(name='T')
+        Strange = Protocol[T]
+        "#);
     }
 
     #[test]
@@ -5925,7 +6257,7 @@ mod tests {
         P = ParamSpec('P')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from typing import ParamSpec
         P = ParamSpec([name=]'P')
@@ -5942,6 +6274,13 @@ mod tests {
         3 | P = ParamSpec([name=]'P')
           |                ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import ParamSpec
+        P = ParamSpec(name='P')
         ");
     }
 
@@ -5983,7 +6322,13 @@ mod tests {
         3 | A = TypeAliasType([name=]'A', [value=]str)
           |                                ^^^^^
           |
-        ");
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing_extensions import TypeAliasType
+        A = TypeAliasType(name='A', value=str)
+        "#);
     }
 
     #[test]
@@ -5994,7 +6339,7 @@ mod tests {
         Ts = TypeVarTuple('Ts')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from typing_extensions import TypeVarTuple
         Ts = TypeVarTuple([name=]'Ts')
@@ -6011,6 +6356,13 @@ mod tests {
         3 | Ts = TypeVarTuple([name=]'Ts')
           |                    ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing_extensions import TypeVarTuple
+        Ts = TypeVarTuple(name='Ts')
         ");
     }
 
@@ -6448,7 +6800,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from foo import D
 
@@ -6497,13 +6849,14 @@ mod tests {
           |
 
         ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        3 |
-        4 | class Baz: ...
-        5 |
-          - a = D(Baz)
-        6 + a: D[Baz] = D(Baz)
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from foo import D
+
+        class Baz: ...
+
+        a: D[Baz] = D(x=Baz)
         ");
     }
 
@@ -6909,7 +7262,7 @@ mod tests {
            "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r"
 
         from dataclasses import dataclass
         import foo
@@ -6950,13 +7303,19 @@ mod tests {
            |
 
         ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        8  | class B[T]:
-        9  |     x: T
-        10 |
-           - b = B(foo.A())
-        11 + b: B[foo.A] = B(foo.A())
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from dataclasses import dataclass
+        import foo
+
+        class A: ...
+
+        @dataclass
+        class B[T]:
+            x: T
+
+        b: B[foo.A] = B(x=foo.A())
         ");
     }
 
