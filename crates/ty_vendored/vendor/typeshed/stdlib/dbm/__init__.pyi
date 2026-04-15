@@ -26,6 +26,7 @@ Future versions may change the order in which implementations are
 tested for existence, and add interfaces to other dbm-like
 implementations.
 """
+
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
@@ -128,48 +129,50 @@ if sys.version_info >= (3, 11):
     def whichdb(filename: StrOrBytesPath) -> str | None:
         """Guess which db package to use to open a db file.
 
-Return values:
+        Return values:
 
-- None if the database file can't be read;
-- empty string if the file can be read but can't be recognized
-- the name of the dbm submodule (e.g. "ndbm" or "gnu") if recognized.
+        - None if the database file can't be read;
+        - empty string if the file can be read but can't be recognized
+        - the name of the dbm submodule (e.g. "ndbm" or "gnu") if recognized.
 
-Importing the given module may still fail, and opening the
-database using that module may still fail.
-"""
+        Importing the given module may still fail, and opening the
+        database using that module may still fail.
+        """
+
     def open(file: StrOrBytesPath, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
         """Open or create database at path given by *file*.
 
-Optional argument *flag* can be 'r' (default) for read-only access, 'w'
-for read-write access of an existing database, 'c' for read-write access
-to a new or existing database, and 'n' for read-write access to a new
-database.
+        Optional argument *flag* can be 'r' (default) for read-only access, 'w'
+        for read-write access of an existing database, 'c' for read-write access
+        to a new or existing database, and 'n' for read-write access to a new
+        database.
 
-Note: 'r' and 'w' fail if the database doesn't exist; 'c' creates it
-only if it doesn't exist; and 'n' always creates a new database.
-"""
+        Note: 'r' and 'w' fail if the database doesn't exist; 'c' creates it
+        only if it doesn't exist; and 'n' always creates a new database.
+        """
 
 else:
     def whichdb(filename: str) -> str | None:
         """Guess which db package to use to open a db file.
 
-    Return values:
+        Return values:
 
-    - None if the database file can't be read;
-    - empty string if the file can be read but can't be recognized
-    - the name of the dbm submodule (e.g. "ndbm" or "gnu") if recognized.
+        - None if the database file can't be read;
+        - empty string if the file can be read but can't be recognized
+        - the name of the dbm submodule (e.g. "ndbm" or "gnu") if recognized.
 
-    Importing the given module may still fail, and opening the
-    database using that module may still fail.
-    """
+        Importing the given module may still fail, and opening the
+        database using that module may still fail.
+        """
+
     def open(file: str, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
         """Open or create database at path given by *file*.
 
-    Optional argument *flag* can be 'r' (default) for read-only access, 'w'
-    for read-write access of an existing database, 'c' for read-write access
-    to a new or existing database, and 'n' for read-write access to a new
-    database.
+        Optional argument *flag* can be 'r' (default) for read-only access, 'w'
+        for read-write access of an existing database, 'c' for read-write access
+        to a new or existing database, and 'n' for read-write access to a new
+        database.
 
-    Note: 'r' and 'w' fail if the database doesn't exist; 'c' creates it
-    only if it doesn't exist; and 'n' always creates a new database.
-    """
+        Note: 'r' and 'w' fail if the database doesn't exist; 'c' creates it
+        only if it doesn't exist; and 'n' always creates a new database.
+        """

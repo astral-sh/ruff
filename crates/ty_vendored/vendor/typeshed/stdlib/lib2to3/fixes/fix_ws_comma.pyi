@@ -4,6 +4,7 @@ This also changes '{a :b}' into '{a: b}', but does not touch other
 uses of colons.  It does not touch other uses of whitespace.
 
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

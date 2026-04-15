@@ -98,6 +98,7 @@ dnd_start().  This will call dnd_leave() if a target is currently
 active; it will never call dnd_commit().
 
 """
+
 from tkinter import Event, Misc, Tk, Widget
 from typing import ClassVar, Protocol, type_check_only
 
