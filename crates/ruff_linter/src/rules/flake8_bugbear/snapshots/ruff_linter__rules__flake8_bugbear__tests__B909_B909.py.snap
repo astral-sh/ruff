@@ -502,4 +502,28 @@ B909 Mutation to loop iterable `some_list` during iteration
 274 |         finally:
 275 |             some_list.append(item)
     |             ^^^^^^^^^^^^^^^^
+276 |
+277 | # should not error - `finally: return` unconditionally exits, so the `try`
+    |
+
+B909 Mutation to loop iterable `outer` during iteration
+   --> B909.py:290:9
+    |
+288 | def fail_nested_return_bypasses_else(outer, inner):
+289 |     for item in outer:
+290 |         outer.append(item)
+    |         ^^^^^^^^^^^^
+291 |         for y in inner:
+292 |             if y:
+    |
+
+B909 Mutation to loop iterable `outer` during iteration
+   --> B909.py:300:9
+    |
+298 | def fail_nested_raise_bypasses_else(outer, inner):
+299 |     for item in outer:
+300 |         outer.append(item)
+    |         ^^^^^^^^^^^^
+301 |         for y in inner:
+302 |             if y:
     |

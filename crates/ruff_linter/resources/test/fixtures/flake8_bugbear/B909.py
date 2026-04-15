@@ -273,3 +273,33 @@ def fail_try_finally(some_list):
             return
         finally:
             some_list.append(item)
+
+# should not error - `finally: return` unconditionally exits, so the `try`
+# body's mutation never reaches another iteration
+def pass_try_finally_return(items):
+    for item in items:
+        try:
+            items.append(item)
+        finally:
+            return
+
+# should error - nested loop's body has a `return` but no `break`, so the
+# outer mutation can reach another iteration if the `return` doesn't fire
+def fail_nested_return_bypasses_else(outer, inner):
+    for item in outer:
+        outer.append(item)
+        for y in inner:
+            if y:
+                return
+        else:
+            return
+
+# should error - nested loop's body can `raise`, which also skips `else`
+def fail_nested_raise_bypasses_else(outer, inner):
+    for item in outer:
+        outer.append(item)
+        for y in inner:
+            if y:
+                raise ValueError
+        else:
+            return

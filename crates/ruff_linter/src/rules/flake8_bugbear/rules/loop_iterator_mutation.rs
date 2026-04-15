@@ -116,27 +116,32 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
     }
 }
 
-/// Whether `body` contains a `break` that would exit the enclosing loop
-/// (not one inside a further-nested loop). When absent, the loop's `else`
-/// clause is guaranteed to run.
-fn body_has_reachable_break(body: &[Stmt]) -> bool {
-    let mut finder = BreakFinder::default();
+/// Whether `body` contains a `break`, `return`, or `raise` that would cause
+/// the enclosing loop's `else` clause to be skipped.
+///
+/// See [the Python tutorial on `else` clauses on loops][else-clauses].
+///
+/// [else-clauses]: https://docs.python.org/3/tutorial/controlflow.html#else-clauses-on-loops
+fn body_may_skip_else(body: &[Stmt]) -> bool {
+    let mut finder = SkipsElseFinder::default();
     finder.visit_body(body);
     finder.found
 }
 
 #[derive(Default)]
-struct BreakFinder {
+struct SkipsElseFinder {
     found: bool,
 }
 
-impl StatementVisitor<'_> for BreakFinder {
+impl StatementVisitor<'_> for SkipsElseFinder {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if self.found {
             return;
         }
         match stmt {
-            Stmt::Break(_) => self.found = true,
+            // `break`/`return`/`raise` all skip the enclosing loop's
+            // `else` clause; see Python docs on `else` clauses for loops.
+            Stmt::Break(_) | Stmt::Return(_) | Stmt::Raise(_) => self.found = true,
             // Don't look inside nested loop bodies, but do check their
             // `else` clause — a `break` there targets the enclosing loop.
             Stmt::For(StmtFor { orelse, .. }) | Stmt::While(StmtWhile { orelse, .. }) => {
@@ -148,6 +153,14 @@ impl StatementVisitor<'_> for BreakFinder {
             _ => statement_visitor::walk_stmt(self, stmt),
         }
     }
+}
+
+/// Whether `body` has an unconditional terminator at its top level.
+/// Used to decide if a `try` statement's `finally` clause always exits the
+/// enclosing control flow (loop or function).
+fn unconditionally_terminates(body: &[Stmt]) -> bool {
+    body.iter()
+        .any(|stmt| matches!(stmt, Stmt::Return(_) | Stmt::Raise(_) | Stmt::Break(_)))
 }
 
 /// Returns `true` if the method mutates when called on an iterator.
@@ -304,7 +317,10 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
         for stmt in body {
             self.visit_stmt(stmt);
             // After a terminator, remaining statements are unreachable.
-            if matches!(stmt, Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_)) {
+            if matches!(
+                stmt,
+                Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_) | Stmt::Raise(_)
+            ) {
                 break;
             }
         }
@@ -353,10 +369,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 self.loop_depth -= 1;
                 self.merge_branch_into(saved_branch);
 
-                // If the body never breaks, the else clause always runs,
-                // so a terminator there can clear earlier mutations.
+                // If the body may `break`, `return`, or `raise`, the `else`
+                // clause may not run, so its terminators must not clear
+                // mutations from the body.
                 if !orelse.is_empty() {
-                    if body_has_reachable_break(body) {
+                    if body_may_skip_else(body) {
                         self.enter_new_branch();
                         self.visit_body(orelse);
                         self.merge_branch_into(saved_branch);
@@ -381,7 +398,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 self.merge_branch_into(saved_branch);
 
                 if !orelse.is_empty() {
-                    if body_has_reachable_break(body) {
+                    if body_may_skip_else(body) {
                         self.enter_new_branch();
                         self.visit_body(orelse);
                         self.merge_branch_into(saved_branch);
@@ -457,6 +474,16 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                     self.enter_new_branch();
                     self.visit_body(finalbody);
                     self.merge_branch_into(saved_branch);
+
+                    // If `finally` unconditionally terminates (e.g., ends in
+                    // `return`), the entire `try` statement always exits the
+                    // enclosing control flow, so earlier mutations never
+                    // reach another iteration.
+                    if unconditionally_terminates(finalbody)
+                        && let Some(mutations) = self.mutations.get_mut(&saved_branch)
+                    {
+                        mutations.clear();
+                    }
                 }
             }
 
