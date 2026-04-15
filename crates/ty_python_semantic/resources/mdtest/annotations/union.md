@@ -93,7 +93,7 @@ PEP-604 unions generally don't work on Python 3.9 and earlier:
 python-version = "3.9"
 ```
 
-`a.py`:
+`foo.py`:
 
 ```py
 x: int | str  # snapshot: unsupported-operator
@@ -108,7 +108,7 @@ d[0]: int | str = 42  # snapshot: unsupported-operator
 
 ```snapshot
 error[unsupported-operator]: Unsupported `|` operation
- --> src/a.py:1:4
+ --> src/foo.py:1:4
   |
 1 | x: int | str  # snapshot: unsupported-operator
   |    ---^^^---
@@ -121,7 +121,7 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 
 
 error[unsupported-operator]: Unsupported `|` operation
- --> src/a.py:5:17
+ --> src/foo.py:5:17
   |
 5 |         self.x: int | str = 42  # snapshot: unsupported-operator
   |                 ---^^^---
@@ -134,7 +134,7 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 
 
 error[unsupported-operator]: Unsupported `|` operation
- --> src/a.py:8:7
+ --> src/foo.py:8:7
   |
 8 | d[0]: int | str = 42  # snapshot: unsupported-operator
   |       ---^^^---
@@ -149,7 +149,7 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 But these runtime errors can be avoided if you add `from __future__ import annotations` to the top
 of your file:
 
-`b.py`:
+`bar.py`:
 
 ```py
 from __future__ import annotations
@@ -167,7 +167,7 @@ d[0]: int | str = 42
 The following ones are still errors because `from __future__ import annotations` only stringifies
 *type annotations*, not arbitrary runtime expressions:
 
-`c.py`:
+`baz.py`:
 
 ```py
 X = str | int  # snapshot: unsupported-operator
@@ -176,7 +176,7 @@ Y = tuple[str | int, ...]  # snapshot: unsupported-operator
 
 ```snapshot
 error[unsupported-operator]: Unsupported `|` operation
- --> src/c.py:1:5
+ --> src/baz.py:1:5
   |
 1 | X = str | int  # snapshot: unsupported-operator
   |     ---^^^---
@@ -189,7 +189,7 @@ info: Python 3.9 was assumed when resolving types because it was specified on th
 
 
 error[unsupported-operator]: Unsupported `|` operation
- --> src/c.py:2:11
+ --> src/baz.py:2:11
   |
 2 | Y = tuple[str | int, ...]  # snapshot: unsupported-operator
   |           ---^^^---
