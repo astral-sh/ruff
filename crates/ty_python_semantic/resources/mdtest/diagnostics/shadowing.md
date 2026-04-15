@@ -20,7 +20,7 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<cl
   | |
   | Declared type `<class 'C'>`
   |
-info: Implicit shadowing of class `C`, add an annotation to make it explicit if this is intentional
+info: Implicit shadowing of class `C`. Add an annotation to make it explicit if this is intentional
 ```
 
 ## Implicit function shadowing
@@ -40,5 +40,5 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `def
   | |
   | Declared type `def f() -> Unknown`
   |
-info: Implicit shadowing of function `f`, add an annotation to make it explicit if this is intentional
+info: Implicit shadowing of function `f`. Add an annotation to make it explicit if this is intentional
 ```
