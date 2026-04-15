@@ -3571,13 +3571,13 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     match target_ty {
         Type::ClassLiteral(class) => {
             diag.info(format_args!(
-                "Implicit shadowing of class `{}`, add an annotation to make it explicit if this is intentional",
+                "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
                 class.name(context.db()),
             ));
         }
         Type::FunctionLiteral(function) => {
             diag.info(format_args!(
-                "Implicit shadowing of function `{}`, add an annotation to make it explicit if this is intentional",
+                "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
             ));
         }
