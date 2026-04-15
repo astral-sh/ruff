@@ -1617,7 +1617,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
-                unpacked.expression_type(target)
+                unpacked
+                    .try_expression_type(target)
+                    .unwrap_or_else(Type::unknown)
             }
             TargetKind::Single => {
                 let context_expr_ty =
@@ -3158,7 +3160,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                unpacked.expression_type(target)
+                unpacked
+                    .try_expression_type(target)
+                    .unwrap_or_else(Type::unknown)
             }
             TargetKind::Single => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
@@ -4331,7 +4335,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                unpacked.expression_type(target)
+                unpacked
+                    .try_expression_type(target)
+                    .unwrap_or_else(Type::unknown)
             }
             TargetKind::Single => {
                 let iterable_type =
@@ -6418,7 +6424,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                unpacked.expression_type(target)
+                unpacked
+                    .try_expression_type(target)
+                    .unwrap_or_else(Type::unknown)
             }
             TargetKind::Single => {
                 let iterable_type = infer_iterable_type();
