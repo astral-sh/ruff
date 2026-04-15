@@ -562,6 +562,53 @@ mod tests {
         "#);
     }
 
+    // A same-code suppression inserted at the end of a narrower multiline range can land on the
+    // start line of a wider multiline range, which makes the wider range's own suppression
+    // redundant.
+    #[test]
+    fn same_code_multiline_suppressions_with_different_ranges_can_become_redundant() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                from typing import TypeAlias
+
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+
+
+                def get_data() -> dict[str, JsonValue]:
+                    return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+
+
+                def f() -> None:
+                    diag = get_data()
+                    diag["home_assistant"]["entities"] = sorted(
+                        diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]
+                    )
+                "#
+        ),
+         @r#"
+        Added 4 suppressions
+
+        ## Fixed source
+
+        ```py
+        from typing import TypeAlias
+
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+
+
+        def get_data() -> dict[str, JsonValue]:
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+
+
+        def f() -> None:
+            diag = get_data()
+            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            )
+        ```
+        "#);
+    }
+
     #[test]
     fn return_type() {
         assert_snapshot!(
