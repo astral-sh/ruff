@@ -6636,6 +6636,18 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    pub(crate) fn is_return_callable_mapping(&self) -> bool {
+        matches!(
+            self,
+            TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(_))
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::ReturnCallables(_),
+                    ..
+                }
+        )
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
