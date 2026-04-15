@@ -21,48 +21,42 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
  6 | class BaseWithBadAwait:
  7 |     __await__ = 42
  8 | 
- 9 | class InheritedNonCallableAwait(BaseWithBadAwait): ...
-10 | 
-11 | async def main() -> None:
-12 |     await InheritedNonCallableAwait()  # error: [invalid-await]
+ 9 | class IntermediateAwait(BaseWithBadAwait): ...
+10 | class DeepInheritedNonCallableAwait(IntermediateAwait): ...
+11 | 
+12 | async def main() -> None:
+13 |     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-await]: `NonCallableAwait` is not awaitable
- --> src/mdtest_snippet.py:2:5
+ --> src/mdtest_snippet.py:5:11
   |
-1 | class NonCallableAwait:
-2 |     __await__ = 42
-  |     --------- attribute defined here
-3 |
-4 | async def main() -> None:
 5 |     await NonCallableAwait()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^^^^^
-6 | class BaseWithBadAwait:
-7 |     __await__ = 42
+  |
+ ::: src/mdtest_snippet.py:2:5
+  |
+2 |     __await__ = 42
+  |     --------- attribute defined here
   |
 info: `__await__` is not callable
 
 ```
 
 ```
-error[invalid-await]: `InheritedNonCallableAwait` is not awaitable
-  --> src/mdtest_snippet.py:12:11
+error[invalid-await]: `DeepInheritedNonCallableAwait` is not awaitable
+  --> src/mdtest_snippet.py:13:11
    |
-11 | async def main() -> None:
-12 |     await InheritedNonCallableAwait()  # error: [invalid-await]
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
   ::: src/mdtest_snippet.py:7:5
    |
- 5 |     await NonCallableAwait()  # error: [invalid-await]
- 6 | class BaseWithBadAwait:
  7 |     __await__ = 42
    |     --------- attribute defined here
- 8 |
- 9 | class InheritedNonCallableAwait(BaseWithBadAwait): ...
    |
 info: `__await__` is not callable
 

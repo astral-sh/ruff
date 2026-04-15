@@ -5311,14 +5311,14 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         }
                     }
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
                         base_type.display(db)
                     ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
@@ -5330,7 +5330,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
