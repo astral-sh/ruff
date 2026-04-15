@@ -406,6 +406,17 @@ reveal_type(box | {"inner": {"age": 31, "name": "Alice"}})  # revealed: Box
 reveal_type({"inner": {"age": 31, "name": "Alice"}} | box)  # revealed: Box
 ```
 
+`dict` fallbacks should remain valid for incompatible `TypedDict` literals:
+
+```py
+from typing import TypedDict
+
+class ConfigOrDict(TypedDict):
+    a: int
+
+x12: ConfigOrDict | dict[str, list[int]] = {"a": [1]}
+```
+
 ## Validation of `TypedDict` construction
 
 ```py
@@ -2341,6 +2352,24 @@ def _(t: type[Config] | type[dict]) -> None:
     t({"factory": 1})
 ```
 
+Other callable arms should also suppress nested `TypedDict` field inference:
+
+```py
+from typing import TypedDict
+
+class NestedConfig(TypedDict):
+    inner: int
+
+class ConfigWithNested(TypedDict):
+    a: NestedConfig
+
+class Other:
+    def __init__(self, *, a: dict[str, str]) -> None: ...
+
+def _(t: type[ConfigWithNested] | type[Other]) -> None:
+    t(a={"k": "v"})
+```
+
 Constructor diagnostics for `type[Foo | Bar]` should only use compatible `TypedDict` arms:
 
 ```py
@@ -2356,6 +2385,48 @@ class BarCompatible(TypedDict):
 
 def _(t: type[FooCompatible | BarCompatible]) -> None:
     t(a=1, foo=1)
+    reveal_type(t(a=1, foo=1))  # revealed: FooCompatible
+```
+
+Literal tag keywords should narrow constructor unions before inferring remaining values:
+
+```py
+from typing import Literal, TypeVar, TypedDict
+from typing_extensions import assert_type
+
+class TaggedKeywordFoo(TypedDict):
+    role: Literal["foo"]
+    content: list[int]
+
+class TaggedKeywordBar(TypedDict):
+    role: Literal["bar"]
+    content: list[str]
+
+T = TypeVar("T")
+
+def homogeneous_list(*args: T) -> list[T]:
+    return list(args)
+
+def _(t: type[TaggedKeywordFoo | TaggedKeywordBar]) -> None:
+    t(role="foo", content=assert_type(homogeneous_list(), list[int]))
+```
+
+Arm-specific keywords should narrow constructor unions before inferring nested values:
+
+```py
+from typing import TypedDict
+
+class FooPayload(TypedDict):
+    a: int
+
+class KeywordNarrowFoo(TypedDict):
+    foo: FooPayload
+
+class KeywordNarrowBar(TypedDict):
+    bar: int
+
+def _(t: type[KeywordNarrowFoo | KeywordNarrowBar]) -> None:
+    t(foo={"a": 1})
 ```
 
 Union-bounded `type[T]` constructor calls validate every `TypedDict` target in the bound:

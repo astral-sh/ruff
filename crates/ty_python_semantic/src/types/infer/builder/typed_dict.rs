@@ -77,6 +77,7 @@ pub(super) struct TypedDictConstructorPlan<'db> {
     validation_targets: SmallVec<[TypedDictType<'db>; 1]>,
     binding_strategy: Option<TypedDictConstructorBindingStrategy>,
     has_non_typed_dict_alternative: bool,
+    return_override: Option<Type<'db>>,
 }
 
 impl<'db> TypedDictConstructorPlan<'db> {
@@ -149,6 +150,18 @@ impl<'db> TypedDictConstructorPlan<'db> {
                 true,
             );
         }
+    }
+
+    pub(super) fn apply_return_override(
+        &self,
+        db: &'db dyn Db,
+        bindings: &mut crate::types::call::Bindings<'db>,
+    ) {
+        let Some(return_override) = self.return_override else {
+            return;
+        };
+
+        bindings.set_constructed_instance_type(db, return_override);
     }
 }
 
@@ -245,6 +258,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .collect()
     }
 
+    fn typed_dict_literal_value_for_narrowing(&mut self, expr: &ast::Expr) -> Option<Type<'db>> {
+        match expr {
+            ast::Expr::BooleanLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::StringLiteral(_) => {
+                let mut speculative = self.speculate();
+                Some(speculative.infer_expression(expr, TypeContext::default()))
+            }
+            _ => None,
+        }
+    }
+
     /// Plan the `TypedDict`-specific work for a constructor call.
     pub(super) fn plan_typed_dict_constructor<'expr>(
         &mut self,
@@ -252,16 +279,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         arguments: &'expr ast::Arguments,
         error_node: AnyNodeRef<'expr>,
     ) -> TypedDictConstructorPlan<'db> {
-        let constructor_targets = self.collect_typed_dict_constructor_targets(callable_type);
         let form = TypedDictConstructorForm::from_arguments(arguments);
+        let mut constructor_targets = self.collect_typed_dict_constructor_targets(callable_type);
+        let original_target_count = constructor_targets.typed_dicts.len();
+
+        if !constructor_targets.has_non_typed_dict_alternative
+            && constructor_targets.typed_dicts.len() > 1
+        {
+            constructor_targets.typed_dicts = self.narrow_typed_dict_constructor_targets(
+                &constructor_targets.typed_dicts,
+                form,
+                arguments,
+            );
+        }
+
+        let return_override = (!constructor_targets.has_non_typed_dict_alternative
+            && constructor_targets.typed_dicts.len() < original_target_count)
+            .then(|| match constructor_targets.typed_dicts.as_slice() {
+                [typed_dict] => Type::TypedDict(*typed_dict),
+                typed_dicts => UnionType::from_elements(
+                    self.db(),
+                    typed_dicts.iter().copied().map(Type::TypedDict),
+                ),
+            });
+
         let binding_strategy = match constructor_targets.typed_dicts.as_slice() {
             [] => None,
             [typed_dict] if !constructor_targets.has_non_typed_dict_alternative => {
                 Some(self.prepare_typed_dict_constructor(*typed_dict, form, arguments, error_node))
             }
-            typed_dicts if constructor_targets.has_non_typed_dict_alternative => {
-                self.prepare_nonexclusive_typed_dict_constructor(typed_dicts, form, arguments)
-            }
+            _typed_dicts if constructor_targets.has_non_typed_dict_alternative => None,
             typed_dicts => self.prepare_shared_typed_dict_constructor(typed_dicts, form, arguments),
         };
 
@@ -269,6 +316,76 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             validation_targets: constructor_targets.typed_dicts,
             binding_strategy,
             has_non_typed_dict_alternative: constructor_targets.has_non_typed_dict_alternative,
+            return_override,
+        }
+    }
+
+    /// Narrow constructor targets using any statically known keys supplied by the call itself.
+    ///
+    /// Explicit keyword names are always authoritative for `TypedDict` constructors. Literal keys
+    /// in a positional dict argument can also discriminate targets in `TD({...})` and
+    /// `TD({...}, key=...)` forms.
+    fn narrow_typed_dict_constructor_targets<'expr>(
+        &mut self,
+        typed_dicts: &[TypedDictType<'db>],
+        form: TypedDictConstructorForm<'expr>,
+        arguments: &'expr ast::Arguments,
+    ) -> SmallVec<[TypedDictType<'db>; 1]> {
+        let mut narrowed_targets: SmallVec<[TypedDictType<'db>; 1]> =
+            typed_dicts.iter().copied().collect();
+
+        let positional_dict = match form {
+            TypedDictConstructorForm::LiteralOnly(ast::Expr::Dict(dict_expr))
+            | TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => Some(dict_expr),
+            _ => None,
+        };
+
+        if let Some(dict_expr) = positional_dict {
+            let literal_narrowed = {
+                let mut speculative = self.speculate();
+                speculative.narrow_typed_dict_literal_targets(dict_expr, &narrowed_targets)
+            };
+
+            if !literal_narrowed.is_empty() {
+                narrowed_targets = literal_narrowed;
+            }
+        }
+
+        let explicit_keywords: SmallVec<[&str; 4]> = arguments
+            .keywords
+            .iter()
+            .filter_map(|keyword| keyword.arg.as_ref().map(ast::Identifier::as_str))
+            .collect();
+
+        if explicit_keywords.is_empty() {
+            return narrowed_targets;
+        }
+
+        let db = self.db();
+        let keyword_narrowed: SmallVec<[TypedDictType<'db>; 1]> = narrowed_targets
+            .iter()
+            .copied()
+            .filter(|typed_dict| {
+                let items = typed_dict.items(db);
+                arguments.keywords.iter().all(|keyword| {
+                    let Some(arg_name) = keyword.arg.as_ref() else {
+                        return true;
+                    };
+
+                    let Some(field) = items.get(arg_name.as_str()) else {
+                        return false;
+                    };
+
+                    self.typed_dict_literal_value_for_narrowing(&keyword.value)
+                        .is_none_or(|value_ty| value_ty.is_assignable_to(db, field.declared_ty))
+                })
+            })
+            .collect();
+
+        if keyword_narrowed.is_empty() {
+            narrowed_targets
+        } else {
+            keyword_narrowed
         }
     }
 
@@ -555,6 +672,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         dict: &ast::ExprDict,
         typed_dicts: &[TypedDictType<'db>],
         item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
+        allow_narrowed_single_target_diagnostics: bool,
     ) -> Option<Type<'db>> {
         let compatible_typed_dicts = {
             let mut speculative = self.speculate();
@@ -563,7 +681,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         match compatible_typed_dicts.as_slice() {
             [] => return None,
-            [typed_dict] => return self.infer_typed_dict_expression(dict, *typed_dict, item_types),
+            [typed_dict] if allow_narrowed_single_target_diagnostics => {
+                return self.infer_typed_dict_expression(dict, *typed_dict, item_types);
+            }
+            [typed_dict] => {
+                let items = typed_dict.items(self.db());
+                self.infer_typed_dict_expression_item_types_with(dict, item_types, |key| {
+                    items.get(key).map(|field| field.declared_ty)
+                });
+
+                let speculative = self.speculate();
+                return validate_typed_dict_dict_literal(
+                    &speculative.context,
+                    *typed_dict,
+                    dict,
+                    dict.into(),
+                    |expr| {
+                        item_types
+                            .get(&expr.node_index().load())
+                            .copied()
+                            .unwrap_or(Type::unknown())
+                    },
+                )
+                .ok()
+                .map(|_| Type::TypedDict(*typed_dict));
+            }
             _ => {}
         }
 
@@ -773,38 +915,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
                 Some(TypedDictConstructorBindingStrategy::ReusePreparedExpressions)
             }
-            TypedDictConstructorForm::SinglePositional(_) => None,
-            TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
-                self.infer_shared_typed_dict_constructor_dict_literal_values(
-                    typed_dicts,
-                    dict_expr,
-                );
-                self.infer_shared_typed_dict_constructor_keyword_values(typed_dicts, arguments);
-                Some(
-                    TypedDictConstructorBindingStrategy::SkipPreparedPositionalDictLiteral(
-                        dict_expr.node_index().load(),
-                    ),
-                )
-            }
-            TypedDictConstructorForm::MixedPositionalAndKeywords
-            | TypedDictConstructorForm::KeywordOnly
-            | TypedDictConstructorForm::MultiplePositionalArguments => {
-                self.infer_shared_typed_dict_constructor_keyword_values(typed_dicts, arguments);
-                Some(TypedDictConstructorBindingStrategy::ReusePreparedExpressions)
-            }
-        }
-    }
-
-    /// Prepare the safe inference work for constructor calls that still have non-`TypedDict`
-    /// callable alternatives in play.
-    pub(super) fn prepare_nonexclusive_typed_dict_constructor<'expr>(
-        &mut self,
-        typed_dicts: &[TypedDictType<'db>],
-        form: TypedDictConstructorForm<'expr>,
-        arguments: &'expr ast::Arguments,
-    ) -> Option<TypedDictConstructorBindingStrategy> {
-        match form {
-            TypedDictConstructorForm::LiteralOnly(_) => None,
             TypedDictConstructorForm::SinglePositional(_) => None,
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_shared_typed_dict_constructor_dict_literal_values(

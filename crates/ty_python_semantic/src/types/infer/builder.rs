@@ -89,9 +89,8 @@ use crate::types::{
     KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionBuilder, UnionType, binding_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ExpressionNodeKey;
@@ -5613,8 +5612,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return ty;
                     }
                 } else if !typed_dicts.is_empty()
-                    && let Some(ty) =
-                        self.infer_shared_typed_dict_expression(dict, &typed_dicts, &mut item_types)
+                    && let Some(ty) = self.infer_shared_typed_dict_expression(
+                        dict,
+                        &typed_dicts,
+                        &mut item_types,
+                        !has_dict_compatible_fallback,
+                    )
                 {
                     // Successfully narrowed to a subset of typed dicts.
                     return ty;
@@ -7023,6 +7026,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         typed_dict_constructor_plan.validate_remaining(self, arguments, func.as_ref().into());
+        typed_dict_constructor_plan.apply_return_override(self.db(), &mut bindings);
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
