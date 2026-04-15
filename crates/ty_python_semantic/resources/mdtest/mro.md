@@ -331,7 +331,7 @@ class Foo(EitherOr): ...
 ## `__bases__` is a union of a dynamic type and valid bases
 
 If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
-types *would be* valid class bases, we do not emit an `invalid-base` or `unsupported-base`
+types _would be_ valid class bases, we do not emit an `invalid-base` or `unsupported-base`
 diagnostic, and we use the dynamic type as a base to prevent further downstream errors.
 
 ```py
@@ -455,6 +455,22 @@ class Bad2:
 
 class BadSub1(Bad1()): ...  # error: [invalid-base]
 class BadSub2(Bad2()): ...  # error: [invalid-base]
+```
+
+For a union base where one member lacks `__mro_entries__`, `invalid-base` should be emitted with a
+sub-diagnostic identifying the problematic union member:
+
+```py
+def _(flag: bool):
+    class HasMroEntries:
+        def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+            return ()
+
+    class NoMroEntries: ...
+
+    base = HasMroEntries() if flag else NoMroEntries()
+
+    class Foo(base): ...  # error: [invalid-base]
 ```
 
 ## `__bases__` lists with duplicate bases
