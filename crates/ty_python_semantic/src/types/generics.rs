@@ -11,7 +11,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -1811,18 +1811,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
         let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions_with(
-            self.db,
-            self.constraints,
-            |typevar, _variance, lower, upper| {
-                PathBounds::default_solve(self.db, self.constraints, typevar, lower, upper)
-            },
-        ) {
+        let solutions = match set.solutions(self.db, self.constraints) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
-        for solution in &solutions {
+        for solution in solutions {
             for binding in solution {
                 let variance = formal.variance_of(self.db, binding.bound_typevar);
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);

@@ -4274,23 +4274,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let return_ty =
                     return_ty.filter_disjoint_elements(self.db, tcx, self.inferable_typevars);
                 let tcx = tcx.filter_disjoint_elements(self.db, return_ty, self.inferable_typevars);
-                let set = return_ty
-                    .when_constraint_set_assignable_to(self.db, tcx, constraints)
-                    .remove_noninferable(self.db, constraints, self.inferable_typevars);
+                let path_bounds = return_ty.assignable_solutions_with_inferable(
+                    self.db,
+                    tcx,
+                    self.inferable_typevars,
+                );
 
                 // Use `solutions_with` to determine per-typevar variance from the raw
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions =
-                    set.solutions_with(self.db, constraints, |typevar, variance, lower, upper| {
-                        let identity = typevar.identity(self.db);
-                        variance_map
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
-                        PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
-                    });
+                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
+                    let identity = typevar.identity(self.db);
+                    variance_map
+                        .entry(identity)
+                        .and_modify(|current| *current = current.join(variance))
+                        .or_insert(variance);
+                    PathBounds::default_solve(self.db, constraints, typevar, lower, upper)
+                });
 
                 let Solutions::Constrained(solutions) = solutions else {
                     return None;

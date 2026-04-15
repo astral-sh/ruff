@@ -236,19 +236,67 @@ where
 /// have to be overly worried about the efficiency of this type.
 ///
 /// Note that you cannot interrogate an owned constraint set in any useful way. Instead, you must
-/// [`load`][ConstraintSetBuilder::load] it into a new builder, and query the result.
+/// use [`query`][OwnedConstraintSet::query] or [`load`][ConstraintSetBuilder::load] to load it
+/// into a new builder, and query the result.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
-    /// The BDD representing this constraint set
     node: NodeId,
-
-    /// The constraints arena for this BDD. This is extracted from the [`ConstraintSetBuilder`]
-    /// when an owned constraint set is constructed.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
-
-    /// The nodes arena for this BDD. This is extracted from the [`ConstraintSetBuilder`] when an
-    /// owned constraint set is constructed.
+    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: IndexVec<NodeId, InteriorNodeData>,
+}
+
+impl Default for OwnedConstraintSet<'_> {
+    fn default() -> Self {
+        Self {
+            node: ALWAYS_FALSE,
+            constraints: IndexVec::default(),
+            typevars: IndexVec::default(),
+            nodes: IndexVec::default(),
+        }
+    }
+}
+
+impl<'db> OwnedConstraintSet<'db> {
+    /// Loads this constraint set into a new builder, invokes a callback with that builder, and
+    /// returns the result.
+    ///
+    /// This is more efficient than [`ConstraintSetBuilder::load`] when this is the only set you
+    /// need to load into the new builder.
+    pub(crate) fn query<F, R>(&self, f: F) -> R
+    where
+        F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, ConstraintSet<'db, 'c>) -> R,
+    {
+        let constraint_cache = self
+            .constraints
+            .iter_enumerated()
+            .map(|(id, constraint)| (*constraint, id))
+            .collect();
+        let typevar_cache = self
+            .typevars
+            .iter_enumerated()
+            .map(|(id, bound_typevar)| (*bound_typevar, id))
+            .collect();
+        let node_cache = self
+            .nodes
+            .iter_enumerated()
+            .map(|(id, interior)| (*interior, id))
+            .collect();
+        let storage = ConstraintSetStorage {
+            constraints: self.constraints.clone(),
+            typevars: self.typevars.clone(),
+            nodes: self.nodes.clone(),
+            constraint_cache,
+            typevar_cache,
+            node_cache,
+            ..ConstraintSetStorage::default()
+        };
+        let builder = ConstraintSetBuilder {
+            storage: RefCell::new(storage),
+        };
+        let set = ConstraintSet::from_node(&builder, self.node);
+        f(&builder, set)
+    }
 }
 
 /// A set of constraints under which a type property holds.
@@ -499,15 +547,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    pub(crate) fn solutions(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        self.verify_builder(builder);
-        self.node.solutions(db, builder)
-    }
-
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's
@@ -517,19 +556,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
     /// results across paths (typically via union).
-    pub(crate) fn solutions_with(
+    pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
+    ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.node.solutions(db, builder)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -617,7 +650,6 @@ struct ConstraintSetStorage<'db> {
     exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
-    solutions_cache: FxHashMap<NodeId, Vec<Solution<'db>>>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
@@ -647,6 +679,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         OwnedConstraintSet {
             node,
             constraints: storage.constraints,
+            typevars: storage.typevars,
             nodes: storage.nodes,
         }
     }
@@ -1760,34 +1793,13 @@ impl NodeId {
         }
     }
 
-    fn solutions<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        match self.node() {
-            Node::AlwaysTrue => Solutions::Unconstrained,
-            Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions(db, builder),
-        }
-    }
-
-    fn solutions_with<'db>(
+    fn solutions<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
-        match self.node() {
-            Node::AlwaysTrue => Solutions::Unconstrained,
-            Node::AlwaysFalse => Solutions::Unsatisfiable,
-            Node::Interior(interior) => interior.solutions_with(db, builder, choose),
-        }
+    ) -> Solutions<'db> {
+        let path_bounds = PathBounds::compute(db, builder, self);
+        path_bounds.solve(db, builder)
     }
 
     /// Returns the negation of this BDD.
@@ -2713,7 +2725,8 @@ impl<'db> Bounds<'db> {
 }
 
 /// Materialized lower and upper bounds for a single typevar on a single BDD path.
-struct TypeVarBounds<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct TypeVarBounds<'db> {
     bound_typevar: BoundTypeVarInstance<'db>,
     /// The union of all lower bounds on this path.
     lower: Type<'db>,
@@ -2722,8 +2735,63 @@ struct TypeVarBounds<'db> {
     upper: Type<'db>,
 }
 
+impl<'db> Type<'db> {
+    /// Calculates the [`PathBounds`] that represent the valid solutions for when `self` is
+    /// constraint-set assignable to `target`.
+    pub(crate) fn assignable_solutions(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> &'db PathBounds<'db> {
+        self.assignable_solutions_inner(db, target, None)
+    }
+
+    pub(crate) fn assignable_solutions_with_inferable(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> &'db PathBounds<'db> {
+        self.assignable_solutions_inner(db, target, Some(inferable))
+    }
+
+    fn assignable_solutions_inner(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: Option<InferableTypeVars<'db>>,
+    ) -> &'db PathBounds<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _, _| PathBounds::Unsatisfiable,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn assignable_solutions_impl<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+            inferable: Option<InferableTypeVars<'db>>,
+        ) -> PathBounds<'db> {
+            let when = source.when_constraint_set_assignable_to_owned(db, target);
+            when.query(|builder, mut when| {
+                if let Some(inferable) = inferable {
+                    when = when.remove_noninferable(db, builder, inferable);
+                }
+                PathBounds::compute(db, &builder, when.node)
+            })
+        }
+
+        assignable_solutions_impl(db, self, target, inferable)
+    }
+}
+
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
-pub(crate) struct PathBounds<'db>(Vec<Vec<TypeVarBounds<'db>>>);
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) enum PathBounds<'db> {
+    Unsatisfiable,
+    Unconstrained,
+    Constrained(Vec<Vec<TypeVarBounds<'db>>>),
+}
 
 impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
@@ -2731,6 +2799,12 @@ impl<'db> PathBounds<'db> {
     /// Returns a list of paths, where each path contains the materialized lower/upper bounds for
     /// each typevar that appears in the path's constraints.
     fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+        match node.node() {
+            Node::AlwaysTrue => return PathBounds::Unconstrained,
+            Node::AlwaysFalse => return PathBounds::Unsatisfiable,
+            Node::Interior(_) => {}
+        }
+
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
@@ -2784,12 +2858,16 @@ impl<'db> PathBounds<'db> {
             result.push(path_bounds);
         }
 
-        Self(result)
+        PathBounds::Constrained(result)
     }
 
-    fn solve(&self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> Vec<Solution<'db>> {
+    pub(crate) fn solve(
+        &self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Solutions<'db> {
         self.solve_with(|bound_typevar, _variance, lower, upper| {
-            Self::default_solve(db, builder, bound_typevar, lower, upper)
+            PathBounds::default_solve(db, builder, bound_typevar, lower, upper)
         })
     }
 
@@ -2799,7 +2877,7 @@ impl<'db> PathBounds<'db> {
     /// - `Ok(Some(solution))` to add a solution for this typevar on this path
     /// - `Ok(None)` to leave this typevar unsolved on this path
     /// - `Err(())` to invalidate the entire path
-    fn solve_with(
+    pub(crate) fn solve_with(
         &self,
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
@@ -2807,9 +2885,15 @@ impl<'db> PathBounds<'db> {
             Type<'db>,
             Type<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Vec<Solution<'db>> {
-        let mut solutions = Vec::with_capacity(self.0.len());
-        'paths: for path in &self.0 {
+    ) -> Solutions<'db> {
+        let paths = match self {
+            PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
+            PathBounds::Unconstrained => return Solutions::Unconstrained,
+            PathBounds::Constrained(paths) => paths,
+        };
+
+        let mut solutions = Vec::with_capacity(paths.len());
+        'paths: for path in paths {
             let mut solution = Vec::with_capacity(path.len());
             for bounds in path {
                 let TypeVarBounds {
@@ -2841,7 +2925,11 @@ impl<'db> PathBounds<'db> {
             }
             solutions.push(solution);
         }
-        solutions
+
+        if solutions.is_empty() {
+            return Solutions::Unsatisfiable;
+        }
+        Solutions::Constrained(solutions)
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
@@ -3461,61 +3549,6 @@ impl InteriorNode {
         result
     }
 
-    fn solutions<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Solutions<Ref<'c, Vec<Solution<'db>>>> {
-        fn solutions_inner<'db, 'c>(
-            db: &'db dyn Db,
-            builder: &'c ConstraintSetBuilder<'db>,
-            interior: NodeId,
-        ) -> Ref<'c, Vec<Solution<'db>>> {
-            let key = interior;
-            let storage = builder.storage.borrow();
-            if let Ok(solutions) =
-                Ref::filter_map(storage, |storage| storage.solutions_cache.get(&key))
-            {
-                return solutions;
-            }
-
-            let path_bounds = PathBounds::compute(db, builder, interior);
-            let solutions = path_bounds.solve(db, builder);
-
-            let mut storage = builder.storage.borrow_mut();
-            storage.solutions_cache.insert(key, solutions);
-            drop(storage);
-
-            let storage = builder.storage.borrow();
-            Ref::map(storage, |storage| &storage.solutions_cache[&key])
-        }
-
-        let solutions = solutions_inner(db, builder, self.node());
-        if solutions.is_empty() {
-            return Solutions::Unsatisfiable;
-        }
-        Solutions::Constrained(solutions)
-    }
-
-    fn solutions_with<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            Type<'db>,
-            Type<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
-    ) -> Solutions<Vec<Solution<'db>>> {
-        let path_bounds = PathBounds::compute(db, builder, self.node());
-        let solutions = path_bounds.solve_with(choose);
-        if solutions.is_empty() {
-            return Solutions::Unsatisfiable;
-        }
-        Solutions::Constrained(solutions)
-    }
-
     fn path_assignments(self, builder: &ConstraintSetBuilder<'_>) -> PathAssignments {
         // Sort the constraints in this BDD by their `source_order`s before adding them to the
         // sequent map. This ensures that constraints appear in the sequent map in a stable order.
@@ -3959,16 +3992,11 @@ impl InteriorNode {
 }
 
 /// The result of solving a constraint set for per-typevar specializations.
-///
-/// Generic over the container type `S`: cached solutions use
-/// `Ref<'c, Vec<Solution<'db>>>` (borrowed from the builder's cache), while
-/// hook-based solutions use `Vec<Solution<'db>>` (owned, since the hook makes
-/// caching inappropriate).
 #[derive(Debug)]
-pub(crate) enum Solutions<S> {
+pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(S),
+    Constrained(Vec<Solution<'db>>),
 }
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
