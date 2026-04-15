@@ -69,11 +69,7 @@ impl MarkdownTestConfig {
     }
 }
 
-impl mdtest::parser::MdtestConfig for MarkdownTestConfig {
-    fn has_dependencies(&self) -> bool {
-        self.dependencies().is_some()
-    }
-}
+impl mdtest::parser::MdtestConfig for MarkdownTestConfig {}
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]

@@ -18,17 +18,7 @@ use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 use serde::Deserialize;
 
 /// Trait for mdtest configuration types.
-///
-/// This allows the parser to be generic over different configuration types
-/// (e.g. ty's `MarkdownTestConfig` vs ruff's `Options`) while still being
-/// able to enforce constraints during parsing.
-pub trait MdtestConfig: Clone + Default + for<'de> Deserialize<'de> {
-    /// Whether this configuration specifies external dependencies.
-    ///
-    /// Used by the parser to enforce that at most one section per file
-    /// specifies dependencies.
-    fn has_dependencies(&self) -> bool;
-}
+pub trait MdtestConfig: Clone + Default + for<'de> Deserialize<'de> {}
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub fn parse<'s, C: MdtestConfig>(
@@ -517,10 +507,6 @@ struct Parser<'s, C> {
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
-
-    /// Whether or not any section in the file has external dependencies.
-    /// Only one section per file is allowed to have dependencies (for lockfile support).
-    file_has_dependencies: bool,
 }
 
 impl<'s, C: MdtestConfig> Parser<'s, C> {
@@ -543,7 +529,6 @@ impl<'s, C: MdtestConfig> Parser<'s, C> {
             stack: SectionStack::new(root_section_id),
             current_section_files: IndexMap::default(),
             current_section_has_config: false,
-            file_has_dependencies: false,
         }
     }
 
@@ -927,16 +912,6 @@ impl<'s, C: MdtestConfig> Parser<'s, C> {
 
         let config: C = toml::from_str(code).context("Error while parsing Markdown TOML config")?;
 
-        if config.has_dependencies() {
-            if self.file_has_dependencies {
-                bail!(
-                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
-                     External dependencies must be specified in a single top-level configuration block."
-                );
-            }
-            self.file_has_dependencies = true;
-        }
-
         let current_section = &mut self.sections[self.stack.top()];
         current_section.config = config;
 
@@ -1105,14 +1080,18 @@ mod tests {
     /// ```
     #[derive(Clone, Debug, Default, Deserialize)]
     #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+    #[expect(
+        unused,
+        reason = "These fields are only used for testing deserialization and never read"
+    )]
     struct TestConfig {
         project: Option<Project>,
-        #[expect(unused)]
         environment: Option<Environment>,
     }
 
     #[derive(Clone, Debug, Default, Deserialize)]
     struct Project {
+        #[expect(unused)]
         dependencies: Option<Vec<String>>,
     }
 
@@ -1122,13 +1101,7 @@ mod tests {
         typeshed: Option<String>,
     }
 
-    impl super::MdtestConfig for TestConfig {
-        fn has_dependencies(&self) -> bool {
-            self.project
-                .as_ref()
-                .is_some_and(|project| project.dependencies.is_some())
-        }
-    }
+    impl super::MdtestConfig for TestConfig {}
 
     fn parse<'s>(
         title: &'s str,
@@ -2256,40 +2229,5 @@ mod tests {
         );
         let parse_result = parse("file.md", &source);
         assert!(parse_result.is_ok(), "{parse_result:?}");
-    }
-
-    #[test]
-    fn multiple_sections_with_dependencies_not_allowed() {
-        let source = dedent(
-            r#"
-            # First section
-
-            ```toml
-            [project]
-            dependencies = ["pydantic==2.12.2"]
-            ```
-
-            ```py
-            x = 1
-            ```
-
-            # Second section
-
-            ```toml
-            [project]
-            dependencies = ["numpy==2.0.0"]
-            ```
-
-            ```py
-            y = 2
-            ```
-            "#,
-        );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(
-            err.to_string(),
-            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
-             External dependencies must be specified in a single top-level configuration block."
-        );
     }
 }

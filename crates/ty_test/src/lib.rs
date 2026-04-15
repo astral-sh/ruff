@@ -1,6 +1,6 @@
 use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use crate::db::Db;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use camino::Utf8Path;
 use colored::Colorize;
 use mdtest::matcher::{self, Failure};
@@ -51,6 +51,21 @@ pub fn run(
 
     let suite = parser::parse::<MarkdownTestConfig>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+
+    // Whether or not any section in the file has external dependencies.
+    // Only one section per file is allowed to have dependencies (for lockfile support).
+    let mut file_has_dependencies = false;
+    for test in suite.tests() {
+        if test.configuration().dependencies().is_some() {
+            if file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            file_has_dependencies = true;
+        }
+    }
 
     let mut db = Db::setup();
     let mut markdown_edits = vec![];
@@ -774,5 +789,49 @@ impl AttemptTestError<'_> {
             backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
             by_line,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mdtest::parser::parse;
+    use ruff_python_trivia::textwrap::dedent;
+
+    use crate::config::MarkdownTestConfig;
+
+    #[test]
+    fn multiple_sections_with_dependencies_not_allowed() {
+        let source = dedent(
+            r#"
+            # First section
+
+            ```toml
+            [project]
+            dependencies = ["pydantic==2.12.2"]
+            ```
+
+            ```py
+            x = 1
+            ```
+
+            # Second section
+
+            ```toml
+            [project]
+            dependencies = ["numpy==2.0.0"]
+            ```
+
+            ```py
+            y = 2
+            ```
+            "#,
+        );
+        let err =
+            parse::<MarkdownTestConfig>("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+             External dependencies must be specified in a single top-level configuration block."
+        );
     }
 }

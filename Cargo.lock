@@ -4783,6 +4783,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_ast",
+ "ruff_python_trivia",
  "ruff_source_file",
  "salsa",
  "serde",
