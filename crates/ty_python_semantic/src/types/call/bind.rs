@@ -44,7 +44,7 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
-use crate::types::known_instance::{FieldInstance, FunctoolsPartialInstance};
+use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, PartialApplication,
     PartialSignatureApplication,
@@ -52,8 +52,8 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, InternedType,
+    BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
     TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
@@ -85,17 +85,6 @@ enum CallErrorPriority {
 enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
-}
-
-/// Wraps a reduced callable as a synthetic `functools.partial(...)` instance type.
-fn functools_partial_instance<'db>(
-    db: &'db dyn Db,
-    wrapped: Type<'db>,
-    partial: CallableType<'db>,
-) -> Type<'db> {
-    Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-        FunctoolsPartialInstance::new(db, InternedType::new(db, wrapped), partial),
-    ))
 }
 
 impl<'db> CallableItem<'db> {
@@ -202,18 +191,22 @@ impl<'db> CallableItem<'db> {
         self.callable().callable_type
     }
 
-    /// Returns the `functools.partial(...)` result synthesized from this callable item.
-    fn functools_partial_type<'a>(
+    /// Returns the reduced callable synthesized from this callable item.
+    fn functools_partial_callable<'a>(
         &self,
         db: &'db dyn Db,
-        wrapped_callable_ty: Type<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<CallableType<'db>> {
         match self {
-            CallableItem::Regular(binding) => binding
-                .functools_partial_callable(db, partial_overload, bound_call_arguments)
-                .map(|callable| functools_partial_instance(db, wrapped_callable_ty, callable)),
+            CallableItem::Regular(binding) => CallableType::partially_apply(
+                db,
+                binding.partial_signature_applications(
+                    db,
+                    partial_overload,
+                    bound_call_arguments,
+                )?,
+            ),
             CallableItem::Constructor(_) => None,
         }
     }
@@ -2508,71 +2501,36 @@ impl<'db> Bindings<'db> {
                             let new_return_type = if func_ty.is_union() || func_ty.is_intersection()
                             {
                                 partial_bindings.map_item_types(db, |partial_item| {
-                                    partial_item.functools_partial_type(
-                                        db,
-                                        func_ty,
-                                        overload,
-                                        &bound_call_arguments,
-                                    )
+                                    partial_item
+                                        .functools_partial_callable(
+                                            db,
+                                            overload,
+                                            &bound_call_arguments,
+                                        )
+                                        .map(|callable| {
+                                            callable.into_precise_functools_partial_instance(
+                                                db, func_ty,
+                                            )
+                                        })
                                 })
                             } else {
-                                let mut partial_types = Vec::new();
-                                let mut new_overloads = Vec::new();
-                                let mut seen_overloads = FxHashSet::default();
-                                for partial_item in partial_bindings.iter_callable_items() {
-                                    let Some(partial_type) = partial_item.functools_partial_type(
-                                        db,
-                                        func_ty,
-                                        overload,
-                                        &bound_call_arguments,
-                                    ) else {
-                                        continue;
-                                    };
+                                let partial_callables: SmallVec<[CallableType<'db>; 1]> =
+                                    partial_bindings
+                                        .iter_callable_items()
+                                        .filter_map(|partial_item| {
+                                            partial_item.functools_partial_callable(
+                                                db,
+                                                overload,
+                                                &bound_call_arguments,
+                                            )
+                                        })
+                                        .collect();
 
-                                    if let Type::KnownInstance(
-                                        KnownInstanceType::FunctoolsPartial(partial_instance),
-                                    ) = partial_type
-                                    {
-                                        for signature in partial_instance.partial(db).signatures(db)
-                                        {
-                                            let signature = signature.clone();
-                                            let dedup_key = signature.clone().with_definition(None);
-                                            if seen_overloads.insert(dedup_key) {
-                                                new_overloads.push(signature);
-                                            }
-                                        }
-                                    } else {
-                                        partial_types.push(partial_type);
-                                    }
-                                }
-
-                                if partial_types.is_empty() {
-                                    if new_overloads.is_empty() {
-                                        Type::Never
-                                    } else {
-                                        let new_callable_sig =
-                                            CallableSignature::from_overloads(new_overloads);
-                                        let callable = CallableType::new(
-                                            db,
-                                            new_callable_sig,
-                                            CallableTypeKind::Regular,
-                                        );
-                                        functools_partial_instance(db, func_ty, callable)
-                                    }
+                                if partial_callables.is_empty() {
+                                    Type::Never
                                 } else {
-                                    if !new_overloads.is_empty() {
-                                        let new_callable_sig =
-                                            CallableSignature::from_overloads(new_overloads);
-                                        let callable = CallableType::new(
-                                            db,
-                                            new_callable_sig,
-                                            CallableTypeKind::Regular,
-                                        );
-                                        partial_types.push(functools_partial_instance(
-                                            db, func_ty, callable,
-                                        ));
-                                    }
-                                    IntersectionType::from_elements(db, partial_types)
+                                    CallableTypes::from_elements(partial_callables)
+                                        .into_precise_functools_partial_instance(db, func_ty)
                                 }
                             };
                             if new_return_type.is_never() {
@@ -2855,16 +2813,16 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    /// Builds the reduced callable for this `functools.partial(...)` binding.
+    /// Selects the reduced signature applications for this `functools.partial(...)` binding.
     ///
-    /// The synthesized callable preserves the reduced callable signature for this binding and reports
-    /// any partial-construction diagnostics back to the outer `partial(...)` overload.
-    fn functools_partial_callable<'a>(
+    /// Diagnostics for invalid bound arguments are still reported back to the outer `partial(...)`
+    /// overload. Callable construction happens in the callable layer after this summary is built.
+    fn partial_signature_applications<'a>(
         &self,
         db: &'db dyn Db,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<CallableType<'db>> {
+    ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
         if self.overloads().is_empty() {
             return None;
         }
@@ -2897,19 +2855,15 @@ impl<'db> CallableBinding<'db> {
         };
 
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let new_callable_sig = CallableSignature::partially_apply(
-            db,
-            selected_overload_indexes.into_iter().filter_map(|index| {
+        let applications: SmallVec<_> = selected_overload_indexes
+            .into_iter()
+            .filter_map(|index| {
                 self.overloads().get(index).map(|overload| {
                     overload.partial_signature_application(signature_arguments.as_ref(), db)
                 })
-            }),
-        )?;
-        Some(CallableType::new(
-            db,
-            new_callable_sig,
-            CallableTypeKind::Regular,
-        ))
+            })
+            .collect();
+        (!applications.is_empty()).then_some(applications)
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -4807,6 +4761,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         let specialization = builder.build_with(generic_context, maybe_promote);
+
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
     }

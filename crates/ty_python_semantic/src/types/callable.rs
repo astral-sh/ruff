@@ -1,4 +1,5 @@
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::{
@@ -6,12 +7,13 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter,
-        Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
+        InternedType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+        Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
         TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
-        signatures::CallableSignature,
+        signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
     },
 };
@@ -372,10 +374,33 @@ impl<'db> CallableType<'db> {
         CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
     }
 
+    /// Returns the reduced callable produced by partially applying selected overloads.
+    pub(crate) fn partially_apply(
+        db: &'db dyn Db,
+        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            CallableSignature::partially_apply(db, overloads)?,
+            CallableTypeKind::Regular,
+        ))
+    }
+
     /// Reifies this callable as the nominal `functools.partial[T]` instance for its return type.
     pub(crate) fn into_functools_partial_instance(self, db: &'db dyn Db) -> Type<'db> {
         let return_ty = self.signatures(db).overload_return_type_or_unknown(db);
         KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty])
+    }
+
+    /// Wraps this reduced callable as a synthetic `functools.partial(...)` instance type.
+    pub(crate) fn into_precise_functools_partial_instance(
+        self,
+        db: &'db dyn Db,
+        wrapped: Type<'db>,
+    ) -> Type<'db> {
+        Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+            FunctoolsPartialInstance::new(db, InternedType::new(db, wrapped), self),
+        ))
     }
 
     pub(crate) fn bind_self(
@@ -503,6 +528,35 @@ impl<'db> CallableTypes<'db> {
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
+    }
+
+    /// Merges reduced callables into one precise `functools.partial(...)` instance type.
+    pub(crate) fn into_precise_functools_partial_instance(
+        self,
+        db: &'db dyn Db,
+        wrapped: Type<'db>,
+    ) -> Type<'db> {
+        let mut overloads = Vec::new();
+        let mut seen_overloads = FxHashSet::default();
+
+        for callable in self.0 {
+            for signature in callable.signatures(db) {
+                let signature = signature.clone();
+                let dedup_key = signature.clone().with_definition(None);
+                if seen_overloads.insert(dedup_key) {
+                    overloads.push(signature);
+                }
+            }
+        }
+
+        debug_assert!(!overloads.is_empty(), "CallableTypes should not be empty");
+
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(overloads),
+            CallableTypeKind::Regular,
+        )
+        .into_precise_functools_partial_instance(db, wrapped)
     }
 }
 
