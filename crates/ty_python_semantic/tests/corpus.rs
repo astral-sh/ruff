@@ -284,6 +284,10 @@ impl ty_python_semantic::Db for CorpusDb {
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
     }
+
+    fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+        Box::new(self.clone())
+    }
 }
 
 #[salsa::db]

@@ -20,7 +20,11 @@ use crate::suppression::{SuppressionKind, SuppressionTarget, Suppressions, suppr
 /// This is different from calling `suppress_single` for every item in `ids_with_range`
 /// in that errors on the same line are grouped together and ty will only insert a single
 /// suppression with possibly multiple codes instead of adding multiple suppression comments.
-pub fn suppress_all(db: &dyn Db, file: File, ids_with_range: &[(LintName, TextRange)]) -> Vec<Fix> {
+pub fn suppress_all(
+    db: &dyn Db,
+    file: File,
+    ids_with_range: &[(LintName, TextRange)],
+) -> Vec<SuppressFix> {
     let suppressions = suppressions(db, file);
     let source = source_text(db, file);
     let parsed = parsed_module(db, file).load(db);
@@ -53,11 +57,12 @@ pub fn suppress_all(db: &dyn Db, file: File, ids_with_range: &[(LintName, TextRa
 
     // 1. Group the diagnostics by their line-start position and try to add
     //    the suppression to an existing `ty: ignore` comment on that line.
-    let mut by_start: BTreeMap<_, BTreeSet<LintName>> = BTreeMap::new();
+    let mut by_start: BTreeMap<_, (BTreeSet<LintName>, usize)> = BTreeMap::new();
 
     for &(id, range) in &ids_full_range {
-        let lints = by_start.entry(range.start()).or_default();
+        let (lints, suppressed_diagnostics) = by_start.entry(range.start()).or_default();
         lints.insert(id);
+        *suppressed_diagnostics += 1;
     }
 
     let mut fixes = Vec::with_capacity(ids_full_range.len());
@@ -68,59 +73,90 @@ pub fn suppress_all(db: &dyn Db, file: File, ids_with_range: &[(LintName, TextRa
     // This also allows deduplicating suppressions for diagnostics with different ranges
     // where an end-suppression of one diagnostic becomes a start-suppression for another
     // (see the example with the wider range above).
-    let mut by_line = BTreeMap::<TextSize, BTreeSet<LintName>>::new();
+    let mut by_line = BTreeMap::<TextSize, BTreeMap<LintName, SuppressionPosition>>::new();
 
-    for (start_offset, lints) in by_start {
+    for (start_offset, (lints, suppressed_diagnostics)) in by_start {
         let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
         if let Some(add_to_start) =
             add_to_existing_suppression(suppressions, &source, &codes, start_offset)
         {
-            by_line
-                .entry(start_offset)
-                .or_default()
-                .extend(codes.iter().copied());
-            fixes.push(add_to_start);
+            by_line.entry(start_offset).or_default().extend(
+                codes
+                    .iter()
+                    .copied()
+                    .map(|code| (code, SuppressionPosition::StartLine)),
+            );
+            fixes.push(SuppressFix {
+                fix: add_to_start,
+                suppressed_diagnostics,
+            });
         }
     }
 
     // 2. Group the diagnostics by their end position and try to add the code to an
     //    existing `ty: ignore` comment or insert a new `ty: ignore` comment.
-    let mut by_end: BTreeMap<TextSize, BTreeSet<LintName>> = BTreeMap::new();
+    let mut by_end: BTreeMap<TextSize, (BTreeSet<LintName>, usize)> = BTreeMap::new();
 
     for (id, range) in ids_full_range {
-        // Skip end-line suppressions when we already inserted a same-code suppression on the
-        // range's start line. This happens either because we appended to an existing ignore
-        // comment on that line, or because a narrower multiline range ends on that same line.
-        if by_line
+        let suppression_position = by_line
             .get(&range.start())
-            .is_some_and(|planned_codes| planned_codes.contains(&id))
-        {
-            continue;
-        }
+            .and_then(|planned| planned.get(&id))
+            .copied();
 
-        by_end.entry(range.end()).or_default().insert(id);
-        // Record the physical line where this end-line suppression will be inserted so wider
-        // same-code ranges starting there can be recognized as already covered.
-        by_line
-            .entry(line_start(tokens, range.end()))
-            .or_default()
-            .insert(id);
+        match suppression_position {
+            // Start-line suppressions already include all diagnostics that start on the same line.
+            Some(SuppressionPosition::StartLine) => {}
+
+            // If coverage comes from an other end-line suppression, count this diagnostic on that fix.
+            Some(SuppressionPosition::EndLine(end_offset)) => {
+                let (_, suppressed_diagnostics) = by_end.entry(end_offset).or_default();
+                *suppressed_diagnostics += 1;
+            }
+
+            None => {
+                let (lints, suppressed_diagnostics) = by_end.entry(range.end()).or_default();
+                lints.insert(id);
+                *suppressed_diagnostics += 1;
+
+                // Record the physical line where this end-line suppression will be inserted so wider
+                // same-code ranges starting there can be recognized as already covered.
+                by_line
+                    .entry(line_start(tokens, range.end()))
+                    .or_default()
+                    .entry(id)
+                    .or_insert(SuppressionPosition::EndLine(range.end()));
+            }
+        }
     }
 
-    for (end_offset, lints) in by_end {
+    for (end_offset, (lints, suppressed_diagnostics)) in by_end {
         let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
 
-        fixes.push(append_to_existing_or_add_end_of_line_suppression(
-            suppressions,
-            &source,
-            &codes,
-            end_offset,
-        ));
+        fixes.push(SuppressFix {
+            fix: append_to_existing_or_add_end_of_line_suppression(
+                suppressions,
+                &source,
+                &codes,
+                end_offset,
+            ),
+            suppressed_diagnostics,
+        });
     }
 
-    fixes.sort_by_key(ruff_diagnostics::Fix::min_start);
-
     fixes
+}
+
+#[derive(Copy, Clone)]
+enum SuppressionPosition {
+    StartLine,
+    EndLine(TextSize),
+}
+
+/// Fix to suppress one or more diagnostics.
+pub struct SuppressFix {
+    pub fix: Fix,
+    /// The number of diagnostics that will be suppressed if this fix is applied.
+    pub suppressed_diagnostics: usize,
 }
 
 /// Creates a fix to suppress a single lint.

@@ -9,7 +9,7 @@ use crate::suppression::{
 use crate::types::check_types;
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use fixes::suppress_all_diagnostics;
+pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -21,7 +21,8 @@ pub use semantic_model::{
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::{
-    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
+    SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
+    suppress_single,
 };
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
