@@ -51,7 +51,7 @@ pub fn suppress_all_diagnostics(
 
 /// Applies the safe fixes for all diagnostics and writes the changed files back to disk.
 ///
-/// Returns how many diagnostics were fixed along the remaining, non-fixed diagnostics.
+/// Returns how many diagnostics were fixed along with the remaining, unfixed diagnostics.
 ///
 /// ## Panics
 /// If the `db`'s system isn't [writable](WritableSystem).
@@ -328,12 +328,13 @@ fn create_too_many_iterations_diagnostics(
     fix_mode: FixMode,
     diagnostics: &[Diagnostic],
 ) -> Diagnostic {
-    let fixable_ids = diagnostics
+    let mut fixable_ids = diagnostics
         .iter()
         .filter(|diagnostic| fix_mode.is_fixable(diagnostic))
         .map(|diagnostic| diagnostic.id().as_str())
         .collect::<Vec<_>>();
 
+    fixable_ids.sort_unstable();
     let codes = fixable_ids.join(", ");
 
     let mut diag = Diagnostic::new(
@@ -431,10 +432,25 @@ struct ApplicableFix {
 
     /// The number of diagnostics this fix resolves.
     ///
-    /// This is always 1 for `--fix`, but there are instances where `--add-ignore` groups
-    /// multiple suppressions into a single fix. We need to track the count here to know
-    /// how many diagnostics were fixed in the presence of overlapping fixes (which `--add-ignore` should
-    /// never generate but better be safe than sorry).
+    /// This is always 1 for `--fix`, but there are instances where `--add-ignore` can suppress
+    /// multiple diagnostics with a single suppression (fix).
+    ///
+    /// In the following example, the two `invalid-argument-type` diagnostics can be suppressed (fixed)
+    /// by inserting a single suppression comment at the end of the call expression:
+    ///
+    /// ```py
+    /// enumerate(0, "1")
+    /// #         ^ expected iterable
+    /// #            ^^^ expected int
+    /// ```
+    ///
+    /// Gets fixed to:
+    ///
+    /// ```py
+    /// enumerate(0, "1")  # ty:ignore[invalid-argument-type]
+    /// ```
+    ///
+    /// In which case `fixed_diagnostics` is 2.
     fixed_diagnostics: usize,
 }
 
