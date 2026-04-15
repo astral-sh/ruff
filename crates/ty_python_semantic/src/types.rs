@@ -7402,8 +7402,19 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-            Self::Call(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+            Self::Call(CallDunderError::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            }) => {
                 diag.info("`__await__` may be missing");
+                if let Some(unbound_on) = unbound_on {
+                    for ty in unbound_on {
+                        diag.info(format_args!(
+                            "`{}` does not implement `__await__`",
+                            ty.display(db)
+                        ));
+                    }
+                }
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.signature)
