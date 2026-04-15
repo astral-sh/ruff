@@ -1396,7 +1396,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::yield_in_init(checker, expr);
             }
             if checker.is_rule_enabled(Rule::YieldInContextManagerInAsyncGenerator) {
-                flake8_async::rules::yield_in_cm_in_async_generator(checker, expr);
+                flake8_async::rules::yield_in_context_manager_in_async_generator(checker, expr);
             }
         }
         Expr::YieldFrom(_) => {

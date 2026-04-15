@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// - [PEP 533 – Deterministic cleanup for iterators](https://peps.python.org/pep-0533/)
 /// - [contextlib.aclosing](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.10")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct YieldInContextManagerInAsyncGenerator;
 
 impl Violation for YieldInContextManagerInAsyncGenerator {
@@ -54,7 +54,7 @@ impl Violation for YieldInContextManagerInAsyncGenerator {
 }
 
 /// ASYNC119
-pub(crate) fn yield_in_cm_in_async_generator(checker: &Checker, expr: &Expr) {
+pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, expr: &Expr) {
     // Check that the enclosing scope is an async function.
     let Some(function_def) = enclosing_async_function(checker) else {
         return;
@@ -107,8 +107,7 @@ fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) ->
                 matches!(
                     qualified_name.segments(),
                     ["contextlib", "asynccontextmanager"]
-                        | ["pytest", "fixture"]
-                        | ["pytest_asyncio", "fixture"]
+                        | ["pytest" | "pytest_asyncio", "fixture"]
                 )
             })
     })
