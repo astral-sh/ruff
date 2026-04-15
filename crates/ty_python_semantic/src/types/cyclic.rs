@@ -25,7 +25,7 @@ use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::FxIndexSet;
 use crate::types::Type;
@@ -129,5 +129,42 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
 impl<Tag, T, R: Default> Default for CycleDetector<Tag, T, R> {
     fn default() -> Self {
         CycleDetector::new(R::default())
+    }
+}
+
+/// Recursion detection without memoization.
+///
+/// This is useful when a recursive relation needs a coinductive-style "we're already proving this
+/// goal, assume it for now" step, but completed results are not safe to reuse for future visits to
+/// the same abstract key.
+#[derive(Debug)]
+pub(crate) struct ActiveRecursionDetector<T> {
+    seen: RefCell<FxHashSet<T>>,
+}
+
+impl<T> Default for ActiveRecursionDetector<T> {
+    fn default() -> Self {
+        Self {
+            seen: RefCell::new(FxHashSet::default()),
+        }
+    }
+}
+
+impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
+    pub(crate) fn visit<R>(
+        &self,
+        item: &T,
+        on_cycle: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        if !self.seen.borrow_mut().insert(item.clone()) {
+            return on_cycle();
+        }
+
+        let ret = func();
+
+        self.seen.borrow_mut().remove(item);
+
+        ret
     }
 }

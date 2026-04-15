@@ -3314,6 +3314,143 @@ def f(c: C[int]) -> None:
     takes_c(c)
 ```
 
+### Recursive generic protocols with alternating growing specializations
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3208>. Unlike the original
+`set[T] -> set[set[T]]` recursion from `ty#1736`, this one alternates between two wrappers, which
+used to evade the cycle guard and hang indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`pkg/config.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import Protocol
+
+class Base[I, O](ABC):
+    @abstractmethod
+    async def run(self, input: I) -> O: ...
+
+class BaseFactory[I, O](Protocol):
+    async def create(self) -> Base[I, O]: ...
+
+class Tagged[T, U, V]: ...
+class Wrapped[T]: ...
+
+class Impl[I, O](Base[I, O]):
+    async def run(self, input: I) -> O:
+        raise NotImplementedError
+
+class Factory[I, O](BaseFactory[I, O], Protocol):
+    async def create(self) -> Impl[I, O]: ...
+    def tag[U, V](self) -> "Factory[Tagged[I, U, V], O]":
+        from pkg.wrapper import TaggedFactory
+
+        return TaggedFactory(self)
+
+    def wrap(self) -> "Factory[Wrapped[I], O]": ...
+```
+
+`pkg/wrapper.py`:
+
+```py
+from dataclasses import dataclass
+
+from pkg.config import Factory, Impl, Tagged
+
+@dataclass
+class TaggedFactory[I, O, U, V](Factory[Tagged[I, U, V], O]):
+    inner: Factory[I, O]
+
+    async def create(self) -> Impl[Tagged[I, U, V], O]:
+        raise NotImplementedError
+```
+
+### Recursive generic protocols with alternating growing specializations via structural conformance
+
+This is another regression test for <https://github.com/astral-sh/ty/issues/3208>. Here the returned
+object does not nominally inherit from the protocol; it only satisfies it structurally. That used to
+recurse through the protocol-valued method returns and hang indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`pkg/config.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import Protocol
+
+class Base[I, O](ABC):
+    @abstractmethod
+    async def run(self, input: I) -> O: ...
+
+class BaseFactory[I, O](Protocol):
+    async def create(self) -> Base[I, O]: ...
+
+class Tagged[T, U, V]: ...
+class Wrapped[T]: ...
+
+class Impl[I, O](Base[I, O]):
+    async def run(self, input: I) -> O:
+        raise NotImplementedError
+
+class Factory[I, O](BaseFactory[I, O], Protocol):
+    async def create(self) -> Impl[I, O]: ...
+    def tag[U, V](self) -> "Factory[Tagged[I, U, V], O]":
+        from pkg.wrapper import TaggedFactory
+
+        return TaggedFactory(self)
+
+    def wrap(self) -> "Factory[Wrapped[I], O]": ...
+```
+
+`pkg/wrapper.py`:
+
+```py
+from dataclasses import dataclass
+
+from pkg.config import Factory, Impl, Tagged, Wrapped
+
+@dataclass
+class TaggedFactory[I, O, U, V]:
+    inner: Factory[I, O]
+
+    async def create(self) -> Impl[Tagged[I, U, V], O]:
+        raise NotImplementedError
+
+    def tag[X, Y](self) -> Factory[Tagged[Tagged[I, U, V], X, Y], O]:
+        raise NotImplementedError
+
+    def wrap(self) -> Factory[Wrapped[Tagged[I, U, V]], O]:
+        raise NotImplementedError
+```
+
+### Explicit protocol inheritance still allows structural inference
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class P(Protocol[T]):
+    x: T
+
+class C(P[int]):
+    x: object = ""
+
+def f(p: P[T]) -> T:
+    return p.x
+
+reveal_type(f(C()))  # revealed: object
+```
+
 ### Recursive legacy generic protocol
 
 ```py

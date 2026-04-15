@@ -527,4 +527,32 @@ class A(Base):
 reveal_type(into_regular_callable(A))
 ```
 
+## Nested callable relations still reach the leaf mismatch
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+from ty_extensions import is_assignable_to, static_assert
+
+type A0 = int
+type B0 = str
+type A1 = Callable[[], A0]
+type B1 = Callable[[], B0]
+type A2 = Callable[[], A1]
+type B2 = Callable[[], B1]
+type A3 = Callable[[], A2]
+type B3 = Callable[[], B2]
+type A4 = Callable[[], A3]
+type B4 = Callable[[], B3]
+type A5 = Callable[[], A4]
+type B5 = Callable[[], B4]
+
+static_assert(not is_assignable_to(A5, B5))
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

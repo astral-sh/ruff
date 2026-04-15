@@ -21,6 +21,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
@@ -342,11 +343,13 @@ impl<'db> CallableSignature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
@@ -395,6 +398,33 @@ pub struct Signature<'db> {
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct SignatureRelationKey<'db> {
+    // Signature recursion for recursive protocols keeps revisiting the same method declarations
+    // under ever-growing specializations. We key the guard on declaration identity so it can
+    // break that active cycle, while synthetic `Callable[...]` signatures still fall through to
+    // the ordinary relation logic because they do not carry definitions.
+    source_definition: Definition<'db>,
+    target_definition: Definition<'db>,
+    relation: TypeRelation,
+}
+
+impl<'db> SignatureRelationKey<'db> {
+    fn from_signatures(
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        relation: TypeRelation,
+    ) -> Option<Self> {
+        Some(Self {
+            source_definition: source.definition?,
+            target_definition: target.definition?,
+            relation,
+        })
+    }
+}
+
+pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -816,11 +846,13 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::constraint_set_assignability(
             constraints,
             &relation_visitor,
             &disjointness_visitor,
+            &signature_relation_visitor,
             &materialization_visitor,
         );
         checker.check_signature_pair(db, self, other)
@@ -1142,7 +1174,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
-        let when = checker.check_signature_pair_inner(db, source, target);
+        let when = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
@@ -1153,6 +1187,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
+    }
+
+    fn with_signature_recursion_guard(
+        &self,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let Some(key) = SignatureRelationKey::from_signatures(source, target, self.relation) else {
+            return work();
+        };
+
+        self.signature_relation_visitor
+            .visit(&key, || self.always(), work)
     }
 
     fn check_signature_pair_inner(
