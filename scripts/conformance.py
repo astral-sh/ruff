@@ -500,6 +500,7 @@ def collect_ty_diagnostics(
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=mismatched-type-name",
+            "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
             "--exit-zero",

@@ -666,6 +666,9 @@ Bad1 = collections.namedtuple("Bad1", "x y", typename="Bad1")
 
 # error: [parameter-already-assigned] "Multiple values provided for parameter `field_names` of `namedtuple`"
 Bad2 = collections.namedtuple("Bad2", "x y", field_names="a b")
+
+# This is valid at runtime and should not panic.
+collections.namedtuple(typename="NT4", field_names="x", **{})
 ```
 
 The `rename`, `defaults`, and `module` keyword arguments:
@@ -1067,8 +1070,10 @@ reveal_type(alice.level)  # revealed: int
 alice = SuperUser(1, "Alice", 3)
 ```
 
-TODO: If any fields added by the subclass conflict with those in the base class, that should be
-flagged.
+Any subclass member that reuses an inherited `NamedTuple` field name is rejected. This is a
+special-cased `NamedTuple` diagnostic rather than a Liskov-substitution check: at runtime, these
+overrides can make attribute access disagree with tuple indexing and `repr`, and this pattern is
+usually a mistake.
 
 ```py
 from typing import NamedTuple
@@ -1079,35 +1084,101 @@ class User(NamedTuple):
     age: int | None
     nickname: str
 
-class SuperUser(User):
-    # TODO: this should be an error because it implies that the `id` attribute on
-    # `SuperUser` is mutable, but the read-only `id` property from the superclass
-    # has not been overridden in the class body
+class AnnotatedAttributeChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `id` inherited from `User`"
     id: int
 
-    # this is fine; overriding a read-only attribute with a mutable one
-    # does not conflict with the Liskov Substitution Principle
+class AnnotatedDefaultChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
     name: str = "foo"
 
-    # this is also fine
+class PropertyChild(User):
     @property
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `User`"
     def age(self) -> int:
         return super().age or 42
 
-    def now_called_robert(self):
-        self.name = "Robert"  # fine because overridden with a mutable attribute
+class MethodChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `nickname` inherited from `User`"
+    def nickname(self) -> str:
+        return "Bob"
 
-        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
-        self.nickname = "Bob"
+class PlainAssignmentChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
+    name = "shadowed"
 
-james = SuperUser(0, "James", 42, "Jimmy")
+class DistinctFieldChild(User):
+    title: str = "staff"
 
-# fine because the property on the superclass was overridden with a mutable attribute
-# on the subclass
-james.name = "Robert"
+james = DistinctFieldChild(0, "James", 42, "Jimmy")
+james.title = "Boss"
 
-# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `DistinctFieldChild`"
 james.nickname = "Bob"
+```
+
+Even though we reject the override, normal attribute lookup still follows the subclass member while
+tuple indexing preserves the inherited field view:
+
+```py
+from typing import NamedTuple
+
+class Parent(NamedTuple):
+    age: int | None
+
+class Child(Parent):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `Parent`"
+    age: int = 42
+
+reveal_type(Child(age=None)[0])  # revealed: int | None
+reveal_type(Child(age=None).age)  # revealed: int
+```
+
+The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
+
+```py
+from typing import NamedTuple
+
+TypingBase = NamedTuple("TypingBase", [("age", int | None)])
+
+class TypingChild(TypingBase):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `TypingBase`"
+    age: int = 42
+
+reveal_type(TypingChild(age=None)[0])  # revealed: int | None
+reveal_type(TypingChild(age=None).age)  # revealed: int
+```
+
+The same check applies through deeper inheritance chains:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    name: str
+
+class Intermediate(Base):
+    unrelated: bytes
+
+class Sub(Intermediate):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `Base`"
+    name: int
+```
+
+Later subclasses still get their own conflict if an earlier base has already overridden the name:
+
+```py
+from typing import NamedTuple
+
+ShadowTupleBase = NamedTuple("ShadowTupleBase", [("name", str)])
+
+class ShadowingMid(ShadowTupleBase):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    name = "shadowed"
+
+class ShadowedChild(ShadowingMid):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    name: int
 ```
 
 ### Generic named tuples

@@ -49,12 +49,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
 error[invalid-named-tuple]: NamedTuple field name cannot start with an underscore
  --> src/mdtest_snippet.py:5:5
   |
-3 | class Foo(NamedTuple):
-4 |     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
 5 |     _bar: int
   |     ^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
-6 |
-7 | class Bar(NamedTuple):
   |
 
 ```
@@ -63,10 +59,8 @@ error[invalid-named-tuple]: NamedTuple field name cannot start with an underscor
 error[invalid-named-tuple]: Field name `_x` in `NamedTuple()` cannot start with an underscore
   --> src/mdtest_snippet.py:15:39
    |
-14 | # error: [invalid-named-tuple] "Field name `_x` in `NamedTuple()` cannot start with an underscore"
 15 | Underscore = NamedTuple("Underscore", [("_x", int), ("y", str)])
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-16 | reveal_type(Underscore)  # revealed: <class 'Underscore'>
    |
 
 ```
@@ -75,10 +69,8 @@ error[invalid-named-tuple]: Field name `_x` in `NamedTuple()` cannot start with 
 error[invalid-named-tuple]: Field name `class` in `NamedTuple()` cannot be a Python keyword
   --> src/mdtest_snippet.py:19:33
    |
-18 | # error: [invalid-named-tuple] "Field name `class` in `NamedTuple()` cannot be a Python keyword"
 19 | Keyword = NamedTuple("Keyword", [("x", int), ("class", str)])
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-20 | reveal_type(Keyword)  # revealed: <class 'Keyword'>
    |
 
 ```
@@ -87,10 +79,8 @@ error[invalid-named-tuple]: Field name `class` in `NamedTuple()` cannot be a Pyt
 error[invalid-named-tuple]: Duplicate field name `x` in `NamedTuple()`
   --> src/mdtest_snippet.py:23:37
    |
-22 | # error: [invalid-named-tuple] "Duplicate field name `x` in `NamedTuple()`"
 23 | Duplicate = NamedTuple("Duplicate", [("x", int), ("y", str), ("x", float)])
    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Field `x` already defined; will raise `ValueError` at runtime
-24 | reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
    |
 
 ```
@@ -99,10 +89,8 @@ error[invalid-named-tuple]: Duplicate field name `x` in `NamedTuple()`
 error[invalid-named-tuple]: Field name `not valid` in `NamedTuple()` is not a valid identifier
   --> src/mdtest_snippet.py:27:33
    |
-26 | # error: [invalid-named-tuple] "Field name `not valid` in `NamedTuple()` is not a valid identifier"
 27 | Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Will raise `ValueError` at runtime
-28 | reveal_type(Invalid)  # revealed: <class 'Invalid'>
    |
 
 ```

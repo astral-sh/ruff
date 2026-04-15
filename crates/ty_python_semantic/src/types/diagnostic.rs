@@ -98,6 +98,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
+    registry.register_lint(&INVALID_NAMED_TUPLE_OVERRIDE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
@@ -732,6 +733,40 @@ declare_lint! {
         summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::stable("0.0.1-alpha.19"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for subclass members that override inherited `NamedTuple` fields.
+    ///
+    /// ## Why is this bad?
+    /// Reusing an inherited `NamedTuple` field name in a subclass creates a
+    /// class where tuple indexing and `repr()` still reflect the original
+    /// field, while attribute access follows the subclass member.
+    ///
+    /// ## Default level
+    /// This rule is a warning by default because these overrides do not make
+    /// the class invalid at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class User(NamedTuple):
+    ///     name: str
+    ///
+    /// class Admin(User):
+    ///     name = "shadowed"  # error: [invalid-named-tuple-override]
+    ///
+    /// admin = Admin("Alice")
+    /// admin.name  # "shadowed"
+    /// admin[0]  # "Alice"
+    /// ```
+    pub(crate) static INVALID_NAMED_TUPLE_OVERRIDE = {
+        summary: "detects subclass members that override inherited `NamedTuple` fields",
+        status: LintStatus::stable("0.0.31"),
+        default_level: Level::Warn,
     }
 }
 

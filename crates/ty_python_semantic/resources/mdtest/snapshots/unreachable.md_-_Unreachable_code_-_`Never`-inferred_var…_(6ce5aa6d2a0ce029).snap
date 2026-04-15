@@ -35,8 +35,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unreachable.md
 error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter annotation
  --> src/main.py:3:10
   |
-1 | import module
-2 |
 3 | def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
   |          ^^^^^^^^^^^^^^^^^
   |
