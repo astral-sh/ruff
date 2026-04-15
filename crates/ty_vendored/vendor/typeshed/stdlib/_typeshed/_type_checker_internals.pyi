@@ -6,7 +6,7 @@ import sys
 import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
 from abc import ABCMeta
-from collections.abc import Awaitable, Generator, Iterable, Mapping
+from collections.abc import Awaitable, Generator, Iterable, Iterator, Mapping
 from typing import Any, ClassVar, Generic, TypeVar, overload
 from typing_extensions import Never
 
@@ -40,6 +40,8 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     def items(self) -> dict_items[str, object]: ...
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
+    if sys.version_info >= (3, 8):
+        def __reversed__(self) -> Iterator[str]: ...
     @overload
     def __or__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...
     @overload
