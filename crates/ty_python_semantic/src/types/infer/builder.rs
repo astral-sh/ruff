@@ -2827,7 +2827,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         return true;
                     }
-                    Err(CallDunderError::CallError(kind, _bindings)) => {
+                    Err(CallDunderError::CallError(kind, _bindings, _)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
                                 &self.context,
@@ -2873,7 +2873,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
-                        Err(CallDunderError::CallError(kind, bindings)) => {
+                        Err(CallDunderError::CallError(kind, bindings, _)) => {
                             if emit_diagnostics {
                                 let failure = CallError(kind, bindings);
                                 report_bad_dunder_delete_call(
@@ -4139,7 +4139,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             binary_return_ty(self, value_ty),
                         )
                     }
-                    Err(CallDunderError::CallError(_, bindings)) => {
+                    Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
                         report_unsupported_augmented_assignment(
                             &self.context,
@@ -4704,7 +4704,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut bindings,
                     call_expression_tcx,
                 ) {
-                    return Err(CallDunderError::CallError(call_error, Box::new(bindings)));
+                    return Err(CallDunderError::CallError(
+                        call_error,
+                        Box::new(bindings),
+                        None,
+                    ));
                 }
 
                 if boundness == Definedness::PossiblyUndefined {

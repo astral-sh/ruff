@@ -14,7 +14,7 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -3657,7 +3657,7 @@ impl<'db> Type<'db> {
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
-            Err(CallDunderError::CallError(_, bindings)) => bindings.return_type(db),
+            Err(CallDunderError::CallError(_, bindings, _)) => bindings.return_type(db),
         };
 
         non_negative_int_literal(db, return_ty)
@@ -4807,12 +4807,9 @@ impl<'db> Type<'db> {
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         match self
-            .member_lookup_with_policy(
-                db,
-                name.into(),
-                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
+            .member_lookup_with_policy(db, name.into(), policy)
             .place
         {
             Place::Defined(DefinedPlace {
@@ -4824,7 +4821,20 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, &constraints, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, tcx, &[]);
+
+                let bindings = match bindings {
+                    Ok(bindings) => bindings,
+                    Err(CallError(kind, bindings)) => {
+                        // Capture the binding site of the dunder on the receiver class so the
+                        // diagnostic can point at the user's own assignment.
+                        // See https://github.com/astral-sh/ty/issues/3250.
+                        // The meta-type MRO walk mirrors `NO_INSTANCE_FALLBACK`, which is what the
+                        // lookup above used.
+                        let definition = self.class_attribute_first_binding(db, name);
+                        return Err(CallDunderError::CallError(kind, bindings, definition));
+                    }
+                };
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -4833,6 +4843,33 @@ impl<'db> Type<'db> {
             }
             Place::Undefined => Err(CallDunderError::MethodNotAvailable),
         }
+    }
+
+    /// Walks the meta-type's MRO and returns the [`Definition`] of the first class-body binding
+    /// of `name`, when one can be statically resolved. Used to attach a binding site to
+    /// [`CallDunderError::CallError`] so diagnostics can point at the user's own assignment
+    /// rather than the type's typeshed origin. See
+    /// <https://github.com/astral-sh/ty/issues/3250>.
+    fn class_attribute_first_binding(self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
+        let class = self.nominal_class(db)?;
+        for base in class.iter_mro(db) {
+            let ClassBase::Class(class_type) = base else {
+                continue;
+            };
+            let Some((literal, _)) = class_type.static_class_literal(db) else {
+                continue;
+            };
+            let scope = literal.body_scope(db);
+            if let Some(symbol) = place_table(db, scope).symbol_id(name)
+                && let Some(binding) = use_def_map(db, scope)
+                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
+                    .next()
+                && let Some(definition) = binding.binding.definition()
+            {
+                return Some(definition);
+            }
+        }
+        None
     }
 
     /// Attempt to call a dunder method defined on a class itself.
@@ -7276,7 +7313,7 @@ impl<'db> AwaitError<'db> {
             format_args!("`{type}` is not awaitable", type = context_expression_type.display(db)),
         );
         match self {
-            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                 diag.info("`__await__` requires arguments and cannot be called implicitly");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
@@ -7287,7 +7324,8 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::CallError(
                 kind @ (CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable),
-                bindings,
+                _,
+                attribute_definition,
             )) => {
                 let possibly = if matches!(kind, CallErrorKind::PossiblyNotCallable) {
                     " possibly"
@@ -7295,20 +7333,14 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                // Prefer the attribute's own binding site on the class over the definition of
-                // the attribute's *type*. Without this, `__await__ = 1` would highlight
-                // `class int:` in typeshed instead of the user's assignment. See astral-sh/ty#3250.
-                let definition_range =
-                    class_attribute_first_binding_range(db, context_expression_type, "__await__")
-                        .or_else(|| {
-                            bindings
-                                .callable_type()
-                                .definition(db)
-                                .and_then(|def| def.focus_range(db))
-                        });
-                if let Some(definition_range) = definition_range {
+                // Pointing at the attribute's *type* definition (the previous behavior) was
+                // rarely useful and motivated https://github.com/astral-sh/ty/issues/3250 — we
+                // skip the secondary annotation entirely when the binding site can't be
+                // statically resolved (e.g., union types or synthesized protocols).
+                if let Some(definition) = attribute_definition {
+                    let module = parsed_module(db, definition.file(db)).load(db);
                     diag.annotate(
-                        Annotation::secondary(definition_range.into())
+                        Annotation::secondary(definition.focus_range(db, &module).into())
                             .message("attribute defined here"),
                     );
                 }
@@ -7346,35 +7378,6 @@ impl<'db> AwaitError<'db> {
             }
         }
     }
-}
-
-/// Walk the MRO of `context_type` and return the focus range of the first binding
-/// named `name` found in any class body scope.
-fn class_attribute_first_binding_range<'db>(
-    db: &'db dyn Db,
-    context_type: Type<'db>,
-    name: &str,
-) -> Option<FileRange> {
-    let class = context_type.nominal_class(db)?;
-    for base in class.iter_mro(db) {
-        let ClassBase::Class(class_type) = base else {
-            continue;
-        };
-        let Some((literal, _)) = class_type.static_class_literal(db) else {
-            continue;
-        };
-        let scope = literal.body_scope(db);
-        if let Some(symbol) = place_table(db, scope).symbol_id(name)
-            && let Some(binding) = use_def_map(db, scope)
-                .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
-                .next()
-            && let Some(definition) = binding.binding.definition()
-        {
-            let module = parsed_module(db, definition.file(db)).load(db);
-            return Some(definition.focus_range(db, &module));
-        }
-    }
-    None
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
