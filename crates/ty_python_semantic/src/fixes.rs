@@ -137,7 +137,7 @@ where
         let fixes = fix_mode.fixes(db, file, diagnostics);
 
         if fixes.is_empty() {
-            tracing::warn!("Skipping file `{path}` without applicable fixes.");
+            tracing::debug!("Skipping file `{path}` without applicable fixes.");
             continue;
         }
 
