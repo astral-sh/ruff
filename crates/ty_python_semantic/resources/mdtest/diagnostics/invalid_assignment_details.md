@@ -210,7 +210,7 @@ error[invalid-assignment]: Object of type `def source(x: int, y: str) -> None` i
   |         |
   |         Declared type
   |
-info: incompatible return types `None` and `bool`
+info: incompatible return types: `None` is not assignable to `bool`
 ```
 
 Assigning a `Callable` to a `Callable` with wrong parameter type:
@@ -229,7 +229,7 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
   |             |
   |             Declared type
   |
-info: incompatible parameter types `str` and `bytes`
+info: incompatible parameter types: `bytes` is not assignable to `str`
 ```
 
 Assigning a `Callable` to a `Callable` with wrong return type:
@@ -248,7 +248,7 @@ error[invalid-assignment]: Object of type `(int, bytes, /) -> None` is not assig
    |             |
    |             Declared type
    |
-info: incompatible return types `None` and `bool`
+info: incompatible return types: `None` is not assignable to `bool`
 ```
 
 Assigning a `Callable` to a `Callable` with wrong number of parameters:
@@ -287,7 +287,7 @@ error[invalid-assignment]: Object of type `<class 'Number'>` is not assignable t
    |         |
    |         Declared type
    |
-info: incompatible parameter types `int` and `str`
+info: incompatible parameter types: `str` is not assignable to `int`
 ```
 
 ## Function assignability and overrides
@@ -319,7 +319,7 @@ error[invalid-method-override]: Invalid override of method `method`
 2 |     def method(self, x: str) -> bool:
   |         ---------------------------- `Parent.method` defined here
   |
-info: incompatible parameter types `bytes` and `str`
+info: incompatible parameter types: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -344,7 +344,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: str) -> bool:
    |         ---------------------------- `Parent.method` defined here
    |
-info: incompatible return types `None` and `bool`
+info: incompatible return types: `None` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -369,7 +369,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: str) -> bool:
    |         ---------------------------- `Parent.method` defined here
    |
-info: parameter `y` does not match `x` (and can be used as a keyword parameter)
+info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -470,7 +470,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveCheck` is not assignable t
   |             |
   |             Declared type
   |
-info: type `DoesNotHaveCheck` is not compatible with protocol `SupportsCheck`
+info: type `DoesNotHaveCheck` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check` is not defined on type `DoesNotHaveCheck`
 ```
 
@@ -494,9 +494,9 @@ error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assig
    |             |
    |             Declared type
    |
-info: type `CheckWithWrongSignature` is not compatible with protocol `SupportsCheck`
+info: type `CheckWithWrongSignature` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check` is incompatible
-info:     └── incompatible parameter types `bytes` and `str`
+info:     └── incompatible parameter types: `str` is not assignable to `bytes`
 ```
 
 Missing protocol properties:
@@ -521,7 +521,7 @@ error[invalid-assignment]: Object of type `DoesNotHaveName` is not assignable to
    |             |
    |             Declared type
    |
-info: type `DoesNotHaveName` is not compatible with protocol `SupportsName`
+info: type `DoesNotHaveName` is not assignable to protocol `SupportsName`
 info: └── protocol member `name` is not defined on type `DoesNotHaveName`
 ```
 
@@ -555,9 +555,9 @@ error[invalid-assignment]: Object of type `HasName` is not assignable to `String
    |             Declared type
    |
 info: type `HasName` is not assignable to any element of the union `str | SupportsName`
-info: ├── type `HasName` is not compatible with protocol `SupportsName`
+info: ├── type `HasName` is not assignable to protocol `SupportsName`
 info: │   └── protocol member `name` is incompatible
-info: │       └── incompatible return types `bytes` and `str`
+info: │       └── incompatible return types: `bytes` is not assignable to `str`
 info: └── ... omitted 1 union element without additional context
 ```
 
@@ -581,7 +581,7 @@ error[invalid-assignment]: Object of type `def source(x: tuple[int, str]) -> boo
   |         |
   |         Declared type
   |
-info: incompatible parameter types `tuple[int, str]` and `tuple[int, bytes]`
+info: incompatible parameter types: `tuple[int, bytes]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `bytes` is not assignable to `str`
 ```
 
@@ -611,9 +611,9 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |             |
    |             Declared type
    |
-info: type `Incompatible` is not compatible with protocol `SupportsCheck`
+info: type `Incompatible` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check1` is incompatible
-info:     └── incompatible parameter types `bytes` and `str`
+info:     └── incompatible parameter types: `str` is not assignable to `bytes`
 ```
 
 ## Failures for multiple union elements
@@ -643,9 +643,9 @@ error[invalid-assignment]: Object of type `HasNeither` is not assignable to `Sup
    |             Declared type
    |
 info: type `HasNeither` is not assignable to any element of the union `SupportsFoo | SupportsBar`
-info: ├── type `HasNeither` is not compatible with protocol `SupportsFoo`
+info: ├── type `HasNeither` is not assignable to protocol `SupportsFoo`
 info: │   └── protocol member `foo` is not defined on type `HasNeither`
-info: └── type `HasNeither` is not compatible with protocol `SupportsBar`
+info: └── type `HasNeither` is not assignable to protocol `SupportsBar`
 info:     └── protocol member `bar` is not defined on type `HasNeither`
 ```
 
@@ -727,9 +727,9 @@ error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to
    |             |
    |             Declared type
    |
-info: type `IncompatibleFoo` is not compatible with protocol `SupportsFooAndBar`
+info: type `IncompatibleFoo` is not assignable to protocol `SupportsFooAndBar`
 info: └── protocol member `foo` is incompatible
-info:     └── parameter `name_` does not match `name` (and can be used as a keyword parameter)
+info:     └── the parameter named `name_` does not match `name` (and can be used as a keyword parameter)
 ```
 
 ## Assigning to `Iterable`
@@ -750,11 +750,11 @@ error[invalid-assignment]: Object of type `list[str]` is not assignable to `Iter
   |             |
   |             Declared type
   |
-info: type `list[str]` is not compatible with protocol `Iterable[bytes]`
+info: type `list[str]` is not assignable to protocol `Iterable[bytes]`
 info: └── protocol member `__iter__` is incompatible
-info:     └── incompatible return types `Iterator[str]` and `Iterator[bytes]`
-info:         └── protocol `Iterator[str]` is not compatible with protocol `Iterator[bytes]`
-info:             └── incompatible return types `str` and `bytes`
+info:     └── incompatible return types: `Iterator[str]` is not assignable to `Iterator[bytes]`
+info:         └── protocol `Iterator[str]` is not assignable to protocol `Iterator[bytes]`
+info:             └── incompatible return types: `str` is not assignable to `bytes`
 ```
 
 ## Deleting a read-only property

@@ -39,7 +39,7 @@ error[invalid-argument-type]: Argument to bound method `split` is incorrect
   |             ^^^ Expected `Buffer | None`, found `Literal[" "]`
   |
 info: type `Literal[" "]` is not assignable to any element of the union `Buffer | None`
-info: ├── type `Literal[" "]` is not compatible with protocol `Buffer`
+info: ├── type `Literal[" "]` is not assignable to protocol `Buffer`
 info: │   └── protocol member `__buffer__` is not defined on type `Literal[" "]`
 info: └── ... omitted 1 union element without additional context
 info: Method defined here

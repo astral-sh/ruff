@@ -54,7 +54,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
    |
-info: incompatible return types `object` and `int`
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -77,7 +77,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
    |
-info: incompatible return types `str` and `int`
+info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -212,7 +212,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
-info: incompatible parameter types `bool` and `int`
+info: incompatible parameter types: `int` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -431,7 +431,7 @@ error[invalid-method-override]: Invalid override of method `method`
 4 |     def method(self, x: int) -> None: ...
   |         ---------------------------- `Grandparent.method` defined here
   |
-info: incompatible parameter types `str` and `int`
+info: incompatible parameter types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
@@ -446,7 +446,7 @@ error[invalid-method-override]: Invalid override of method `method`
  7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
    |         ---------------------------- `Parent.method` defined here
    |
-info: incompatible parameter types `int` and `str`
+info: incompatible parameter types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
@@ -461,7 +461,7 @@ error[invalid-method-override]: Invalid override of method `method`
  7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
    |         ---------------------------- `Parent.method` defined here
    |
-info: incompatible parameter types `bytes` and `str`
+info: incompatible parameter types: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 
 
@@ -476,7 +476,7 @@ error[invalid-method-override]: Invalid override of method `method`
 25 |     def method(self) -> int: ...
    |         ------------------- `GrandparentWithReturnType.method` defined here
    |
-info: incompatible return types `str` and `int`
+info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
@@ -491,7 +491,7 @@ error[invalid-method-override]: Invalid override of method `method`
 28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
    |         ------------------- `ParentWithReturnType.method` defined here
    |
-info: incompatible return types `int` and `str`
+info: incompatible return types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
@@ -506,7 +506,7 @@ error[invalid-method-override]: Invalid override of method `method`
  4 |     def method(self, x: int) -> None: ...
    |         ---------------------------- `Grandparent.method` defined here
    |
-info: incompatible parameter types `str` and `int`
+info: incompatible parameter types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -746,7 +746,7 @@ error[invalid-method-override]: Invalid override of method `foo`
 2 |     def foo(self, x): ...
   |         ------------ `one.A.foo` defined here
   |
-info: parameter `y` does not match `x` (and can be used as a keyword parameter)
+info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -835,7 +835,7 @@ error[invalid-method-override]: Invalid override of method `x`
 1 | def x(self, y: str): ...
   |     --------------- Signature of `B.x`
   |
-info: incompatible parameter types `str` and `int`
+info: incompatible parameter types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
@@ -855,7 +855,7 @@ error[invalid-method-override]: Invalid override of method `x`
  1 | def x(self, y: str): ...
    |     --------------- Signature of `C.x`
    |
-info: incompatible parameter types `int` and `str`
+info: incompatible parameter types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -880,7 +880,7 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 142 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
     |
-info: incompatible parameter types `Bad` and `object`
+info: incompatible parameter types: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:
 help
@@ -977,7 +977,7 @@ error[invalid-method-override]: Invalid override of method `__lt__`
 9 |     def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
   |
-info: incompatible parameter types `Bar` and `Foo`
+info: incompatible parameter types: `Foo` is not assignable to `Bar`
 info: This violates the Liskov Substitution Principle
 info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
  --> src/mdtest_snippet.pyi:5:7
@@ -993,7 +993,7 @@ error[invalid-method-override]: Invalid override of method `_asdict`
 54 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
    |
-info: incompatible return types `tuple[int, ...]` and `dict[str, Any]`
+info: incompatible return types: `tuple[int, ...]` is not assignable to `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
 info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
   --> src/mdtest_snippet.pyi:50:7
@@ -1049,7 +1049,7 @@ error[invalid-method-override]: Invalid override of method `class_method`
  4 |     def class_method(cls, x: int) -> int: ...
    |         -------------------------------- `Parent.class_method` defined here
    |
-info: incompatible return types `object` and `int`
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -1071,7 +1071,7 @@ error[invalid-method-override]: Invalid override of method `static_method`
  6 |     def static_method(x: int) -> int: ...
    |         ---------------------------- `Parent.static_method` defined here
    |
-info: incompatible return types `object` and `int`
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 

@@ -98,20 +98,21 @@ impl<'db> ErrorContext<'db> {
                     .to_string()
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
-                "incompatible return types `{}` and `{}`",
-                source.display(db),
-                target.display(db),
+                "incompatible return types: `{source}` is not assignable to `{target}`",
+                source = source.display(db),
+                target = target.display(db),
             ),
             Self::IncompatibleParameterTypes { source, target } => format!(
-                "incompatible parameter types `{}` and `{}`",
-                source.display(db),
-                target.display(db),
+                // reversed order due to covariance
+                "incompatible parameter types: `{target}` is not assignable to `{source}`",
+                source = source.display(db),
+                target = target.display(db),
             ),
             Self::ParameterNameMismatch {
                 source_name,
                 target_name,
             } => format!(
-                "parameter `{source_name}` does not match `{target_name}` (and can be used as a keyword parameter)",
+                "the parameter named `{source_name}` does not match `{target_name}` (and can be used as a keyword parameter)",
             ),
             Self::ParameterMustAcceptKeywordArguments {
                 source_name,
@@ -157,13 +158,13 @@ impl<'db> ErrorContext<'db> {
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
                 if let Type::ProtocolInstance(_) = ty {
                     format!(
-                        "protocol `{}` is not compatible with protocol `{}`",
+                        "protocol `{}` is not assignable to protocol `{}`",
                         ty.display(db),
                         protocol.display(db),
                     )
                 } else {
                     format!(
-                        "type `{}` is not compatible with protocol `{}`",
+                        "type `{}` is not assignable to protocol `{}`",
                         ty.display(db),
                         protocol.display(db),
                     )
