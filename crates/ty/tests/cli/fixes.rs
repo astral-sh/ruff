@@ -143,18 +143,6 @@ fn fix() -> anyhow::Result<()> {
     "
     );
 
-    assert_cmd_snapshot!(
-        case.command().arg("--warn").arg("unused-ignore-comment"),
-        @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    "
-    );
-
     Ok(())
 }
 
@@ -196,6 +184,27 @@ fn fix_unfixable() -> anyhow::Result<()> {
     x = 1
     "
     );
+
+    Ok(())
+}
+
+#[test]
+fn fix_clean_file() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "clean.py",
+        r#"
+            x = 1
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--fix"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

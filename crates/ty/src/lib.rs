@@ -486,7 +486,7 @@ impl MainLoop {
         let is_human_readable = terminal_settings.output_format.is_human_readable();
 
         match diagnostics {
-            [] if is_human_readable && fixed_diagnostics.is_none() => {
+            [] if is_human_readable && fixed_diagnostics.is_none_or(|fixed| fixed == 0) => {
                 writeln!(
                     self.printer.stream_for_success_summary(),
                     "{}",
