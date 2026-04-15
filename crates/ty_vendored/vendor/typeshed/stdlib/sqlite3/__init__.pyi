@@ -459,14 +459,14 @@ class Connection:
     def interrupt(self) -> None:
         """Abort any pending database operation."""
     if sys.version_info >= (3, 13):
-        def iterdump(self, *, filter: str | None = None) -> Generator[str, None, None]:
+        def iterdump(self, *, filter: str | None = None) -> Generator[str]:
             """Returns iterator to the dump of the database in an SQL text format.
 
             filter
               An optional LIKE pattern for database objects to dump
             """
     else:
-        def iterdump(self) -> Generator[str, None, None]:
+        def iterdump(self) -> Generator[str]:
             """Returns iterator to the dump of the database in an SQL text format."""
 
     def rollback(self) -> None:
