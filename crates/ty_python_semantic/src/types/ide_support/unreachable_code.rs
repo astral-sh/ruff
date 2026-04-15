@@ -88,7 +88,7 @@ mod tests {
             .iter()
             .map(|range| {
                 (
-                    source[usize::from(range.range.start())..usize::from(range.range.end())]
+                    source[usize::from(range.range]
                         .trim()
                         .to_owned(),
                     range.kind,
