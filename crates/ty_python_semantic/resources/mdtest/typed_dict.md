@@ -1873,7 +1873,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal`"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
