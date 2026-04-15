@@ -459,6 +459,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we can.
         let mut result = self.never();
 
+        if !matches!(ty, Type::ProtocolInstance(_))
+            && let Some(nominal_protocol) = protocol.to_nominal_instance()
+            && nominal_protocol.known_class(db).is_some_and(|known_class| {
+                matches!(known_class, KnownClass::Iterable | KnownClass::Iterator)
+            })
+            && let Some(protocol_alias) = nominal_protocol.class(db).into_generic_alias()
+            && let Some(expected_element_ty) = protocol_alias.specialization(db).types(db).first()
+            && let Ok(iterated) = ty.try_iterate(db)
+        {
+            result = result.or(db, self.constraints, || {
+                self.check_type_pair(
+                    db,
+                    iterated.homogeneous_element_type(db),
+                    *expected_element_ty,
+                )
+            });
+
+            if result.is_always_satisfied(db) {
+                return result;
+            }
+        }
+
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
