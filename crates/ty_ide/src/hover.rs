@@ -1021,7 +1021,7 @@ mod tests {
         )
         class S(a: int)
         ---------------------------------------------
-        new docs
+        init docs
 
         ---------------------------------------------
         ```python
@@ -1032,7 +1032,7 @@ mod tests {
         class S(a: int)
         ```
         ---
-        new docs
+        init docs
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:12:5
@@ -1475,7 +1475,29 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover());
+        assert_snapshot!(test.hover(), @r"
+        def foo(x: int) -> int
+        ---------------------------------------------
+        Sample docstring
+
+        ---------------------------------------------
+        ```python
+        def foo(x: int) -> int
+        ```
+        ---
+        Sample docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:10
+           |
+        13 | my_class = MyTestClass()
+        14 | my_class.foo(1)
+           |          ^-^
+           |          ||
+           |          |Cursor offset
+           |          source
+           |
+        ");
     }
 
     #[test]
