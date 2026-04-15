@@ -6,8 +6,9 @@ use crate::types::{
         IncompatibleBases, report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
     },
     infer::builder::dynamic_class::report_dynamic_mro_errors,
+    overrides,
 };
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::Definition;
 
 /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done
@@ -18,10 +19,6 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 ) {
     let db = context.db();
 
-    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-        return;
-    };
-
     let ty = binding_type(db, definition);
 
     // Check if it's a dynamic class with a Definition anchor.
@@ -29,13 +26,15 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    // Only check classes with Definition anchors (i.e., assigned `type()` calls).
-    // Dangling `type()` calls are validated eagerly during inference.
+    // Only check classes with Definition anchors. Dangling `type()` calls are validated eagerly
+    // during inference.
     let DynamicClassAnchor::Definition(_) = dynamic_class.anchor(db) else {
         return;
     };
 
-    let value = assignment.value(context.module());
+    let Some(value) = definition.kind(db).value(context.module()) else {
+        return;
+    };
     let Some(call_expr) = value.as_call_expr() else {
         return;
     };
@@ -88,4 +87,6 @@ pub(crate) fn check_dynamic_class_definition<'db>(
             base2.display(db),
         );
     }
+
+    overrides::check_dynamic_class(context, dynamic_class);
 }

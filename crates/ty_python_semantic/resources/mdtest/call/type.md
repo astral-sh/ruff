@@ -738,6 +738,86 @@ NoSlots = type("NoSlots", (), {})
 StringSlots = type("StringSlots", (), {"__slots__": "x"})
 ```
 
+Dynamic class members defined in the namespace dictionary are also checked as overrides of
+superclass members:
+
+```py
+from typing import Final, final
+
+class Base:
+    value: Final[int] = 1
+
+    @final
+    def final_method(self) -> None: ...
+    def method(self, x: int) -> None: ...
+
+def bad(self, x: str) -> None: ...
+def final_override(self) -> None: ...
+
+Dyn1 = type("Dyn1", (Base,), {"method": bad})  # error: [invalid-method-override]
+Dyn2 = type("Dyn2", (Base,), {"final_method": final_override})  # error: [override-of-final-method]
+Dyn3 = type("Dyn3", (Base,), {"value": 2})  # error: [override-of-final-variable]
+```
+
+Dangling `type()` calls and annotated assignments also emit dynamic override diagnostics:
+
+```py
+from typing import Final, final
+
+class Base:
+    value: Final[int] = 1
+
+    @final
+    def final_method(self) -> None: ...
+    def method(self, x: int) -> None: ...
+
+def bad(self, x: str) -> None: ...
+def good(self, x: int) -> None: ...
+def final_override(self) -> None: ...
+
+type("DynExpr", (Base,), {"method": bad})  # error: [invalid-method-override]
+DynAnn: type = type("DynAnn", (Base,), {"final_method": final_override})  # error: [override-of-final-method]
+DynShadowed = type("DynShadowed", (Base,), {"method": bad, "method": good})
+DynUnpacked = type("DynUnpacked", (Base,), {**{"method": bad}})  # error: [invalid-method-override]
+DynUnpackedShadowed = type("DynUnpackedShadowed", (Base,), {"method": bad, **{"method": good}})
+DynUO = type("DynUO", (Base,), {**{"method": good}, "method": bad})  # error: [invalid-method-override]
+# error: [invalid-argument-type]
+# error: [override-of-final-variable]
+DynNonStringKey = type("DynNonStringKey", (Base,), {"value": 2, 1: 3})
+```
+
+Only guaranteed namespace keys from `TypedDict` namespaces are checked for overrides:
+
+```py
+from typing import Final, TypedDict
+
+class Base:
+    value: Final[int] = 1
+
+class OptionalNamespace(TypedDict, total=False):
+    value: int
+
+class RequiredNamespace(TypedDict):
+    value: int
+
+optional_namespace: OptionalNamespace = {}
+required_namespace: RequiredNamespace = {"value": 2}
+
+DynOptional = type("DynOptional", (Base,), optional_namespace)
+DynRequired = type("DynRequired", (Base,), required_namespace)  # error: [override-of-final-variable]
+```
+
+Inherited `NamedTuple` field names are also rejected for dynamic subclasses:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    name: str
+
+DynNamedTuple = type("DynNamedTuple", (Base,), {"name": "shadowed"})  # error: [invalid-named-tuple-override]
+```
+
 Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases:
 
 ```py

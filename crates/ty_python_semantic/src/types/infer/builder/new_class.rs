@@ -1,6 +1,6 @@
 use crate::types::class::{
-    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
-    dynamic_class_bases_argument,
+    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicClassMember,
+    DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
@@ -143,9 +143,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .map(|kw| &kw.value)
         });
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
-        let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
-        let dynamic_class =
-            DynamicClassLiteral::new(db, name.clone(), anchor, members, has_exec_body, None);
+        let members: Box<[DynamicClassMember<'db>]> = Box::new([]);
+        let override_members: Box<[DynamicClassMember<'db>]> = Box::new([]);
+        let dynamic_class = DynamicClassLiteral::new(
+            db,
+            name.clone(),
+            anchor,
+            members,
+            override_members,
+            has_exec_body,
+            None,
+        );
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
