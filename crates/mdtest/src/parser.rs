@@ -21,11 +21,16 @@ use serde::Deserialize;
 pub trait MdtestConfig: Clone + Default + for<'de> Deserialize<'de> {}
 
 /// Parse the Markdown `source` as a test suite with given `title`.
+///
+/// `validate_config` is invoked once for every literally-declared `toml` config block
+/// (after deserialization, before it replaces the section's inherited config) so callers
+/// can enforce invariants that mdtest itself shouldn't know about.
 pub fn parse<'s, C: MdtestConfig>(
     title: &'s str,
     source: &'s str,
+    validate_config: impl FnMut(&C) -> anyhow::Result<()>,
 ) -> anyhow::Result<MarkdownTestSuite<'s, C>> {
-    let parser = Parser::new(title, source);
+    let parser = Parser::new(title, source, validate_config);
     parser.parse()
 }
 
@@ -480,8 +485,7 @@ impl SectionStack {
 }
 
 /// Parse the source of a Markdown file into a [`MarkdownTestSuite`].
-#[derive(Debug)]
-struct Parser<'s, C> {
+struct Parser<'s, C, F> {
     /// [`Section`]s of the final [`MarkdownTestSuite`].
     sections: IndexVec<SectionId, Section<'s, C>>,
 
@@ -507,10 +511,13 @@ struct Parser<'s, C> {
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
+
+    /// Callback to validate config blocks
+    validate_config: F,
 }
 
-impl<'s, C: MdtestConfig> Parser<'s, C> {
-    fn new(title: &'s str, source: &'s str) -> Self {
+impl<'s, C: MdtestConfig, F: FnMut(&C) -> anyhow::Result<()>> Parser<'s, C, F> {
+    fn new(title: &'s str, source: &'s str, validate_config: F) -> Self {
         let mut sections = IndexVec::default();
         let root_section_id = sections.push(Section {
             title,
@@ -529,6 +536,7 @@ impl<'s, C: MdtestConfig> Parser<'s, C> {
             stack: SectionStack::new(root_section_id),
             current_section_files: IndexMap::default(),
             current_section_has_config: false,
+            validate_config,
         }
     }
 
@@ -912,6 +920,8 @@ impl<'s, C: MdtestConfig> Parser<'s, C> {
 
         let config: C = toml::from_str(code).context("Error while parsing Markdown TOML config")?;
 
+        (self.validate_config)(&config)?;
+
         let current_section = &mut self.sections[self.stack.top()];
         current_section.config = config;
 
@@ -1107,7 +1117,7 @@ mod tests {
         title: &'s str,
         source: &'s str,
     ) -> anyhow::Result<super::MarkdownTestSuite<'s, TestConfig>> {
-        super::parse::<TestConfig>(title, source)
+        super::parse::<TestConfig>(title, source, |_| Ok(()))
     }
 
     #[test]

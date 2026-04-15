@@ -49,23 +49,8 @@ pub fn run(
 ) -> anyhow::Result<()> {
     let output_format = output_format();
 
-    let suite = parser::parse::<MarkdownTestConfig>(short_title, source)
-        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
-
-    // Whether or not any section in the file has external dependencies.
-    // Only one section per file is allowed to have dependencies (for lockfile support).
-    let mut file_has_dependencies = false;
-    for test in suite.tests() {
-        if test.configuration().dependencies().is_some() {
-            if file_has_dependencies {
-                bail!(
-                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
-                     External dependencies must be specified in a single top-level configuration block."
-                );
-            }
-            file_has_dependencies = true;
-        }
-    }
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = Db::setup();
     let mut markdown_edits = vec![];
@@ -792,12 +777,28 @@ impl AttemptTestError<'_> {
     }
 }
 
+fn parse<'s>(
+    short_title: &'s str,
+    source: &'s str,
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, MarkdownTestConfig>> {
+    let mut file_has_dependencies = false;
+    parser::parse::<MarkdownTestConfig>(short_title, source, |config| {
+        if config.dependencies().is_some() {
+            if file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            file_has_dependencies = true;
+        }
+        Ok(())
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use mdtest::parser::parse;
     use ruff_python_trivia::textwrap::dedent;
-
-    use crate::config::MarkdownTestConfig;
 
     #[test]
     fn multiple_sections_with_dependencies_not_allowed() {
@@ -826,8 +827,7 @@ mod tests {
             ```
             "#,
         );
-        let err =
-            parse::<MarkdownTestConfig>("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Multiple sections with `[project]` dependencies in the same file are not allowed. \
