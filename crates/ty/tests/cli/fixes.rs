@@ -130,8 +130,7 @@ fn fix() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    All checks passed!
-    Applied 1 fix
+    Found 1 diagnostic (1 fixed, 0 remaining).
 
     ----- stderr -----
     "
@@ -184,8 +183,7 @@ fn fix_unfixable() -> anyhow::Result<()> {
       |      ^
       |
 
-    Found 1 diagnostic
-    Applied 1 fix
+    Found 2 diagnostics (1 fixed, 1 remaining).
 
     ----- stderr -----
     WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors

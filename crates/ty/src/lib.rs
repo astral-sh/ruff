@@ -22,6 +22,7 @@ use ruff_db::diagnostic::{
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
+use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
@@ -375,7 +376,7 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
 
-                            self.write_diagnostics(db, &result)?;
+                            self.write_diagnostics(db, &result, None)?;
 
                             if self.cancellation_token.is_cancelled() {
                                 Err(Canceled)
@@ -388,30 +389,37 @@ impl MainLoop {
                                 FixMode::AddIgnore => {
                                     suppress_all_diagnostics(db, result, &self.cancellation_token)
                                 }
-                                FixMode::ApplyFixes => {
-                                    fix_all_diagnostics(db, result, &self.cancellation_token)
-                                }
+                                FixMode::ApplyFixes => fix_all_diagnostics(
+                                    db,
+                                    result,
+                                    Applicability::Safe,
+                                    &self.cancellation_token,
+                                ),
                             };
 
                             if let Ok(result) = result {
-                                self.write_diagnostics(db, &result.diagnostics)?;
+                                let fixed_diagnostics = match mode {
+                                    FixMode::AddIgnore => None,
+                                    FixMode::ApplyFixes => Some(result.count),
+                                };
+                                self.write_diagnostics(db, &result.diagnostics, fixed_diagnostics)?;
 
                                 let terminal_settings = db.project().settings(db).terminal();
                                 let is_human_readable =
                                     terminal_settings.output_format.is_human_readable();
 
                                 if is_human_readable {
-                                    let (action, noun) = match mode {
-                                        FixMode::AddIgnore => ("Added", "ignore comment"),
-                                        FixMode::ApplyFixes => ("Applied", "fix"),
-                                    };
-
-                                    writeln!(
-                                        self.printer.stream_for_failure_summary(),
-                                        "{action} {} {noun}{}",
-                                        result.count,
-                                        if result.count > 1 { "s" } else { "" }
-                                    )?;
+                                    match mode {
+                                        FixMode::AddIgnore => {
+                                            writeln!(
+                                                self.printer.stream_for_failure_summary(),
+                                                "Added {} ignore comment{}",
+                                                result.count,
+                                                if result.count > 1 { "s" } else { "" }
+                                            )?;
+                                        }
+                                        FixMode::ApplyFixes => {}
+                                    }
                                 }
 
                                 Ok(result.diagnostics)
@@ -472,12 +480,13 @@ impl MainLoop {
         &self,
         db: &ProjectDatabase,
         diagnostics: &[Diagnostic],
+        fixed_diagnostics: Option<usize>,
     ) -> anyhow::Result<()> {
         let terminal_settings = db.project().settings(db).terminal();
         let is_human_readable = terminal_settings.output_format.is_human_readable();
 
         match diagnostics {
-            [] if is_human_readable => {
+            [] if is_human_readable && fixed_diagnostics.is_none() => {
                 writeln!(
                     self.printer.stream_for_success_summary(),
                     "{}",
@@ -506,12 +515,21 @@ impl MainLoop {
                 }
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {
-                    writeln!(
-                        self.printer.stream_for_failure_summary(),
-                        "Found {} diagnostic{}",
-                        diagnostics_count,
-                        if diagnostics_count > 1 { "s" } else { "" }
-                    )?;
+                    if let Some(fixed) = fixed_diagnostics {
+                        let total = fixed + diagnostics_count;
+                        writeln!(
+                            self.printer.stream_for_failure_summary(),
+                            "Found {total} diagnostic{} ({fixed} fixed, {diagnostics_count} remaining).",
+                            if total == 1 { "" } else { "s" }
+                        )?;
+                    } else {
+                        writeln!(
+                            self.printer.stream_for_failure_summary(),
+                            "Found {} diagnostic{}",
+                            diagnostics_count,
+                            if diagnostics_count > 1 { "s" } else { "" }
+                        )?;
+                    }
                 }
             }
         }

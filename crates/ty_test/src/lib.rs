@@ -702,8 +702,13 @@ fn run_test(
     // But don't try to run fixes for tests that are expected to panic.
     if test.should_expect_panic().is_err() {
         let token_source = CancellationTokenSource::new();
-        let result = fix_all_diagnostics(db, all_diagnostics, &token_source.token())
-            .expect("to succeed because fixing is never cancelled");
+        let result = fix_all_diagnostics(
+            db,
+            all_diagnostics,
+            Applicability::Unsafe,
+            &token_source.token(),
+        )
+        .expect("to succeed because fixing is never cancelled");
 
         tracing::debug!("Fixed {} diagnostics", result.count);
 
