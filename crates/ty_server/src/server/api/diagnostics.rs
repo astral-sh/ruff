@@ -374,7 +374,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = collect_unnecessary_hints(db, file);
+    let unnecessary_hints = collect_hints(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
@@ -384,7 +384,7 @@ pub(super) fn compute_diagnostics(
     })
 }
 
-pub(super) fn collect_unnecessary_hints(db: &ProjectDatabase, file: File) -> Vec<UnnecessaryHint> {
+pub(super) fn collect_hints(db: &ProjectDatabase, file: File) -> Vec<UnnecessaryHint> {
     if !db.project().should_check_file(db, file) {
         return Vec::new();
     }
@@ -395,9 +395,10 @@ pub(super) fn collect_unnecessary_hints(db: &ProjectDatabase, file: File) -> Vec
         .iter()
         // Avoid a narrower unused-binding hint inside code that is already reported as unreachable.
         .filter(|binding| {
-            !unreachable
-                .iter()
-                .any(|range| range.range.contains_range(binding.range))
+            unreachable.is_empty()
+                || !unreachable
+                    .iter()
+                    .any(|range| range.range.contains_range(binding.range))
         })
         .map(|binding| UnnecessaryHint {
             range: binding.range,
