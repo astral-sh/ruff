@@ -163,8 +163,6 @@ def f(x: Foo[int]):
 
 ## Stringified values
 
-<!-- snapshot-diagnostics -->
-
 Stringifying the right-hand side of a type alias is redundant, but allowed:
 
 ```py
@@ -179,11 +177,24 @@ accesses the `.__value__` attribute. Normal runtime rules still therefore apply 
 stringified alias values:
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 type Y = "int" | str
 
 def g(obj: Y):
     reveal_type(obj)  # revealed: int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:6:10
+  |
+6 | type Y = "int" | str
+  |          -----^^^---
+  |          |       |
+  |          |       Has type `<class 'str'>`
+  |          Has type `Literal["int"]`
+  |
+info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 
 ## In unions and intersections
