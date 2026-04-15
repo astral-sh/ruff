@@ -201,6 +201,61 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
+Assignments through `type(self)` should bind `Self` to the instance type when writing a `ClassVar`.
+
+```py
+from typing import ClassVar, Self, TypeVar
+
+class Saved:
+    latest: ClassVar[Self]
+
+    def save(self) -> None:
+        type(self).latest = self
+
+Saved.latest = Saved()  # error: [invalid-assignment]
+
+reveal_type(Saved.latest)  # revealed: Saved
+
+class SavedSub(Saved): ...
+
+reveal_type(SavedSub.latest)  # revealed: SavedSub
+
+def store_bad(cls: type[Saved]) -> None:
+    cls.latest = Saved()  # error: [invalid-assignment]
+
+T = TypeVar("T", bound=Saved)
+
+def store_ok(cls: type[T], value: T) -> None:
+    cls.latest = value
+```
+
+Assignments through gradual class objects remain permissive.
+
+```py
+from typing import Any, ClassVar, reveal_type
+
+class DynamicSaved:
+    count: ClassVar[int]
+
+def store_any(cls: type[Any], value: Any) -> None:
+    cls.count = value
+    reveal_type(cls.count)  # revealed: Any
+```
+
+Assignments through generic aliases still resolve class variables.
+
+```py
+from typing import ClassVar, Generic, TypeVar, reveal_type
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    count: ClassVar[int]
+
+Box[int].count = 1
+reveal_type(Box[int].count)  # revealed: int
+```
+
 ## Combining `ClassVar` and `Final` in normal classes
 
 An attribute on a class body that is annotated as `Final` is implicitly treated as a class variable.
