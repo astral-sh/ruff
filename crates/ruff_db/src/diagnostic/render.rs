@@ -263,7 +263,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            is_fixable: config.show_fix_status
+                && diag.has_applicable_fix(config.fix_applicability()),
             header_offset: diag.inner.header_offset,
         }
     }

@@ -19,14 +19,23 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    ty_test::run(
-        &absolute_fixture_path,
-        &workspace_relative_fixture_path,
-        &content,
-        &snapshot_path,
-        short_title,
-        test_name,
-    )?;
+    // Limit multithreading in tests to avoid that they compete
+    // for the same resources (tests are run concurrently most of the time).
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+
+    pool.install(|| {
+        ty_test::run(
+            &absolute_fixture_path,
+            &workspace_relative_fixture_path,
+            &content,
+            &snapshot_path,
+            short_title,
+            test_name,
+        )
+    })?;
 
     Ok(())
 }

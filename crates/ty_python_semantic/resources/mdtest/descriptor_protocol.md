@@ -568,8 +568,6 @@ class Derived(Base):
 
 ### Properties with no setters
 
-<!-- snapshot-diagnostics -->
-
 If a property has no setter, we emit a bespoke error message when a user attempts to set that
 attribute, since this is a common error.
 
@@ -578,8 +576,22 @@ class DontAssignToMe:
     @property
     def immutable(self): ...
 
-# error: [invalid-assignment]
+# snapshot: invalid-assignment
 DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
+ --> src/mdtest_snippet.py:6:1
+  |
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
+  |
+ ::: src/mdtest_snippet.py:3:9
+  |
+3 |     def immutable(self): ...
+  |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+  |
 ```
 
 ### Built-in `classmethod` descriptor

@@ -1082,19 +1082,25 @@ def _(flag1: bool, flag2: bool):
 
 ## Invalid access to attribute
 
-<!-- snapshot-diagnostics -->
-
 If an undefined variable is used in a method, and an attribute with the same name is defined and
-accessible, then we emit a subdiagnostic suggesting the use of `self.`. (These don't appear inline
-here; see the diagnostic snapshots.)
+accessible, then we emit a subdiagnostic suggesting the use of `self.`.
 
 ```py
 class Foo:
     x: int
 
     def method(self):
-        # error: [unresolved-reference] "Name `x` used when not defined"
-        y = x
+        y = x  # snapshot
+```
+
+```snapshot
+error[unresolved-reference]: Name `x` used when not defined
+ --> src/mdtest_snippet.py:5:13
+  |
+5 |         y = x  # snapshot
+  |             ^
+  |
+info: An attribute `x` is available: consider using `self.x`
 ```
 
 ```py
@@ -1102,8 +1108,17 @@ class Foo:
     x: int = 1
 
     def method(self):
-        # error: [unresolved-reference] "Name `x` used when not defined"
-        y = x
+        y = x  # snapshot
+```
+
+```snapshot
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:10:13
+   |
+10 |         y = x  # snapshot
+   |             ^
+   |
+info: An attribute `x` is available: consider using `self.x`
 ```
 
 ```py
@@ -3051,8 +3066,6 @@ reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -3063,17 +3076,44 @@ python-version = "3.10"
 ```py
 import datetime
 
-# error: [unresolved-attribute]
+# snapshot: unresolved-attribute
 reveal_type(datetime.UTC)  # revealed: Unknown
-# error: [unresolved-attribute]
+```
+
+```snapshot
+error[unresolved-attribute]: Module `datetime` has no member `UTC`
+ --> src/main.py:4:13
+  |
+4 | reveal_type(datetime.UTC)  # revealed: Unknown
+  |             ^^^^^^^^^^^^
+  |
+info: The member may be available on other Python versions or platforms
+info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
+```
+
+If an attribute doesn't exist at all, we still give the same error as before:
+
+`wrong.py`:
+
+```py
+import datetime
+
+# snapshot: unresolved-attribute
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+```snapshot
+error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
+ --> src/wrong.py:4:13
+  |
+4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
+  |             ^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
 
 We give special diagnostics for this common case too:
-
-<!-- snapshot-diagnostics -->
 
 `foo/__init__.py`:
 
@@ -3090,21 +3130,47 @@ We give special diagnostics for this common case too:
 ```py
 ```
 
-`main.py`:
+`foo_importer.py`:
 
 ```py
 import foo
+
+# snapshot: possibly-missing-submodule
+reveal_type(foo.bar)  # revealed: Unknown
+```
+
+```snapshot
+warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
+ --> src/foo_importer.py:4:13
+  |
+4 | reveal_type(foo.bar)  # revealed: Unknown
+  |             ^^^^^^^
+  |
+help: Consider explicitly importing `foo.bar`
+```
+
+`baz_importer.py`:
+
+```py
 import baz
 
-# error: [possibly-missing-submodule]
-reveal_type(foo.bar)  # revealed: Unknown
-# error: [possibly-missing-submodule]
+# snapshot: possibly-missing-submodule
 reveal_type(baz.bar)  # revealed: Unknown
+```
+
+```snapshot
+warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
+ --> src/baz_importer.py:4:13
+  |
+4 | reveal_type(baz.bar)  # revealed: Unknown
+  |             ^^^^^^^
+  |
+help: Consider explicitly importing `baz.bar`
 ```
 
 ## Diagnostic for function attribute accessed on `Callable` type
 
-<!-- snapshot-diagnostics -->
+We show a special help message here that explains that not all callables are functions.
 
 ```toml
 [environment]
@@ -3115,8 +3181,34 @@ python-version = "3.14"
 from typing import Callable
 
 def f(x: Callable):
-    x.__name__  # error: [unresolved-attribute]
-    x.__annotate__  # error: [unresolved-attribute]
+    x.__name__  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     x.__name__  # snapshot: unresolved-attribute
+  |     ^^^^^^^^^^
+  |
+help: Function objects have a `__name__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
+```
+
+```py
+def g(x: Callable):
+    x.__annotate__  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+ --> src/mdtest_snippet.py:6:5
+  |
+6 |     x.__annotate__  # snapshot: unresolved-attribute
+  |     ^^^^^^^^^^^^^^
+  |
+help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
 
 ## References

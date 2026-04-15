@@ -76,9 +76,9 @@ impl OutputFormat {
             OutputFormat::Cli => {
                 let _ = writeln!(
                     assertion_buf,
-                    "  {file_line} {message}",
+                    "{file_line} {message}",
                     file_line = format!("{file}:{line}").cyan(),
-                    message = failure.message()
+                    message = Indented(failure.message()),
                 );
                 if let Some((expected, actual)) = failure.diff() {
                     let _ = render_diff(assertion_buf, actual, expected);
@@ -116,6 +116,51 @@ impl OutputFormat {
     }
 }
 
+/// Indents every line except the first when formatting `T` by four spaces.
+///
+/// ## Examples
+/// Wrapping the message part indents the `error[...]` diagnostic frame by four spaces:
+///
+/// ```text
+/// crates/ty_python_semantic/resources/mdtest/mro.md:465 Fixing the diagnostics caused a fatal error:
+///        error[internal-error]: Applying fixes introduced a syntax error. Reverting changes.
+///        --> src/mdtest_snippet.py:1:1
+///        info: This indicates a bug in ty.
+/// ```
+struct Indented<T>(T);
+
+impl<T> std::fmt::Display for Indented<T>
+where
+    T: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut w = IndentingWriter {
+            f,
+            at_line_start: false,
+        };
+        write!(&mut w, "{}", self.0)
+    }
+}
+
+struct IndentingWriter<'a, 'b> {
+    f: &'a mut std::fmt::Formatter<'b>,
+    at_line_start: bool,
+}
+
+impl Write for IndentingWriter<'_, '_> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        for part in s.split_inclusive('\n') {
+            if self.at_line_start {
+                self.f.write_str("    ")?;
+            }
+            self.f.write_str(part)?;
+            self.at_line_start = part.ends_with('\n');
+        }
+
+        Ok(())
+    }
+}
+
 pub type Failures = Vec<FileFailures>;
 
 /// The failures for a single file in a test by line number.
@@ -144,66 +189,6 @@ impl TestFile<'_> {
     }
 }
 
-pub fn create_diagnostic_snapshot<C>(
-    resolver: &dyn FileResolver,
-    tool_name: &'static str,
-    relative_fixture_path: &Utf8Path,
-    test: &parser::MarkdownTest<'_, '_, C>,
-    diagnostics: impl IntoIterator<Item = Diagnostic>,
-) -> String {
-    let mut snapshot = String::new();
-    writeln!(snapshot).unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
-    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot).unwrap();
-
-    writeln!(snapshot, "# Python source files").unwrap();
-    writeln!(snapshot).unwrap();
-    for file in test.files() {
-        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
-        writeln!(snapshot).unwrap();
-        // Note that we don't use ```py here because the line numbering
-        // we add makes it invalid Python. This sacrifices syntax
-        // highlighting when you look at the snapshot on GitHub,
-        // but the line numbers are extremely useful for analyzing
-        // snapshots. So we keep them.
-        writeln!(snapshot, "```").unwrap();
-
-        let line_number_width = file.code.lines().count().to_string().len();
-        for (i, line) in file.code.lines().enumerate() {
-            let line_number = i + 1;
-            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot).unwrap();
-    }
-
-    writeln!(snapshot, "# Diagnostics").unwrap();
-    writeln!(snapshot).unwrap();
-    for (i, diag) in diagnostics.into_iter().enumerate() {
-        if i > 0 {
-            writeln!(snapshot).unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        write!(
-            snapshot,
-            "{}",
-            render_diagnostic(resolver, tool_name, &diag)
-        )
-        .unwrap();
-        writeln!(snapshot, "```").unwrap();
-    }
-    snapshot
-}
-
-#[derive(Debug, Clone)]
-pub struct MarkdownEdit {
-    pub(crate) range: TextRange,
-    pub(crate) replacement: String,
-}
-
 pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
     DisplayDiagnosticConfig::new(tool_name)
         .color(false)
@@ -217,7 +202,7 @@ pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagn
         .context(0)
 }
 
-pub(crate) fn render_diagnostic(
+pub fn render_diagnostic(
     resolver: &dyn FileResolver,
     tool_name: &'static str,
     diagnostic: &Diagnostic,
@@ -300,7 +285,7 @@ pub fn validate_inline_snapshot(
             if let Some(snapshot_code_block) = code_block.inline_snapshot_block() {
                 if update_snapshots {
                     markdown_edits.push(MarkdownEdit {
-                        range: Ranged::range(snapshot_code_block),
+                        range: snapshot_code_block.range(),
                         replacement: String::new(),
                     });
                 } else {
@@ -344,7 +329,7 @@ pub fn validate_inline_snapshot(
 
         if update_snapshots {
             markdown_edits.push(MarkdownEdit {
-                range: Ranged::range(snapshot_code_block),
+                range: snapshot_code_block.range(),
                 replacement: format!("```snapshot\n{actual}\n```"),
             });
         } else {
@@ -364,31 +349,7 @@ pub fn validate_inline_snapshot(
     }
 }
 
-pub fn try_apply_markdown_edits(
-    absolute_fixture_path: &Utf8Path,
-    source: &str,
-    mut edits: Vec<MarkdownEdit>,
-) {
-    edits.sort_unstable_by_key(|edit| edit.range.start());
-
-    let mut updated = source.to_string();
-    for edit in edits.into_iter().rev() {
-        updated.replace_range(
-            edit.range.start().to_usize()..edit.range.end().to_usize(),
-            &edit.replacement,
-        );
-    }
-
-    if let Err(err) = std::fs::write(absolute_fixture_path, updated) {
-        tracing::error!("Failed to write updated inline snapshots in: {err}");
-    }
-}
-
-pub(crate) fn render_diff(
-    f: &mut dyn std::fmt::Write,
-    expected: &str,
-    actual: &str,
-) -> std::fmt::Result {
+fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std::fmt::Result {
     let diff = TextDiff::from_lines(expected, actual);
 
     writeln!(f, "{}", "--- expected".red())?;
@@ -419,6 +380,86 @@ pub(crate) fn render_diff(
     }
 
     Ok(())
+}
+
+pub fn try_apply_markdown_edits(
+    absolute_fixture_path: &Utf8Path,
+    source: &str,
+    mut edits: Vec<MarkdownEdit>,
+) {
+    edits.sort_unstable_by_key(|edit| edit.range.start());
+
+    let mut updated = source.to_string();
+    for edit in edits.into_iter().rev() {
+        updated.replace_range(
+            edit.range.start().to_usize()..edit.range.end().to_usize(),
+            &edit.replacement,
+        );
+    }
+
+    if let Err(err) = std::fs::write(absolute_fixture_path, updated) {
+        tracing::error!("Failed to write updated inline snapshots in: {err}");
+    }
+}
+
+pub fn create_diagnostic_snapshot<'d, C>(
+    resolver: &dyn FileResolver,
+    tool_name: &'static str,
+    relative_fixture_path: &Utf8Path,
+    test: &parser::MarkdownTest<'_, '_, C>,
+    diagnostics: impl IntoIterator<Item = &'d Diagnostic>,
+) -> String {
+    let mut snapshot = String::new();
+    writeln!(snapshot).unwrap();
+    writeln!(snapshot, "---").unwrap();
+    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
+    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
+    writeln!(snapshot, "---").unwrap();
+    writeln!(snapshot).unwrap();
+
+    writeln!(snapshot, "# Python source files").unwrap();
+    writeln!(snapshot).unwrap();
+    for file in test.files() {
+        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
+        writeln!(snapshot).unwrap();
+        // Note that we don't use ```py here because the line numbering
+        // we add makes it invalid Python. This sacrifices syntax
+        // highlighting when you look at the snapshot on GitHub,
+        // but the line numbers are extremely useful for analyzing
+        // snapshots. So we keep them.
+        writeln!(snapshot, "```").unwrap();
+
+        let line_number_width = file.code.lines().count().to_string().len();
+        for (i, line) in file.code.lines().enumerate() {
+            let line_number = i + 1;
+            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
+        }
+        writeln!(snapshot, "```").unwrap();
+        writeln!(snapshot).unwrap();
+    }
+
+    writeln!(snapshot, "# Diagnostics").unwrap();
+    writeln!(snapshot).unwrap();
+    for (index, diagnostic) in diagnostics.into_iter().enumerate() {
+        if index > 0 {
+            writeln!(snapshot).unwrap();
+        }
+        writeln!(snapshot, "```").unwrap();
+        write!(
+            snapshot,
+            "{}",
+            render_diagnostic(resolver, tool_name, diagnostic)
+        )
+        .unwrap();
+        writeln!(snapshot, "```").unwrap();
+    }
+    snapshot
+}
+
+#[derive(Debug, Clone)]
+pub struct MarkdownEdit {
+    pub(crate) range: TextRange,
+    pub(crate) replacement: String,
 }
 
 #[cfg(test)]

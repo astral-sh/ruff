@@ -7,11 +7,13 @@ use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
+use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
+use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
@@ -24,6 +26,7 @@ use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    fix_all_diagnostics,
 };
 
 mod config;
@@ -408,9 +411,7 @@ fn run_test(
     db.update_analysis_options(configuration.analysis.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
-    // When snapshot testing is enabled, this is populated with
-    // all diagnostics. Otherwise it remains empty.
-    let mut snapshot_diagnostics = vec![];
+    let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
@@ -452,14 +453,7 @@ fn run_test(
                 }),
             };
 
-            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-            // since they make snapshots very noisy!
-            if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
-                    diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                }));
-            }
+            all_diagnostics.extend(diagnostics);
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
             match pull_types_result {
@@ -532,19 +526,26 @@ fn run_test(
         failures.push(failure);
     }
 
-    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
-        panic!(
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !all_diagnostics.is_empty(),
             "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
             test.name()
         );
-    } else if !snapshot_diagnostics.is_empty() {
+
+        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+        // since they make snapshots very noisy!
         let snapshot = mdtest::create_diagnostic_snapshot(
             db,
             "ty",
             relative_fixture_path,
             test,
-            snapshot_diagnostics,
+            all_diagnostics.iter().filter(|diagnostic| {
+                diagnostic.id() != DiagnosticId::RevealedType
+                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+            }),
         );
+
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
@@ -555,6 +556,47 @@ fn run_test(
             },
             { insta::assert_snapshot!(name, snapshot) }
         );
+    }
+
+    // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
+    // But don't try to run fixes for tests that are expected to panic.
+    if test.should_expect_panic().is_err() {
+        let token_source = CancellationTokenSource::new();
+        let result = fix_all_diagnostics(
+            db,
+            all_diagnostics,
+            Applicability::Unsafe,
+            &token_source.token(),
+        )
+        .expect("to succeed because fixing is never cancelled");
+
+        tracing::debug!("Fixed {} diagnostics", result.count);
+
+        let mut fatals = result.diagnostics;
+        fatals.retain(|diagnostic| diagnostic.id() == DiagnosticId::InternalError);
+
+        for diagnostic in fatals {
+            let ty_file = diagnostic.expect_primary_span().expect_ty_file();
+
+            let test_file = test_files
+                .iter()
+                .find(|test_file| test_file.file == ty_file)
+                .unwrap_or(&test_files[0]);
+
+            let mut by_line = matcher::FailuresByLine::default();
+            by_line.push(
+                OneIndexed::from_zero_indexed(0),
+                vec![Failure::new(format_args!(
+                    "Fixing the diagnostics caused a fatal error:\n{}",
+                    mdtest::render_diagnostic(db, "ty", &diagnostic)
+                ))],
+            );
+            let failure = FileFailures {
+                backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                by_line,
+            };
+            failures.push(failure);
+        }
     }
 
     if failures.is_empty() {

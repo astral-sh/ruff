@@ -97,3 +97,12 @@ def setup_app(app_arg: FastAPI, non_app: str) -> None:
     async def get_root() -> str:
         return "Hello World!"
 
+
+# asynccontextmanager-decorated functions must be async even without await
+
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def pass_7():  # OK: decorated with asynccontextmanager
+    yield
