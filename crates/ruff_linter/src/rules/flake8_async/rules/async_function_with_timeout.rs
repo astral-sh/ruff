@@ -37,6 +37,15 @@ use ruff_python_ast::PythonVersion;
 /// `anyio.move_on_after`, false positives from this rule can be avoided
 /// by using a different parameter name.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Removing a parameter from a subclass method may cause type checkers to
+/// complain about a violation of the Liskov Substitution Principle if it
+/// means that the method now incompatibly overrides a method defined on a
+/// superclass. Explicitly decorating an overriding method with `@override`
+/// signals to Ruff that the method is intended to override a superclass
+/// method and that a type checker will enforce that it does so; Ruff
+/// therefore knows that it should not enforce this rule on such methods.
+///
 /// ## Example
 ///
 /// ```python
@@ -64,6 +73,7 @@ use ruff_python_ast::PythonVersion;
 /// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
 ///
 /// ["structured concurrency"]: https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#timeouts-and-cancellation
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct AsyncFunctionWithTimeout {
