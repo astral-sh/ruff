@@ -2500,6 +2500,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     infer_value_ty(self, TypeContext::default());
                     return true;
                 };
+                let class_attr_self_ty = match object_ty {
+                    Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                        // Preserve symbolic subtype information for `type[Self]`, `type[T]`, and
+                        // gradual forms, but avoid collapsing concrete class objects to instances.
+                        SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
+                            Some(subclass_of.to_instance(db))
+                        }
+                        SubclassOfInner::Class(_) => None,
+                    },
+                    Type::ClassLiteral(_) | Type::GenericAlias(_) => None,
+                    _ => unreachable!(),
+                };
 
                 match meta_attr {
                     PlaceAndQualifiers {
@@ -2522,6 +2534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // attribute resolution.
                         let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
 
+                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
                         // Perform loud inference without type context, as we may encounter multiple equally
                         // applicable type contexts during attribute resolution.
                         let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
@@ -2569,6 +2582,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ..
                             } = fallback_attr
                             {
+                                let class_attr_ty = class_attr_self_ty
+                                    .map(|self_ty| class_attr_ty.bind_self_typevars(db, self_ty))
+                                    .unwrap_or(class_attr_ty);
                                 let value_ty = infer_value_ty
                                     .infer_silent(self, TypeContext::new(Some(class_attr_ty)));
                                 (
@@ -2609,6 +2625,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             qualifiers,
                         }) = fallback_attr
                         {
+                            let class_attr_ty = class_attr_self_ty
+                                .map(|self_ty| class_attr_ty.bind_self_typevars(db, self_ty))
+                                .unwrap_or(class_attr_ty);
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
                             if emit_diagnostics
