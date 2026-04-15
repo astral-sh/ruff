@@ -33,6 +33,7 @@ pub(crate) enum ErrorContext<'db> {
     IncompatibleParameterTypes {
         source: Type<'db>,
         target: Type<'db>,
+        name: Option<Name>,
     },
     ParameterNameMismatch {
         source_name: Name,
@@ -102,12 +103,26 @@ impl<'db> ErrorContext<'db> {
                 source = source.display(db),
                 target = target.display(db),
             ),
-            Self::IncompatibleParameterTypes { source, target } => format!(
+            Self::IncompatibleParameterTypes {
+                source,
+                target,
+                name,
+            } => {
                 // reversed order due to covariance
-                "incompatible parameter types: `{target}` is not assignable to `{source}`",
-                source = source.display(db),
-                target = target.display(db),
-            ),
+                if let Some(name) = name {
+                    format!(
+                        "parameter `{name}` has an incompatible type: `{target}` is not assignable to `{source}`",
+                        source = source.display(db),
+                        target = target.display(db),
+                    )
+                } else {
+                    format!(
+                        "incompatible parameter types: `{target}` is not assignable to `{source}`",
+                        source = source.display(db),
+                        target = target.display(db),
+                    )
+                }
+            }
             Self::ParameterNameMismatch {
                 source_name,
                 target_name,

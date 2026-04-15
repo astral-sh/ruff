@@ -319,7 +319,7 @@ error[invalid-method-override]: Invalid override of method `method`
 2 |     def method(self, x: str) -> bool:
   |         ---------------------------- `Parent.method` defined here
   |
-info: incompatible parameter types: `str` is not assignable to `bytes`
+info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -496,7 +496,7 @@ error[invalid-assignment]: Object of type `CheckWithWrongSignature` is not assig
    |
 info: type `CheckWithWrongSignature` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check` is incompatible
-info:     └── incompatible parameter types: `str` is not assignable to `bytes`
+info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
 ```
 
 Missing protocol properties:
@@ -613,7 +613,7 @@ error[invalid-assignment]: Object of type `Incompatible` is not assignable to `S
    |
 info: type `Incompatible` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check1` is incompatible
-info:     └── incompatible parameter types: `str` is not assignable to `bytes`
+info:     └── parameter `x` has an incompatible type: `str` is not assignable to `bytes`
 ```
 
 ## Failures for multiple union elements
