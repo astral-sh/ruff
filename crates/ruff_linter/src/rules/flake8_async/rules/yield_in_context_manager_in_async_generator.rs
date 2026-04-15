@@ -11,37 +11,50 @@ use crate::checkers::ast::Checker;
 /// Checks for `yield` inside a context manager in an async generator.
 ///
 /// ## Why is this bad?
-/// Yielding inside a context manager in an async generator is unsafe. Unless
-/// the generator is explicitly decorated with a decorator that is known to
-/// handle async generator cleanup safely (such as
-/// `@asynccontextmanager` or `@pytest.fixture`), the cleanup of the context
-/// manager may be delayed until the generator is closed, at which point
-/// `await` is no longer allowed. This can lead to resource leaks or other
-/// bugs.
+/// Yielding inside a context manager in an async generator is unsafe because
+/// the cleanup of the context manager may be delayed until the generator is
+/// closed, at which point `await` is no longer allowed. This can lead to
+/// resource leaks or other bugs.
 ///
 /// For more information, see [PEP 533](https://peps.python.org/pep-0533/).
 ///
+/// If the function is intended to yield only once and act as a context
+/// manager, use `@asynccontextmanager`. If it's a true async generator
+/// that yields multiple values, consumers should use `aclosing()` to
+/// ensure timely cleanup, or the generator should be refactored to avoid
+/// holding context managers open across yields.
+///
 /// ## Example
+///
+/// The following function yields once inside a context manager, but without
+/// `@asynccontextmanager`, cleanup of the connection may be delayed:
 /// ```python
-/// async def open_connections():
-///     with open("file.txt") as f:
-///         yield f
+/// async def open_connection():
+///     async with connect() as conn:
+///         yield conn
 /// ```
 ///
-/// Use instead:
+/// If the function is intended to yield exactly once (i.e., it's a context
+/// manager), add `@asynccontextmanager`:
 /// ```python
 /// from contextlib import asynccontextmanager
 ///
 ///
 /// @asynccontextmanager
-/// async def open_connections():
-///     with open("file.txt") as f:
-///         yield f
+/// async def open_connection():
+///     async with connect() as conn:
+///         yield conn
 /// ```
+///
+/// For async generators that yield multiple values, `@asynccontextmanager`
+/// is not appropriate. Instead, refactor to avoid holding context managers
+/// open across yields, or ensure consumers use `aclosing()` for timely
+/// cleanup.
 ///
 /// ## References
 /// - [PEP 533 – Deterministic cleanup for iterators](https://peps.python.org/pep-0533/)
 /// - [contextlib.aclosing](https://docs.python.org/3/library/contextlib.html#contextlib.aclosing)
+/// - [trio.as_safe_channel](https://trio.readthedocs.io/en/latest/reference-core.html#trio.as_safe_channel)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct YieldInContextManagerInAsyncGenerator;
@@ -49,7 +62,7 @@ pub(crate) struct YieldInContextManagerInAsyncGenerator;
 impl Violation for YieldInContextManagerInAsyncGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Yield in context manager in async generator is unsafe, the cleanup may be delayed until `await` is no longer allowed".to_string()
+        "Yield in context manager in async generator may not trigger cleanup. Use `@asynccontextmanager` if appropriate, or refactor.".to_string()
     }
 }
 
