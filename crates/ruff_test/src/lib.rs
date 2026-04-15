@@ -10,7 +10,7 @@ use serde::Deserialize;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
-use ruff_db::diagnostic::{FileResolver, UnifiedFile};
+use ruff_db::diagnostic::UnifiedFile;
 use ruff_db::system::SystemPathBuf;
 use ruff_linter::message::EmitterContext;
 use ruff_linter::source_kind::SourceKind;
@@ -219,18 +219,17 @@ fn run_test(
             };
             let path = Path::new(source_file.name());
             let (mut diagnostics, _, parsed) = test_contents(&source_kind, path, &settings.linter);
-            let resolver: &dyn FileResolver = &resolver;
 
             diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(resolver)
-                    .cmp(&right.rendering_sort_key(resolver))
+                left.rendering_sort_key(&resolver)
+                    .cmp(&right.rendering_sort_key(&resolver))
             });
 
             let failure =
-                match matcher::match_file(resolver, &test_file.file, parsed.tokens(), &diagnostics)
+                match matcher::match_file(&resolver, &test_file.file, &parsed, &diagnostics)
                     .and_then(|inline_diagnostics| {
                         mdtest::validate_inline_snapshot(
-                            resolver,
+                            &resolver,
                             "ruff",
                             test_file,
                             &inline_diagnostics,

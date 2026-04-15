@@ -34,9 +34,10 @@
 //! reveal_type(x)
 //! ```
 
-use ruff_python_ast::token::{Token, Tokens};
+use ruff_python_ast::{ModModule, token::Token};
+use ruff_python_parser::Parsed;
 use ruff_python_trivia::{CommentRanges, Cursor};
-use ruff_source_file::{OneIndexed, SourceCode};
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::str::FromStr;
@@ -48,21 +49,21 @@ pub(crate) struct InlineFileAssertions<'s> {
 }
 
 impl<'s> InlineFileAssertions<'s> {
-    pub(crate) fn from_tokens(
+    pub(crate) fn from_file(
         source: &'s str,
-        tokens: &'_ Tokens,
-        source_code: &SourceCode<'_, '_>,
+        parsed: &Parsed<ModModule>,
+        file_index: &LineIndex,
     ) -> Self {
         let mut by_line = Vec::new();
         let mut file_assertions = UnparsedAssertionsIter {
-            tokens: tokens.iter(),
+            tokens: parsed.tokens().iter(),
             source,
         }
         .peekable();
 
         while let Some(ranged_assertion) = file_assertions.next() {
             let mut collector = AssertionVec::new();
-            let mut line_number = source_code.line_index(ranged_assertion.start());
+            let mut line_number = file_index.line_index(ranged_assertion.start());
 
             // Collect all own-line comments on consecutive lines; these all apply to the same line of
             // code. For example:
@@ -80,7 +81,7 @@ impl<'s> InlineFileAssertions<'s> {
                 while let Some(ranged_assertion) = file_assertions.next_if(|next_pragma| {
                     let next_line_number = line_number.saturating_add(1);
 
-                    if source_code.line_index(next_pragma.start()) == next_line_number {
+                    if file_index.line_index(next_pragma.start()) == next_line_number {
                         line_number = next_line_number;
                         true
                     } else {
@@ -497,9 +498,9 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 mod tests {
     use super::*;
     use crate::tests::TestDb;
-    use ruff_db::diagnostic::UnifiedFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
@@ -509,10 +510,7 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);
-        let file = UnifiedFile::Ty(file);
-        let diagnostic_source = file.diagnostic_source(&db);
-        let source_code = diagnostic_source.as_source_code();
-        InlineFileAssertions::from_tokens(source, parsed.tokens(), &source_code)
+        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
     }
 
     fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {

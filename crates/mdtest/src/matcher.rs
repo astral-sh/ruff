@@ -9,7 +9,8 @@ use std::sync::LazyLock;
 use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, FileResolver, UnifiedFile};
-use ruff_python_ast::token::Tokens;
+use ruff_python_ast::ModModule;
+use ruff_python_parser::Parsed;
 use ruff_source_file::{OneIndexed, SourceCode};
 use smallvec::SmallVec;
 
@@ -87,15 +88,15 @@ struct LineFailures {
 pub fn match_file(
     resolver: &dyn FileResolver,
     file: &UnifiedFile,
-    tokens: &Tokens,
+    parsed: &Parsed<ModModule>,
     diagnostics: &[Diagnostic],
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
     let diagnostic_source = file.diagnostic_source(resolver);
     let source_code = diagnostic_source.as_source_code();
-    let source = source_code.after(ruff_text_size::TextSize::new(0));
-    let assertions = InlineFileAssertions::from_tokens(source, tokens, &source_code);
+    let assertions =
+        InlineFileAssertions::from_file(source_code.text(), parsed, source_code.index());
 
-    let diagnostics = SortedDiagnostics::new(diagnostics, &source_code);
+    let diagnostics = SortedDiagnostics::new(diagnostics, source_code.index());
 
     let mut line_diagnostics = diagnostics.iter_lines();
 
@@ -561,7 +562,7 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, &UnifiedFile::Ty(file), parsed.tokens(), &diagnostics)
+        super::match_file(&db, &UnifiedFile::Ty(file), &parsed, &diagnostics)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {

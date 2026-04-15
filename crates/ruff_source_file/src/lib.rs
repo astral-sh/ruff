@@ -100,6 +100,11 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         self.text
     }
 
+    /// Returns the line index
+    pub fn index(&self) -> &'index LineIndex {
+        self.index
+    }
+
     /// Returns the number of lines
     #[inline]
     pub fn line_count(&self) -> usize {

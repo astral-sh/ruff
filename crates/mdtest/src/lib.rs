@@ -263,6 +263,7 @@ pub fn validate_inline_snapshot(
     let update_snapshots = is_update_inline_snapshots_enabled();
     let diagnostic_source = test_file.file.diagnostic_source(resolver);
     let source_code = diagnostic_source.as_source_code();
+    let line_index = source_code.index();
     let mut failures = matcher::FailuresByLine::default();
     let mut inline_diagnostics = inline_diagnostics;
 
@@ -292,7 +293,7 @@ pub fn validate_inline_snapshot(
             inline_diagnostics.split_at(diagnostics_end);
         inline_diagnostics = remaining_diagnostics;
 
-        let failure_line = source_code.line_index(code_block.embedded_start_offset());
+        let failure_line = line_index.line_index(code_block.embedded_start_offset());
 
         let Some(first_diagnostic) = block_diagnostics.first() else {
             // If there are no inline diagnostics (no usages of `# snapshot`) but the code block has a
@@ -328,7 +329,7 @@ pub fn validate_inline_snapshot(
                 });
             } else {
                 let first_range = first_diagnostic.primary_span().unwrap().range().unwrap();
-                let line = source_code.line_index(first_range.start());
+                let line = line_index.line_index(first_range.start());
                 failures.push(
                     line,
                     vec![Failure::new(format!(
