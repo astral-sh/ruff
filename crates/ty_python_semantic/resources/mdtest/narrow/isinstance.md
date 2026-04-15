@@ -1025,6 +1025,25 @@ def narrow_iterable_keys(choices: Iterable[Any] | None) -> None:
         sink(choices.keys())
 ```
 
+`reversed()` is a read-only dict operation, so it should dispatch through the `TypedDictTop` arm
+without raising a spurious overload-resolution error:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+def narrow_reversed_typeddict_union(x: Movie | int) -> None:
+    if isinstance(x, dict):
+        reveal_type(reversed(x))  # revealed: Iterator[Unknown]
+
+def narrow_reversed_object(x: object) -> None:
+    if isinstance(x, dict):
+        reveal_type(reversed(x))  # revealed: Iterator[object]
+```
+
 ## Narrowing with named expressions (walrus operator)
 
 When `isinstance()` is used with a named expression, the target of the named expression should be

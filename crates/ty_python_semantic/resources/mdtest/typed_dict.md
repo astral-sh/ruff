@@ -2199,6 +2199,28 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## `reversed()` on Python 3.7
+
+`TypedDict` should not be treated as reversible before dictionaries gained `__reversed__` in Python
+3.8.
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+def _(movie: Movie) -> None:
+    # error: [no-matching-overload]
+    reveal_type(reversed(movie))  # revealed: Iterator[Unknown]
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
