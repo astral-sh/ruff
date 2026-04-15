@@ -318,7 +318,7 @@ fn run_test(
             let file = system_path_to_file(db, full_path).unwrap();
 
             Some(TestFile {
-                file,
+                file: UnifiedFile::Ty(file),
                 code_blocks: embedded.python_code_blocks.clone(),
             })
         })
@@ -435,30 +435,28 @@ fn run_test(
                 }
             };
 
-            let parsed = parsed_module(db, test_file.file).load(db);
-
-            let failure = match matcher::match_file(
-                db,
-                &UnifiedFile::Ty(test_file.file),
-                parsed.tokens(),
-                &diagnostics,
-            )
-            .and_then(|inline_diagnostics| {
-                mdtest::validate_inline_snapshot(
-                    db,
-                    db,
-                    "ty",
-                    test_file,
-                    &inline_diagnostics,
-                    &mut markdown_edits,
-                )
-            }) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
-                    by_line: line_failures,
-                }),
+            let UnifiedFile::Ty(file) = test_file.file else {
+                unreachable!("ty mdtests should always use ty files")
             };
+            let parsed = parsed_module(db, file).load(db);
+
+            let failure =
+                match matcher::match_file(db, &test_file.file, parsed.tokens(), &diagnostics)
+                    .and_then(|inline_diagnostics| {
+                        mdtest::validate_inline_snapshot(
+                            db,
+                            "ty",
+                            test_file,
+                            &inline_diagnostics,
+                            &mut markdown_edits,
+                        )
+                    }) {
+                    Ok(()) => None,
+                    Err(line_failures) => Some(FileFailures {
+                        backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                        by_line: line_failures,
+                    }),
+                };
 
             // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
             // since they make snapshots very noisy!
@@ -674,8 +672,11 @@ fn attempt_test<'db, 'a, T, F>(
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
 {
-    catch_unwind(|| test_fn(db, test_file.file))
-        .map_err(|info| AttemptTestError { info, test_file })
+    let UnifiedFile::Ty(file) = test_file.file else {
+        unreachable!("ty mdtests should always use ty files")
+    };
+
+    catch_unwind(|| test_fn(db, file)).map_err(|info| AttemptTestError { info, test_file })
 }
 
 struct AttemptTestError<'a> {

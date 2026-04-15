@@ -4,8 +4,7 @@ use camino::Utf8Path;
 use colored::Colorize;
 use similar::{ChangeTag, TextDiff};
 
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
-use ruff_db::source::line_index;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver, UnifiedFile};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
@@ -129,7 +128,7 @@ pub struct FileFailures {
 
 /// File in a test.
 pub struct TestFile<'a> {
-    pub file: ruff_db::files::File,
+    pub file: UnifiedFile,
 
     /// Information about the checkable code block(s) that compose this file.
     pub code_blocks: Vec<parser::CodeBlock<'a>>,
@@ -255,7 +254,6 @@ pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str
 }
 
 pub fn validate_inline_snapshot(
-    db: &dyn ruff_db::Db,
     resolver: &dyn FileResolver,
     tool_name: &'static str,
     test_file: &TestFile<'_>,
@@ -263,7 +261,8 @@ pub fn validate_inline_snapshot(
     markdown_edits: &mut Vec<MarkdownEdit>,
 ) -> Result<(), matcher::FailuresByLine> {
     let update_snapshots = is_update_inline_snapshots_enabled();
-    let line_index = line_index(db, test_file.file);
+    let diagnostic_source = test_file.file.diagnostic_source(resolver);
+    let source_code = diagnostic_source.as_source_code();
     let mut failures = matcher::FailuresByLine::default();
     let mut inline_diagnostics = inline_diagnostics;
 
@@ -293,7 +292,7 @@ pub fn validate_inline_snapshot(
             inline_diagnostics.split_at(diagnostics_end);
         inline_diagnostics = remaining_diagnostics;
 
-        let failure_line = line_index.line_index(code_block.embedded_start_offset());
+        let failure_line = source_code.line_index(code_block.embedded_start_offset());
 
         let Some(first_diagnostic) = block_diagnostics.first() else {
             // If there are no inline diagnostics (no usages of `# snapshot`) but the code block has a
@@ -329,7 +328,7 @@ pub fn validate_inline_snapshot(
                 });
             } else {
                 let first_range = first_diagnostic.primary_span().unwrap().range().unwrap();
-                let line = line_index.line_index(first_range.start());
+                let line = source_code.line_index(first_range.start());
                 failures.push(
                     line,
                     vec![Failure::new(format!(

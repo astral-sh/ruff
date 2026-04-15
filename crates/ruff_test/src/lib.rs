@@ -1,4 +1,5 @@
 use std::fmt::Write;
+use std::path::Path;
 
 use anyhow::anyhow;
 use camino::Utf8Path;
@@ -9,19 +10,15 @@ use serde::Deserialize;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
-use ruff_db::Db as _;
-use ruff_db::diagnostic::UnifiedFile;
-use ruff_db::files::{FileRootKind, system_path_to_file};
-use ruff_db::source::source_text;
-use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
+use ruff_db::diagnostic::{FileResolver, UnifiedFile};
+use ruff_db::system::SystemPathBuf;
 use ruff_linter::message::EmitterContext;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
 use ruff_source_file::LineIndex;
+use ruff_source_file::SourceFileBuilder;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
-
-mod db;
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(transparent)]
@@ -49,7 +46,6 @@ pub fn run(
     let suite = mdtest::parser::parse::<RuffOptions>(short_title, source)
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    let mut db = db::Db::setup();
     let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
@@ -63,7 +59,7 @@ pub fn run(
             continue;
         }
 
-        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let result = run_test(relative_fixture_path, snapshot_path, &test);
 
         let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
@@ -148,20 +144,11 @@ enum TestOutcome {
 }
 
 fn run_test(
-    db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &mdtest::parser::MarkdownTest<RuffOptions>,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
-    // Initialize the system and remove all files and directories to reset the system to a clean state.
-    db.use_in_memory_system();
-
     let project_root = SystemPathBuf::from("/src");
-    db.create_directory_all(&project_root)
-        .expect("Creating the project root to succeed");
-    db.files()
-        .try_add_root(db, &project_root, FileRootKind::Project);
-
     let src_path = project_root.clone();
 
     let test_files: Vec<_> = test
@@ -181,28 +168,17 @@ fn run_test(
 
             let full_path = embedded.full_path(&project_root);
 
-            let temp_string;
-            let to_write = if embedded.lang == "pth" && !embedded.code.starts_with('/') {
-                // Make any relative .pths be relative to src_path
-                temp_string = format!("{src_path}/{}", embedded.code);
-                &*temp_string
-            } else {
-                &*embedded.code
-            };
-
-            db.write_file(&full_path, to_write).unwrap();
-
             if !(full_path.starts_with(&src_path)
                 && matches!(embedded.lang, "py" | "python" | "pyi"))
             {
-                // These files need to be written to the file system (above), but we don't run any checks on them.
+                // These files can be referenced by a test configuration, but we don't run checks on them.
                 return None;
             }
 
-            let file = system_path_to_file(db, full_path).unwrap();
-
             Some(TestFile {
-                file,
+                file: UnifiedFile::Ruff(
+                    SourceFileBuilder::new(full_path.as_str(), embedded.code.as_ref()).finish(),
+                ),
                 code_blocks: embedded.python_code_blocks.clone(),
             })
         })
@@ -231,45 +207,42 @@ fn run_test(
     let failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let source_kind = SourceKind::Python {
-                code: source_text(db, test_file.file).as_str().to_string(),
-                is_stub: test_file.file.is_stub(db),
+            let UnifiedFile::Ruff(source_file) = &test_file.file else {
+                unreachable!("ruff mdtests should always use Ruff files")
             };
-            let path = test_file
-                .file
-                .path(db)
-                .as_system_path()
-                .expect("mdtest files are on the system")
-                .as_std_path();
+
+            let source_kind = SourceKind::Python {
+                code: source_file.source_text().to_string(),
+                is_stub: Path::new(source_file.name())
+                    .extension()
+                    .is_some_and(|ext| ext == "pyi"),
+            };
+            let path = Path::new(source_file.name());
             let (mut diagnostics, _, parsed) = test_contents(&source_kind, path, &settings.linter);
+            let resolver: &dyn FileResolver = &resolver;
 
             diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(db)
-                    .cmp(&right.rendering_sort_key(db))
+                left.rendering_sort_key(resolver)
+                    .cmp(&right.rendering_sort_key(resolver))
             });
 
-            let failure = match matcher::match_file(
-                db,
-                &UnifiedFile::Ty(test_file.file),
-                parsed.tokens(),
-                &diagnostics,
-            )
-            .and_then(|inline_diagnostics| {
-                mdtest::validate_inline_snapshot(
-                    db,
-                    &resolver,
-                    "ruff",
-                    test_file,
-                    &inline_diagnostics,
-                    &mut markdown_edits,
-                )
-            }) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
-                    by_line: line_failures,
-                }),
-            };
+            let failure =
+                match matcher::match_file(resolver, &test_file.file, parsed.tokens(), &diagnostics)
+                    .and_then(|inline_diagnostics| {
+                        mdtest::validate_inline_snapshot(
+                            resolver,
+                            "ruff",
+                            test_file,
+                            &inline_diagnostics,
+                            &mut markdown_edits,
+                        )
+                    }) {
+                    Ok(()) => None,
+                    Err(line_failures) => Some(FileFailures {
+                        backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                        by_line: line_failures,
+                    }),
+                };
 
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
