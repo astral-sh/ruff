@@ -160,6 +160,7 @@ mod tests {
             &diagnostics,
         )
         .to_string()
+        .replace('\\', "/")
     }
 
     #[test]
@@ -170,7 +171,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:4:5
           |
@@ -190,7 +191,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
@@ -215,7 +216,7 @@ mod tests {
                 return value
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:7:9
           |
@@ -235,7 +236,7 @@ mod tests {
                 print("still dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:4:5
           |
@@ -255,7 +256,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:4:5
           |
@@ -277,7 +278,7 @@ mod tests {
                     pass
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:9
           |
@@ -296,7 +297,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:4:5
           |
@@ -316,7 +317,7 @@ mod tests {
                     print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:9
           |
@@ -336,7 +337,7 @@ mod tests {
                     print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:9
           |
@@ -354,7 +355,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -372,7 +373,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -392,7 +393,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
@@ -412,7 +413,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
@@ -429,7 +430,7 @@ mod tests {
             x = "yes" if True else "no"
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:2:24
           |
@@ -450,7 +451,7 @@ mod tests {
                 y = 2
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -475,7 +476,7 @@ mod tests {
                 x = lambda: 1
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -494,7 +495,7 @@ mod tests {
                     pass
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -514,7 +515,7 @@ mod tests {
                     pass
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -533,7 +534,7 @@ mod tests {
                 x = [i for i in range(10)]
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -557,7 +558,7 @@ mod tests {
                 z = (i for i in range(10))
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -592,7 +593,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY312);
 
-        assert_snapshot!(test.render(&source)?, @r"
+        assert_snapshot!(test.render(source)?, @r"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:3:5
           |
@@ -615,7 +616,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY310);
 
-        assert_snapshot!(test.render(&source)?, @r"
+        assert_snapshot!(test.render(source)?, @r"
         info[unreachable-code]: Code is unreachable under the current analysis
          --> src/main.py:5:5
           |
@@ -639,7 +640,7 @@ mod tests {
                 print("dead")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @r#"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is unreachable under the current analysis
          --> src/main.py:9:5
           |
@@ -664,7 +665,7 @@ mod tests {
                 print("reachable")
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @"");
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"");
         Ok(())
     }
 
@@ -681,7 +682,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY310);
 
-        assert_snapshot!(test.render(&source)?, @r"
+        assert_snapshot!(test.render(source)?, @r"
         info[unreachable-code]: Code is unreachable under the current analysis
          --> src/main.py:5:5
           |
@@ -702,7 +703,7 @@ mod tests {
                 import expensive_module
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(&source)?, @"");
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"");
         Ok(())
     }
 }
