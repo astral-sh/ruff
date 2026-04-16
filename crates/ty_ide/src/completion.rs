@@ -8756,8 +8756,6 @@ bar(y_true=y<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r###"
-        y_pred=
-        y_true=
         y_pred
         y_true
         "###
