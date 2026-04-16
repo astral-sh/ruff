@@ -1411,8 +1411,8 @@ fn add_argument_completions<'db>(
     let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
         match node {
-            // Do not suggest argument completions in value
-            // positions for keyword arguments
+            // Do not suggest argument completions in value positions for
+            // keyword arguments
             ast::AnyNodeRef::Keyword(kw) => {
                 if kw.value.range().contains_range(cursor.range) {
                     return;
