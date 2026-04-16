@@ -2,8 +2,6 @@
 
 ## Abstract classmethod with trivial body on class literal
 
-<!-- snapshot-diagnostics -->
-
 Calling an abstract `@classmethod` with a trivial body directly on the class is unsound.
 
 ```py
@@ -14,8 +12,23 @@ class Foo(ABC):
     @abstractmethod
     def method(cls) -> int: ...
 
-# error: [call-abstract-method] "Cannot call `method` on class object"
+# snapshot: call-abstract-method
 Foo.method()
+```
+
+```snapshot
+error[call-abstract-method]: Cannot call `method` on class object
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | Foo.method()
+  | ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
+  |
+info: Method `method` defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def method(cls) -> int: ...
+  |         ^^^^^^
+  |
 ```
 
 ## Abstract staticmethod with trivial body on class literal
