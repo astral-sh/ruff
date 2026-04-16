@@ -8733,6 +8733,30 @@ re.match('', '', fla<CURSOR>
         );
     }
 
+    #[test]
+    fn call_keyword_argument_at_value() {
+        let builder = completion_test_builder(
+            "\
+def bar(y_true,y_pred): ...
+
+y_true = 1
+y_pred = 2
+
+bar(y_true=y<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r###"
+        y_pred=
+        y_true=
+        y_pred
+        y_true
+        "###
+        );
+    }
+
     // Ideally, we should favour completions that are definitely raisable
     // here. However, doing so would require `exception_ty` to fall back to
     // token matching when AST-matching fails, making the function signficantly
