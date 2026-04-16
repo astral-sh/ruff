@@ -97,7 +97,7 @@ pub use special_form::SpecialFormType;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
+use ty_python_core::{Truthiness, place_table, semantic_index};
 
 mod bool;
 mod bound_super;
@@ -2838,6 +2838,7 @@ impl<'db> Type<'db> {
                     origin,
                     definedness,
                     public_type_policy,
+                    definition,
                 }),
             qualifiers,
         } = attribute
@@ -2850,6 +2851,7 @@ impl<'db> Type<'db> {
                     origin,
                     definedness,
                     public_type_policy,
+                    definition,
                 })
                 .with_qualifiers(qualifiers),
                 instance,
@@ -2882,6 +2884,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness: boundness,
                         public_type_policy,
+                        ..
                     }),
                 qualifiers,
             } => (
@@ -2894,6 +2897,7 @@ impl<'db> Type<'db> {
                             origin,
                             definedness: boundness,
                             public_type_policy,
+                            definition: None,
                         })
                     })
                     .with_qualifiers(qualifiers),
@@ -2915,6 +2919,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness,
                         public_type_policy,
+                        ..
                     }),
                 qualifiers,
             } => (
@@ -2930,6 +2935,7 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                definition: None,
                             })
                         })
                         .with_qualifiers(qualifiers)
@@ -2945,6 +2951,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness: boundness,
                         public_type_policy,
+                        definition,
                     }),
                 qualifiers: _,
             } => {
@@ -2957,6 +2964,7 @@ impl<'db> Type<'db> {
                             origin,
                             definedness: boundness,
                             public_type_policy,
+                            definition,
                         })
                         .into(),
                         attribute_kind,
@@ -3086,12 +3094,14 @@ impl<'db> Type<'db> {
                     origin: fallback_origin,
                     definedness: fallback_boundness,
                     public_type_policy: fallback_public_type_policy,
+                    definition: fallback_definition,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
                 public_type_policy: fallback_public_type_policy,
+                definition: fallback_definition,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -3130,12 +3140,14 @@ impl<'db> Type<'db> {
                     origin: fallback_origin,
                     definedness: fallback_boundness,
                     public_type_policy: fallback_public_type_policy,
+                    definition: fallback_definition,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
                 public_type_policy: fallback_public_type_policy,
+                definition: fallback_definition,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -4793,6 +4805,7 @@ impl<'db> Type<'db> {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                definition,
                 ..
             }) => {
                 let constraints = ConstraintSetBuilder::new();
@@ -4804,12 +4817,6 @@ impl<'db> Type<'db> {
                 let bindings = match bindings {
                     Ok(bindings) => bindings,
                     Err(CallError(kind, bindings)) => {
-                        // Capture the binding site of the dunder on the receiver class so the
-                        // diagnostic can point at the user's own assignment.
-                        // See https://github.com/astral-sh/ty/issues/3250.
-                        // The meta-type MRO walk mirrors `NO_INSTANCE_FALLBACK`, which is what the
-                        // lookup above used.
-                        let definition = self.class_attribute_first_binding(db, name);
                         return Err(CallDunderError::CallError(kind, bindings, definition));
                     }
                 };
@@ -4824,33 +4831,6 @@ impl<'db> Type<'db> {
             }
             Place::Undefined => Err(CallDunderError::MethodNotAvailable),
         }
-    }
-
-    /// Walks the meta-type's MRO and returns the [`Definition`] of the first class-body binding
-    /// of `name`, when one can be statically resolved. Used to attach a binding site to
-    /// [`CallDunderError::CallError`] so diagnostics can point at the user's own assignment
-    /// rather than the type's typeshed origin. See
-    /// <https://github.com/astral-sh/ty/issues/3250>.
-    fn class_attribute_first_binding(self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
-        let class = self.nominal_class(db)?;
-        for base in class.iter_mro(db) {
-            let ClassBase::Class(class_type) = base else {
-                continue;
-            };
-            let Some((literal, _)) = class_type.static_class_literal(db) else {
-                continue;
-            };
-            let scope = literal.body_scope(db);
-            if let Some(symbol) = place_table(db, scope).symbol_id(name)
-                && let Some(binding) = use_def_map(db, scope)
-                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
-                    .next()
-                && let Some(definition) = binding.binding.definition()
-            {
-                return Some(definition);
-            }
-        }
-        None
     }
 
     /// Attempt to call a dunder method defined on a class itself.
@@ -7040,6 +7020,7 @@ pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -7048,6 +7029,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin,
             qualifiers,
+            definition: None,
         }
     }
 
@@ -7056,7 +7038,17 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
+            definition: None,
         }
+    }
+
+    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.definition = definition;
+        self
+    }
+
+    pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+        self.definition
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -7087,6 +7079,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner: f(self.inner),
             origin: self.origin,
             qualifiers: self.qualifiers,
+            definition: self.definition,
         }
     }
 }
@@ -7432,10 +7425,6 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                // Pointing at the attribute's *type* definition (the previous behavior) was
-                // rarely useful and motivated https://github.com/astral-sh/ty/issues/3250 — we
-                // skip the secondary annotation entirely when the binding site can't be
-                // statically resolved (e.g., union types or synthesized protocols).
                 if let Some(definition) = attribute_definition {
                     let module = parsed_module(db, definition.file(db)).load(db);
                     diag.annotate(
