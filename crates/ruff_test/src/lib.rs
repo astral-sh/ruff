@@ -166,8 +166,6 @@ fn run_test(
     db.files()
         .try_add_root(db, &project_root, FileRootKind::Project);
 
-    let src_path = project_root.clone();
-
     let test_files: Vec<_> = test
         .files()
         .filter_map(|embedded| {
@@ -176,32 +174,13 @@ fn run_test(
             }
 
             assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
-                ),
-                "Supported file types are: py (or python), pyi, text, cfg and ignore"
+                matches!(embedded.lang, "py" | "pyi" | "python"),
+                "Supported file types are: py (or python), pyi, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
 
-            let temp_string;
-            let to_write = if embedded.lang == "pth" && !embedded.code.starts_with('/') {
-                // Make any relative .pths be relative to src_path
-                temp_string = format!("{src_path}/{}", embedded.code);
-                &*temp_string
-            } else {
-                &*embedded.code
-            };
-
-            db.write_file(&full_path, to_write).unwrap();
-
-            if !(full_path.starts_with(&src_path)
-                && matches!(embedded.lang, "py" | "python" | "pyi"))
-            {
-                // These files need to be written to the file system (above), but we don't run any checks on them.
-                return None;
-            }
+            db.write_file(&full_path, &*embedded.code).unwrap();
 
             let file = system_path_to_file(db, full_path).unwrap();
 
@@ -279,27 +258,60 @@ fn run_test(
                 }),
             };
 
-            if test.should_snapshot_diagnostics() {
-                all_diagnostics.extend(diagnostics);
-            }
+            all_diagnostics.extend(diagnostics);
 
             failure
         })
         .collect();
 
-    if all_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
-        panic!(
+    match panic_info {
+        Some(panic_info) => {
+            let expected_message = test
+                .should_expect_panic()
+                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+            let message = panic_info
+                .payload
+                .as_str()
+                .unwrap_or("Box<dyn Any>")
+                .to_string();
+
+            if let Some(expected_message) = expected_message {
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name()
+                );
+            }
+        }
+        None => {
+            if let Ok(message) = test.should_expect_panic() {
+                if let Some(message) = message {
+                    panic!(
+                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                        test.name()
+                    );
+                }
+                panic!("Test `{}` is expected to panic but it didn't.", test.name());
+            }
+        }
+    }
+
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !all_diagnostics.is_empty(),
             "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
             test.name()
         );
-    } else if !all_diagnostics.is_empty() {
+
         let snapshot = mdtest::create_diagnostic_snapshot(
-            &resolver,
+            db,
             "ruff",
             relative_fixture_path,
             test,
             all_diagnostics.iter(),
         );
+
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
