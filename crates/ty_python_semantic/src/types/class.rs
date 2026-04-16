@@ -2593,7 +2593,7 @@ pub(super) enum DisjointBaseKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassError<'db> {
-    kind: MetaclassErrorKind<'db>,
+    pub(crate) kind: MetaclassErrorKind<'db>,
 }
 
 impl<'db> MetaclassError<'db> {
@@ -2623,12 +2623,14 @@ pub(super) enum MetaclassErrorKind<'db> {
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
-    /// The metaclass is not callable
-    NotCallable(Type<'db>),
-    /// The metaclass is of a union type whose some members are not callable
-    PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
+    /// A non-class object was provided as the `metaclass=` keyword.
+    ///
+    /// We won't necessarily emit an error for this case, but it's important to record
+    /// the fact that we weren't able to resolve the metaclass in
+    /// [`StaticClassLiteral::try_metaclass`].
+    NotAClass,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

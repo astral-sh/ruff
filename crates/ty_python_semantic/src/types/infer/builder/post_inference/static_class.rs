@@ -5,19 +5,18 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::attribute_assignments;
 use crate::{
-    TypeQualifiers,
+    TypeQualifiers, attribute_assignments,
     diagnostic::format_enumeration,
-    place::{place_from_bindings, place_from_declarations},
+    place::{LookupError, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
+        SpecialFormType, StaticClassLiteral, Type, UnionType,
         call::Argument,
         class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
         context::InferContext,
@@ -30,13 +29,13 @@ use crate::{
             INVALID_TYPED_DICT_HEADER, IncompatibleBases, SUBCLASS_OF_FINAL_CLASS,
             UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
             report_conflicting_metaclass_from_bases, report_duplicate_bases,
-            report_instance_layout_conflict, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference,
+            report_instance_layout_conflict, report_invalid_dunder_prepare_call,
+            report_invalid_init_subclass_call, report_invalid_metaclass,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
             report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
-            report_shadowed_type_variable,
-            report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
+            report_shadowed_type_variable, report_unsupported_base,
         },
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
@@ -622,26 +621,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                     builder.into_diagnostic("Generic metaclasses are not supported");
                 }
             }
-            MetaclassErrorKind::NotCallable(ty) => {
-                if let Some(builder) =
-                    context.report_lint(&INVALID_METACLASS, invalid_metaclass_range)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Metaclass type `{}` is not callable",
-                        ty.display(db)
-                    ));
-                }
-            }
-            MetaclassErrorKind::PartlyNotCallable(ty) => {
-                if let Some(builder) =
-                    context.report_lint(&INVALID_METACLASS, invalid_metaclass_range)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Metaclass type `{}` is partly not callable",
-                        ty.display(db)
-                    ));
-                }
-            }
             MetaclassErrorKind::Conflict {
                 candidate1:
                     MetaclassCandidate {
@@ -681,6 +660,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                     ));
                 }
             }
+            // We check whether the passed in argument was callable elsewhere
+            MetaclassErrorKind::NotAClass => {}
         }
     }
 
@@ -741,41 +722,13 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         } else {
-            let call_args: CallArguments = args
-                .keywords
-                .iter()
-                .filter_map(|keyword| match keyword.arg.as_ref() {
-                    // We mimic the runtime behaviour and discard the metaclass argument
-                    Some(name) if name.id.as_str() == "metaclass" => None,
-                    Some(name) => {
-                        let ty = file_expression_type(&keyword.value);
-                        Some((Argument::Keyword(name.id.as_str()), Some(ty)))
-                    }
-                    None => {
-                        let ty = file_expression_type(&keyword.value);
-                        Some((Argument::Keywords, Some(ty)))
-                    }
-                })
-                .collect();
-
-            let init_subclass_type = class
-                .class_member_from_mro(
-                    db,
-                    "__init_subclass__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    // skip(1) to skip the current class and only consider base classes.
-                    class.iter_mro(db, None).skip(1),
-                )
-                .ignore_possibly_undefined();
-
-            if let Some(init_subclass) = init_subclass_type {
-                let call_args = call_args.with_self(Some(Type::from(class)));
-                if let Err(call_error) = init_subclass.try_call(db, &call_args) {
-                    report_subclass_of_class_with_non_callable_init_subclass(
-                        context, call_error, class, class_node,
-                    );
-                }
-            }
+            check_non_typeddict_keyword_arguments(
+                context,
+                class,
+                class_node,
+                &args.keywords,
+                file_expression_type,
+            );
         }
     }
 
@@ -1263,4 +1216,208 @@ fn has_binding_in_init<'db>(
                 .into_iter()
                 .any(|b| b.binding.definition().is_some())
     })
+}
+
+fn check_non_typeddict_keyword_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    keywords: &[ast::Keyword],
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+) {
+    let db = context.db();
+
+    let mut explicit_metaclass = None;
+
+    let keyword_call_args: CallArguments = keywords
+        .iter()
+        .filter_map(|keyword| match keyword.arg.as_deref() {
+            // We mimic the runtime behaviour and discard the metaclass argument
+            Some("metaclass") => {
+                explicit_metaclass = Some(keyword);
+                None
+            }
+            Some(name) => {
+                let ty = file_expression_type(&keyword.value);
+                Some((Argument::Keyword(name), Some(ty)))
+            }
+            None => {
+                let ty = file_expression_type(&keyword.value);
+                Some((Argument::Keywords, Some(ty)))
+            }
+        })
+        .collect();
+
+    // Our `class.metaclass()` method will return `Unknown` if there's a metaclass conflict,
+    // or if the user has passed a non-`type` metaclass via the `metaclass=` keyword argument.
+    // But we should still verify that the `metaclass=` argument is callable with the correct
+    // arguments even in these error cases. So, if the metaclass was unresolvable, fallback
+    // to the inferred type of the explicit `metaclass=` argument if it was provided.
+    //
+    // This approximately emulates what CPython does at runtime. If an object is passed for
+    // `metaclass=` that is an instance of `type`, that object will not necessarily become the
+    // class's metaclass: CPython compares that object with the metaclasses of the class's
+    // bases to determine the "most derived metaclass", and uses the result of that computation
+    // as the new class's metaclass. But if an object is passed that is not an instance of
+    // `type` to `metaclass=` at runtime, CPython skips attempting to determine the most
+    // derived metaclass and just calls the object directly to construct the new object that
+    // will be the result of the `class` statement.
+    //
+    // It's tempting to attempt to emulate CPython exactly here by distinguishing between
+    // objects that are instances of `type` (using the result of `class.metaclass(db)` for
+    // those cases) and those that are not (using the `metaclass=` argument directly for those
+    // cases). However, that would lead to false negatives for objects such as `typing.Any`,
+    // which we correctly recognise as instances of `type` but which we don't recognise as
+    // actual class objects. If you use `metaclass=Any` for a class `Foo`, our
+    // `class.metaclass()` method will return `Unknown` for `Foo`, meaning we'd never try to
+    // call `Any` here, and we'd never emit a diagnostic complaining that `Any` is not
+    // callable (it isn't). So only falling back to `explicit_metaclass` here when
+    // `class.try_metaclass()` returns an error reduces false negatives without increasing
+    // false positives.
+    let try_metaclass_result = class.try_metaclass(db);
+
+    let metaclass = try_metaclass_result
+        .as_ref()
+        .ok()
+        .map(|(metaclass, _)| *metaclass)
+        .or_else(|| {
+            explicit_metaclass.map(|metaclass_kwarg| file_expression_type(&metaclass_kwarg.value))
+        })
+        .unwrap_or_else(Type::unknown);
+
+    let builtins_type = KnownClass::Type.to_class_literal(db);
+
+    let overrides_member = |typ: Type<'db>, member| {
+        !typ.member_lookup_with_policy(
+            db,
+            Name::new_static(member),
+            MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        )
+        .is_undefined()
+    };
+
+    // Any class statement is syntactic sugar at runtime for a constructor call to the class's metaclass.
+    // As an optimisation, however, we avoid desugaring the `class` statement into a call to the metaclass
+    // unless:
+    //
+    // (1) The metaclass is not `builtins.type`, and;
+    // (2) Either the metaclass is not a subclass of `builtins.type`, or one of the following conditions applies:
+    //     (a) The metaclass overrides `__new__` from `builtins.type`, or
+    //     (b) The metaclass overrides `__prepare__` from `builtins.type`, or
+    //     (c) The metaclass overrides `__init__` from `builtins.type`, or
+    //     (d) The metaclass itself has its own custom metaclass that:
+    //         (i) is not `builtins.type`, and;
+    //         (ii) either is not a subclass of `builtins.type` or overrides `__call__` from `builtins.type`.
+    let (check_call_to_metaclass, check_init_subclass) = if metaclass == builtins_type {
+        (false, true)
+    } else if !metaclass.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
+        || overrides_member(metaclass, "__new__")
+    {
+        (true, false)
+    } else {
+        let meta_metaclass = metaclass.to_meta_type(db);
+        if meta_metaclass != builtins_type
+            && !meta_metaclass.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
+        {
+            // for now, I give up at this point
+            (false, false)
+        } else if meta_metaclass != builtins_type && overrides_member(meta_metaclass, "__call__") {
+            (true, false)
+        } else if overrides_member(metaclass, "__prepare__")
+            || overrides_member(metaclass, "__init__")
+        {
+            (true, true)
+        } else {
+            (false, true)
+        }
+    };
+
+    if check_call_to_metaclass {
+        let class_name_type = Type::string_literal(db, class.name(db));
+        let instance_of_type = KnownClass::Type.to_instance(db);
+        let original_bases = class.explicit_bases(db);
+
+        // Okay, so, for any non-`type` element in the class's original bases list,
+        // if the element is not an instance of `type`, `__mro_entries__` will be called
+        // on that element at runtime. `__mro_entries__` could return a tuple of arbitrary
+        // length, so in that situation, we have no idea what the class's actual bases
+        // will really be. In this situation, we pass in `tuple[Unknown, ...]`
+        // as the type of the `bases` argument to `__prepare__` and the metaclass's
+        // `__new__`/`__init__` methods, reflecting the fact that we don't know exactly
+        // which types will be passed in as the tuple elements, and we don't even know the
+        // exact length of the tuple.
+        let bases_type = if original_bases
+            .iter()
+            .all(|base| base.is_subtype_of(db, instance_of_type))
+        {
+            Type::heterogeneous_tuple(db, original_bases)
+        } else {
+            Type::homogeneous_tuple(db, Type::unknown())
+        };
+
+        // https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
+        // `__prepare__` is only called if it exists as an attribute on the metaclass;
+        // otherwise, an "empty ordered mapping" is passed in as the namespace.
+        let call_prepare = |prepare: Type<'db>| {
+            prepare
+                .try_call(
+                    db,
+                    &keyword_call_args.with_prepended_parameters(&[class_name_type, bases_type]),
+                )
+                .unwrap_or_else(|err| {
+                    report_invalid_dunder_prepare_call(context, &err, class, metaclass, class_node);
+                    *err.1
+                })
+                .return_type(db)
+        };
+
+        let fallback = || {
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
+        };
+
+        let namespace_type = match metaclass
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__prepare__"),
+                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .into_lookup_result(db)
+        {
+            Ok(prepare) => call_prepare(prepare.inner_type()),
+            Err(LookupError::Undefined(_)) => fallback(),
+            Err(LookupError::PossiblyUndefined(prepare)) => {
+                UnionType::from_two_elements(db, call_prepare(prepare.inner_type()), fallback())
+            }
+        };
+
+        let metaclass_new_prepended_parameters = &[class_name_type, bases_type, namespace_type];
+
+        let metaclass_new_args =
+            keyword_call_args.with_prepended_parameters(metaclass_new_prepended_parameters);
+
+        if let Err(call_error) = metaclass.try_call(db, &metaclass_new_args) {
+            report_invalid_metaclass(context, &call_error, class, metaclass, class_node);
+        }
+    }
+
+    if check_init_subclass {
+        let init_subclass = class.class_member_from_mro(
+            db,
+            "__init_subclass__",
+            MemberLookupPolicy::default(),
+            // skip(1) to skip the current class and only consider base classes.
+            class.iter_mro(db, None).skip(1),
+        );
+
+        // This should generally always be `Some()`, since `object.__init_subclass__` exists...
+        // but there's always the chance that the user is employing a custom typeshed.
+        if let Some(init_subclass) = init_subclass.ignore_possibly_undefined() {
+            let args = keyword_call_args.with_self(Some(Type::from(class)));
+            if let Err(call_error) = init_subclass.try_call(db, &args) {
+                report_invalid_init_subclass_call(context, call_error, class, class_node);
+            }
+        }
+    }
 }

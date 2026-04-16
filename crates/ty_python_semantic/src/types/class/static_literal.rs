@@ -17,13 +17,12 @@ use crate::{
     },
     reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+        ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, GenericContext,
+        KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy, MetaclassCandidate,
+        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, Signature,
+        SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
         TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
@@ -834,7 +833,15 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
             .map(|(ty, _)| ty)
-            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
+            .unwrap_or_else(|err| match err.kind {
+                // If a non-class was passed as `metaclass=`,
+                // the object constructed by the `class` statement might
+                // not be an instance of type at all
+                MetaclassErrorKind::NotAClass => Type::unknown(),
+                MetaclassErrorKind::GenericMetaclass
+                | MetaclassErrorKind::Cycle
+                | MetaclassErrorKind::Conflict { .. } => SubclassOfType::subclass_of_unknown(),
+            })
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
@@ -850,7 +857,9 @@ impl<'db> StaticClassLiteral<'db> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-        if base_classes.peek().is_some() && self.inheritance_cycle(db).is_some() {
+        let first_base = base_classes.peek().copied();
+
+        if first_base.is_some() && self.inheritance_cycle(db).is_some() {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined.
             return Ok((SubclassOfType::subclass_of_unknown(), None));
@@ -898,34 +907,15 @@ impl<'db> StaticClassLiteral<'db> {
                 metaclass: metaclass_ty,
                 explicit_metaclass_of: class_metaclass_was_from,
             }
+        } else if first_base.is_none()
+            && metaclass.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
+        {
+            return Ok((metaclass, None));
         } else {
-            let name = Type::string_literal(db, self.name(db));
-            let bases = Type::heterogeneous_tuple(db, self.explicit_bases(db));
-            let namespace = KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-
-            // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([name, bases, namespace]);
-
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
-                Ok(bindings) => Ok(bindings.return_type(db)),
-
-                Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type()),
-                }),
-
-                // TODO we should also check for binding errors that would indicate the metaclass
-                // does not accept the right arguments
-                Err(CallError(CallErrorKind::BindingError, bindings)) => {
-                    Ok(bindings.return_type(db))
-                }
-
-                Err(CallError(CallErrorKind::PossiblyNotCallable, _)) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
-                }),
-            };
-
-            return return_ty_result.map(|ty| (ty.to_meta_type(db), None));
+            // Call validation is done elsewhere.
+            return Err(MetaclassError {
+                kind: MetaclassErrorKind::NotAClass,
+            });
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -975,6 +965,7 @@ impl<'db> StaticClassLiteral<'db> {
                 params,
                 from_explicit_metaclass: candidate.explicit_metaclass_of == self,
             });
+
         Ok((candidate.metaclass.into(), transform_info))
     }
 

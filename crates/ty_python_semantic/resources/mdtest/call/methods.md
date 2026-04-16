@@ -516,9 +516,10 @@ with Child().create() as child:
 
 ### `__init_subclass__`
 
-#### Basics
-
-<!-- snapshot-diagnostics -->
+```toml
+[environment]
+python-version = "3.12"
+```
 
 The [`__init_subclass__`] method is implicitly a classmethod:
 
@@ -551,8 +552,8 @@ class MissingArg(RequiresArg): ...  # error: [missing-argument]
 class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
 class Valid(RequiresArg, arg=1): ...
 
-# error: [missing-argument]
-# error: [unknown-argument]
+# snapshot: missing-argument
+# snapshot: unknown-argument
 class IncorrectArg(RequiresArg, not_arg="foo"):
     a = 1
     b = 2
@@ -564,15 +565,62 @@ class IncorrectArg(RequiresArg, not_arg="foo"):
     h = 8
     i = 9
     j = 10
+```
 
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:25:1
+   |
+25 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:13:32
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+   |
+
+
+error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:25:33
+   |
+25 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   |                                 ^^^^^^^^^^^^^
+   |
+info: Function signature here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
+```py
 class NotCallableInitSubclass:
     __init_subclass__ = None
 
-# error: [non-callable-init-subclass] "Class `NotCallableInitSubclass` cannot be subclassed due to an `__init_subclass__` definition that may not be callable"
+# snapshot
 class Bad(NotCallableInitSubclass):
     a = 1
     b = 2
     c = 3
+```
+
+```snapshot
+error[non-callable-init-subclass]: Invalid definition of class `Bad`
+  --> src/mdtest_snippet.py:40:7
+   |
+40 | class Bad(NotCallableInitSubclass):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
+   |
+  ::: src/mdtest_snippet.py:37:5
+   |
+37 |     __init_subclass__ = None
+   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
+   |
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```
 
 The `metaclass` keyword is ignored, as it has special meaning and is not passed to
@@ -584,7 +632,14 @@ class Base:
 
 class Valid(Base, arg=5, metaclass=object): ...
 
-# error: [invalid-argument-type]
+# Despite the explicit `metaclass=object` call,
+# the metaclass of this class is `type`, because that is
+# the metaclass of its superclass `object`, and `type`
+# (metaclass of superclass) is a subclass of `object`
+# (explicit `metaclass=` argument in this class statement).
+reveal_type(Valid.__class__)  # revealed: <class 'type'>
+
+# error: [invalid-argument-type] "Argument to function `Base.__init_subclass__` is incorrect: Expected `int`, found `Literal["foo"]`"
 class Invalid(Base, metaclass=type, arg="foo"): ...
 ```
 
@@ -603,7 +658,7 @@ class Base:
 class Valid(Base, mode="a", arg=5): ...
 class Valid(Base, mode="b", arg="foo"): ...
 
-# error: [no-matching-overload]
+# snapshot: no-matching-overload
 class InvalidType(Base, mode="b", arg=5):
     a = 1
     b = 2
@@ -612,14 +667,31 @@ class InvalidType(Base, mode="b", arg=5):
     e = 5
 ```
 
-#### More complex cases
+```snapshot
+error[no-matching-overload]: No overload of function `Base.__init_subclass__` matches arguments
+  --> src/mdtest_snippet.py:71:1
+   |
+71 | class InvalidType(Base, mode="b", arg=5):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: First overload defined here
+  --> src/mdtest_snippet.py:62:9
+   |
+62 |     def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Possible overloads for function `__init_subclass__`:
+info:   (cls, mode: Literal["a"], arg: int) -> None
+info:   (cls, mode: Literal["b"], arg: str) -> None
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:65:9
+   |
+65 |     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
 
 For multiple inheritance, the first resolved `__init_subclass__` method is used.
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 class Empty: ...
@@ -694,6 +766,654 @@ class Base(Generic[T]):
 
 class Valid(Base[int], arg=1): ...
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+```
+
+### Metaclass `__new__` keyword arguments
+
+When a custom metaclass overrides `__new__` with keyword-only parameters, class keyword arguments
+are validated against the metaclass's `__new__` signature instead of `__init_subclass__`.
+
+```py
+from typing import Any
+
+class Meta(type):
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+        return super().__new__(mcs, name, bases, namespace)
+
+class Valid(metaclass=Meta, required_arg=5): ...
+class MissingArg(metaclass=Meta): ...  # snapshot: missing-argument
+class InvalidType(metaclass=Meta, required_arg="foo"): ...  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `required_arg` of constructor `Meta.__new__`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | class MissingArg(metaclass=Meta): ...  # snapshot: missing-argument
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^^^^^
+  |
+
+
+error[invalid-argument-type]: Argument to constructor `Meta.__new__` is incorrect
+ --> src/mdtest_snippet.py:9:35
+  |
+9 | class InvalidType(metaclass=Meta, required_arg="foo"): ...  # snapshot: invalid-argument-type
+  |                                   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, required_arg: int):
+  |         ^^^^^^^                                                                        ----------------- Parameter declared here
+  |
+```
+
+### Metaclass `__new__` takes priority over `__init_subclass__`
+
+If a metaclass defines `__new__`, we do no checking of a superclass `__init_subclass__` method even
+if one exists on a base. `__new__` on the metaclass could consume or add arbitrary keyword arguments
+before passing them onto `__init_subclass__`, so there is no way for us to check that
+`__init_subclass__` has been called correctly in this scenario:
+
+```py
+from typing import Any
+
+class Meta(type):
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+        return super().__new__(mcs, name, bases, namespace, sub_arg="ooh, fancy")
+
+class Base:
+    def __init_subclass__(cls, sub_arg: str): ...
+
+# `meta_arg` is checked against `Meta.__new__`, not `Base.__init_subclass__`
+class Valid(Base, meta_arg=5, metaclass=Meta): ...
+class MissingArg(Base, metaclass=Meta): ...  # snapshot: missing-argument
+class InvalidType(Base, meta_arg="foo", metaclass=Meta): ...  # snapshot: invalid-argument-type
+
+# snapshot: missing-argument
+class Invalid2(metaclass=Meta):
+    def __init_subclass__(cls, sub_arg: str): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `meta_arg` of constructor `Meta.__new__`
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | class MissingArg(Base, metaclass=Meta): ...  # snapshot: missing-argument
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^
+  |
+
+
+error[invalid-argument-type]: Argument to constructor `Meta.__new__` is incorrect
+  --> src/mdtest_snippet.py:13:25
+   |
+13 | class InvalidType(Base, meta_arg="foo", metaclass=Meta): ...  # snapshot: invalid-argument-type
+   |                         ^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |         ^^^^^^^                                                                        ------------- Parameter declared here
+  |
+
+
+error[missing-argument]: No argument provided for required parameter `meta_arg` of constructor `Meta.__new__`
+  --> src/mdtest_snippet.py:16:1
+   |
+16 | class Invalid2(metaclass=Meta):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:4:88
+  |
+4 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], *, meta_arg: int):
+  |                                                                                        ^^^^^^^^^^^^^
+  |
+```
+
+### Metaclass `__prepare__`
+
+When a metaclass defines `__prepare__`, class keyword arguments are also validated against its
+signature.
+
+```py
+from typing import Any
+
+class Meta(type):
+    @classmethod
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any):
+        return super().__new__(mcs, name, bases, namespace)
+
+class Valid(metaclass=Meta, prep_arg=5): ...
+class InvalidType(metaclass=Meta, prep_arg="foo"): ...  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `Meta.__prepare__` is incorrect
+  --> src/mdtest_snippet.py:12:35
+   |
+12 | class InvalidType(metaclass=Meta, prep_arg="foo"): ...  # snapshot: invalid-argument-type
+   |                                   ^^^^^^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __prepare__(mcs, name: str, bases: tuple[type, ...], *, prep_arg: int = 0, **kwargs: Any) -> dict[str, Any]:
+  |         ^^^^^^^^^^^                                             ----------------- Parameter declared here
+  |
+```
+
+When `__new__` expects a custom `dict` subclass as the namespace parameter, and `__prepare__`
+returns a plain `dict[str, Any]`, this should produce a type error on the namespace argument.
+
+```py
+from typing import Any
+
+class MyNamespace(dict[str, Any]):
+    pass
+
+class Meta(type):
+    @classmethod
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
+        return super().__new__(mcs, name, bases, namespace)
+
+class Foo(metaclass=Meta): ...  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to constructor `Meta.__new__` is incorrect
+  --> src/mdtest_snippet.py:26:10
+   |
+26 | class Foo(metaclass=Meta): ...  # snapshot: invalid-argument-type
+   |          ^^^^^^^^^^^^^^^^ Expected `MyNamespace`, found `dict[str, Any]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:23:9
+   |
+23 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
+   |         ^^^^^^^                                          ---------------------- Parameter declared here
+   |
+```
+
+When `__prepare__` returns the expected custom namespace type, no error should be emitted.
+
+```py
+from typing import Any
+
+class Meta(type):
+    @classmethod
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> MyNamespace:
+        return MyNamespace()
+
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: MyNamespace, **kwargs: Any):
+        return super().__new__(mcs, name, bases, namespace)
+
+class Foo(metaclass=Meta): ...
+```
+
+We complain if `__prepare__` is set to a non-callable type such as `None`, and point to the binding
+of `__prepare__` in our diagnostic:
+
+```py
+class Meta(type):
+    __prepare__ = None
+
+# snapshot: invalid-metaclass
+class Foo(metaclass=Meta): ...
+class MetaSub(Meta): ...
+
+# error: [invalid-metaclass]
+class Bar(Foo, metaclass=MetaSub): ...
+```
+
+```snapshot
+error[invalid-metaclass]: Invalid definition of class `Foo`
+  --> src/mdtest_snippet.py:42:11
+   |
+42 | class Foo(metaclass=Meta): ...
+   |           ^^^^^^^^^^^^^^
+   |           |
+   |           Class creation will fail at runtime due to its metaclass
+   |           Metaclass `<class 'Meta'>` has an invalid `__prepare__` definition
+   |
+  ::: src/mdtest_snippet.py:39:5
+   |
+39 |     __prepare__ = None
+   |     ----------- Metaclass `__prepare__` defined here
+   |
+info: `__prepare__` on a class's metaclass is implicitly called during creation of the class object
+info: See https://docs.python.org/3/reference/datamodel.html#preparing-the-class-namespace
+```
+
+### Metaclass `__new__`, `__init__` and `__prepare__` all defined
+
+```py
+from typing import Any
+
+class Meta(type):
+    @classmethod
+    def __prepare__(  # error: [invalid-method-override]
+        mcs, name: str, bases: tuple[type, ...], prepare_arg: int, **kwargs: Any
+    ) -> dict[str, Any]:
+        return {}
+
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], dunder_new_arg: int, **kwargs: Any):
+        return super().__new__(mcs, name, bases, namespace)
+
+    # TODO: we could complain here that `__init__` has an incompatible signature with `__new__`
+    def __init__(cls, *args, init_arg: int): ...
+
+# Implicit calls to metaclass constructors work the same way as explicit "regular" constructor calls.
+# We do not complain about the missing argument to the metaclass `__init__` method here:
+# it'll never get called because of the missing argument to the metaclass `__new__` method
+#
+# snapshot: missing-argument
+# snapshot: missing-argument
+class Foo(metaclass=Meta): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `prepare_arg` of bound method `Meta.__prepare__`
+  --> src/mdtest_snippet.py:22:1
+   |
+22 | class Foo(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:6:50
+  |
+6 |         mcs, name: str, bases: tuple[type, ...], prepare_arg: int, **kwargs: Any
+  |                                                  ^^^^^^^^^^^^^^^^
+  |
+
+
+error[missing-argument]: No argument provided for required parameter `dunder_new_arg` of constructor `Meta.__new__`
+  --> src/mdtest_snippet.py:22:1
+   |
+22 | class Foo(metaclass=Meta): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:10:85
+   |
+10 |     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], dunder_new_arg: int, **kwargs: Any):
+   |                                                                                     ^^^^^^^^^^^^^^^^^^^
+   |
+```
+
+### Metaclass `__new__` expects a fixed-length tuple of bases
+
+```py
+from typing import Any
+
+class Meta(type):
+    def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+
+class A: ...
+class B: ...
+
+# This errors because a `bases` tuple of length 0 was passed to metaclass `__new__`
+#
+# snapshot: invalid-argument-type
+class Bad1(metaclass=Meta): ...
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to constructor `Meta.__new__` is incorrect
+  --> src/mdtest_snippet.py:12:11
+   |
+12 | class Bad1(metaclass=Meta): ...
+   |           ^^^^^^^^^^^^^^^^ Expected `tuple[type, type]`, found `tuple[()]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+  |         ^^^^^^^                     ------------------------ Parameter declared here
+  |
+```
+
+```py
+# This errors because a `bases` tuple of length 1 was passed to metaclass `__new__`
+#
+# snapshot: invalid-argument-type
+class Bad2(A, metaclass=Meta): ...
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to constructor `Meta.__new__` is incorrect
+  --> src/mdtest_snippet.py:16:11
+   |
+16 | class Bad2(A, metaclass=Meta): ...
+   |           ^^^^^^^^^^^^^^^^^^^ Expected `tuple[type, type]`, found `tuple[<class 'A'>]`
+   |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __new__(metacls, name: str, bases: tuple[type, type], ns: dict[str, Any]): ...
+  |         ^^^^^^^                     ------------------------ Parameter declared here
+  |
+```
+
+```py
+# This succeeds
+class Good(A, B, metaclass=Meta): ...
+```
+
+### Metaclass `__new__` expects a string-literal type
+
+```py
+from typing import Literal, Any
+
+class Meta(type):
+    def __new__(metacls, name: Literal["Foo"], bases: tuple[type, ...], namespace: dict[str, Any]): ...
+
+# this errors because `Literal["Bad"]` was passed as the `name` argument to `Meta.__new__`,
+# instead of `Literal["Foo"]`
+#
+# error: [invalid-argument-type]
+class Bad(metaclass=Meta): ...
+class Foo(metaclass=Meta): ...
+```
+
+### If a metaclass does not override `__new__`, we still check `__init_subclass__`
+
+The mere presence of a custom metaclass does not prevent us from checking `__init_subclass__`: if
+the metaclass is a `type` subclass that does not override `__new__`, we will still do so:
+
+```py
+class Meta(type):
+    pass
+
+class Base(metaclass=Meta):
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5): ...
+class MissingArg(Base): ...  # snapshot: missing-argument
+class InvalidType(Base, arg="foo"): ...  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `Base.__init_subclass__`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | class MissingArg(Base): ...  # snapshot: missing-argument
+  | ^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:32
+  |
+5 |     def __init_subclass__(cls, arg: int): ...
+  |                                ^^^^^^^^
+  |
+
+
+error[invalid-argument-type]: Argument to function `Base.__init_subclass__` is incorrect
+ --> src/mdtest_snippet.py:9:25
+  |
+9 | class InvalidType(Base, arg="foo"): ...  # snapshot: invalid-argument-type
+  |                         ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __init_subclass__(cls, arg: int): ...
+  |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+  |
+```
+
+This includes if the metaclass defines `__init__`: `__init_subclass__` is called before the
+metaclass's `__init__` method, so it is not possible for a metaclass's `__init__` method to consume
+or inject arguments before `__init_subclass__` is called in the same way that it is possible for a
+metaclass's `__new__` method:
+
+```py
+class Meta2(type):
+    def __init__(cls, *args, **kwargs): ...
+
+class Base(metaclass=Meta2):
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5): ...
+class MissingArg(Base): ...  # snapshot: missing-argument
+class InvalidType(Base, arg="foo"): ...  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `Base.__init_subclass__`
+  --> src/mdtest_snippet.py:17:1
+   |
+17 | class MissingArg(Base): ...  # snapshot: missing-argument
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:14:32
+   |
+14 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+   |
+
+
+error[invalid-argument-type]: Argument to function `Base.__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:18:25
+   |
+18 | class InvalidType(Base, arg="foo"): ...  # snapshot: invalid-argument-type
+   |                         ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:14:9
+   |
+14 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+   |
+```
+
+```py
+class MetaclassWithFancyInit(type):
+    def __init__(cls, *args, metaclass_arg: int, **kwargs): ...
+
+# `object.__init_subclass__` is called before `MetaclassWithFancyInit.__init__` here, so this is an...
+#
+# error: [unknown-argument] "Argument `metaclass_arg` does not match any known parameter of function `object.__init_subclass__`"
+class Base2(metaclass=MetaclassWithFancyInit, metaclass_arg=42):
+    def __init_subclass__(cls, init_subclass_arg: int): ...
+
+class Base3:
+    def __init_subclass__(cls, *args, **kwargs): ...
+
+# In this situation, the permissive signature of `Base3.__init_subclass__` allows
+# the `metaclass_arg` argument to be passed unhindered to the metaclass `__init__` method
+class Fine(Base3, metaclass=MetaclassWithFancyInit, metaclass_arg=42): ...
+
+# snapshot: missing-argument
+class NotGood(Base3, metaclass=MetaclassWithFancyInit): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `metaclass_arg` of `MetaclassWithFancyInit.__init__`
+  --> src/mdtest_snippet.py:36:1
+   |
+36 | class NotGood(Base3, metaclass=MetaclassWithFancyInit): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:20:30
+   |
+20 |     def __init__(cls, *args, metaclass_arg: int, **kwargs): ...
+   |                              ^^^^^^^^^^^^^^^^^^
+   |
+```
+
+### Metaclass with a custom metaclass
+
+If the metaclass itself has a custom metaclass and the meta-metaclass defines `__call__`, we do call
+checking against `__call__` on the meta-metaclass:
+
+```py
+class MetaMeta(type):
+    def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+        return "foo"
+
+class Meta(type, metaclass=MetaMeta): ...
+
+# snapshot: missing-argument
+class Bad(metaclass=Meta): ...
+
+# TODO: should be `str` because of the return type of `MetaMeta.__call__`
+reveal_type(Bad)  # revealed: <class 'Bad'>
+
+class Good(metaclass=Meta, meta_meta_arg=42): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `meta_meta_arg` of bound method `MetaMeta.__call__`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | class Bad(metaclass=Meta): ...
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:34
+  |
+2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+  |                                  ^^^^^^^^^^^^^^^^^^
+  |
+```
+
+Similar to the case where a metaclass defines `__new__`, this also prevents us from checking the
+call signature of `__init_subclass__`, since the `__call__` method of a meta-metaclass is called
+prior to `__init_subclass__` on the class and could therefore consume or inject arbitrary arguments
+when the `__init_subclass__` method is called:
+
+```py
+class InitSubclassBase(metaclass=Meta, meta_meta_arg=42):
+    def __init_subclass__(cls, required_arg: int): ...
+
+class InitSubclassNotCheckedHere(InitSubclassBase, metaclass=Meta, meta_meta_arg=42): ...
+```
+
+But if the meta-metaclass does not override `__call__`, `__init_subclass__` is still checked:
+
+```py
+class LessFancyMetaMeta(type): ...
+class LessFancyMeta(type, metaclass=LessFancyMetaMeta): ...
+
+class WithInitSubclass(metaclass=LessFancyMeta):
+    def __init_subclass__(cls, arg: int): ...
+
+# error: [missing-argument] "No argument provided for required parameter `arg` of function `WithInitSubclass.__init_subclass__`"
+class Bad(WithInitSubclass): ...
+class Good(WithInitSubclass, arg=42): ...
+```
+
+### Metaclass with a custom `__new__` method and a custom meta-metaclass
+
+Same as the way that we do not check `__new__` if a regular class's metaclass defines `__call__` and
+`__call__` does not return an instance of the class, we also do not check `__new__` on a metaclass
+if the meta-metaclass has a `__call__` method that does not return an instance of the metaclass:
+
+```py
+class MetaMeta(type):
+    def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+        return "foo"
+
+class Meta(type, metaclass=MetaMeta):
+    def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+
+# snapshot: missing-argument
+class Bad(metaclass=Meta): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `meta_meta_arg` of bound method `MetaMeta.__call__`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | class Bad(metaclass=Meta): ...
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:34
+  |
+2 |     def __call__(metacls, *args, meta_meta_arg: int, **kwargs) -> str:
+  |                                  ^^^^^^^^^^^^^^^^^^
+  |
+```
+
+```py
+# `Meta.__new__` is not checked because `MetaMeta.__call__` returns `str`,
+# so no diagnostic is emitted here
+class Fine(metaclass=Meta, meta_meta_arg=42): ...
+
+class MetaMeta2(type):
+    def __call__(metacls, *args, **kwargs) -> "Meta2":
+        return type.__call__(metacls, *args, **kwargs)
+
+class Meta2(type, metaclass=MetaMeta2):
+    def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+
+# snapshot: missing-argument
+class AlsoBad(metaclass=Meta2): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `meta_arg` of constructor `Meta2.__new__`
+  --> src/mdtest_snippet.py:22:1
+   |
+22 | class AlsoBad(metaclass=Meta2): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:19:33
+   |
+19 |     def __new__(metacls, *args, meta_arg: int, **kwargs): ...
+   |                                 ^^^^^^^^^^^^^
+   |
+```
+
+```py
+class MetaMeta3(type):
+    def __call__(metacls, *args, **kwargs) -> "Meta3":
+        return type.__call__(metacls, *args, **kwargs)
+
+class Meta3(type, metaclass=MetaMeta3):
+    def __init__(cls, *args, init_arg: int, **kwargs): ...
+
+# snapshot: missing-argument
+class AlsoFine(metaclass=Meta3): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `init_arg` of `Meta3.__init__`
+  --> src/mdtest_snippet.py:31:1
+   |
+31 | class AlsoFine(metaclass=Meta3): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/mdtest_snippet.py:28:30
+   |
+28 |     def __init__(cls, *args, init_arg: int, **kwargs): ...
+   |                              ^^^^^^^^^^^^^
+   |
 ```
 
 ## `@staticmethod`
