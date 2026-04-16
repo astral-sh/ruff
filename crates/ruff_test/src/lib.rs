@@ -4,9 +4,12 @@ use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 
+use db::Db;
 use mdtest::matcher::{self, Failure};
-use mdtest::parser::EmbeddedFileSourceMap;
-use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
+use mdtest::parser::{self, EmbeddedFileSourceMap};
+use mdtest::{
+    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, output_format,
+};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{FileResolver, Input, UnifiedFile};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -31,13 +34,14 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    crate_name: &str,
 ) -> anyhow::Result<()> {
     let output_format = output_format();
 
-    let suite = mdtest::parser::parse::<Options>(short_title, source, |_| Ok(()))
-        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    let mut db = db::Db::setup();
+    let mut db = Db::setup();
     let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
@@ -51,7 +55,15 @@ pub fn run(
             continue;
         }
 
-        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let result = run_test(
+            &mut db,
+            absolute_fixture_path,
+            relative_fixture_path,
+            snapshot_path,
+            &test,
+            &mut assertion,
+            output_format,
+        );
 
         let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
@@ -113,7 +125,7 @@ pub fn run(
             );
             let _ = writeln!(
                 assertion,
-                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ruff_linter \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p {crate_name} \
                 --test mdtest -- {test_name}",
             );
 
@@ -136,10 +148,13 @@ enum TestOutcome {
 }
 
 fn run_test(
-    db: &mut db::Db,
+    db: &mut Db,
+    _absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &mdtest::parser::MarkdownTest<Options>,
+    test: &parser::MarkdownTest<Options>,
+    _assertion: &mut String,
+    _output_format: OutputFormat,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     db.use_in_memory_system();
@@ -294,7 +309,7 @@ fn run_test(
 
 /// Wrap the db to avoid panicking when provided a Ruff file like the blanket `FileResolver`
 /// implementation.
-struct RuffResolver<'a>(&'a db::Db);
+struct RuffResolver<'a>(&'a Db);
 
 impl FileResolver for RuffResolver<'_> {
     fn path(&self, file: File) -> &str {
@@ -316,4 +331,11 @@ impl FileResolver for RuffResolver<'_> {
     fn is_notebook(&self, _file: &UnifiedFile) -> bool {
         false
     }
+}
+
+fn parse<'s>(
+    short_title: &'s str,
+    source: &'s str,
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, Options>> {
+    parser::parse::<Options>(short_title, source, |_| Ok(()))
 }

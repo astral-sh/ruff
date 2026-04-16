@@ -26,6 +26,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         &snapshot_path,
         short_title,
         test_name,
+        "ruff_linter",
     )?;
 
     Ok(())
