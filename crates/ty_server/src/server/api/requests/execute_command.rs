@@ -8,60 +8,59 @@ use crate::session::client::Client;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use ruff_db::system::SystemPath;
-use ruff_python_ast::name::Name;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 use std::str::FromStr;
 use ty_project::Db as _;
+use ty_python_semantic::Program;
 
 /// Arguments for the `ty.runTest` command.
+///
+/// The `program` and `arguments` fields are provided as a convenience for clients
+/// that want to run the test command directly. The server does not use these fields
+/// when executing tests; it reconstructs the command from `test_target` and `cwd`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct RunTestArgs {
     cwd: String,
     program: String,
-    args: Vec<String>,
+    // Full arguments to call program with and execute the tests.
+    arguments: Vec<String>,
+    // Path of the file that contains the test.
+    file_path: String,
+    // qualified test name e.g. `Class::test_func`
     test_target: String,
 }
 
 impl RunTestArgs {
     pub(crate) fn new(
         cwd: &str,
-        file_path: &str,
-        class_name: Option<&Name>,
-        function_name: Option<&str>,
-        python_executable: Option<&SystemPath>,
+        file_path: String,
+        test_target: &str,
+        python_executable: &SystemPath,
     ) -> Self {
-        let mut test_target = file_path.to_string();
-        if let Some(class_name) = class_name {
-            if !test_target.is_empty() {
-                test_target.push_str("::");
-            }
-            test_target.push_str(class_name);
-        }
-        if let Some(func) = function_name {
-            if !test_target.is_empty() {
-                test_target.push_str("::");
-            }
-            test_target.push_str(func);
-        }
-
-        let (program, prefix_args) = if let Some(executable) = python_executable {
-            (executable.to_string(), vec!["-m".to_string()])
-        } else {
-            // Fall back to `uv run` when no Python executable is available.
-            ("uv".to_string(), vec!["run".to_string()])
-        };
-
-        let mut args = prefix_args;
-        args.push("pytest".to_string());
-        args.push(test_target.clone());
+        let test_target = format!("{file_path}::{test_target}");
+        let arguments = vec!["-m".to_string(), "pytest".to_string(), test_target.clone()];
 
         Self {
             cwd: cwd.to_string(),
-            program,
-            args,
+            program: python_executable.to_string(),
+            arguments,
+            file_path,
             test_target,
         }
+    }
+}
+
+impl std::fmt::Display for RunTestArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} in {}",
+            self.program,
+            self.arguments.join(" "),
+            self.cwd
+        )
     }
 }
 
@@ -84,16 +83,19 @@ impl SyncRequestHandler for ExecuteCommand {
             SupportedCommand::Debug => Ok(Some(serde_json::Value::String(
                 debug_information(session).with_failure_code(ErrorCode::InternalError)?,
             ))),
-            SupportedCommand::RunTest => {
-                run_test(client, params.arguments).with_failure_code(ErrorCode::InvalidParams)
-            }
+            SupportedCommand::RunTest => run_test(session, client, params.arguments)
+                .with_failure_code(ErrorCode::InvalidParams),
         }
     }
 }
 
 /// Fallback test runner for editors that don't handle the `ty.runTest` command client-side.
 /// Editors with native test UI should intercept this command and run tests themselves.
+///
+// TODO: Consider adding an option argument to control whether output is returned in the
+// response or shown via `show_message`.
 fn run_test(
+    session: &Session,
     client: &Client,
     mut arguments: Vec<serde_json::Value>,
 ) -> crate::Result<Option<serde_json::Value>> {
@@ -103,18 +105,27 @@ fn run_test(
             arguments.len()
         ));
     }
-    let run_test: RunTestArgs = serde_json::from_value(arguments.swap_remove(0))?;
+    let run_test_args: RunTestArgs = serde_json::from_value(arguments.swap_remove(0))?;
+    let python_executable = session
+        .project_db_for_path(&run_test_args.cwd)
+        .and_then(|db| Program::get(db).python_executable(db).as_deref())
+        .ok_or_else(|| anyhow::anyhow!("No Python executable found"))?;
+
+    // Reconstruct the command again, to now allow client to run any program
+    let run_test_args = RunTestArgs::new(
+        &run_test_args.cwd,
+        run_test_args.file_path,
+        &run_test_args.test_target,
+        python_executable,
+    );
 
     let client = client.clone();
 
-    // TODO: This thread is not joined, we need to handle the cancel running tests on exit.
+    // TODO: This thread is not joined, we need to cancel running tests on exit.
     std::thread::spawn(move || {
-        let cwd = std::path::PathBuf::from(&run_test.cwd);
-        let cmd_display = format!("{} {}", run_test.program, run_test.args.join(" "));
-
-        match std::process::Command::new(&run_test.program)
-            .args(&run_test.args)
-            .current_dir(&cwd)
+        match std::process::Command::new(&run_test_args.program)
+            .args(&run_test_args.arguments)
+            .current_dir(std::path::PathBuf::from(&run_test_args.cwd))
             .output()
         {
             Ok(output) => {
@@ -123,19 +134,19 @@ fn run_test(
 
                 if output.status.success() {
                     client.show_message(
-                        format!("passed\n{stdout}\n command: {cmd_display}"),
+                        format!("passed\n{stdout}\n command: {run_test_args}"),
                         types::MessageType::INFO,
                     );
                 } else {
                     client.show_message(
-                        format!("\nfailed\n{stdout}\n{stderr}\n command: {cmd_display}"),
+                        format!("\nfailed\n{stdout}\n{stderr}\n command: {run_test_args}"),
                         types::MessageType::ERROR,
                     );
                 }
             }
             Err(e) => {
                 client.show_message(
-                    format!("Failed to run `{cmd_display}`: {e}"),
+                    format!("Failed to run `{run_test_args}`: {e}"),
                     types::MessageType::ERROR,
                 );
             }
