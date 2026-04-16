@@ -506,23 +506,27 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
-                    if let ArgOrKeyword::Arg(_) = arg_or_keyword {
-                        if let Some((name, parameter_label_offset)) =
-                            details.argument_names.get(&positional_index)
-                            && !arg_matches_name(&arg_or_keyword, name)
-                        {
-                            // Starred args like `*t` cannot be given a keyword name (`b=*t` is
-                            // invalid syntax), so we show the hint but suppress the text edit.
-                            self.add_call_argument_name(
-                                arg_or_keyword.range().start(),
-                                name,
-                                parameter_label_offset.map(NavigationTarget::from),
-                                !arg_or_keyword.is_variadic(),
-                            );
-                        }
-                        positional_index += 1;
-                    }
                     self.visit_expr(arg_or_keyword.value());
+
+                    let ArgOrKeyword::Arg(_) = arg_or_keyword else {
+                        continue;
+                    };
+
+                    if let Some((name, parameter_label_offset)) =
+                        details.argument_names.get(&positional_index)
+                        && !arg_matches_name(&arg_or_keyword, name)
+                    {
+                        // Starred args like `*t` cannot be given a keyword name (`b=*t` is
+                        // invalid syntax), so we show the hint but suppress the text edit.
+                        self.add_call_argument_name(
+                            arg_or_keyword.range().start(),
+                            name,
+                            parameter_label_offset.map(NavigationTarget::from),
+                            !arg_or_keyword.is_variadic(),
+                        );
+                    }
+
+                    positional_index += 1;
                 }
             }
             _ => {
@@ -4536,6 +4540,48 @@ mod tests {
 
         def foo(x: int, y: str, z: bool): pass
         foo(x=1, z=True, y='hello')
+        ");
+    }
+
+    #[test]
+    fn test_function_call_positional_after_keyword_in_source_order() {
+        // Simulates the intermediate state after a text edit converts one positional arg to a
+        // keyword arg, leaving remaining positional args after it (invalid Python, but ty should
+        // still show hints for them). The key invariant: `1` gets a hint even though a keyword arg
+        // precedes it in source order. Before the fix, `1` would get no hint at all because the
+        // source-order index for `1` (1) didn't match its positional-args-only index (0).
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: int, y: str): pass
+            foo(y='hello', 1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+
+        def foo(x: int, y: str): pass
+        foo(y='hello', [y=]1)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(x: int, y: str): pass
+          |                 ^
+        3 | foo(y='hello', 1)
+          |
+        info: Source
+         --> main2.py:3:17
+          |
+        2 | def foo(x: int, y: str): pass
+        3 | foo(y='hello', [y=]1)
+          |                 ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int, y: str): pass
+        foo(y='hello', y=1)
         ");
     }
 
