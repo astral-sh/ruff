@@ -8,7 +8,8 @@ use db::Db;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
 use mdtest::{
-    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, output_format,
+    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, attempt_test,
+    output_format,
 };
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{FileResolver, Input, UnifiedFile};
@@ -220,34 +221,45 @@ fn run_test(
     .into_settings(project_root.as_std_path())
     .expect("Failed to construct settings");
 
-    // When snapshot testing is enabled, this is populated with
-    // all diagnostics. Otherwise it remains empty.
-    let mut snapshot_diagnostics = vec![];
+    let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
 
     let resolver = RuffResolver(db);
 
+    let mut panic_info = None;
+
     let failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let source_kind = SourceKind::Python {
-                code: source_text(db, test_file.file).as_str().to_string(),
-                is_stub: test_file.file.is_stub(db),
-            };
-            let path = test_file
-                .file
-                .path(db)
-                .as_system_path()
-                .expect("mdtest files are on the system")
-                .as_std_path();
-            let mut diagnostics = test_contents(&source_kind, path, &settings.linter).0;
+            let mdtest_result = attempt_test(
+                |file| {
+                    let source_kind = SourceKind::Python {
+                        code: source_text(db, file).as_str().to_string(),
+                        is_stub: file.is_stub(db),
+                    };
+                    let path = file
+                        .path(db)
+                        .as_system_path()
+                        .expect("mdtest files are on the system")
+                        .as_std_path();
+                    test_contents(&source_kind, path, &settings.linter).0
+                },
+                test_file,
+            );
 
-            diagnostics.sort_by(|left, right| {
-                left.rendering_sort_key(db)
-                    .cmp(&right.rendering_sort_key(db))
-            });
+            let diagnostics = match mdtest_result {
+                Ok(diagnostics) => diagnostics,
+                Err(failures) => {
+                    if test.should_expect_panic().is_ok() {
+                        panic_info = Some(failures.info);
+                        return None;
+                    }
+
+                    return Some(failures.into_file_failures(db, "run mdtest", None));
+                }
+            };
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
                 |inline_diagnostics| {
@@ -268,25 +280,25 @@ fn run_test(
             };
 
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics);
+                all_diagnostics.extend(diagnostics);
             }
 
             failure
         })
         .collect();
 
-    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
+    if all_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
         panic!(
             "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
             test.name()
         );
-    } else if !snapshot_diagnostics.is_empty() {
+    } else if !all_diagnostics.is_empty() {
         let snapshot = mdtest::create_diagnostic_snapshot(
             &resolver,
             "ruff",
             relative_fixture_path,
             test,
-            snapshot_diagnostics.iter(),
+            all_diagnostics.iter(),
         );
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
