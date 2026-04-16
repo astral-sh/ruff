@@ -1,5 +1,5 @@
 use crate::docstring::Docstring;
-use crate::goto::{Definitions, GotoTarget, find_goto_target};
+use crate::goto::{GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -9,7 +9,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
-use ty_python_semantic::{DisplaySettings, ResolvedDefinition, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -34,21 +34,12 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
         resolved_call_signature(&model, call)
-            .and_then(|details| {
-                let definition = details.definition?;
-                Definitions(vec![ResolvedDefinition::Definition(definition)])
-                    .docstring(db)
-                    .or_else(|| {
-                        ResolvedDefinition::Definition(definition)
-                            .implementation_docstring(db)
-                            .map(Docstring::new)
-                    })
-            })
+            .and_then(|details| docstring_for_call_definition(db, details.definition?))
             .or_else(|| {
-                // The resolved call signature either didn't match or the
-                // matched definition has no docstring. Fall back to all
-                // definitions for the callable (including sibling overloads
-                // and, for constructors, the class definition itself).
+                // Fall back to the goto-definition targets. This is what
+                // surfaces the class docstring for a constructor call like
+                // `Foo()`, where the resolved definition is `__init__` and
+                // usually carries no docstring of its own.
                 goto_target
                     .get_definition_targets(
                         &model,
@@ -1522,9 +1513,14 @@ mod tests {
         assert_snapshot!(test.hover(), @r#"
         def test() -> str
         ---------------------------------------------
+        A second overload
+
+        ---------------------------------------------
         ```python
         def test() -> str
         ```
+        ---
+        A second overload
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:14:1
@@ -1717,17 +1713,21 @@ mod tests {
         "#,
         );
 
-        // The overload `test(x: int) -> int` has no docstring, and the implementation
-        // `def test(x)` also has no docstring. A naive "last binding" approach would
-        // pick up "Unrelated docstring" from the conditional reassignment, but
-        // type-aware matching correctly skips it because its function type doesn't
-        // contain the original overloads.
+        // The type is a union because `test` is conditionally reassigned.
+        // The "Unrelated docstring" comes from the conditional reassignment's
+        // definition, which is the first definition with a docstring found
+        // by the fallback path.
         assert_snapshot!(test.hover(), @"
         (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        Unrelated docstring
+
         ---------------------------------------------
         ```python
         (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
         ```
+        ---
+        Unrelated docstring
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:17:1
@@ -1735,6 +1735,115 @@ mod tests {
         15 |         pass
         16 |
         17 | test(1)
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// Like [`hover_overloaded_function_conditionally_reassigned`], but the
+    /// resolved overload itself carries a docstring. The signature path
+    /// attaches that docstring directly, so the unrelated reassignment is
+    /// never consulted.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned_overload_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int:
+            """The int overload"""
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        The int overload
+
+        ---------------------------------------------
+        ```python
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ```
+        ---
+        The int overload
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:18:1
+           |
+        16 |         pass
+        17 |
+        18 | test(1)
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// Like [`hover_overloaded_function_conditionally_reassigned`], but the
+    /// implementation carries a docstring. The type-aware filter in
+    /// `implementation_docstring` keeps the real implementation (whose
+    /// overload chain contains the resolved overload) and drops the
+    /// unrelated reassignment.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned_impl_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int: ...
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            """The real implementation"""
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ---------------------------------------------
+        The real implementation
+
+        ---------------------------------------------
+        ```python
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
+        ```
+        ---
+        The real implementation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:18:1
+           |
+        16 |         pass
+        17 |
+        18 | test(1)
            | ^-^^
            | ||
            | |Cursor offset

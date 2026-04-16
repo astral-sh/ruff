@@ -12,7 +12,7 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ty_python_core::definition::DefinitionKind;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
@@ -319,6 +319,25 @@ impl<'db> Definitions<'db> {
 
         None
     }
+}
+
+/// Resolve the docstring for a call-signature's resolved definition.
+///
+/// Tries the definition's own docstring first (stub-mapped when appropriate)
+/// and falls back to [`ResolvedDefinition::implementation_docstring`], which
+/// uses type-aware overload-chain matching to pick up the runtime
+/// implementation's docstring for overloaded functions whose stubs carry none.
+///
+/// Shared by hover and signature help so both surfaces render the same
+/// docstring for a given call site.
+pub(crate) fn docstring_for_call_definition<'db>(
+    db: &'db dyn crate::Db,
+    definition: Definition<'db>,
+) -> Option<Docstring> {
+    let resolved = ResolvedDefinition::Definition(definition);
+    Definitions(vec![resolved.clone()])
+        .docstring(db)
+        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 
 impl GotoTarget<'_> {

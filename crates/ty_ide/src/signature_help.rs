@@ -8,20 +8,19 @@
 
 use crate::Db;
 use crate::docstring::Docstring;
-use crate::goto::Definitions;
+use crate::goto::docstring_for_call_definition;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_core::definition::Definition;
+use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     CallSignatureDetails, CallSignatureParameter, call_signature_details,
     find_active_signature_from_details,
 };
-use ty_python_semantic::{ResolvedDefinition, SemanticModel};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -186,7 +185,9 @@ fn create_signature_details_from_call_signature_details<'db>(
     details: CallSignatureDetails<'db>,
     current_arg_index: usize,
 ) -> SignatureDetails<'db> {
-    let documentation = get_callable_documentation(db, details.definition);
+    let documentation = details
+        .definition
+        .and_then(|def| docstring_for_call_definition(db, def));
 
     // Translate the argument index to parameter index using the mapping.
     let active_parameter =
@@ -224,22 +225,6 @@ fn create_signature_details_from_call_signature_details<'db>(
         parameters,
         active_parameter,
     }
-}
-
-/// Determine appropriate documentation for a callable type based on its original type.
-///
-/// Tries the definition's own docstring first, then falls back to the
-/// implementation docstring (for overloaded functions where only the
-/// implementation carries a docstring).
-fn get_callable_documentation(
-    db: &dyn crate::Db,
-    definition: Option<Definition>,
-) -> Option<Docstring> {
-    let definition = definition?;
-    let resolved = ResolvedDefinition::Definition(definition);
-    Definitions(vec![resolved.clone()])
-        .docstring(db)
-        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 
 /// Create `ParameterDetails` objects from semantic displayed parameter details.
@@ -1352,6 +1337,84 @@ def ab(a: int, *, c: int):
                 .as_ref()
                 .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
+        );
+    }
+
+    /// Like [`signature_help_overloaded_function_implementation_docstring`], but
+    /// the overloads are followed by an unrelated conditional reassignment of
+    /// the same name. The overload being called has its own docstring, so the
+    /// signature path attaches it directly.
+    #[test]
+    fn signature_help_overloaded_function_conditionally_reassigned_overload_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int:
+            """The int overload"""
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        test(<CURSOR>1)
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        let signature = &result.signatures[result.active_signature.unwrap()];
+        assert_eq!(
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
+            Some("The int overload\n".to_string())
+        );
+    }
+
+    /// Like [`signature_help_overloaded_function_implementation_docstring`], but
+    /// with an unrelated conditional reassignment of the same name. The
+    /// type-aware filter in `implementation_docstring` keeps the real
+    /// implementation and drops the reassignment.
+    #[test]
+    fn signature_help_overloaded_function_conditionally_reassigned_impl_has_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int: ...
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            """The real implementation"""
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        test(<CURSOR>1)
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        let signature = &result.signatures[result.active_signature.unwrap()];
+        assert_eq!(
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
+            Some("The real implementation\n".to_string())
         );
     }
 
