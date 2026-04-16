@@ -4430,6 +4430,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     return None;
                 }
 
+                // With the pending-constraint solve path, upper-bound-only constraints expose a
+                // vacuous lower bound of `Never`. That indicates that no concrete lower-bound
+                // information was inferred for this path, so we must not treat it as a candidate
+                // for literal promotion.
+                if lower.is_never() {
+                    return None;
+                }
+
                 let promoted = lower.promote(self.db);
 
                 // If the TypeVar has an upper bound, only use the promoted type if it

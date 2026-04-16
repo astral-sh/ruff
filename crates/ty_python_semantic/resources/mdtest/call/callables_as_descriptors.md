@@ -143,6 +143,21 @@ class C2:
 C2().method_decorated(1)
 ```
 
+And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
+those parameters unspecialized rather than collapsing them to `Never`:
+
+```py
+def passthrough[T, R](f: Callable[[T], R]) -> Callable[[T], R]:
+    raise NotImplementedError
+
+@passthrough
+def f(x):
+    return x
+
+reveal_type(f)  # revealed: (Unknown, /) -> Unknown
+reveal_type(f(1))  # revealed: Unknown
+```
+
 And with unions of `Callable` types:
 
 ```py
