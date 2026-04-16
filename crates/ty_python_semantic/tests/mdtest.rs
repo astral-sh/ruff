@@ -1,11 +1,5 @@
 use anyhow::anyhow;
 use camino::Utf8Path;
-use ty_test::OutputFormat;
-
-/// Switch mdtest output format to GitHub Actions annotations.
-///
-/// If set (to any value), mdtest will output errors in GitHub Actions format.
-const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
 
 /// See `crates/ty_test/README.md` for documentation on these tests.
 #[expect(clippy::needless_pass_by_value)]
@@ -25,12 +19,6 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    let output_format = if std::env::var(MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
-        OutputFormat::GitHub
-    } else {
-        OutputFormat::Cli
-    };
-
     // Limit multithreading in tests to avoid that they compete
     // for the same resources (tests are run concurrently most of the time).
     let pool = rayon::ThreadPoolBuilder::new()
@@ -46,7 +34,6 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
             &snapshot_path,
             short_title,
             test_name,
-            output_format,
         )
     })?;
 

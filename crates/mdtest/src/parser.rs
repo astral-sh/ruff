@@ -4,22 +4,33 @@ use std::{
     hash::Hash,
 };
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use indexmap::{IndexMap, map::Entry};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use crate::config::MarkdownTestConfig;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
+use serde::Deserialize;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
-pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
-    let parser = Parser::new(title, source);
+///
+/// `validate_config` is invoked once for every literally-declared `toml` config block
+/// (after deserialization, before it replaces the section's inherited config) so callers
+/// can enforce invariants that mdtest itself shouldn't know about.
+pub fn parse<'s, C>(
+    title: &'s str,
+    source: &'s str,
+    validate_config: impl FnMut(&C) -> anyhow::Result<()>,
+) -> anyhow::Result<MarkdownTestSuite<'s, C>>
+where
+    C: Clone + Default + for<'de> Deserialize<'de>,
+{
+    let parser = Parser::new(title, source, validate_config);
     parser.parse()
 }
 
@@ -27,16 +38,16 @@ pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<Markd
 ///
 /// Borrows from the source string and filepath it was created from.
 #[derive(Debug)]
-pub(crate) struct MarkdownTestSuite<'s> {
+pub struct MarkdownTestSuite<'s, C> {
     /// Header sections.
-    sections: IndexVec<SectionId, Section<'s>>,
+    sections: IndexVec<SectionId, Section<'s, C>>,
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
 }
 
-impl<'s> MarkdownTestSuite<'s> {
-    pub(crate) fn tests(&self) -> MarkdownTestIterator<'_, 's> {
+impl<'s, C> MarkdownTestSuite<'s, C> {
+    pub fn tests(&self) -> MarkdownTestIterator<'_, 's, C> {
         MarkdownTestIterator {
             suite: self,
             current_file_index: 0,
@@ -69,13 +80,13 @@ impl LowerHex for Hash128 {
 /// headers in the file), containing one or more embedded Python files as fenced code blocks, and
 /// containing no nested header subsections.
 #[derive(Debug)]
-pub(crate) struct MarkdownTest<'m, 's> {
-    suite: &'m MarkdownTestSuite<'s>,
-    section: &'m Section<'s>,
+pub struct MarkdownTest<'m, 's, C> {
+    suite: &'m MarkdownTestSuite<'s, C>,
+    section: &'m Section<'s, C>,
     files: &'m [EmbeddedFile<'s>],
 }
 
-impl<'m, 's> MarkdownTest<'m, 's> {
+impl<'m, 's, C> MarkdownTest<'m, 's, C> {
     const MAX_TITLE_LENGTH: usize = 20;
     const ELLIPSIS: char = '\u{2026}';
 
@@ -125,33 +136,34 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         contracted_name
     }
 
-    pub(crate) fn uncontracted_name(&self) -> String {
+    pub fn uncontracted_name(&self) -> String {
         self.joined_name(false)
     }
 
-    pub(crate) fn name(&self) -> String {
+    pub fn name(&self) -> String {
         self.joined_name(true)
     }
 
-    pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
+    pub fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
         self.files.iter()
     }
 
-    pub(crate) fn configuration(&self) -> &MarkdownTestConfig {
+    pub fn configuration(&self) -> &C {
         &self.section.config
     }
 
-    pub(super) fn should_snapshot_diagnostics(&self) -> bool {
+    pub fn should_snapshot_diagnostics(&self) -> bool {
         self.section
             .directives
             .has_directive_set(MdtestDirective::SnapshotDiagnostics)
     }
 
-    pub(super) fn should_expect_panic(&self) -> Result<Option<&str>, ()> {
+    #[expect(clippy::result_unit_err)]
+    pub fn should_expect_panic(&self) -> Result<Option<&str>, ()> {
         self.section.directives.get(MdtestDirective::ExpectPanic)
     }
 
-    pub(super) fn should_skip_pulling_types(&self) -> bool {
+    pub fn should_skip_pulling_types(&self) -> bool {
         self.section
             .directives
             .has_directive_set(MdtestDirective::PullTypesSkip)
@@ -160,13 +172,13 @@ impl<'m, 's> MarkdownTest<'m, 's> {
 
 /// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
 #[derive(Debug)]
-pub(crate) struct MarkdownTestIterator<'m, 's> {
-    suite: &'m MarkdownTestSuite<'s>,
+pub struct MarkdownTestIterator<'m, 's, C> {
+    suite: &'m MarkdownTestSuite<'s, C>,
     current_file_index: usize,
 }
 
-impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
-    type Item = MarkdownTest<'m, 's>;
+impl<'m, 's, C> Iterator for MarkdownTestIterator<'m, 's, C> {
+    type Item = MarkdownTest<'m, 's, C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut current_file_index = self.current_file_index;
@@ -200,11 +212,11 @@ struct SectionId;
 /// [`MarkdownTest`]), or it may contain nested sections (headers with more `#` characters), but
 /// not both.
 #[derive(Debug)]
-struct Section<'s> {
+pub struct Section<'s, C> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
-    config: MarkdownTestConfig,
+    config: C,
     directives: MdtestDirectives,
 }
 
@@ -216,7 +228,7 @@ struct EmbeddedFileId;
 /// The start is the offset of the first triple-backtick in the code block, and the end is the
 /// offset immediately after the closing triple-backtick.
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct BacktickOffsets(TextRange);
+pub struct BacktickOffsets(TextRange);
 
 impl Ranged for BacktickOffsets {
     fn range(&self) -> TextRange {
@@ -272,12 +284,12 @@ impl Ranged for InlineSnapshotBlock<'_> {
 /// count of the first block, and then add the new relative line number (1)
 /// to the absolute start line of the second block (12), resulting in an
 /// absolute line number of 13.
-pub(crate) struct EmbeddedFileSourceMap {
+pub struct EmbeddedFileSourceMap {
     start_line_and_line_count: Vec<(usize, usize)>,
 }
 
 impl EmbeddedFileSourceMap {
-    pub(crate) fn new(
+    pub fn new(
         md_index: &LineIndex,
         dimensions: impl IntoIterator<Item = BacktickOffsets>,
     ) -> EmbeddedFileSourceMap {
@@ -302,7 +314,7 @@ impl EmbeddedFileSourceMap {
     ///
     /// # Panics
     ///  If called when the markdown file has no code blocks.
-    pub(crate) fn to_absolute_line_number(
+    pub fn to_absolute_line_number(
         &self,
         relative_line_number: OneIndexed,
     ) -> std::result::Result<OneIndexed, OneIndexed> {
@@ -368,13 +380,13 @@ impl EmbeddedFilePath<'_> {
 ///
 /// [typeshed `VERSIONS`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18
 #[derive(Debug)]
-pub(crate) struct EmbeddedFile<'s> {
+pub struct EmbeddedFile<'s> {
     section: SectionId,
     path: EmbeddedFilePath<'s>,
-    pub(crate) lang: &'s str,
-    pub(crate) code: Cow<'s, str>,
+    pub lang: &'s str,
+    pub code: Cow<'s, str>,
     /// The checkable code blocks
-    pub(crate) python_code_blocks: Vec<CodeBlock<'s>>,
+    pub python_code_blocks: Vec<CodeBlock<'s>>,
 }
 
 impl EmbeddedFile<'_> {
@@ -402,7 +414,7 @@ impl EmbeddedFile<'_> {
     }
 
     /// Returns the full path using unix file-path convention.
-    pub(crate) fn full_path(&self, project_root: &SystemPath) -> SystemPathBuf {
+    pub fn full_path(&self, project_root: &SystemPath) -> SystemPathBuf {
         // Don't use `SystemPath::absolute` here because it's platform dependent
         // and we want to use unix file-path convention.
         let relative_path = self.relative_path();
@@ -419,7 +431,7 @@ impl EmbeddedFile<'_> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CodeBlock<'s> {
+pub struct CodeBlock<'s> {
     /// The offsets of the code block's code fences in the markdown source.
     backticks: BacktickOffsets,
     /// The offset in the concatenated file source at which this code block starts.
@@ -473,10 +485,9 @@ impl SectionStack {
 }
 
 /// Parse the source of a Markdown file into a [`MarkdownTestSuite`].
-#[derive(Debug)]
-struct Parser<'s> {
+struct Parser<'s, C, F> {
     /// [`Section`]s of the final [`MarkdownTestSuite`].
-    sections: IndexVec<SectionId, Section<'s>>,
+    sections: IndexVec<SectionId, Section<'s, C>>,
 
     /// [`EmbeddedFile`]s of the final [`MarkdownTestSuite`].
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
@@ -501,19 +512,22 @@ struct Parser<'s> {
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
 
-    /// Whether or not any section in the file has external dependencies.
-    /// Only one section per file is allowed to have dependencies (for lockfile support).
-    file_has_dependencies: bool,
+    /// Callback to validate config blocks
+    validate_config: F,
 }
 
-impl<'s> Parser<'s> {
-    fn new(title: &'s str, source: &'s str) -> Self {
+impl<'s, C, F> Parser<'s, C, F>
+where
+    C: Clone + Default + for<'de> Deserialize<'de>,
+    F: FnMut(&C) -> anyhow::Result<()>,
+{
+    fn new(title: &'s str, source: &'s str, validate_config: F) -> Self {
         let mut sections = IndexVec::default();
         let root_section_id = sections.push(Section {
             title,
             level: 0,
             parent_id: None,
-            config: MarkdownTestConfig::default(),
+            config: C::default(),
             directives: MdtestDirectives::default(),
         });
         Self {
@@ -526,16 +540,16 @@ impl<'s> Parser<'s> {
             stack: SectionStack::new(root_section_id),
             current_section_files: IndexMap::default(),
             current_section_has_config: false,
-            file_has_dependencies: false,
+            validate_config,
         }
     }
 
-    fn parse(mut self) -> anyhow::Result<MarkdownTestSuite<'s>> {
+    fn parse(mut self) -> anyhow::Result<MarkdownTestSuite<'s, C>> {
         self.parse_impl()?;
         Ok(self.finish())
     }
 
-    fn finish(mut self) -> MarkdownTestSuite<'s> {
+    fn finish(mut self) -> MarkdownTestSuite<'s, C> {
         self.sections.shrink_to_fit();
         self.files.shrink_to_fit();
 
@@ -908,17 +922,9 @@ impl<'s> Parser<'s> {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
-        let config = MarkdownTestConfig::from_str(code)?;
+        let config: C = toml::from_str(code).context("Error while parsing Markdown TOML config")?;
 
-        if config.dependencies().is_some() {
-            if self.file_has_dependencies {
-                bail!(
-                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
-                     External dependencies must be specified in a single top-level configuration block."
-                );
-            }
-            self.file_has_dependencies = true;
-        }
+        (self.validate_config)(&config)?;
 
         let current_section = &mut self.sections[self.stack.top()];
         current_section.config = config;
@@ -1070,12 +1076,55 @@ mod tests {
     use ruff_source_file::OneIndexed;
 
     use insta::assert_snapshot;
+    use serde::Deserialize;
 
     use crate::parser::EmbeddedFilePath;
 
+    /// A minimal copy of `ty_test::config::MarkdownTestConfig` for testing the
+    /// parser.
+    ///
+    /// Supports the following options:
+    ///
+    /// ```toml
+    /// [project]
+    /// dependencies = ["package==1.2.3"]
+    ///
+    /// [environment]
+    /// typeshed = "path/to/typeshed"
+    /// ```
+    #[derive(Clone, Debug, Default, Deserialize)]
+    #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+    #[expect(
+        unused,
+        reason = "These fields are only used for testing deserialization and never read"
+    )]
+    struct TestConfig {
+        project: Option<Project>,
+        environment: Option<Environment>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize)]
+    struct Project {
+        #[expect(unused)]
+        dependencies: Option<Vec<String>>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize)]
+    struct Environment {
+        #[expect(unused)]
+        typeshed: Option<String>,
+    }
+
+    fn parse<'s>(
+        title: &'s str,
+        source: &'s str,
+    ) -> anyhow::Result<super::MarkdownTestSuite<'s, TestConfig>> {
+        super::parse::<TestConfig>(title, source, |_| Ok(()))
+    }
+
     #[test]
     fn empty() {
-        let mf = super::parse("file.md", "").unwrap();
+        let mf = parse("file.md", "").unwrap();
 
         assert!(mf.tests().next().is_none());
     }
@@ -1114,7 +1163,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1142,7 +1191,7 @@ mod tests {
             x = 1
             ```",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1193,7 +1242,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test1, test2, test3] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected three tests");
@@ -1263,7 +1312,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test1, test2] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected two tests");
@@ -1321,7 +1370,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1358,7 +1407,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Test `One` has duplicate files named `foo.py`."
@@ -1405,7 +1454,7 @@ mod tests {
             ```
             ",
         ] {
-            let err = super::parse("file.md", &dedent(source)).expect_err("Should fail to parse");
+            let err = parse("file.md", &dedent(source)).expect_err("Should fail to parse");
             assert_eq!(
                 err.to_string(),
                 "Merged snippets in test `One` are not allowed in the presence of other files."
@@ -1432,7 +1481,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Merged snippets in test `One` are not allowed in the presence of other files."
@@ -1450,7 +1499,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1474,7 +1523,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1495,7 +1544,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1519,7 +1568,7 @@ mod tests {
             ",
         );
 
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Cannot auto-generate file name for code block with empty language specifier in test `No language specifier`"
@@ -1537,7 +1586,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Cannot auto-generate file name for code block with language `json` in test `JSON test?`"
@@ -1557,7 +1606,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block on line `6`"
@@ -1576,7 +1625,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1601,7 +1650,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1622,7 +1671,7 @@ mod tests {
             x = 1
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Unterminated code block on line 2.");
     }
 
@@ -1642,7 +1691,7 @@ mod tests {
             x = 1
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Unterminated code block on line 10.");
     }
 
@@ -1659,7 +1708,7 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1679,7 +1728,7 @@ mod tests {
                 ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Indented code blocks are not supported.");
     }
 
@@ -1696,7 +1745,7 @@ mod tests {
             ## Two
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Header 'Two' not valid inside a test case; parent 'One' has code files."
@@ -1716,7 +1765,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1748,7 +1797,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1782,7 +1831,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Test `file.md` has duplicate files named `foo.py`."
@@ -1806,7 +1855,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "The file name `mdtest_snippet.py` in test `Name clash` must not be used explicitly."
@@ -1825,7 +1874,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1850,7 +1899,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1874,7 +1923,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1899,7 +1948,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1925,7 +1974,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1953,7 +2002,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -1982,7 +2031,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -2011,7 +2060,7 @@ mod tests {
             ",
         );
 
-        let mf = super::parse("file.md", &source).unwrap();
+        let mf = parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -2041,7 +2090,7 @@ mod tests {
             ",
         );
 
-        super::parse("file.md", &source).expect_err(
+        parse("file.md", &source).expect_err(
             "Code blocks must start on a new line and be preceded by at least one blank line.",
         );
     }
@@ -2055,7 +2104,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Trailing code-block metadata is not supported. Only the code block language can be specified."
@@ -2076,7 +2125,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Section config to enable snapshotting diagnostics should appear at most once.",
@@ -2101,7 +2150,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Section config to enable snapshotting diagnostics should appear at most once.",
@@ -2126,7 +2175,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Section config to enable snapshotting diagnostics must \
@@ -2148,7 +2197,7 @@ mod tests {
             <!-- snapshot-diagnostics -->
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Section config to enable snapshotting diagnostics must \
@@ -2168,7 +2217,7 @@ mod tests {
             ```
             ",
         );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Unknown HTML comment `snpshotttt-digggggnosstic` -- possibly a typo? \
@@ -2190,42 +2239,7 @@ mod tests {
             <!-- fmt:on -->
             ",
         );
-        let parse_result = super::parse("file.md", &source);
+        let parse_result = parse("file.md", &source);
         assert!(parse_result.is_ok(), "{parse_result:?}");
-    }
-
-    #[test]
-    fn multiple_sections_with_dependencies_not_allowed() {
-        let source = dedent(
-            r#"
-            # First section
-
-            ```toml
-            [project]
-            dependencies = ["pydantic==2.12.2"]
-            ```
-
-            ```py
-            x = 1
-            ```
-
-            # Second section
-
-            ```toml
-            [project]
-            dependencies = ["numpy==2.0.0"]
-            ```
-
-            ```py
-            y = 2
-            ```
-            "#,
-        );
-        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(
-            err.to_string(),
-            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
-             External dependencies must be specified in a single top-level configuration block."
-        );
     }
 }
