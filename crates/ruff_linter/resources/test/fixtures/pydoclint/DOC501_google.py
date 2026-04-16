@@ -246,3 +246,74 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+# OK - exception raised via classmethod, documented in Raises section
+def validate_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        ValueError: if the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    )
+
+
+# DOC501 - exception raised via classmethod, NOT documented
+def validate_classmethod_missing(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    )
+
+
+# OK - exception raised via classmethod using imported exception
+def validate_imported_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        AnotherError: if the value is invalid.
+    """
+    raise AnotherError.create(value)
+
+
+# OK - chained method call with .with_traceback(), documented
+def chained_with_traceback(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        ValueError: if the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    ).with_traceback(None)
+
+
+# DOC501 - chained method call, NOT documented
+def chained_missing(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    ).with_traceback(None)
