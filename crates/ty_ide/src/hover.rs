@@ -10,7 +10,7 @@ use std::fmt::Formatter;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{
-    DisplaySettings, HasType, ResolvedDefinition, SemanticModel, TypeQualifiers,
+    DisplaySettings, ResolvedDefinition, SemanticModel, TypeQualifiers,
 };
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
@@ -34,7 +34,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if typed_dict_key.is_some() {
         None
-    } else if let GotoTarget::Call { callable, call, .. } = goto_target {
+    } else if let GotoTarget::Call { call, .. } = goto_target {
         resolved_call_signature(&model, call)
             .and_then(|details| {
                 let definition = details.definition?;
@@ -47,18 +47,12 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                     })
             })
             .or_else(|| {
-                callable
-                    .inferred_type(&model)
-                    .is_some_and(|ty| ty.is_class_literal())
-                    .then(|| {
-                        goto_target
-                            .get_definition_targets(
-                                &model,
-                                ty_python_semantic::ImportAliasResolution::ResolveAliases,
-                            )
-                            .and_then(|definitions| definitions.docstring(db))
-                    })
-                    .flatten()
+                goto_target
+                    .get_definition_targets(
+                        &model,
+                        ty_python_semantic::ImportAliasResolution::ResolveAliases,
+                    )
+                    .and_then(|definitions| definitions.docstring(db))
             })
             .map(HoverContent::Docstring)
     } else {
@@ -1540,6 +1534,48 @@ mod tests {
            | source
            |
         "#);
+    }
+
+    #[test]
+    fn hover_non_callable_decorated_function_shows_docstring() {
+        let test = cursor_test(
+            r#"
+        def decorator(f):
+            return 42
+
+        @decorator
+        def foo():
+            """Foo documentation"""
+            pass
+
+        f<CURSOR>oo()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        Foo documentation
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        Foo documentation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:1
+           |
+         8 |     pass
+         9 |
+        10 | foo()
+           | ^-^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
     }
 
     #[test]
