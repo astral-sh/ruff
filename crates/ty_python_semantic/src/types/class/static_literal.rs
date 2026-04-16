@@ -490,6 +490,8 @@ impl<'db> StaticClassLiteral<'db> {
         if self
             .known_function_decorators(db)
             .contains(&KnownFunction::DisjointBase)
+            && !self.is_typed_dict(db)
+            && !self.is_protocol(db)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
