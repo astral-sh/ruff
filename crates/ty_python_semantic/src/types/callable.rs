@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::ActiveRecursionDetector,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -77,8 +78,29 @@ impl<'db> Type<'db> {
         policy: UpcastPolicy,
         context: CallableUpcastContext<'db>,
     ) -> Option<CallableTypes<'db>> {
+        let recursion_detector = ActiveRecursionDetector::default();
+        self.try_upcast_to_callable_with_policy_impl(
+            db,
+            policy,
+            context,
+            &recursion_detector,
+        )
+    }
+
+    fn try_upcast_to_callable_with_policy_impl(
+        self,
+        db: &'db dyn Db,
+        policy: UpcastPolicy,
+        context: CallableUpcastContext<'db>,
+        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
+    ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
+            return fallback.try_upcast_to_callable_with_policy_impl(
+                db,
+                policy,
+                context,
+                recursion_detector,
+            );
         }
 
         match self {
@@ -124,7 +146,12 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
-                        .try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                        .try_upcast_to_callable_with_policy_impl(
+                            db,
+                            policy,
+                            context,
+                            recursion_detector,
+                        )
                 } else {
                     None
                 }
@@ -137,7 +164,12 @@ impl<'db> Type<'db> {
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+                .try_upcast_to_callable_with_policy_impl(
+                    db,
+                    policy,
+                    context,
+                    recursion_detector,
+                ),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
@@ -153,7 +185,12 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound
                             .to_meta_type(db)
-                            .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
+                            .try_upcast_to_callable_with_policy_impl(
+                                db,
+                                policy,
+                                context,
+                                recursion_detector,
+                            )?;
                         Some(upcast_callables.map(|callable| {
                             let signatures = callable
                                 .signatures(db)
@@ -171,8 +208,11 @@ impl<'db> Type<'db> {
                         for constraint in constraints.elements(db) {
                             let element_upcast = constraint
                                 .to_meta_type(db)
-                                .try_upcast_to_callable_with_policy_and_context(
-                                    db, policy, context,
+                                .try_upcast_to_callable_with_policy_impl(
+                                    db,
+                                    policy,
+                                    context,
+                                    recursion_detector,
                                 )?;
                             for callable in element_upcast.into_inner() {
                                 let signatures = callable
@@ -203,7 +243,12 @@ impl<'db> Type<'db> {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
                     let element_callable = element
-                        .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
+                        .try_upcast_to_callable_with_policy_impl(
+                            db,
+                            policy,
+                            context,
+                            recursion_detector,
+                        )?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -212,13 +257,28 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
-                    .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+                    .try_upcast_to_callable_with_policy_impl(
+                        db,
+                        policy,
+                        context,
+                        recursion_detector,
+                    ),
                 _ => None,
             },
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::TypeAlias(_) => self.visit_type_alias_value(
+                db,
+                recursion_detector,
+                || Some(CallableTypes::one(CallableType::unknown(db))),
+                |value_ty| {
+                    value_ty.try_upcast_to_callable_with_policy_impl(
+                        db,
+                        policy,
+                        context,
+                        recursion_detector,
+                    )
+                },
+            ),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>
