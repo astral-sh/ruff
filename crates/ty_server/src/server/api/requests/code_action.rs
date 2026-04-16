@@ -37,6 +37,13 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
         let diagnostics = params.context.diagnostics;
+        let has_kind = |kind| {
+            params
+                .context
+                .only
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&kind))
+        };
 
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
@@ -102,7 +109,9 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             }
         }
 
-        if let Some(range) = params.range.to_text_range(db, file, url, encoding) {
+        if has_kind(CodeActionKind::REFACTOR)
+            && let Some(range) = params.range.to_text_range(db, file, url, encoding)
+        {
             for action in refactor_code_actions(db, file, range) {
                 actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
                     title: action.title,
