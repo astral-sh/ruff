@@ -248,6 +248,25 @@ c.attr = 1
 reveal_type(c.attr)  # revealed: Never
 ```
 
+### Non-returning setter
+
+```py
+from typing import NoReturn
+
+class NoReturnSetter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> NoReturn:
+        raise RuntimeError
+
+no_return_setter = NoReturnSetter()
+# error: [invalid-assignment] "Cannot assign to attribute `x` on type `NoReturnSetter` whose `__set__` method returns `Never`/`NoReturn`"
+no_return_setter.x = 1
+```
+
 ### Wrong setter signature
 
 ```py
