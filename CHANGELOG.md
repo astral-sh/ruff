@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.15.11
+
+Released on 2026-04-16.
+
+### Preview features
+
+- \[`ruff`\] Ignore `RUF029` when function is decorated with `asynccontextmanager` ([#24642](https://github.com/astral-sh/ruff/pull/24642))
+- \[`airflow`\] Implement `airflow-xcom-pull-in-template-string` (`AIR201`) ([#23583](https://github.com/astral-sh/ruff/pull/23583))
+- \[`flake8-bandit`\] Fix `S103` false positives and negatives in mask analysis ([#24424](https://github.com/astral-sh/ruff/pull/24424))
+
+### Bug fixes
+
+- \[`flake8-async`\] Omit overridden methods for `ASYNC109` ([#24648](https://github.com/astral-sh/ruff/pull/24648))
+
+### Documentation
+
+- \[`flake8-async`\] Add override mention to `ASYNC109` docs ([#24666](https://github.com/astral-sh/ruff/pull/24666))
+- Update Neovim config examples to use `vim.lsp.config` ([#24577](https://github.com/astral-sh/ruff/pull/24577))
+
+### Contributors
+
+- [@augustelalande](https://github.com/augustelalande)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@benberryallwood](https://github.com/benberryallwood)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Dev-iL](https://github.com/Dev-iL)
+
 ## 0.15.10
 
 Released on 2026-04-09.
