@@ -792,6 +792,9 @@ mod tests {
         Ok(())
     }
 
+    // The merged span includes `if False:` (CurrentAnalysis) which dominates `x = lambda: 1`
+    // (Unconditional), so the whole range is conservatively classified as CurrentAnalysis.
+    // TODO: if we ever report sub-ranges separately, the inner range could be Unconditional.
     #[test]
     fn merges_overlapping_ranges_of_different_kinds() -> anyhow::Result<()> {
         let source = r#"
