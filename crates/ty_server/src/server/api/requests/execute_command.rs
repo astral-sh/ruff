@@ -109,7 +109,7 @@ fn run_test(
     let python_executable = session
         .project_db_for_path(&run_test_args.cwd)
         .and_then(|db| Program::get(db).python_executable(db).as_deref())
-        .ok_or_else(|| anyhow::anyhow!("No Python executable found"))?;
+        .ok_or_else(|| anyhow::anyhow!("No Python executable found. Set `environment.python` in your ty configuration: https://docs.astral.sh/ty/reference/configuration/#python"))?;
 
     // Reconstruct the command again, to now allow client to run any program
     let run_test_args = RunTestArgs::new(
