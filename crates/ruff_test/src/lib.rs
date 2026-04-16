@@ -3,18 +3,18 @@ use std::fmt::Write;
 use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
-use rustc_hash::FxHashMap;
 
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::EmbeddedFileSourceMap;
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
-use ruff_db::files::{FileRootKind, system_path_to_file};
+use ruff_db::diagnostic::{FileResolver, Input, UnifiedFile};
+use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
-use ruff_linter::message::EmitterContext;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::LineIndex;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
@@ -212,9 +212,7 @@ fn run_test(
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
 
-    // Construct a separate `FileResolver` for rendering diagnostics.
-    let notebook_indexes = FxHashMap::default();
-    let resolver = EmitterContext::new(&notebook_indexes);
+    let resolver = RuffResolver(db);
 
     let failures: Failures = test_files
         .iter()
@@ -239,7 +237,6 @@ fn run_test(
             let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
                 |inline_diagnostics| {
                     mdtest::validate_inline_snapshot(
-                        db,
                         &resolver,
                         "ruff",
                         test_file,
@@ -292,5 +289,31 @@ fn run_test(
         Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
+    }
+}
+
+/// Wrap the db to avoid panicking when provided a Ruff file like the blanket `FileResolver`
+/// implementation.
+struct RuffResolver<'a>(&'a db::Db);
+
+impl FileResolver for RuffResolver<'_> {
+    fn path(&self, file: File) -> &str {
+        self.0.path(file)
+    }
+
+    fn input(&self, file: File) -> Input {
+        self.0.input(file)
+    }
+
+    fn current_directory(&self) -> &std::path::Path {
+        self.0.current_directory()
+    }
+
+    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
+        None
+    }
+
+    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
+        false
     }
 }

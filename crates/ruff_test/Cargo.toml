@@ -18,6 +18,7 @@ test = false
 mdtest = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_linter = { workspace = true, features = ["testing"] }
+ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_workspace = { workspace = true }
@@ -26,7 +27,6 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
-rustc-hash = { workspace = true }
 salsa = { workspace = true }
 
 [lints]

@@ -439,7 +439,6 @@ fn run_test(
                 |inline_diagnostics| {
                     mdtest::validate_inline_snapshot(
                         db,
-                        db,
                         "ty",
                         test_file,
                         &inline_diagnostics,

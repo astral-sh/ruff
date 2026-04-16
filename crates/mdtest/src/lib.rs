@@ -5,7 +5,6 @@ use colored::Colorize;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
-use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
@@ -240,7 +239,6 @@ pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str
 }
 
 pub fn validate_inline_snapshot(
-    db: &dyn ruff_db::Db,
     resolver: &dyn FileResolver,
     tool_name: &'static str,
     test_file: &TestFile<'_>,
@@ -248,7 +246,8 @@ pub fn validate_inline_snapshot(
     markdown_edits: &mut Vec<MarkdownEdit>,
 ) -> Result<(), matcher::FailuresByLine> {
     let update_snapshots = is_update_inline_snapshots_enabled();
-    let line_index = line_index(db, test_file.file);
+    let input = resolver.input(test_file.file);
+    let line_index = input.line_index();
     let mut failures = matcher::FailuresByLine::default();
     let mut inline_diagnostics = inline_diagnostics;
 
