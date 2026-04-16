@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::request::CodeLensRequest;
 use lsp_types::{CodeLens, CodeLensParams, Url};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_ide::{CodeLensCommand, code_lens};
 use ty_project::{Db as _, ProjectDatabase};
 
@@ -45,8 +46,8 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
         };
 
         let items = code_lens(db, file);
-
         let cwd = root.to_string();
+        let python_executable = snapshot.workspace_settings().python_executable();
 
         let lenses: Vec<CodeLens> = items
             .into_iter()
@@ -54,17 +55,9 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
                 let range = item.range.to_lsp_range(db, file, snapshot.encoding())?;
 
                 let args = match &item.command {
-                    CodeLensCommand::RunTest {
-                        class_name,
-                        function_name,
-                    } => {
-                        let run_test_args = RunTestArgs::new(
-                            &cwd,
-                            &file_path,
-                            class_name.as_ref(),
-                            function_name.as_deref(),
-                            snapshot.workspace_settings().python_executable(),
-                        );
+                    CodeLensCommand::RunTest { test } => {
+                        let run_test_args =
+                            RunTestArgs::new(&cwd, &file_path, test, python_executable.as_deref());
                         serde_json::to_value(&run_test_args).ok()?
                     }
                 };
