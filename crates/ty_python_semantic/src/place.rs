@@ -101,6 +101,7 @@ pub(crate) struct DefinedPlace<'db> {
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 impl<'db> DefinedPlace<'db> {
@@ -110,6 +111,7 @@ impl<'db> DefinedPlace<'db> {
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
             public_type_policy: PublicTypePolicy::Raw,
+            definition: None,
         }
     }
 
@@ -125,6 +127,11 @@ impl<'db> DefinedPlace<'db> {
 
     pub(crate) fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
         self.public_type_policy = public_type_policy;
+        self
+    }
+
+    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.definition = definition;
         self
     }
 
@@ -301,14 +308,16 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
         match value {
             Ok(type_and_qualifiers) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
-                    .with_origin(type_and_qualifiers.origin()),
+                    .with_origin(type_and_qualifiers.origin())
+                    .with_definition(type_and_qualifiers.definition()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin())
-                    .with_definedness(Definedness::PossiblyUndefined),
+                    .with_definedness(Definedness::PossiblyUndefined)
+                    .with_definition(type_and_qualifiers.definition()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
         }
@@ -737,7 +746,8 @@ impl<'db> PlaceAndQualifiers<'db> {
                 qualifiers,
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
-                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
+                    .with_definition(place.definition);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -923,6 +933,7 @@ pub(crate) fn place_by_id<'db>(
                     origin,
                     definedness: boundness,
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
@@ -930,6 +941,7 @@ pub(crate) fn place_by_id<'db>(
                     origin,
                     definedness,
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 })
                 .with_qualifiers(qualifiers),
             }
@@ -969,6 +981,7 @@ pub(crate) fn place_by_id<'db>(
                         origin,
                         definedness: Definedness::AlwaysDefined,
                         public_type_policy: PublicTypePolicy::Raw,
+                        definition: None,
                     })
                 }
                 // Place is possibly undeclared and (possibly) bound
@@ -986,6 +999,7 @@ pub(crate) fn place_by_id<'db>(
                         boundness
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 }),
             };
 
@@ -1514,12 +1528,16 @@ fn place_from_bindings_impl<'db>(
         };
 
         match deleted_reachability {
-            Truthiness::AlwaysFalse => {
-                Place::Defined(DefinedPlace::new(ty).with_definedness(boundness))
-            }
+            Truthiness::AlwaysFalse => Place::Defined(
+                DefinedPlace::new(ty)
+                    .with_definedness(boundness)
+                    .with_definition(first_definition),
+            ),
             Truthiness::AlwaysTrue => Place::Undefined,
             Truthiness::Ambiguous => Place::Defined(
-                DefinedPlace::new(ty).with_definedness(Definedness::PossiblyUndefined),
+                DefinedPlace::new(ty)
+                    .with_definedness(Definedness::PossiblyUndefined)
+                    .with_definition(first_definition),
             ),
         }
     } else {
@@ -2120,6 +2138,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2129,6 +2148,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2139,6 +2159,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2148,6 +2169,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2171,7 +2193,8 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                public_type_policy: PublicTypePolicy::Raw
+                public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .into()
         );
@@ -2181,7 +2204,8 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                public_type_policy: PublicTypePolicy::Raw
+                public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .into()
         );

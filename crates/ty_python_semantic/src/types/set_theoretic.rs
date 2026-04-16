@@ -284,6 +284,7 @@ impl<'db> UnionType<'db> {
                     Definedness::AlwaysDefined
                 },
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
         }
     }
@@ -340,6 +341,7 @@ impl<'db> UnionType<'db> {
                         Definedness::AlwaysDefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 })
             },
             qualifiers,
@@ -855,6 +857,7 @@ impl<'db> IntersectionType<'db> {
                     Definedness::PossiblyUndefined
                 },
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
         }
     }
@@ -908,6 +911,7 @@ impl<'db> IntersectionType<'db> {
                         Definedness::PossiblyUndefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 })
             },
             qualifiers,
