@@ -1409,7 +1409,14 @@ fn add_argument_completions<'db>(
     completions: &mut Completions<'db>,
 ) {
     let mut in_arguments = false;
-    for node in cursor.covering_node.ancestors() {
+    let ancestors = cursor.covering_node.ancestors();
+    let parents = cursor.covering_node.ancestors().skip(1);
+    for (node, parent) in ancestors.zip(parents) {
+        if let ast::AnyNodeRef::Keyword(kw) = parent
+            && node.ptr_eq(AnyNodeRef::from(&kw.value))
+        {
+            return;
+        }
         match node {
             ast::AnyNodeRef::Arguments(_) => {
                 in_arguments = true;
