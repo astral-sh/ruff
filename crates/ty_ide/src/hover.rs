@@ -1542,6 +1542,57 @@ mod tests {
     }
 
     #[test]
+    fn hover_overloaded_function_with_conditional_definitions() {
+        let test = cursor_test(
+            r#"
+        from typing import overload, Any
+        def foo() -> bool: ...
+
+        @overload
+        def test() -> None: ...
+
+        if foo():
+            @overload
+            def test(a: str) -> str: ...
+        else:
+            @overload
+            def test(a: int) -> int: ...
+
+        def test(a: Any) -> Any:
+            """Implementation docstring"""
+            return a
+
+        t<CURSOR>est()
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def test() -> None
+        ---------------------------------------------
+        Implementation docstring
+
+        ---------------------------------------------
+        ```python
+        def test() -> None
+        ```
+        ---
+        Implementation docstring
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:1
+           |
+        17 |     return a
+        18 |
+        19 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
     fn hover_member() {
         let test = hover_test(
             r#"
