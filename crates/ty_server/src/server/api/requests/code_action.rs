@@ -5,7 +5,7 @@ use lsp_types::{self as types, NumberOrString, TextEdit, Url, request as req};
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
-use ty_ide::{code_actions, refactor_code_actions};
+use ty_ide::{diagnostic_code_actions, refactor_code_actions};
 use ty_project::ProjectDatabase;
 use types::{CodeActionKind, CodeActionOrCommand};
 
@@ -83,7 +83,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
                 && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
             {
-                for action in code_actions(db, file, range, diagnostic_id) {
+                for action in diagnostic_code_actions(db, file, range, diagnostic_id) {
                     actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QUICKFIX),

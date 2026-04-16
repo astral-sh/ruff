@@ -17,7 +17,7 @@ pub struct CodeAction {
     pub preferred: bool,
 }
 
-pub fn code_actions(
+pub fn diagnostic_code_actions(
     db: &dyn Db,
     file: File,
     diagnostic_range: TextRange,
@@ -78,7 +78,7 @@ fn unresolved_fixes(
 #[cfg(test)]
 mod tests {
 
-    use crate::{code_actions, refactor_code_actions};
+    use crate::{diagnostic_code_actions, refactor_code_actions};
 
     use insta::assert_snapshot;
     use ruff_db::{
@@ -102,7 +102,7 @@ mod tests {
     fn add_ignore() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -118,7 +118,7 @@ mod tests {
     fn add_ignore_existing_comment() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  # fmt: off"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -135,7 +135,7 @@ mod tests {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  "#);
 
         // Not an inline snapshot because of trailing whitespace.
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE));
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE));
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -167,7 +167,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -188,7 +188,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -211,7 +211,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:5
           |
@@ -236,7 +236,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -257,7 +257,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -278,7 +278,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -303,7 +303,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -336,7 +336,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -368,7 +368,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -400,7 +400,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:6
           |
@@ -431,7 +431,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:5
           |
@@ -463,7 +463,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -489,7 +489,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -516,7 +516,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:4:11
           |
@@ -544,7 +544,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNDEFINED_REVEAL), @"
         info[code-action]: import typing.reveal_type
          --> main.py:2:1
           |
@@ -577,7 +577,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
          --> main.py:2:2
           |
@@ -616,7 +616,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
          --> main.py:4:2
           |
@@ -676,7 +676,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:2:1
           |
@@ -713,7 +713,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |
@@ -751,7 +751,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        assert_snapshot!(test.diagnostic_code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |
@@ -837,7 +837,7 @@ mod tests {
             }
         }
 
-        pub(super) fn code_actions(&self, lint: &'static LintMetadata) -> String {
+        pub(super) fn diagnostic_code_actions(&self, lint: &'static LintMetadata) -> String {
             use std::fmt::Write;
 
             let mut buf = String::new();
@@ -847,7 +847,7 @@ mod tests {
                 .show_fix_diff(true)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.range, &lint.name) {
+            for mut action in diagnostic_code_actions(&self.db, self.file, self.range, &lint.name) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,
