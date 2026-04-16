@@ -28,7 +28,6 @@ colored = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

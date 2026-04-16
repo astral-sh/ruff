@@ -3557,7 +3557,6 @@ dependencies = [
  "ruff_workspace",
  "rustc-hash",
  "salsa",
- "serde",
 ]
 
 [[package]]

@@ -4,10 +4,9 @@ use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 use rustc_hash::FxHashMap;
-use serde::Deserialize;
 
 use mdtest::matcher::{self, Failure};
-use mdtest::parser::{EmbeddedFileSourceMap, MdtestConfig};
+use mdtest::parser::EmbeddedFileSourceMap;
 use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
 use ruff_db::files::{FileRootKind, system_path_to_file};
@@ -22,16 +21,6 @@ use ruff_workspace::options::Options;
 
 mod db;
 
-#[derive(Clone, Default, Deserialize)]
-#[serde(transparent)]
-struct RuffOptions(Options);
-
-impl MdtestConfig for RuffOptions {
-    fn has_dependencies(&self) -> bool {
-        false
-    }
-}
-
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
@@ -45,7 +34,7 @@ pub fn run(
 ) -> anyhow::Result<()> {
     let output_format = output_format();
 
-    let suite = mdtest::parser::parse::<RuffOptions>(short_title, source)
+    let suite = mdtest::parser::parse::<Options>(short_title, source, |_| Ok(()))
         .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
@@ -150,7 +139,7 @@ fn run_test(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &mdtest::parser::MarkdownTest<RuffOptions>,
+    test: &mdtest::parser::MarkdownTest<Options>,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     db.use_in_memory_system();
@@ -208,7 +197,7 @@ fn run_test(
         .collect();
 
     let settings = Configuration::from_options(
-        test.configuration().0.clone(),
+        test.configuration().clone(),
         None,
         project_root.as_std_path(),
     )
@@ -285,7 +274,7 @@ fn run_test(
             "ruff",
             relative_fixture_path,
             test,
-            snapshot_diagnostics,
+            snapshot_diagnostics.iter(),
         );
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
