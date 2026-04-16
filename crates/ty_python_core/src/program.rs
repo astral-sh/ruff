@@ -21,7 +21,6 @@ pub struct Program {
     #[returns(ref)]
     pub search_paths: SearchPaths,
 
-    /// The path to the Python executable for the resolved environment, if known.
     #[returns(ref)]
     pub python_executable: Option<SystemPathBuf>,
 }

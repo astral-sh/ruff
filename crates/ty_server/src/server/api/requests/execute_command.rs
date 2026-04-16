@@ -36,11 +36,14 @@ impl RunTestArgs {
     pub(crate) fn new(
         cwd: &str,
         file_path: String,
-        test_target: &str,
+        test_target: String,
         python_executable: &SystemPath,
     ) -> Self {
-        let test_target = format!("{file_path}::{test_target}");
-        let arguments = vec!["-m".to_string(), "pytest".to_string(), test_target.clone()];
+        let arguments = vec![
+            "-m".to_string(),
+            "pytest".to_string(),
+            format!("{file_path}::{test_target}"),
+        ];
 
         Self {
             cwd: cwd.to_string(),
@@ -50,17 +53,6 @@ impl RunTestArgs {
             test_target,
         }
     }
-}
-
-pub(crate) fn python_executable(db: &dyn ty_project::Db) -> crate::Result<&SystemPath> {
-    Program::get(db)
-        .python_executable(db)
-        .as_deref()
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "No Python executable found. Set `environment.python` in your ty configuration: https://docs.astral.sh/ty/reference/configuration/#python"
-            )
-        })
 }
 
 impl std::fmt::Display for RunTestArgs {
@@ -122,13 +114,16 @@ fn run_test(
         .ok_or_else(|| {
             anyhow::anyhow!("No project database found for path: {}", run_test_args.cwd)
         })?;
-    let python_executable = python_executable(db)?;
+    let python_executable = Program::get(db)
+        .python_executable(db)
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("No Python executable found."))?;
 
     // Reconstruct the command again, to now allow client to run any program
     let run_test_args = RunTestArgs::new(
         &run_test_args.cwd,
         run_test_args.file_path,
-        &run_test_args.test_target,
+        run_test_args.test_target,
         python_executable,
     );
     let client = client.clone();

@@ -9,7 +9,7 @@ use crate::Db;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CodeLensCommand {
-    /// fully qualified name of the test function
+    /// qualified name of the test function
     RunTest { test: String },
 }
 
