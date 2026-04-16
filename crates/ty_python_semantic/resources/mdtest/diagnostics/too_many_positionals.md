@@ -69,7 +69,7 @@ info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
 
-error[too-many-positional-arguments]: Too many positional arguments to bound method `method`: expected 2, got 3
+error[too-many-positional-arguments]: Too many positional arguments to bound method `Foo.method`: expected 2, got 3
   --> src/main.py:14:17
    |
 14 | Foo().method(1, 2)  # snapshot: too-many-positional-arguments

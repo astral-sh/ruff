@@ -88,7 +88,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/methods.md
 # Diagnostics
 
 ```
-error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
   --> src/mdtest_snippet.py:19:1
    |
 19 | class MissingArg(RequiresArg): ...  # error: [missing-argument]
@@ -104,7 +104,7 @@ info: Parameter declared here
 ```
 
 ```
-error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
+error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass__` is incorrect
   --> src/mdtest_snippet.py:20:32
    |
 20 | class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
@@ -120,7 +120,7 @@ info: Function defined here
 ```
 
 ```
-error[missing-argument]: No argument provided for required parameter `arg` of function `__init_subclass__`
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
   --> src/mdtest_snippet.py:25:1
    |
 25 | class IncorrectArg(RequiresArg, not_arg="foo"):
@@ -136,7 +136,7 @@ info: Parameter declared here
 ```
 
 ```
-error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `__init_subclass__`
+error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
   --> src/mdtest_snippet.py:25:33
    |
 25 | class IncorrectArg(RequiresArg, not_arg="foo"):
@@ -169,7 +169,7 @@ info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-c
 ```
 
 ```
-error[invalid-argument-type]: Argument to function `__init_subclass__` is incorrect
+error[invalid-argument-type]: Argument to function `Base.__init_subclass__` is incorrect
   --> src/mdtest_snippet.py:51:37
    |
 51 | class Invalid(Base, metaclass=type, arg="foo"): ...
@@ -185,7 +185,7 @@ info: Function defined here
 ```
 
 ```
-error[no-matching-overload]: No overload of function `__init_subclass__` matches arguments
+error[no-matching-overload]: No overload of function `Base.__init_subclass__` matches arguments
   --> src/mdtest_snippet.py:65:1
    |
 65 | class InvalidType(Base, mode="b", arg=5):

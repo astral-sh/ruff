@@ -32,7 +32,7 @@ error[unresolved-attribute]: Attribute `split` is not defined on `int` in union 
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `split` is incorrect
+error[invalid-argument-type]: Argument to bound method `bytes.split` is incorrect
  --> src/mdtest_snippet.py:4:13
   |
 4 |     x.split(" ")

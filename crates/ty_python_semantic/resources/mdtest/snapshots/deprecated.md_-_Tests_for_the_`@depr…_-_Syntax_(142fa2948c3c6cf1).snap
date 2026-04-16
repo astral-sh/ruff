@@ -78,7 +78,7 @@ error[invalid-argument-type]: Argument to class `deprecated` is incorrect
 ```
 
 ```
-error[missing-argument]: No argument provided for required parameter `arg` of bound method `__call__`
+error[missing-argument]: No argument provided for required parameter `arg` of bound method `deprecated.__call__`
  --> src/mdtest_snippet.py:6:1
   |
 6 | invalid_deco()  # error: [missing-argument]

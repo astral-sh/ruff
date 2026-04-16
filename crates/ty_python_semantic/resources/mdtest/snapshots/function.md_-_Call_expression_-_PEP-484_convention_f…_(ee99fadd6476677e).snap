@@ -178,7 +178,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `method`
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.method`
   --> src/mdtest_snippet.py:63:14
    |
 63 | C(42).method(__x=1)
@@ -194,7 +194,7 @@ info: Method signature here
 ```
 
 ```
-error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `class_method`
+error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.class_method`
   --> src/mdtest_snippet.py:65:16
    |
 65 | C.class_method(__x="1")

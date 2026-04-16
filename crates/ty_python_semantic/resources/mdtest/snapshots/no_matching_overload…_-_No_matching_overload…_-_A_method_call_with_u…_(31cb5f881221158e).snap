@@ -30,7 +30,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_
 # Diagnostics
 
 ```
-error[no-matching-overload]: No overload of bound method `bar` matches arguments
+error[no-matching-overload]: No overload of bound method `Foo.bar` matches arguments
   --> src/mdtest_snippet.py:12:1
    |
 12 | foo.bar(b"wat")  # error: [no-matching-overload]
