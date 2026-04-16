@@ -720,6 +720,7 @@ pub(crate) mod testing {
                     },
                     python_platform: PythonPlatform::default(),
                     search_paths,
+                    python_executable: None,
                 },
             );
 
