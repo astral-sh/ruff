@@ -26,6 +26,7 @@ use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use ty_python_core::definition::Definition;
 
@@ -871,6 +872,15 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+    let recursion_detector = ActiveRecursionDetector::default();
+    extract_unpacked_typed_dict_keys_from_value_type_impl(db, ty, &recursion_detector)
+}
+
+fn extract_unpacked_typed_dict_keys_from_value_type_impl<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    recursion_detector: &ActiveRecursionDetector<Type<'db>>,
+) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
     match ty {
         Type::TypedDict(td) => {
             let keys = td
@@ -895,7 +905,11 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                 .positive(db)
                 .iter()
                 .filter_map(|element| {
-                    extract_unpacked_typed_dict_keys_from_value_type(db, *element)
+                    extract_unpacked_typed_dict_keys_from_value_type_impl(
+                        db,
+                        *element,
+                        recursion_detector,
+                    )
                 })
                 .collect();
 
@@ -932,7 +946,13 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
             let key_maps: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_keys_from_value_type(db, *element))
+                .map(|element| {
+                    extract_unpacked_typed_dict_keys_from_value_type_impl(
+                        db,
+                        *element,
+                        recursion_detector,
+                    )
+                })
                 .collect::<Option<_>>()?;
 
             let all_keys: OrderSet<Name> = key_maps
@@ -977,8 +997,14 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 
             Some(result)
         }
-        Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_keys_from_value_type(db, alias.value_type(db))
+        Type::TypeAlias(_) => {
+            ty.visit_type_alias_value_or_default(db, recursion_detector, |value_ty| {
+                extract_unpacked_typed_dict_keys_from_value_type_impl(
+                    db,
+                    value_ty,
+                    recursion_detector,
+                )
+            })
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)

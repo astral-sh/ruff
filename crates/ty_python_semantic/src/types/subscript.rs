@@ -13,6 +13,7 @@ use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
+use super::cyclic::ActiveRecursionDetector;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
@@ -513,44 +514,67 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        let recursion_detector = ActiveRecursionDetector::default();
+        self.subscript_impl(db, slice_ty, expr_context, &recursion_detector)
+    }
+
+    fn subscript_impl(
+        self,
+        db: &'db dyn Db,
+        slice_ty: Type<'db>,
+        expr_context: ast::ExprContext,
+        recursion_detector: &ActiveRecursionDetector<(Type<'db>, Type<'db>)>,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(db, slice_ty, expr_context);
+            return fallback.subscript_impl(db, slice_ty, expr_context, recursion_detector);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(db, fallback, expr_context);
+            return self.subscript_impl(db, fallback, expr_context, recursion_detector);
         }
 
         let value_ty = self;
+        let recursion_key = (value_ty, slice_ty);
 
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
-            }
+            (Type::TypeAlias(alias), _) => Some(recursion_detector.visit(
+                &recursion_key,
+                || Ok(Type::unknown()),
+                || alias.value_type(db).subscript_impl(db, slice_ty, expr_context, recursion_detector),
+            )),
 
-            (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, alias.value_type(db), expr_context))
-            }
+            (_, Type::TypeAlias(alias)) => Some(recursion_detector.visit(
+                &recursion_key,
+                || Ok(Type::unknown()),
+                || {
+                    value_ty.subscript_impl(
+                        db,
+                        alias.value_type(db),
+                        expr_context,
+                        recursion_detector,
+                    )
+                },
+            )),
 
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
-                element.subscript(db, slice_ty, expr_context)
+                element.subscript_impl(db, slice_ty, expr_context, recursion_detector)
             })),
 
             (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
-                value_ty.subscript(db, element, expr_context)
+                value_ty.subscript_impl(db, element, expr_context, recursion_detector)
             })),
 
             (Type::Intersection(intersection), _) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
-                    element.subscript(db, slice_ty, expr_context)
+                    element.subscript_impl(db, slice_ty, expr_context, recursion_detector)
                 }))
             }
 
             (_, Type::Intersection(intersection)) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
-                    value_ty.subscript(db, element, expr_context)
+                    value_ty.subscript_impl(db, element, expr_context, recursion_detector)
                 }))
             }
 
@@ -701,14 +725,14 @@ impl<'db> Type<'db> {
             // Ex) Given `"value"[True]`, return `"a"`
             (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
                 let bool = rhs_literal.as_bool().unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(db, Type::int_literal(i64::from(bool)), expr_context, recursion_detector))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if literal.is_bool() && nominal.tuple_spec(db).is_some() =>
             {
                 let bool = literal.as_bool().unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(db, Type::int_literal(i64::from(bool)), expr_context, recursion_detector))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {

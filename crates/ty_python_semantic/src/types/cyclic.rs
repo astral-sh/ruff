@@ -166,9 +166,9 @@ impl<Tag, T, R: Default> Default for CycleDetector<Tag, T, R> {
 
 /// Recursion detection without memoization.
 ///
-/// This is useful when a recursive relation needs a coinductive-style "we're already proving this
-/// goal, assume it for now" step, but completed results are not safe to reuse for future visits to
-/// the same abstract key.
+/// This is useful when a recursive operation or relation needs a coinductive-style "we're already
+/// evaluating this, assume a conservative answer for now" step, but completed results are not safe
+/// to reuse for future visits to the same key.
 #[derive(Debug)]
 pub(crate) struct ActiveRecursionDetector<T> {
     seen: RefCell<FxHashSet<T>>,

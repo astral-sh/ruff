@@ -19,7 +19,7 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-        generics::Specialization,
+        cyclic::ActiveRecursionDetector, generics::Specialization,
     },
 };
 use ty_python_core::{
@@ -155,14 +155,28 @@ struct AllMembers<'db> {
 
 impl<'db> AllMembers<'db> {
     fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        let recursion_detector = ActiveRecursionDetector::default();
+        Self::of_impl(db, ty, &recursion_detector)
+    }
+
+    fn of_impl(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
+    ) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
         };
-        all_members.extend_with_type(db, ty);
+        all_members.extend_with_type(db, ty, recursion_detector);
         all_members
     }
 
-    fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn extend_with_type(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
+    ) {
         match ty {
             Type::Union(union) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
@@ -180,13 +194,13 @@ impl<'db> AllMembers<'db> {
 
                 let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
                     Type::Union(union) => union,
-                    ty => return self.extend_with_type(db, ty),
+                    ty => return self.extend_with_type(db, ty, recursion_detector),
                 };
                 self.members.extend(
                     union
                         .elements(db)
                         .iter()
-                        .map(|ty| AllMembers::of(db, *ty).members)
+                        .map(|ty| AllMembers::of_impl(db, *ty, recursion_detector).members)
                         .reduce(|acc, members| acc.intersection(&members).cloned().collect())
                         .unwrap_or_default(),
                 );
@@ -196,7 +210,7 @@ impl<'db> AllMembers<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
+                    .map(|ty| AllMembers::of_impl(db, *ty, recursion_detector).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
                     .unwrap_or_default(),
             ),
@@ -210,33 +224,52 @@ impl<'db> AllMembers<'db> {
                         ty,
                         ClassLiteral::Static(class_literal),
                         specialization,
+                        recursion_detector,
                     );
                 } else {
                     // For dynamic classes, we can't enumerate instance members (requires body scope),
                     // but we can still add synthetic members for dataclass-like classes.
-                    self.extend_with_synthetic_members(db, ty, class.class_literal(db), None);
+                    self.extend_with_synthetic_members(
+                        db,
+                        ty,
+                        class.class_literal(db),
+                        None,
+                        recursion_detector,
+                    );
                 }
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, newtype.concrete_base_type(db));
+                self.extend_with_type(db, newtype.concrete_base_type(db), recursion_detector);
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(
+                    db,
+                    KnownClass::TypedDictFallback.to_class_literal(db),
+                    recursion_detector,
+                );
             }
 
             Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(
+                    db,
+                    KnownClass::TypedDictFallback.to_class_literal(db),
+                    recursion_detector,
+                );
             }
 
             Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(
+                    db,
+                    KnownClass::TypedDictFallback.to_class_literal(db),
+                    recursion_detector,
+                );
             }
 
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
+                self.extend_with_synthetic_members(db, ty, class_literal, None, recursion_detector);
                 if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
                     self.extend_with_class_members(db, ty, metaclass);
                 }
@@ -250,6 +283,7 @@ impl<'db> AllMembers<'db> {
                     ty,
                     ClassLiteral::Static(class_literal),
                     None,
+                    recursion_detector,
                 );
                 if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
                     self.extend_with_class_members(db, ty, metaclass);
@@ -258,7 +292,7 @@ impl<'db> AllMembers<'db> {
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => {
-                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db), recursion_detector);
                 }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
@@ -275,6 +309,7 @@ impl<'db> AllMembers<'db> {
                                 ty,
                                 ClassLiteral::Static(class_literal),
                                 specialization,
+                                recursion_detector,
                             );
                             if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
                                 self.extend_with_class_members(db, ty, metaclass);
@@ -289,25 +324,33 @@ impl<'db> AllMembers<'db> {
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
-                self.extend_with_type(db, Type::object());
+                self.extend_with_type(db, Type::object(), recursion_detector);
             }
 
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            Type::TypeAlias(_) => {
+                let members = ty.visit_type_alias_value(
+                    db,
+                    recursion_detector,
+                    || AllMembers::of_impl(db, Type::unknown(), recursion_detector).members,
+                    |value_ty| AllMembers::of_impl(db, value_ty, recursion_detector).members,
+                );
+                self.members.extend(members);
+            }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => {
-                        self.extend_with_type(db, Type::object());
+                        self.extend_with_type(db, Type::object(), recursion_detector);
                     }
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.extend_with_type(db, bound);
+                        self.extend_with_type(db, bound, recursion_detector);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         self.members.extend(
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| AllMembers::of(db, *ty).members)
+                                .map(|ty| AllMembers::of_impl(db, *ty, recursion_detector).members)
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
@@ -375,7 +418,11 @@ impl<'db> AllMembers<'db> {
                     ty: dunder_file_type,
                 });
 
-                self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
+                self.extend_with_type(
+                    db,
+                    KnownClass::ModuleType.to_instance(db),
+                    recursion_detector,
+                );
                 let module = literal.module(db);
 
                 let Some(file) = module.file(db) else {
@@ -557,13 +604,22 @@ impl<'db> AllMembers<'db> {
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
+        recursion_detector: &ActiveRecursionDetector<Type<'db>>,
     ) {
         match CodeGeneratorKind::from_class(db, class_literal, specialization) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
+                    self.extend_with_type(
+                        db,
+                        KnownClass::NamedTupleFallback.to_instance(db),
+                        recursion_detector,
+                    );
                 } else {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                    self.extend_with_type(
+                        db,
+                        KnownClass::NamedTupleFallback.to_class_literal(db),
+                        recursion_detector,
+                    );
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
