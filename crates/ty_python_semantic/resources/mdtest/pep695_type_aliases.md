@@ -433,6 +433,28 @@ type Bar[T] = int | Foo[T]
 def _(x: Bar[int]):
     # TODO: should be `int | list[int]`
     reveal_type(x)  # revealed: int | list[int] | Any
+
+#### Parser-recovery regressions
+
+# Regression tests for crashy subscript/call cases involving cyclic aliases.
+from typing import Any
+from ty_extensions import Not
+
+type CrashySubscript = list[Not[CrashySubscript] | CrashySubscript]
+
+def _(x: CrashySubscript):
+    # error: [invalid-syntax] "Expected index or slice expression"
+    reveal_type(x[])  # revealed: Unknown
+    reveal_type(x[0])  # revealed: ~list[Any] | list[Any]
+
+def _(x: CrashySubscript, y: Any):
+    reveal_type(x[y])  # revealed: Unknown
+
+# error: [invalid-syntax] "Expected an expression"
+type CrashyCall = | CrashyCall
+
+def _(x: CrashyCall):
+    reveal_type(x())  # revealed: Unknown
 ```
 
 ### With legacy generic

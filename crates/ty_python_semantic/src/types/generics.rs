@@ -1494,6 +1494,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
+        self.materialization_visitor.visit_invariant_relation(
+            source_type,
+            target_type,
+            || self.check_type_pair(db, source_type, target_type),
+            || {
+                self.check_subtyping_in_invariant_position_impl(
+                    db,
+                    source_type,
+                    source_materialization,
+                    target_type,
+                    target_materialization,
+                )
+            },
+        )
+    }
+
+    fn check_subtyping_in_invariant_position_impl(
+        &self,
+        db: &'db dyn Db,
+        source_type: Type<'db>,
+        source_materialization: MaterializationKind,
+        target_type: Type<'db>,
+        target_materialization: MaterializationKind,
+    ) -> ConstraintSet<'db, 'c> {
         let source_top =
             source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
         let source_bottom = source_type.materialize(

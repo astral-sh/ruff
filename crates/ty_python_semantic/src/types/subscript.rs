@@ -526,13 +526,17 @@ impl<'db> Type<'db> {
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
-            }
+            (Type::TypeAlias(_), _) => Some(
+                value_ty
+                    .resolve_type_alias(db)
+                    .subscript(db, slice_ty, expr_context),
+            ),
 
-            (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, alias.value_type(db), expr_context))
-            }
+            (_, Type::TypeAlias(_)) => Some(value_ty.subscript(
+                db,
+                slice_ty.resolve_type_alias(db),
+                expr_context,
+            )),
 
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
                 element.subscript(db, slice_ty, expr_context)
