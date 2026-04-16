@@ -506,13 +506,13 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns whether this class is a subclass of `unittest.TestCase`.
+    /// Returns whether this class is a `unittest.TestCase` subclass that contains
+    /// at least one test method.
     pub fn is_unittest_test_case(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => {
                 // https://docs.python.org/3/library/unittest.html#organizing-test-code
-                // Check if class is subclass of unittest.TestCase and contains a method that starts
-                // with "test_".
+                // TODO: naming customization https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions
                 let has_test_method = place_table(db, class.body_scope(db))
                     .symbols()
                     .any(|sym| sym.name().starts_with("test_"));
