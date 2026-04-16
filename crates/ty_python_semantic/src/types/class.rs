@@ -515,7 +515,7 @@ impl<'db> ClassLiteral<'db> {
                 // TODO: naming customization https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions
                 let has_test_method = place_table(db, class.body_scope(db))
                     .symbols()
-                    .any(|sym| sym.name().starts_with("test_"));
+                    .any(|sym| sym.name().starts_with("test"));
 
                 if !has_test_method {
                     return false;
