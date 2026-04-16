@@ -266,6 +266,7 @@ mod tests {
     use std::fmt::Write as _;
 
     use insta::assert_snapshot;
+    use ruff_python_ast::PythonVersion;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
@@ -1584,6 +1585,65 @@ mod tests {
         17 |     return a
         18 |
         19 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_function_with_version_conditional_implementation() {
+        let test = CursorTest::builder()
+            .python_version(PythonVersion::PY310)
+            .source(
+                "main.py",
+                r#"
+        from typing import overload, Any
+        import sys
+
+        @overload
+        def test() -> None: ...
+
+        if sys.version_info >= (3, 10):
+            @overload
+            def test(a: str) -> str: ...
+
+            def test(a: Any) -> Any:
+                """Version 3.10+ implementation"""
+                return a
+        else:
+            @overload
+            def test(a: int) -> int: ...
+
+            def test(a: Any) -> Any:
+                """Fallback implementation"""
+                return a
+
+        t<CURSOR>est()
+        "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @r"
+        def test() -> None
+        ---------------------------------------------
+        Version 3.10+ implementation
+
+        ---------------------------------------------
+        ```python
+        def test() -> None
+        ```
+        ---
+        Version 3.10+ implementation
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:23:1
+           |
+        21 |     return a
+        22 |
+        23 | test()
            | ^-^^
            | ||
            | |Cursor offset

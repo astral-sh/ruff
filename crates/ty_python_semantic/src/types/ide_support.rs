@@ -1374,7 +1374,7 @@ mod resolve_definition {
         let use_def = use_def_map(db, scope);
 
         let implementation = use_def
-            .reachable_symbol_bindings(symbol_id)
+            .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| binding.binding.definition())
             .filter(|candidate| *candidate != definition)
             .last()?;

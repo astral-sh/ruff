@@ -388,6 +388,7 @@ mod tests {
     use ty_project::ProjectMetadata;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
@@ -457,6 +458,8 @@ mod tests {
         /// file's path and its contents.
         sources: Vec<Source>,
         snapshot_filters: Vec<(String, String)>,
+        /// The python version to use.
+        python_version: Option<PythonVersion>,
     }
 
     impl CursorTestBuilder {
@@ -466,7 +469,11 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            db.init_program().unwrap();
+            db.init_program_with_python_version(
+                self.python_version
+                    .unwrap_or_else(PythonVersion::latest_ty),
+            )
+            .unwrap();
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -548,6 +555,14 @@ mod tests {
         ) -> &mut CursorTestBuilder {
             self.snapshot_filters
                 .push((pattern.into(), replacement.into()));
+            self
+        }
+
+        pub(super) fn python_version(
+            &mut self,
+            version: PythonVersion,
+        ) -> &mut CursorTestBuilder {
+            self.python_version = Some(version);
             self
         }
 
