@@ -1251,12 +1251,22 @@ impl<'db> Bindings<'db> {
                         ] = overload.parameter_types()
                         {
                             if let Some(setter) = property.setter(db) {
-                                if let Err(_call_error) = setter
+                                if let Ok(return_ty) = setter
                                     .try_call(db, &CallArguments::positional([*instance, *value]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__set__` returns `None` for ordinary setters, but
+                                    // preserving `Never` keeps non-returning setters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1271,12 +1281,22 @@ impl<'db> Bindings<'db> {
                             overload.parameter_types()
                         {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__delete__` returns `None` for ordinary deleters,
+                                    // but preserving `Never` keeps non-returning deleters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1289,12 +1309,22 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
-                                if let Err(_call_error) = setter
+                                if let Ok(return_ty) = setter
                                     .try_call(db, &CallArguments::positional([*instance, *value]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__set__` returns `None` for ordinary setters, but
+                                    // preserving `Never` keeps non-returning setters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1309,12 +1339,22 @@ impl<'db> Bindings<'db> {
                     )) => {
                         if let [Some(instance), ..] = overload.parameter_types() {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__delete__` returns `None` for ordinary deleters,
+                                    // but preserving `Never` keeps non-returning deleters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload

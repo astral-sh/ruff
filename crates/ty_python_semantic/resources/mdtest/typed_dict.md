@@ -1775,9 +1775,11 @@ RecursiveKey = list["RecursiveKey | None"]
 class Person(TypedDict):
     name: str
     age: int | None
+    leg: str
 
 class Animal(TypedDict):
     name: str
+    log: str
 
 class Movie(TypedDict):
     name: str
@@ -1824,6 +1826,10 @@ def _(
 
     # error: [invalid-key] "Unknown key "age" for TypedDict `Animal`"
     reveal_type(being["age"])  # revealed: int | None | Unknown
+
+    # error: [invalid-key]
+    # error: [invalid-key]
+    reveal_type(being["legs"])  # revealed: Unknown
 ```
 
 ### Writing
@@ -1873,7 +1879,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal`"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):

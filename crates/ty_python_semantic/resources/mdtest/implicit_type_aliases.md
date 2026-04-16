@@ -801,8 +801,6 @@ def _():
 
 ### Snapshots for verbose diagnostics
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -811,19 +809,57 @@ python-version = "3.12"
 ```py
 type ListOfInts2 = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias `ListOfInts2`"
+# snapshot: not-subscriptable
 DoublySpecialized = ListOfInts2[int]
+```
 
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
+ --> src/mdtest_snippet.py:4:21
+  |
+4 | DoublySpecialized = ListOfInts2[int]
+  |                     -----------^^^^^
+  |                     |
+  |                     Alias to `list[int]`, which is already specialized
+  |
+```
+
+```py
 ThreeInts = tuple[int, int, int]
 
+# snapshot: not-subscriptable
+three_ints: ThreeInts[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | three_ints: ThreeInts[int]
+  |             ---------^^^^^
+  |             |
+  |             Type is already specialized
+  |
+```
+
+```py
 class A[T]: ...
 
 AliasForA = A[int]
 
-def f(
-    a: AliasForA[int],  # error: [not-subscriptable]
-    b: ThreeInts[int],  # error: [not-subscriptable]
-): ...
+# snapshot: not-subscriptable
+alias_for_a: AliasForA[int]
+```
+
+```snapshot
+error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+  --> src/mdtest_snippet.py:14:14
+   |
+14 | alias_for_a: AliasForA[int]
+   |              ---------^^^^^
+   |              |
+   |              Type is already specialized
+   |
 ```
 
 ### Multiple definitions

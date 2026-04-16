@@ -770,7 +770,7 @@ class socket:
     recv(buflen[, flags]) -- receive data
     recv_into(buffer[, nbytes[, flags]]) -- receive data (into a buffer)
     recvfrom(buflen[, flags]) -- receive data and sender's address
-    recvfrom_into(buffer[, nbytes, [, flags])
+    recvfrom_into(buffer[, nbytes, [, flags]])
       -- receive data and sender's address (into a buffer)
     sendall(data[, flags]) -- send all data
     send(data[, flags]) -- send data, may not send all of it
@@ -797,7 +797,7 @@ class socket:
         """the socket protocol"""
     # F811: "Redefinition of unused `timeout`"
     @property
-    def timeout(self) -> float | None:  # noqa: F811
+    def timeout(self) -> float | None:
         """the socket timeout"""
     if sys.platform == "win32":
         def __init__(
@@ -1236,7 +1236,7 @@ def getdefaulttimeout() -> float | None:
     """
 
 # F811: "Redefinition of unused `timeout`"
-def setdefaulttimeout(timeout: float | None, /) -> None:  # noqa: F811
+def setdefaulttimeout(timeout: float | None, /) -> None:
     """setdefaulttimeout(timeout)
 
     Set the default timeout in seconds (float) for new socket objects.

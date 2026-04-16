@@ -18,6 +18,8 @@ pub trait Db: PythonCoreDb {
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
+
+    fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
 #[cfg(test)]
@@ -152,6 +154,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn dyn_clone(&self) -> Box<dyn crate::Db> {
+            Box::new(self.clone())
         }
     }
 
