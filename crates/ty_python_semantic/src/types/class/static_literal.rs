@@ -2156,11 +2156,7 @@ impl<'db> StaticClassLiteral<'db> {
                             //     [.., self.name, ..] = <value>
 
                             let unpacked = infer_unpack_types(db, unpack);
-                            Some(
-                                unpacked
-                                    .try_expression_type(assign.target(&module))
-                                    .unwrap_or_else(Type::unknown),
-                            )
+                            Some(unpacked.expression_type_or_unknown(assign.target(&module)))
                         }
                         TargetKind::Single => {
                             // We found an un-annotated attribute assignment of the form:
@@ -2181,11 +2177,7 @@ impl<'db> StaticClassLiteral<'db> {
                             //     for .., self.name, .. in <iterable>:
 
                             let unpacked = infer_unpack_types(db, unpack);
-                            Some(
-                                unpacked
-                                    .try_expression_type(for_stmt.target(&module))
-                                    .unwrap_or_else(Type::unknown),
-                            )
+                            Some(unpacked.expression_type_or_unknown(for_stmt.target(&module)))
                         }
                         TargetKind::Single => {
                             // We found an attribute assignment like:
@@ -2208,11 +2200,7 @@ impl<'db> StaticClassLiteral<'db> {
                             //     with <context_manager> as .., self.name, ..:
 
                             let unpacked = infer_unpack_types(db, unpack);
-                            Some(
-                                unpacked
-                                    .try_expression_type(with_item.target(&module))
-                                    .unwrap_or_else(Type::unknown),
-                            )
+                            Some(unpacked.expression_type_or_unknown(with_item.target(&module)))
                         }
                         TargetKind::Single => {
                             // We found an attribute assignment like:
@@ -2241,8 +2229,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 let unpacked = infer_unpack_types(db, unpack);
                                 Some(
                                     unpacked
-                                        .try_expression_type(comprehension.target(&module))
-                                        .unwrap_or_else(Type::unknown),
+                                        .expression_type_or_unknown(comprehension.target(&module)),
                                 )
                             }
                             TargetKind::Single => {
