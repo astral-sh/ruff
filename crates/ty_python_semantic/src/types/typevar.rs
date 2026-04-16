@@ -1292,6 +1292,7 @@ impl<'db> TypeVarConstraints<'db> {
                         Definedness::AlwaysDefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    definition: None,
                 })
             },
             qualifiers,

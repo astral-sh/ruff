@@ -2385,6 +2385,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,
+                definition: None,
             })
             .with_qualifiers(union_qualifiers)
         };

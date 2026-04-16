@@ -2368,6 +2368,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
+                                        definition: None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -2431,6 +2432,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
+                                        definition: None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
