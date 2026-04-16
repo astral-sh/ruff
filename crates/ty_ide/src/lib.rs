@@ -381,6 +381,7 @@ mod tests {
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
@@ -388,7 +389,6 @@ mod tests {
     use ty_project::ProjectMetadata;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
@@ -470,8 +470,7 @@ mod tests {
             ));
 
             db.init_program_with_python_version(
-                self.python_version
-                    .unwrap_or_else(PythonVersion::latest_ty),
+                self.python_version.unwrap_or_else(PythonVersion::latest_ty),
             )
             .unwrap();
 
@@ -558,10 +557,7 @@ mod tests {
             self
         }
 
-        pub(super) fn python_version(
-            &mut self,
-            version: PythonVersion,
-        ) -> &mut CursorTestBuilder {
+        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut CursorTestBuilder {
             self.python_version = Some(version);
             self
         }

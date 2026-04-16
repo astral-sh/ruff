@@ -9,9 +9,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
-use ty_python_semantic::{
-    DisplaySettings, ResolvedDefinition, SemanticModel, TypeQualifiers,
-};
+use ty_python_semantic::{DisplaySettings, ResolvedDefinition, SemanticModel, TypeQualifiers};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -260,11 +258,11 @@ mod tests {
     use std::fmt::Write as _;
 
     use insta::assert_snapshot;
-    use ruff_python_ast::PythonVersion;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
     };
+    use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextRange};
 
     fn hover_test(source: &str) -> CursorTest {
@@ -1680,6 +1678,57 @@ mod tests {
         21 |     return a
         22 |
         23 | test()
+           | ^-^^
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    /// The implementation docstring fallback uses type-aware overload matching
+    /// to avoid picking up an unrelated conditional reassignment of the same name.
+    #[test]
+    fn hover_overloaded_function_conditionally_reassigned() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def test(x: int) -> int: ...
+        @overload
+        def test(x: str) -> str: ...
+        def test(x):
+            return x
+
+        def flag() -> bool: ...
+        if flag():
+            def test():
+                """Unrelated docstring"""
+                pass
+
+        t<CURSOR>est(1)
+        "#,
+        );
+
+        // The overload `test(x: int) -> int` has no docstring, and the implementation
+        // `def test(x)` also has no docstring. A naive "last binding" approach would
+        // pick up "Unrelated docstring" from the conditional reassignment, but
+        // type-aware matching correctly skips it because its function type doesn't
+        // contain the original overloads.
+        assert_snapshot!(test.hover(), @r"
+        def test(x: int) -> int
+        ---------------------------------------------
+        ```python
+        def test(x: int) -> int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:1
+           |
+        17 |         pass
+        18 |
+        19 | test(1)
            | ^-^^
            | ||
            | |Cursor offset

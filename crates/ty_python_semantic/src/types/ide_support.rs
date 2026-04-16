@@ -1303,6 +1303,7 @@ mod resolve_definition {
 
     use crate::Db;
     use crate::module_docstring;
+    use crate::types::binding_type;
     use ty_python_core::definition::{Definition, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -1360,6 +1361,11 @@ mod resolve_definition {
     // Overload declarations often omit docstrings, while the runtime
     // implementation appears as the last sibling binding for the same symbol.
     // Fall back to that binding's docstring when the resolved overload has none.
+    //
+    // Uses type-aware matching: resolves each end-of-scope binding's type to a
+    // function literal, then checks whether that function's overloads contain the
+    // current definition. This correctly handles version-conditional branches and
+    // avoids picking up unrelated reassignments of the same name.
     fn implementation_docstring<'db>(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1373,13 +1379,23 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
+        let current_overload = binding_type(db, definition)
+            .as_function_literal()?
+            .literal(db)
+            .last_definition;
+
+        // Find the last end-of-scope binding whose function type contains this overload.
         let implementation = use_def
             .end_of_scope_symbol_bindings(symbol_id)
-            .filter_map(|binding| binding.binding.definition())
-            .filter(|candidate| *candidate != definition)
+            .filter_map(|binding| {
+                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(db)
+                    .any(|overload| overload == current_overload)
+                    .then_some(ty)
+            })
             .last()?;
 
-        implementation.docstring(db)
+        implementation.definition(db).docstring(db)
     }
 
     /// Resolve import definitions to their targets.

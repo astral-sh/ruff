@@ -227,11 +227,19 @@ fn create_signature_details_from_call_signature_details<'db>(
 }
 
 /// Determine appropriate documentation for a callable type based on its original type.
+///
+/// Tries the definition's own docstring first, then falls back to the
+/// implementation docstring (for overloaded functions where only the
+/// implementation carries a docstring).
 fn get_callable_documentation(
     db: &dyn crate::Db,
     definition: Option<Definition>,
 ) -> Option<Docstring> {
-    Definitions(vec![ResolvedDefinition::Definition(definition?)]).docstring(db)
+    let definition = definition?;
+    let resolved = ResolvedDefinition::Definition(definition);
+    Definitions(vec![resolved.clone()])
+        .docstring(db)
+        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 
 /// Create `ParameterDetails` objects from semantic displayed parameter details.
@@ -1307,6 +1315,37 @@ def ab(a: int, *, c: int):
         assert_eq!(signature.label, "() -> str");
 
         let expected_docstring = "This function does something.\n";
+        assert_eq!(
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
+            Some(expected_docstring.to_string())
+        );
+    }
+
+    #[test]
+    fn signature_help_overloaded_function_implementation_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def foo(x: int) -> int: ...
+        @overload
+        def foo(x: str) -> str: ...
+        def foo(x: int | str) -> int | str:
+            """Implementation docstring for foo."""
+            return x
+
+        foo(<CURSOR>1)
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+
+        let signature = &result.signatures[result.active_signature.unwrap()];
+        let expected_docstring = "Implementation docstring for foo.\n";
         assert_eq!(
             signature
                 .documentation
