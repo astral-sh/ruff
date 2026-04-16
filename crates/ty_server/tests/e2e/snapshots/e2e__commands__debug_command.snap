@@ -24,7 +24,7 @@ Settings: WorkspaceSettings {
         auto_import: true,
     },
     overrides: None,
-    python_executable: None,
+    sys_prefix: None,
 }
 
 Project at XXX
