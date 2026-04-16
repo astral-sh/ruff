@@ -461,38 +461,7 @@ fn run_test(
         })
         .collect();
 
-    match panic_info {
-        Some(panic_info) => {
-            let expected_message = test
-                .should_expect_panic()
-                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
-
-            let message = panic_info
-                .payload
-                .as_str()
-                .unwrap_or("Box<dyn Any>")
-                .to_string();
-
-            if let Some(expected_message) = expected_message {
-                assert!(
-                    message.contains(expected_message),
-                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                    test.name()
-                );
-            }
-        }
-        None => {
-            if let Ok(message) = test.should_expect_panic() {
-                if let Some(message) = message {
-                    panic!(
-                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
-                        test.name()
-                    );
-                }
-                panic!("Test `{}` is expected to panic but it didn't.", test.name());
-            }
-        }
-    }
+    test.check_panic(panic_info);
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
@@ -510,37 +479,19 @@ fn run_test(
         failures.push(failure);
     }
 
-    if test.should_snapshot_diagnostics() {
-        assert!(
-            !all_diagnostics.is_empty(),
-            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
-            test.name()
-        );
-
-        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-        // since they make snapshots very noisy!
-        let snapshot = mdtest::create_diagnostic_snapshot(
-            db,
-            "ty",
-            relative_fixture_path,
-            test,
-            all_diagnostics.iter().filter(|diagnostic| {
-                diagnostic.id() != DiagnosticId::RevealedType
-                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-            }),
-        );
-
-        let name = test.name().replace(' ', "_").replace(':', "__");
-        insta::with_settings!(
-            {
-                snapshot_path => snapshot_path,
-                input_file => name.clone(),
-                filters => vec![(r"\\", "/")],
-                prepend_module_to_snapshot => false,
-            },
-            { insta::assert_snapshot!(name, snapshot) }
-        );
-    }
+    // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+    // since they make snapshots very noisy!
+    test.snapshot_diagnostics(
+        db,
+        "ty",
+        relative_fixture_path,
+        snapshot_path,
+        &all_diagnostics,
+        |diagnostic| {
+            diagnostic.id() != DiagnosticId::RevealedType
+                && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+        },
+    );
 
     // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
     // But don't try to run fixes for tests that are expected to panic.

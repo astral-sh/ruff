@@ -26,7 +26,6 @@ ruff_workspace = { workspace = true }
 anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
-insta = { workspace = true, features = ["filters"] }
 salsa = { workspace = true }
 
 [lints]
