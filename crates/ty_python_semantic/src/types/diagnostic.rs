@@ -5045,12 +5045,18 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
             match mro_entries_call_error {
                 CallDunderError::MethodNotAvailable => {}
-                CallDunderError::PossiblyUnbound { .. } => {
+                CallDunderError::PossiblyUnbound { unbound_on, .. } => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
                         base_type.display(db)
                     ));
+                    for ty in unbound_on {
+                        diagnostic.info(format_args!(
+                            "`{}` does not implement `__mro_entries__`",
+                            ty.display(db)
+                        ));
+                    }
                 }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     explain_mro_entries(&mut diagnostic);
