@@ -1409,15 +1409,15 @@ fn add_argument_completions<'db>(
     completions: &mut Completions<'db>,
 ) {
     let mut in_arguments = false;
-    let ancestors = cursor.covering_node.ancestors();
-    let parents = cursor.covering_node.ancestors().skip(1);
-    for (node, parent) in ancestors.zip(parents) {
-        if let ast::AnyNodeRef::Keyword(kw) = parent
-            && node.ptr_eq(AnyNodeRef::from(&kw.value))
-        {
-            return;
-        }
+    for node in cursor.covering_node.ancestors() {
         match node {
+            // Do not suggest argument completions in value
+            // positions for keyword arguments
+            ast::AnyNodeRef::Keyword(kw) => {
+                if kw.value.range().contains_range(cursor.range) {
+                    return;
+                }
+            }
             ast::AnyNodeRef::Arguments(_) => {
                 in_arguments = true;
             }
