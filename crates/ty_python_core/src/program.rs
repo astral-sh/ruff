@@ -1,6 +1,6 @@
 use crate::{Db, platform::PythonPlatform};
 
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
@@ -20,6 +20,10 @@ pub struct Program {
 
     #[returns(ref)]
     pub search_paths: SearchPaths,
+
+    /// The path to the Python executable for the resolved environment, if known.
+    #[returns(ref)]
+    pub python_executable: Option<SystemPathBuf>,
 }
 
 impl Program {
@@ -38,13 +42,19 @@ impl Program {
             python_version,
             python_platform,
             search_paths,
+            python_executable,
         } = settings;
 
         search_paths.try_register_static_roots(db);
 
-        Program::builder(python_version, python_platform, search_paths)
-            .durability(Durability::HIGH)
-            .new(db)
+        Program::builder(
+            python_version,
+            python_platform,
+            search_paths,
+            python_executable,
+        )
+        .durability(Durability::HIGH)
+        .new(db)
     }
 
     pub fn python_version(self, db: &dyn Db) -> PythonVersion {
@@ -56,6 +66,7 @@ impl Program {
             python_version,
             python_platform,
             search_paths,
+            python_executable,
         } = settings;
 
         if self.search_paths(db) != &search_paths {
@@ -76,6 +87,10 @@ impl Program {
             );
             self.set_python_version_with_source(db).to(python_version);
         }
+
+        if self.python_executable(db) != &python_executable {
+            self.set_python_executable(db).to(python_executable);
+        }
     }
 
     pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
@@ -87,5 +102,6 @@ impl Program {
 pub struct ProgramSettings {
     pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
+    pub python_executable: Option<SystemPathBuf>,
     pub search_paths: SearchPaths,
 }

@@ -24,7 +24,6 @@ Settings: WorkspaceSettings {
         auto_import: true,
     },
     overrides: None,
-    sys_prefix: None,
 }
 
 Project at XXX

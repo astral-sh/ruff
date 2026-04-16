@@ -286,10 +286,20 @@ impl Options {
             python_version = python_version.version
         );
 
+        let python_executable = python_environment.as_ref().map(|env| {
+            let sys_prefix = env.sys_prefix();
+            if cfg!(windows) {
+                sys_prefix.join("Scripts/python.exe")
+            } else {
+                sys_prefix.join("bin/python")
+            }
+        });
+
         Ok(ProgramSettings {
             python_version,
             python_platform,
             search_paths,
+            python_executable,
         })
     }
 

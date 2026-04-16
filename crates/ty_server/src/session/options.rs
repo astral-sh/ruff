@@ -249,18 +249,9 @@ impl WorkspaceOptions {
         let mut overrides =
             ProjectOptionsOverrides::new(configuration_file, options_overrides.unwrap_or_default());
 
-        let mut python_executable = None;
-
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            python_executable = active_environment
-                .executable
-                .uri
-                .to_file_path()
-                .ok()
-                .and_then(|path| SystemPathBuf::from_path_buf(path).ok());
-
             overrides.fallback_python = if let Some(environment) = &active_environment.environment {
                 environment.folder_uri.to_file_path().ok().and_then(|path| {
                     Some(RelativePathBuf::python_extension(
@@ -312,7 +303,6 @@ impl WorkspaceOptions {
                 .map(CompletionOptions::into_settings)
                 .unwrap_or_default(),
             overrides,
-            python_executable,
         }
     }
 }
@@ -515,6 +505,7 @@ pub(crate) struct PythonEnvironment {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
+    #[allow(dead_code)]
     pub(crate) uri: Url,
     pub(crate) sys_prefix: SystemPathBuf,
 }

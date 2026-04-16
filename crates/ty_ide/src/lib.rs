@@ -618,6 +618,7 @@ mod tests {
                     python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
                     search_paths,
+                    python_executable: None,
                 },
             );
 

@@ -209,6 +209,7 @@ impl CorpusDb {
                 search_paths: SearchPathSettings::new(vec![])
                     .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                     .unwrap(),
+                python_executable: None,
             },
         );
 

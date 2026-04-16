@@ -561,6 +561,7 @@ mod tests {
         colored::control::set_override(false);
 
         let mut db = TestDb::setup();
+
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 
