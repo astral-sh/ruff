@@ -32,19 +32,34 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if typed_dict_key.is_some() {
         None
-    } else if let GotoTarget::Call { call, .. } = goto_target {
+    } else if let GotoTarget::Call { call, callable, .. } = goto_target {
         resolved_call_signature(&model, call)
             .and_then(|details| {
                 let definition = details.definition?;
-                Definitions(vec![ResolvedDefinition::Definition(definition)])
-                    .docstring(db)
-                    .or_else(|| {
-                        ResolvedDefinition::Definition(definition)
-                            .implementation_docstring(db)
-                            .map(Docstring::new)
-                    })
+                let docstring =
+                    Definitions(vec![ResolvedDefinition::Definition(definition)])
+                        .docstring(db)
+                        .or_else(|| {
+                            ResolvedDefinition::Definition(definition)
+                                .implementation_docstring(db)
+                                .map(Docstring::new)
+                        });
+                // If the resolved definition matches the callable name (e.g.,
+                // an overload of the called function), commit to it even with
+                // no docstring — falling back would pick up sibling overloads.
+                // For constructors (`__init__` != class name), allow fallback.
+                let callable_name = match callable {
+                    ast::ExprRef::Name(name) => Some(name.id.as_str()),
+                    ast::ExprRef::Attribute(attr) => Some(attr.attr.as_str()),
+                    _ => None,
+                };
+                if docstring.is_some() || callable_name == definition.name(db).as_deref() {
+                    Some(docstring)
+                } else {
+                    None
+                }
             })
-            .or_else(|| {
+            .unwrap_or_else(|| {
                 goto_target
                     .get_definition_targets(
                         &model,
@@ -1550,14 +1565,14 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        int
+        assert_snapshot!(test.hover(), @"
+        Unknown
         ---------------------------------------------
         Foo documentation
 
         ---------------------------------------------
         ```python
-        int
+        Unknown
         ```
         ---
         Foo documentation
@@ -1660,7 +1675,7 @@ mod tests {
             )
             .build();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def test() -> None
         ---------------------------------------------
         Version 3.10+ implementation
@@ -1675,7 +1690,7 @@ mod tests {
         info[hover]: Hovered content is
           --> main.py:23:1
            |
-        21 |     return a
+        21 |         return a
         22 |
         23 | test()
            | ^-^^
@@ -1716,19 +1731,19 @@ mod tests {
         // pick up "Unrelated docstring" from the conditional reassignment, but
         // type-aware matching correctly skips it because its function type doesn't
         // contain the original overloads.
-        assert_snapshot!(test.hover(), @r"
-        def test(x: int) -> int
+        assert_snapshot!(test.hover(), @"
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
         ---------------------------------------------
         ```python
-        def test(x: int) -> int
+        (Overload[(x: int) -> int, (x: str) -> str]) | (def test() -> Unknown)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:19:1
+          --> main.py:17:1
            |
-        17 |         pass
-        18 |
-        19 | test(1)
+        15 |         pass
+        16 |
+        17 | test(1)
            | ^-^^
            | ||
            | |Cursor offset
