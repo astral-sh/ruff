@@ -53,10 +53,10 @@ use crate::{
 use ty_python_core::{SemanticIndex, definition::DefinitionKind, scope::ScopeId};
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
-/// the definition will not cause an exception to be raised at runtime. This needs to be done
-/// after most other types in the scope have been inferred, due to the fact that base classes
-/// can be deferred. If it looks like a class definition is invalid in some way, issue a
-/// diagnostic.
+/// the definition is semantically valid and will not cause an exception to be raised at runtime.
+/// This needs to be done after most other types in the scope have been inferred, due to the fact
+/// that base classes can be deferred. If it looks like a class definition is invalid in some way,
+/// issue a diagnostic.
 ///
 /// Note: Dynamic classes created via `type()` calls are checked separately during type
 /// inference of the call expression.
@@ -141,6 +141,30 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let is_protocol = class.is_protocol(db);
+
+    if let Some(disjoint_base_decorator) = class_node.decorator_list.iter().find(|decorator| {
+        file_expression_type(&decorator.expression)
+            .as_function_literal()
+            .is_some_and(|function| function.is_known(db, KnownFunction::DisjointBase))
+    }) {
+        if class_kind == Some(CodeGeneratorKind::TypedDict) {
+            if let Some(builder) =
+                context.report_lint(&INVALID_TYPED_DICT_HEADER, disjoint_base_decorator)
+            {
+                builder.into_diagnostic(format_args!(
+                    "`@disjoint_base` cannot be used with `TypedDict` class `{}`",
+                    class.name(db),
+                ));
+            }
+        } else if is_protocol
+            && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, disjoint_base_decorator)
+        {
+            builder.into_diagnostic(format_args!(
+                "`@disjoint_base` cannot be used with protocol class `{}`",
+                class.name(db),
+            ));
+        }
+    }
 
     // Check for invalid `@dataclass` applications.
     if class.dataclass_params(db).is_some() {

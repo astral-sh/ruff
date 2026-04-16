@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import disjoint_base
+ 1 | from typing_extensions import Protocol, TypedDict, disjoint_base
  2 | 
  3 | # fmt: off
  4 | 
@@ -43,15 +43,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict
 28 | 
 29 | @disjoint_base
 30 | class H: ...
-31 | 
-32 | class I(  # error: [instance-layout-conflict]
-33 |     G,
-34 |     H
-35 | ): ...
-36 | 
-37 | # fmt: on
-38 | # error: [invalid-generic-class]
-39 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+31 | @disjoint_base  # error: [invalid-typed-dict-header] "`@disjoint_base` cannot be used with `TypedDict` class `Movie`"
+32 | class Movie(TypedDict):
+33 |     name: str
+34 | @disjoint_base  # error: [invalid-protocol] "`@disjoint_base` cannot be used with protocol class `SupportsClose`"
+35 | class SupportsClose(Protocol):
+36 |     def close(self) -> None: ...
+37 | class I(  # error: [instance-layout-conflict]
+38 |     G,
+39 |     H
+40 | ): ...
+41 | # fmt: on
+42 | # error: [invalid-generic-class]
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
 # Diagnostics
@@ -145,22 +149,42 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 ```
 
 ```
-error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
-  --> src/mdtest_snippet.py:32:7
+error[invalid-typed-dict-header]: `@disjoint_base` cannot be used with `TypedDict` class `Movie`
+  --> src/mdtest_snippet.py:31:1
    |
-32 |   class I(  # error: [instance-layout-conflict]
+31 | @disjoint_base  # error: [invalid-typed-dict-header] "`@disjoint_base` cannot be used with `TypedDict` class `Movie`"
+   | ^^^^^^^^^^^^^^
+   |
+
+```
+
+```
+error[invalid-protocol]: `@disjoint_base` cannot be used with protocol class `SupportsClose`
+  --> src/mdtest_snippet.py:34:1
+   |
+34 | @disjoint_base  # error: [invalid-protocol] "`@disjoint_base` cannot be used with protocol class `SupportsClose`"
+   | ^^^^^^^^^^^^^^
+   |
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:37:7
+   |
+37 |   class I(  # error: [instance-layout-conflict]
    |  _______^
-33 | |     G,
-34 | |     H
-35 | | ): ...
+38 | |     G,
+39 | |     H
+40 | | ): ...
    | |_^ Bases `G` and `H` cannot be combined in multiple inheritance
    |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
-  --> src/mdtest_snippet.py:33:5
+  --> src/mdtest_snippet.py:38:5
    |
-33 |     G,
+38 |     G,
    |     - `G` instances have a distinct memory layout because of the way `G` is implemented in a C extension
-34 |     H
+39 |     H
    |     - `H` instances have a distinct memory layout because of the way `H` is implemented in a C extension
    |
 
@@ -168,9 +192,9 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 
 ```
 error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among class bases
-  --> src/mdtest_snippet.py:39:7
+  --> src/mdtest_snippet.py:43:7
    |
-39 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
    |       ^^^^-----^^---^
    |           |      |
    |           |      Later class base inherits from `Sequence[str]`
@@ -181,9 +205,9 @@ error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among c
 
 ```
 error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `range`
-  --> src/mdtest_snippet.py:39:11
+  --> src/mdtest_snippet.py:43:11
    |
-39 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
    |           ^^^^^
    |
 
