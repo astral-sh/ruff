@@ -15,9 +15,9 @@ use crate::types::constraints::{
     Solutions,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, InvariantRelationGoal, RelationContext, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
+use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -1325,18 +1325,8 @@ impl<'db> Specialization<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let checker = DisjointnessChecker::new(
-            constraints,
-            inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
-            &materialization_visitor,
-        );
+        let context = RelationContext::default(constraints);
+        let checker = DisjointnessChecker::new(constraints, inferable, &context);
         checker.check_specialization_pair(db, self, other)
     }
 
@@ -1509,6 +1499,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 
     fn check_subtyping_in_invariant_position(
+        &self,
+        db: &'db dyn Db,
+        source_type: Type<'db>,
+        source_materialization: MaterializationKind,
+        target_type: Type<'db>,
+        target_materialization: MaterializationKind,
+    ) -> ConstraintSet<'db, 'c> {
+        self.context.visitors.invariant.visit(
+            &InvariantRelationGoal::new(
+                source_type,
+                source_materialization,
+                target_type,
+                target_materialization,
+                self.relation,
+            ),
+            || self.check_type_pair(db, source_type, target_type),
+            || {
+                self.check_subtyping_in_invariant_position_impl(
+                    db,
+                    source_type,
+                    source_materialization,
+                    target_type,
+                    target_materialization,
+                )
+            },
+        )
+    }
+
+    /// Checks invariant-position subtyping once the source/target pair has been registered.
+    ///
+    /// The public wrapper guards this helper against recursive relation checks. That matters for
+    /// recursive aliases inside invariant containers, where materialization can otherwise revisit
+    /// the same pair before the first check completes:
+    ///
+    /// ```python
+    /// type RecursiveList = list[RecursiveList]
+    /// ```
+    fn check_subtyping_in_invariant_position_impl(
         &self,
         db: &'db dyn Db,
         source_type: Type<'db>,

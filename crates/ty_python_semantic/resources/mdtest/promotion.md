@@ -735,6 +735,19 @@ def _(a: A | None):
     return {}
 ```
 
+Callable promotion visits parameters with promotion disabled and returns with promotion enabled, so
+those two traversals should not share cached intersection results:
+
+```py
+from typing import Literal
+from ty_extensions import Intersection, Not
+
+def f(x: Intersection[int, Not[Literal[2]]]) -> Intersection[int, Not[Literal[2]]]:
+    return x
+
+reveal_type([f])  # revealed: list[(x: int & ~Literal[2]) -> int]
+```
+
 ## Module-literal types are not promoted
 
 Since module-literal types are "literal" types in a certain sense (each type is a singleton type),
