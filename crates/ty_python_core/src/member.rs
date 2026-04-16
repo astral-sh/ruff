@@ -453,6 +453,11 @@ impl MemberTable {
         self.members.iter()
     }
 
+    /// Returns an iterator over all members with their IDs.
+    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedMemberId, &Member)> + '_ {
+        self.members.iter_enumerated()
+    }
+
     fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
         hash_single(member)
     }

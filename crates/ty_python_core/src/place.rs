@@ -186,6 +186,11 @@ impl PlaceTable {
         self.members.iter()
     }
 
+    /// Iterator over all members in this scope with their IDs.
+    pub fn members_enumerated(&self) -> impl Iterator<Item = (ScopedMemberId, &Member)> + '_ {
+        self.members.iter_enumerated()
+    }
+
     /// Looks up a symbol by its ID and returns a reference to it.
     ///
     /// ## Panics

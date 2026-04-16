@@ -14,6 +14,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasOptionalDefinition, HasType, MemberDefinition, NameKind,
@@ -30,8 +31,8 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
+    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, ScopedMemberId,
+    attribute_scopes, semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -124,12 +125,17 @@ pub(crate) fn attribute_assignments<'db, 's>(
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
-    })
+    attribute_scopes_by_name(db, class_body_scope)
+        .get(name)
+        .into_iter()
+        .flat_map(|entries| entries.iter().copied())
+        .map(move |(function_scope_id, member_id)| {
+            let use_def = index.use_def_map(function_scope_id);
+            (
+                use_def.reachable_member_bindings(member_id),
+                function_scope_id,
+            )
+        })
 }
 
 /// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
@@ -145,15 +151,47 @@ pub(crate) fn attribute_declarations<'db, 's>(
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+    attribute_scopes_by_name(db, class_body_scope)
+        .get(name)
+        .into_iter()
+        .flat_map(|entries| entries.iter().copied())
+        .map(move |(function_scope_id, member_id)| {
+            let use_def = index.use_def_map(function_scope_id);
+            (
+                use_def.reachable_member_declarations(member_id),
+                function_scope_id,
+            )
+        })
+}
+
+#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn attribute_scopes_by_name<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> FxIndexMap<Name, Box<[(FileScopeId, ScopedMemberId)]>> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+    let mut scopes_by_name: FxIndexMap<Name, Vec<(FileScopeId, ScopedMemberId)>> =
+        FxIndexMap::default();
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
         let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
-        Some((
-            use_def.reachable_member_declarations(member),
-            function_scope_id,
-        ))
-    })
+        for (member_id, member) in place_table.members_enumerated() {
+            let Some(name) = member.as_instance_attribute() else {
+                continue;
+            };
+
+            scopes_by_name
+                .entry(Name::new(name))
+                .or_default()
+                .push((function_scope_id, member_id));
+        }
+    }
+
+    scopes_by_name
+        .into_iter()
+        .map(|(name, entries)| (name, entries.into_boxed_slice()))
+        .collect()
 }
 
 /// Get the module-level docstring for the given file.

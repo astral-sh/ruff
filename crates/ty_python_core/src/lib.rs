@@ -21,6 +21,7 @@ pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
+pub use member::ScopedMemberId;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
