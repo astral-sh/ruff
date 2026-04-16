@@ -17,7 +17,7 @@ expression: diagnostics
       },
       "severity": 4,
       "source": "ty",
-      "message": "Code is unreachable",
+      "message": "Code is always unreachable",
       "tags": [
         1
       ]

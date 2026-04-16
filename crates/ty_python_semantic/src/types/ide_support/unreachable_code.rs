@@ -100,17 +100,20 @@ mod tests {
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+    use ty_python_core::platform::PythonPlatform;
 
     const TEST_PATH: &str = "/src/main.py";
 
     struct UnreachableTest {
         python_version: Option<PythonVersion>,
+        python_platform: Option<PythonPlatform>,
     }
 
     impl UnreachableTest {
         fn new() -> Self {
             Self {
                 python_version: None,
+                python_platform: None,
             }
         }
 
@@ -119,11 +122,20 @@ mod tests {
             self
         }
 
+        fn with_python_platform(&mut self, platform: PythonPlatform) -> &mut Self {
+            self.python_platform = Some(platform);
+            self
+        }
+
         fn render(&self, source: &str) -> anyhow::Result<String> {
             let mut db = TestDbBuilder::new();
 
             if let Some(version) = self.python_version {
                 db = db.with_python_version(version);
+            }
+
+            if let Some(platform) = self.python_platform.clone() {
+                db = db.with_python_platform(platform);
             }
 
             let source = dedent(source);
@@ -141,10 +153,8 @@ mod tests {
                     DiagnosticId::lint("unreachable-code"),
                     Severity::Info,
                     match range.kind {
-                        UnreachableKind::Unconditional => "Code is unreachable",
-                        UnreachableKind::CurrentAnalysis => {
-                            "Code is unreachable under the current analysis"
-                        }
+                        UnreachableKind::Unconditional => "Code is always unreachable",
+                        UnreachableKind::CurrentAnalysis => "Code is unreachable",
                     },
                 );
                 diagnostic.annotate(Annotation::primary(
@@ -172,7 +182,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:4:5
           |
         4 |     print("dead")
@@ -192,7 +202,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:5
           |
         5 |     print("dead")
@@ -217,7 +227,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:7:9
           |
         7 |         print("dead")
@@ -237,7 +247,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:4:5
           |
         4 | /     print("dead")
@@ -257,7 +267,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:4:5
           |
         4 |     print("dead")
@@ -279,7 +289,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:9
           |
         5 |         print("dead")
@@ -298,7 +308,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:4:5
           |
         4 |     print("dead")
@@ -318,7 +328,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:9
           |
         5 |         print("dead")
@@ -338,11 +348,31 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:9
           |
         5 |         print("dead")
           |         ^^^^^^^^^^^^^
+          |
+        "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_statement_after_infinite_loop() -> anyhow::Result<()> {
+        let source = r#"
+            def f():
+                while True:
+                    pass
+                print("dead")
+            "#;
+
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:5:5
+          |
+        5 |     print("dead")
+          |     ^^^^^^^^^^^^^
           |
         "#);
         Ok(())
@@ -356,7 +386,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     print("dead")
@@ -370,6 +400,24 @@ mod tests {
     fn reports_while_false_body_statement() -> anyhow::Result<()> {
         let source = r#"
             while False:
+                print("dead")
+            "#;
+
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:3:5
+          |
+        3 |     print("dead")
+          |     ^^^^^^^^^^^^^
+          |
+        "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_false_branch_from_statically_known_arithmetic() -> anyhow::Result<()> {
+        let source = r#"
+            if 2 + 3 > 10:
                 print("dead")
             "#;
 
@@ -394,7 +442,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:5
           |
         5 |     print("dead")
@@ -414,7 +462,59 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:5:5
+          |
+        5 |     print("dead")
+          |     ^^^^^^^^^^^^^
+          |
+        "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_statement_after_chained_always_taken_terminating_branch() -> anyhow::Result<()> {
+        let source = r#"
+            def f():
+                if False:
+                    return
+                elif True:
+                    return
+                else:
+                    pass
+                print("dead")
+            "#;
+
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:4:9
+          |
+        4 |         return
+          |         ^^^^^^
+          |
+
+        info[unreachable-code]: Code is always unreachable
+         --> src/main.py:8:9
+          |
+        8 | /         pass
+        9 | |     print("dead")
+          | |_________________^
+          |
+        "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_statement_after_always_taken_terminating_branch() -> anyhow::Result<()> {
+        let source = r#"
+            def f():
+                if True:
+                    return
+                print("dead")
+            "#;
+
+        assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:5:5
           |
         5 |     print("dead")
@@ -431,7 +531,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:2:24
           |
         2 | x = "yes" if True else "no"
@@ -452,14 +552,14 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     x = 1
           |     ^^^^^
           |
 
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:6:5
           |
         6 |     y = 2
@@ -477,7 +577,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     x = lambda: 1
@@ -496,7 +596,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 | /     def f():
@@ -516,7 +616,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 | /     class Foo:
@@ -535,7 +635,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     x = [i for i in range(10)]
@@ -559,21 +659,21 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     x = {k: v for k, v in {}.items()}
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:6:5
           |
         6 |     y = {i for i in range(10)}
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:9:5
           |
         9 |     z = (i for i in range(10))
@@ -594,7 +694,7 @@ mod tests {
         test.with_python_version(PythonVersion::PY312);
 
         assert_snapshot!(test.render(source)?, @r"
-        info[unreachable-code]: Code is unreachable
+        info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
         3 |     type Alias[T] = list[T]
@@ -617,11 +717,34 @@ mod tests {
         test.with_python_version(PythonVersion::PY310);
 
         assert_snapshot!(test.render(source)?, @r"
-        info[unreachable-code]: Code is unreachable under the current analysis
+        info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
         5 |     from typing import Self
           |     ^^^^^^^^^^^^^^^^^^^^^^^
+          |
+        ");
+        Ok(())
+    }
+
+    #[test]
+    fn reports_platform_guarded_branch_as_current_analysis_unreachable() -> anyhow::Result<()> {
+        let source = r#"
+            import sys
+
+            if sys.platform == "win32":
+                import winreg
+            "#;
+
+        let mut test = UnreachableTest::new();
+        test.with_python_platform(PythonPlatform::Identifier("linux".to_string()));
+
+        assert_snapshot!(test.render(source)?, @r"
+        info[unreachable-code]: Code is unreachable
+         --> src/main.py:5:5
+          |
+        5 |     import winreg
+          |     ^^^^^^^^^^^^^
           |
         ");
         Ok(())
@@ -641,7 +764,7 @@ mod tests {
             "#;
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
-        info[unreachable-code]: Code is unreachable under the current analysis
+        info[unreachable-code]: Code is unreachable
          --> src/main.py:9:5
           |
         9 |     print("dead")
@@ -683,7 +806,7 @@ mod tests {
         test.with_python_version(PythonVersion::PY310);
 
         assert_snapshot!(test.render(source)?, @r"
-        info[unreachable-code]: Code is unreachable under the current analysis
+        info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
         5 | /     if False:

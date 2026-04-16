@@ -23,7 +23,7 @@ expression: diagnostics
           },
           "severity": 4,
           "source": "ty",
-          "message": "Code is unreachable under the current analysis",
+          "message": "Code is unreachable\nThis may depend on your current environment and settings",
           "tags": [
             1
           ]

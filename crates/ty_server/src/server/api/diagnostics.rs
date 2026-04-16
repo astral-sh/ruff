@@ -46,10 +46,11 @@ impl UnnecessaryHintKind {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
             Self::UnreachableCode(UnreachableKind::Unconditional) => {
-                "Code is unreachable".to_owned()
+                "Code is always unreachable".to_owned()
             }
             Self::UnreachableCode(UnreachableKind::CurrentAnalysis) => {
-                "Code is unreachable under the current analysis".to_owned()
+                "Code is unreachable\nThis may depend on your current environment and settings"
+                    .to_owned()
             }
         }
     }
