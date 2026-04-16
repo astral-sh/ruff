@@ -160,8 +160,6 @@ error[UP046]: Generic class `A` uses `Generic` subclass instead of type paramete
    |
 11 | class A(Generic[T]):  # snapshot: non-pep695-generic-class
    |         ^^^^^^^^^^
-12 |     # Comments in a class body are preserved
-13 |     var: T
    |
 help: Use type parameters
 8  | P = ParamSpec("P")
@@ -180,7 +178,6 @@ error[UP046]: Generic class `B` uses `Generic` subclass instead of type paramete
    |
 16 | class B(Generic[*Ts]):  # snapshot: non-pep695-generic-class
    |         ^^^^^^^^^^^^
-17 |     var: tuple[*Ts]
    |
 help: Use type parameters
 13 |     var: T
@@ -199,7 +196,6 @@ error[UP046]: Generic class `C` uses `Generic` subclass instead of type paramete
    |
 20 | class C(Generic[P]):  # snapshot: non-pep695-generic-class
    |         ^^^^^^^^^^
-21 |     var: P
    |
 help: Use type parameters
 17 |     var: tuple[*Ts]
@@ -218,7 +214,6 @@ error[UP046]: Generic class `Constrained` uses `Generic` subclass instead of typ
    |
 24 | class Constrained(Generic[S]):  # snapshot: non-pep695-generic-class
    |                   ^^^^^^^^^^
-25 |     var: S
    |
 help: Use type parameters
 21 |     var: P
@@ -235,12 +230,8 @@ note: This is an unsafe fix and may change runtime behavior
 error[UP046]: Generic class `ExternalType` uses `Generic` subclass instead of type parameters
   --> mdtest_snippet.py:30:20
    |
-28 | # This case gets a diagnostic but not a fix because we can't look up the bounds
-29 | # or constraints on the TypeVar imported from another module
 30 | class ExternalType(Generic[T, SupportsRichComparisonT]):  # snapshot: non-pep695-generic-class
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-31 |     var: T
-32 |     compare: SupportsRichComparisonT
    |
 help: Use type parameters
 
@@ -248,11 +239,8 @@ help: Use type parameters
 error[UP046]: Generic class `MyStr` uses `Generic` subclass instead of type parameters
   --> mdtest_snippet.py:37:13
    |
-35 | # typing.AnyStr is a common external type variable, so treat it specially as a
-36 | # known TypeVar
 37 | class MyStr(Generic[AnyStr]):  # snapshot: non-pep695-generic-class
    |             ^^^^^^^^^^^^^^^
-38 |     s: AnyStr
    |
 help: Use type parameters
 34 |
@@ -271,8 +259,6 @@ error[UP046]: Generic class `MultipleGenerics` uses `Generic` subclass instead o
    |
 41 | class MultipleGenerics(Generic[S, T, *Ts, P]):  # snapshot: non-pep695-generic-class
    |                        ^^^^^^^^^^^^^^^^^^^^^
-42 |     var: S
-43 |     typ: T
    |
 help: Use type parameters
 38 |     s: AnyStr
@@ -291,7 +277,6 @@ error[UP046]: Generic class `MultipleBaseClasses` uses `Generic` subclass instea
    |
 48 | class MultipleBaseClasses(list, Generic[T]):  # snapshot: non-pep695-generic-class
    |                                 ^^^^^^^^^^
-49 |     var: T
    |
 help: Use type parameters
 45 |     pep: P
@@ -310,7 +295,6 @@ error[UP046]: Generic class `MoreBaseClasses` uses `Generic` subclass instead of
    |
 62 | class MoreBaseClasses(Base1, Base2, Base3, Generic[T]):  # snapshot: non-pep695-generic-class
    |                                            ^^^^^^^^^^
-63 |     var: T
    |
 help: Use type parameters
 59 | class Base3: ...
@@ -329,8 +313,6 @@ error[UP046]: Generic class `MultipleBaseAndGenerics` uses `Generic` subclass in
    |
 66 | class MultipleBaseAndGenerics(Base1, Base2, Base3, Generic[S, T, *Ts, P]):  # snapshot: non-pep695-generic-class
    |                                                    ^^^^^^^^^^^^^^^^^^^^^
-67 |     var: S
-68 |     typ: T
    |
 help: Use type parameters
 63 |     var: T
@@ -367,7 +349,6 @@ error[UP046]: Generic class `B` uses `Generic` subclass instead of type paramete
    |
 76 | class B(A[S], Generic[S]):  # snapshot: non-pep695-generic-class
    |               ^^^^^^^^^^
-77 |     var: S
    |
 help: Use type parameters
 73 | class A(Generic[T]): ...  # snapshot: non-pep695-generic-class
@@ -386,7 +367,6 @@ error[UP046]: Generic class `C` uses `Generic` subclass instead of type paramete
    |
 80 | class C(A[S], Generic[S, T]):  # snapshot: non-pep695-generic-class
    |               ^^^^^^^^^^^^^
-81 |     var: tuple[S, T]
    |
 help: Use type parameters
 77 |     var: S
@@ -405,7 +385,6 @@ error[UP046]: Generic class `D` uses `Generic` subclass instead of type paramete
    |
 84 | class D(A[int], Generic[T]):  # snapshot: non-pep695-generic-class
    |                 ^^^^^^^^^^
-85 |     var: T
    |
 help: Use type parameters
 81 |     var: tuple[S, T]
@@ -424,7 +403,6 @@ error[UP046]: Generic class `NotLast` uses `Generic` subclass instead of type pa
    |
 88 | class NotLast(Generic[T], Base1):  # snapshot: non-pep695-generic-class
    |               ^^^^^^^^^^
-89 |     var: T
    |
 help: Use type parameters
 
@@ -434,21 +412,16 @@ error[UP046]: Generic class `Sandwich` uses `Generic` subclass instead of type p
    |
 92 | class Sandwich(Base1, Generic[T], Base2):  # snapshot: non-pep695-generic-class
    |                       ^^^^^^^^^^
-93 |     var: T
    |
 help: Use type parameters
 
 
 error[UP046]: Generic class `TooManyGenerics` uses `Generic` subclass instead of type parameters
-   --> mdtest_snippet.py:98:23
-    |
- 96 | # runtime `TypeError` to inherit from `Generic` multiple times, but we still
- 97 | # emit a diagnostic
- 98 | class TooManyGenerics(Generic[T], Generic[S]):  # snapshot: non-pep695-generic-class
-    |                       ^^^^^^^^^^
- 99 |     var: T
-100 |     var: S
-    |
+  --> mdtest_snippet.py:98:23
+   |
+98 | class TooManyGenerics(Generic[T], Generic[S]):  # snapshot: non-pep695-generic-class
+   |                       ^^^^^^^^^^
+   |
 help: Use type parameters
 ```
 
@@ -474,7 +447,6 @@ error[UP046]: Generic class `BadStr` uses `Generic` subclass instead of type par
   |
 6 | class BadStr(Generic[AnyStr]):  # snapshot: non-pep695-generic-class
   |              ^^^^^^^^^^^^^^^
-7 |     var: AnyStr
   |
 help: Use type parameters
 ```
