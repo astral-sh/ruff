@@ -651,7 +651,10 @@ impl<'db> GenericContext<'db> {
                                 (*bound_typevar, bound_typevar.with_name_suffix(db, "return"))
                             })
                             .collect();
-                        let apply = ApplySpecialization::ReturnCallables(&typevar_replacements);
+                        let apply = ApplySpecialization::ReturnCallables {
+                            replacements: &typevar_replacements,
+                            self_reference_definition: function_definition,
+                        };
                         let signatures = callable.signatures(db).apply_type_mapping_impl(
                             db,
                             &TypeMapping::ApplySpecialization(apply),
@@ -1630,7 +1633,10 @@ pub enum ApplySpecialization<'a, 'db> {
         /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
-    ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    ReturnCallables {
+        replacements: &'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>,
+        self_reference_definition: Definition<'db>,
+    },
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
@@ -1661,7 +1667,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
                 }
                 types.get(index).copied()
             }
-            ApplySpecialization::ReturnCallables(replacements) => {
+            ApplySpecialization::ReturnCallables { replacements, .. } => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
             ApplySpecialization::Single(typevar, ty) => {

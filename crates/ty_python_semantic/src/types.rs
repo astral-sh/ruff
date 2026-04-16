@@ -5602,6 +5602,14 @@ impl<'db> Type<'db> {
 
             Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
                 match type_mapping {
+                    TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables {
+                        self_reference_definition,
+                        ..
+                    })
+                        if function.definition(db) == *self_reference_definition =>
+                    {
+                        self
+                    }
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, _) => {
