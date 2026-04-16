@@ -294,15 +294,15 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
-    let severity = if preview.is_disabled() {
-        severity(code)
-    } else {
+    let severity = if is_warning_severity_enabled(preview) {
         match diagnostic.severity() {
             ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
             ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
             ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
             ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
         }
+    } else {
+        severity(code)
     };
 
     (
