@@ -11,7 +11,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, NameKind, attribute_scopes_by_name,
+    Db, NameKind,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
@@ -23,7 +23,8 @@ use crate::{
     },
 };
 use ty_python_core::{
-    definition::Definition, global_scope, place_table, scope::ScopeId, use_def_map,
+    attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
+    semantic_index, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -498,15 +499,22 @@ impl<'db> AllMembers<'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        for name in attribute_scopes_by_name(db, class_body_scope).keys() {
-            let result = ty.member(db, name.as_str());
-            let Some(ty) = result.place.ignore_possibly_undefined() else {
-                continue;
-            };
-            self.members.insert(Member {
-                name: name.clone(),
-                ty,
-            });
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        for function_scope_id in attribute_scopes(db, class_body_scope) {
+            for place_expr in index.place_table(function_scope_id).members() {
+                let Some(name) = place_expr.as_instance_attribute() else {
+                    continue;
+                };
+                let result = ty.member(db, name);
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
+                    continue;
+                };
+                self.members.insert(Member {
+                    name: Name::new(name),
+                    ty,
+                });
+            }
         }
 
         // This is very similar to `extend_with_class_members`,

@@ -52,8 +52,9 @@ use crate::{
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
-use crate::{attribute_assignments, attribute_declarations, attribute_scopes_by_name};
+use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
+    attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -2659,23 +2660,29 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
                     },
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
-                    table
-                        .place(symbol_id)
-                        .as_symbol()
-                        .map(Symbol::name)
-                        .filter(|name| ![init_name, new_name].contains(name))
-                        .cloned()
-                        .map(|name| (name, place_and_qual))
+                    if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
+                        (![init_name, new_name].contains(&name))
+                            .then_some((name.to_string(), place_and_qual))
+                    } else {
+                        None
+                    }
                 });
 
         // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
         // `__lt__`, etc.) but none of these will have field types type variables in their signatures, so we
         // don't need to consider them for variance.
 
-        let attribute_names = attribute_scopes_by_name(db, self.body_scope(db))
-            .keys()
-            .filter(|name| ![init_name, new_name].contains(name))
-            .cloned();
+        let attribute_names = attribute_scopes(db, self.body_scope(db))
+            .flat_map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute())
+                    .filter(|name| *name != init_name && *name != new_name)
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .dedup();
 
         let attribute_variances = attribute_names
             .map(|name| {
