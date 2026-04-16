@@ -1222,6 +1222,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        // Fast path: if target has more positional parameters than source and source has no
+        // `*args` to absorb them, then source cannot handle all argument combinations that
+        // target accepts. Skip the expensive return-type and per-parameter type comparisons.
+        if source.parameters.is_standard()
+            && target.parameters.is_standard()
+            && !source.parameters.iter().any(Parameter::is_variadic)
+        {
+            let source_positional = source.parameters.positional().count();
+            let target_positional = target.parameters.positional().count();
+            if target_positional > source_positional {
+                return self.never();
+            }
+        }
+
         let mut result = self.always();
 
         let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
@@ -2484,6 +2498,12 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_top(&self) -> bool {
         matches!(self.kind, ParametersKind::Top)
+    }
+
+    /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
+    /// `ParamSpec`, or `Concatenate`).
+    pub(crate) const fn is_standard(&self) -> bool {
+        matches!(self.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
