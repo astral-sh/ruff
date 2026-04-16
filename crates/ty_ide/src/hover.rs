@@ -32,34 +32,23 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if typed_dict_key.is_some() {
         None
-    } else if let GotoTarget::Call { call, callable, .. } = goto_target {
+    } else if let GotoTarget::Call { call, .. } = goto_target {
         resolved_call_signature(&model, call)
             .and_then(|details| {
                 let definition = details.definition?;
-                let docstring =
-                    Definitions(vec![ResolvedDefinition::Definition(definition)])
-                        .docstring(db)
-                        .or_else(|| {
-                            ResolvedDefinition::Definition(definition)
-                                .implementation_docstring(db)
-                                .map(Docstring::new)
-                        });
-                // If the resolved definition matches the callable name (e.g.,
-                // an overload of the called function), commit to it even with
-                // no docstring — falling back would pick up sibling overloads.
-                // For constructors (`__init__` != class name), allow fallback.
-                let callable_name = match callable {
-                    ast::ExprRef::Name(name) => Some(name.id.as_str()),
-                    ast::ExprRef::Attribute(attr) => Some(attr.attr.as_str()),
-                    _ => None,
-                };
-                if docstring.is_some() || callable_name == definition.name(db).as_deref() {
-                    Some(docstring)
-                } else {
-                    None
-                }
+                Definitions(vec![ResolvedDefinition::Definition(definition)])
+                    .docstring(db)
+                    .or_else(|| {
+                        ResolvedDefinition::Definition(definition)
+                            .implementation_docstring(db)
+                            .map(Docstring::new)
+                    })
             })
-            .unwrap_or_else(|| {
+            .or_else(|| {
+                // The resolved call signature either didn't match or the
+                // matched definition has no docstring. Fall back to all
+                // definitions for the callable (including sibling overloads
+                // and, for constructors, the class definition itself).
                 goto_target
                     .get_definition_targets(
                         &model,
@@ -1508,8 +1497,10 @@ mod tests {
         ");
     }
 
+    /// When the resolved overload has no docstring and neither does the
+    /// implementation, we fall back to showing a sibling overload's docstring.
     #[test]
-    fn hover_overloaded_function_does_not_use_unrelated_sibling_docstring() {
+    fn hover_overloaded_function_uses_sibling_overload_docstring_as_fallback() {
         let test = cursor_test(
             r#"
         from typing import overload
