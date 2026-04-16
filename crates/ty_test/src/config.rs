@@ -69,8 +69,6 @@ impl MarkdownTestConfig {
     }
 }
 
-impl mdtest::parser::MdtestConfig for MarkdownTestConfig {}
-
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Environment {

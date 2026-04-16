@@ -17,19 +17,19 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 use serde::Deserialize;
 
-/// Trait for mdtest configuration types.
-pub trait MdtestConfig: Clone + Default + for<'de> Deserialize<'de> {}
-
 /// Parse the Markdown `source` as a test suite with given `title`.
 ///
 /// `validate_config` is invoked once for every literally-declared `toml` config block
 /// (after deserialization, before it replaces the section's inherited config) so callers
 /// can enforce invariants that mdtest itself shouldn't know about.
-pub fn parse<'s, C: MdtestConfig>(
+pub fn parse<'s, C>(
     title: &'s str,
     source: &'s str,
     validate_config: impl FnMut(&C) -> anyhow::Result<()>,
-) -> anyhow::Result<MarkdownTestSuite<'s, C>> {
+) -> anyhow::Result<MarkdownTestSuite<'s, C>>
+where
+    C: Clone + Default + for<'de> Deserialize<'de>,
+{
     let parser = Parser::new(title, source, validate_config);
     parser.parse()
 }
@@ -516,7 +516,11 @@ struct Parser<'s, C, F> {
     validate_config: F,
 }
 
-impl<'s, C: MdtestConfig, F: FnMut(&C) -> anyhow::Result<()>> Parser<'s, C, F> {
+impl<'s, C, F> Parser<'s, C, F>
+where
+    C: Clone + Default + for<'de> Deserialize<'de>,
+    F: FnMut(&C) -> anyhow::Result<()>,
+{
     fn new(title: &'s str, source: &'s str, validate_config: F) -> Self {
         let mut sections = IndexVec::default();
         let root_section_id = sections.push(Section {
@@ -1110,8 +1114,6 @@ mod tests {
         #[expect(unused)]
         typeshed: Option<String>,
     }
-
-    impl super::MdtestConfig for TestConfig {}
 
     fn parse<'s>(
         title: &'s str,
