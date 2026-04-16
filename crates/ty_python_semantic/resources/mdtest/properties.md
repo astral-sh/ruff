@@ -136,6 +136,52 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+Direct `property.__set__` and `property.__delete__` calls return `None` for ordinary accessors, but
+preserve `Never`/`NoReturn` for typed non-returning accessors:
+
+```py
+from typing import Any, NoReturn, cast
+
+def raw_setter(obj: object, value: object) -> int:
+    return 1
+
+def raw_deleter(obj: object) -> int:
+    return 1
+
+prop = property(fset=cast(Any, raw_setter), fdel=cast(Any, raw_deleter))
+reveal_type(prop.__set__(object(), object()))  # revealed: None
+reveal_type(property.__set__(prop, object(), object()))  # revealed: None
+reveal_type(prop.__delete__(object()))  # revealed: None
+reveal_type(property.__delete__(prop, object()))  # revealed: None
+
+class NoReturnSetterAndDeleter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> NoReturn:
+        raise RuntimeError
+
+    @x.deleter
+    def x(self) -> NoReturn:
+        raise RuntimeError
+
+def direct_set() -> None:
+    reveal_type(NoReturnSetterAndDeleter.x.__set__(NoReturnSetterAndDeleter(), 1))  # revealed: Never
+
+def direct_set_unbound() -> None:
+    cls = NoReturnSetterAndDeleter
+    reveal_type(type(cls.x).__set__(cls.x, cls(), 1))  # revealed: Never
+
+def direct_delete() -> None:
+    reveal_type(NoReturnSetterAndDeleter.x.__delete__(NoReturnSetterAndDeleter()))  # revealed: Never
+
+def direct_delete_unbound() -> None:
+    cls = NoReturnSetterAndDeleter
+    reveal_type(type(cls.x).__delete__(cls.x, cls()))  # revealed: Never
+```
+
 ## Conditional redefinition in class body
 
 Distinct property definitions in statically unknown class-body branches should remain distinct, the
@@ -200,6 +246,25 @@ c.attr = 1
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
 reveal_type(c.attr)  # revealed: Never
+```
+
+### Non-returning setter
+
+```py
+from typing import NoReturn
+
+class NoReturnSetter:
+    @property
+    def x(self) -> int:
+        return 1
+
+    @x.setter
+    def x(self, value: int) -> NoReturn:
+        raise RuntimeError
+
+no_return_setter = NoReturnSetter()
+# error: [invalid-assignment] "Cannot assign to attribute `x` on type `NoReturnSetter` whose `__set__` method returns `Never`/`NoReturn`"
+no_return_setter.x = 1
 ```
 
 ### Wrong setter signature

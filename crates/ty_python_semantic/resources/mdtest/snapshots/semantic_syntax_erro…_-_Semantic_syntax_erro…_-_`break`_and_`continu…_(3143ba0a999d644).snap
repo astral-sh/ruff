@@ -38,7 +38,6 @@ error[invalid-syntax]: `break` outside loop
   |
 1 | break  # error: [invalid-syntax]
   | ^^^^^
-2 | continue  # error: [invalid-syntax]
   |
 
 ```
@@ -47,24 +46,19 @@ error[invalid-syntax]: `break` outside loop
 error[invalid-syntax]: `continue` outside loop
  --> src/mdtest_snippet.py:2:1
   |
-1 | break  # error: [invalid-syntax]
 2 | continue  # error: [invalid-syntax]
   | ^^^^^^^^
-3 |
-4 | for x in range(42):
   |
 
 ```
 
 ```
 error[invalid-syntax]: `break` outside loop
-  --> src/mdtest_snippet.py:9:9
-   |
- 8 |     def _():
- 9 |         break  # error: [invalid-syntax]
-   |         ^^^^^
-10 |         continue  # error: [invalid-syntax]
-   |
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |         break  # error: [invalid-syntax]
+  |         ^^^^^
+  |
 
 ```
 
@@ -72,12 +66,8 @@ error[invalid-syntax]: `break` outside loop
 error[invalid-syntax]: `continue` outside loop
   --> src/mdtest_snippet.py:10:9
    |
- 8 |     def _():
- 9 |         break  # error: [invalid-syntax]
 10 |         continue  # error: [invalid-syntax]
    |         ^^^^^^^^
-11 |
-12 |     class Fine:
    |
 
 ```
@@ -86,11 +76,8 @@ error[invalid-syntax]: `continue` outside loop
 error[invalid-syntax]: `break` outside loop
   --> src/mdtest_snippet.py:14:9
    |
-12 |     class Fine:
-13 |         # this is invalid syntax despite it being in an eager-nested scope!
 14 |         break  # error: [invalid-syntax]
    |         ^^^^^
-15 |         continue  # error: [invalid-syntax]
    |
 
 ```
@@ -99,8 +86,6 @@ error[invalid-syntax]: `break` outside loop
 error[invalid-syntax]: `continue` outside loop
   --> src/mdtest_snippet.py:15:9
    |
-13 |         # this is invalid syntax despite it being in an eager-nested scope!
-14 |         break  # error: [invalid-syntax]
 15 |         continue  # error: [invalid-syntax]
    |         ^^^^^^^^
    |

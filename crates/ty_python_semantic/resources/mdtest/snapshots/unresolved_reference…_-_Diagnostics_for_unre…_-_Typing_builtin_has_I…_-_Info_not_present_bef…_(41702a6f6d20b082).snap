@@ -25,7 +25,6 @@ error[unresolved-reference]: Name `List` used when not defined
   |
 1 | foo: List[int]  # error: [unresolved-reference]
   |      ^^^^
-2 | bar: Type  # error: [unresolved-reference]
   |
 
 ```
@@ -34,7 +33,6 @@ error[unresolved-reference]: Name `List` used when not defined
 error[unresolved-reference]: Name `Type` used when not defined
  --> src/mdtest_snippet.py:2:6
   |
-1 | foo: List[int]  # error: [unresolved-reference]
 2 | bar: Type  # error: [unresolved-reference]
   |      ^^^^
   |

@@ -29,19 +29,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
  --> src/mdtest_snippet.py:8:8
   |
-7 | # error: [unsupported-bool-conversion]
 8 | 10 and a and True
   |        ^
   |
 info: `str` is not assignable to `bool`
  --> src/mdtest_snippet.py:2:9
   |
-1 | class NotBoolable:
 2 |     def __bool__(self) -> str:
   |         --------          ^^^ Incorrect return type
   |         |
   |         Method defined here
-3 |         return "wat"
   |
 
 ```

@@ -212,7 +212,7 @@ supports_delete = SupportsDelete()
 del supports_delete.x
 
 rejects_descriptor_delete = RejectsDescriptorDelete()
-# TODO: this should be an error once properties with `Never`/`NoReturn` deleters are rejected
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
 del rejects_descriptor_delete.x
 
 explicit_none_deleter = ExplicitNoneDeleter()

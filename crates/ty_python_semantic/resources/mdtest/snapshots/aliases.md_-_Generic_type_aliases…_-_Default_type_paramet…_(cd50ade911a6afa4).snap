@@ -35,13 +35,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/aliases.
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
  --> src/mdtest_snippet.py:2:13
   |
-1 | # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
   |             ---  ^^^^^^^ `T` has a default
   |             |
   |             `Ts` is a TypeVarTuple
-3 |
-4 | # error: [invalid-type-variable-default]
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
@@ -51,13 +48,10 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
  --> src/mdtest_snippet.py:5:17
   |
-4 | # error: [invalid-type-variable-default]
 5 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
   |                 ---  ^^^^^^^^ `T2` has a default
   |                 |
   |                 `Ts` is a TypeVarTuple
-6 |
-7 | # error: [invalid-type-variable-default]
   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
@@ -65,17 +59,14 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:8:13
-   |
- 7 | # error: [invalid-type-variable-default]
- 8 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
-   |             ---  ^^^^^^^^  -------- `T2` also has a default
-   |             |    |
-   |             |    `T1` has a default
-   |             `Ts` is a TypeVarTuple
- 9 |
-10 | # error: [invalid-type-variable-default]
-   |
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+  |             ---  ^^^^^^^^  -------- `T2` also has a default
+  |             |    |
+  |             |    `T1` has a default
+  |             `Ts` is a TypeVarTuple
+  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -84,13 +75,10 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
   --> src/mdtest_snippet.py:11:13
    |
-10 | # error: [invalid-type-variable-default]
 11 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
    |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
    |             |
    |             `Us` is a TypeVarTuple
-12 |
-13 | # These are fine:
    |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 

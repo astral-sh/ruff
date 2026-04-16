@@ -28,11 +28,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
 warning[mismatched-type-name]: The name passed to `NamedTuple` must match the variable it is assigned to
  --> src/mdtest_snippet.py:5:23
   |
-4 | # error: [mismatched-type-name]
 5 | Mismatch = NamedTuple("WrongName", [("x", int)])
   |                       ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-6 | reveal_type(Mismatch)  # revealed: <class 'WrongName'>
-7 | reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
   |
 
 ```

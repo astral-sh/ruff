@@ -268,30 +268,84 @@ static_assert(False, shouted_message)
 
 ## Diagnostic snapshots
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from ty_extensions import static_assert
 import secrets
 
-# a passing assert
+# a passing assertion
 static_assert(1 < 2)
+```
 
-# evaluates to False
-# error: [static-assert-error]
+When the argument evalutes to `False`:
+
+```py
+# snapshot: static-assert-error
 static_assert(1 > 2)
+```
 
-# evaluates to False, with a message as the second argument
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: argument evaluates to `False`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | static_assert(1 > 2)
+  | ^^^^^^^^^^^^^^-----^
+  |               |
+  |               Inferred type of argument is `Literal[False]`
+  |
+```
+
+With a custom message:
+
+```py
+# snapshot: static-assert-error
 static_assert(1 > 2, "with a message")
+```
 
-# evaluates to something falsey
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: with a message
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | static_assert(1 > 2, "with a message")
+  | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
+  |               |
+  |               Inferred type of argument is `Literal[False]`
+  |
+```
+
+When it evaluates to something falsy:
+
+```py
+# snapshot: static-assert-error
 static_assert("")
+```
 
-# evaluates to something ambiguous
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: argument of type `Literal[""]` is always falsy
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | static_assert("")
+   | ^^^^^^^^^^^^^^--^
+   |               |
+   |               Inferred type of argument is `Literal[""]`
+   |
+```
+
+When it evaluates to something that is not statically known to be truthy or falsy:
+
+```py
+# snapshot: static-assert-error
 static_assert(secrets.randbelow(2))
+```
+
+```snapshot
+error[static-assert-error]: Static assertion error: argument of type `int` has an ambiguous static truthiness
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | static_assert(secrets.randbelow(2))
+   | ^^^^^^^^^^^^^^--------------------^
+   |               |
+   |               Inferred type of argument is `int`
+   |
 ```
 
 ## Type predicates

@@ -286,7 +286,7 @@ For example::
 There is no runtime checking of these properties.
 """
 
-def final(f: _F) -> _F:
+def final(f: _T) -> _T:
     """Decorator to indicate final methods and final classes.
 
     Use this decorator to indicate to type checkers that the decorated

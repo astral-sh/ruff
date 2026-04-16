@@ -11,7 +11,7 @@ use crate::{
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         constraints::ConstraintSetBuilder,
         diagnostic::{
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, PARAMETER_ALREADY_ASSIGNED,
+            INVALID_ARGUMENT_TYPE, INVALID_BASE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
             TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
         infer::TypeInferenceBuilder,
@@ -364,6 +364,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_arg = name_arg?;
 
+        let Some(names_arg) = names_arg else {
+            for arg in args {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            for kw in keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+
+            self.infer_enum_name_argument(name_arg, base_class);
+            if let Some(keyword) = start_kw {
+                self.infer_enum_start_argument(&keyword.value);
+            }
+            if let Some(keyword) = type_kw {
+                self.infer_enum_mixin_argument(&keyword.value, base_class);
+            }
+
+            if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
+                builder.into_diagnostic(format_args!(
+                    "Missing required argument `names` to `{base_name}()`"
+                ));
+            }
+
+            return Some(base_class.to_instance(db));
+        };
+
         for arg in args {
             self.infer_expression(arg, TypeContext::default());
         }
@@ -392,8 +417,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        // Without `names`, this is a value-lookup call, not functional enum creation.
-        let names_arg = names_arg?;
         let name_ty = self.expression_type(name_arg);
         let name = name_ty
             .as_string_literal()

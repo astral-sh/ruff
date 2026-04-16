@@ -32,7 +32,7 @@ pub fn all_symbols<'db>(
     let results = std::sync::Mutex::new(Vec::new());
     {
         let modules = all_modules(db);
-        let db = db.dyn_clone();
+        let db = Db::dyn_clone(db);
         let all_symbols_span = &all_symbols_span;
         let results = &results;
         let query = &query;
@@ -40,7 +40,7 @@ pub fn all_symbols<'db>(
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
             for module in modules {
-                let db = db.dyn_clone();
+                let db = Db::dyn_clone(&*db);
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };

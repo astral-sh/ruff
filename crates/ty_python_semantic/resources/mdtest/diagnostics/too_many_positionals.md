@@ -38,31 +38,22 @@ Foo().method(1, 2)  # snapshot: too-many-positional-arguments
 error[too-many-positional-arguments]: Too many positional arguments to function `f`: expected 2, got 3
  --> src/main.py:3:9
   |
-1 | from module import f, g, Foo
-2 |
 3 | f(1, 2, 3)  # snapshot: too-many-positional-arguments
   |         ^
-4 |
-5 | def coinflip() -> bool:
   |
 info: Function signature here
  --> src/module.py:1:5
   |
 1 | def f(a, b=42): ...
   |     ^^^^^^^^^^
-2 | def g(a, b): ...
   |
 
 
 error[too-many-positional-arguments]: Too many positional arguments to function `f`: expected 2, got 3
   --> src/main.py:12:9
    |
-10 | # snapshot: too-many-positional-arguments
-11 | # snapshot: too-many-positional-arguments
 12 | h(1, 2, 3)
    |         ^
-13 |
-14 | Foo().method(1, 2)  # snapshot: too-many-positional-arguments
    |
 info: Union variant `def f(a, b=42) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
@@ -71,12 +62,8 @@ info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -
 error[too-many-positional-arguments]: Too many positional arguments to function `g`: expected 2, got 3
   --> src/main.py:12:9
    |
-10 | # snapshot: too-many-positional-arguments
-11 | # snapshot: too-many-positional-arguments
 12 | h(1, 2, 3)
    |         ^
-13 |
-14 | Foo().method(1, 2)  # snapshot: too-many-positional-arguments
    |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
@@ -85,15 +72,12 @@ info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -
 error[too-many-positional-arguments]: Too many positional arguments to bound method `Foo.method`: expected 2, got 3
   --> src/main.py:14:17
    |
-12 | h(1, 2, 3)
-13 |
 14 | Foo().method(1, 2)  # snapshot: too-many-positional-arguments
    |                 ^
    |
 info: Method signature here
  --> src/module.py:5:9
   |
-4 | class Foo:
 5 |     def method(self, a): ...
   |         ^^^^^^^^^^^^^^^
   |

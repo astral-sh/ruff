@@ -1508,20 +1508,48 @@ reveal_type(enum_members(Color))
 
 ### Name mismatch diagnostics
 
-<!-- snapshot-diagnostics -->
+The name passed to `Enum` must match the variable it is assigned to:
 
 ```py
 from enum import Enum
 
-# error: [mismatched-type-name]
+GoodMatch1 = Enum("GoodMatch1", "A B")  # fine
+
+name = "GoodMatch2"
+GoodMatch2 = Enum(name, "A B")  # also fine
+```
+
+If there is a mitmatch, we emit the following diagnostic:
+
+```py
+# snapshot: mismatched-type-name
 Mismatch = Enum("WrongName", "A B")
+```
 
+```snapshot
+warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:8:17
+  |
+8 | Mismatch = Enum("WrongName", "A B")
+  |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
+  |
+```
+
+If the name is not a string literal, we also emit a diagnostic:
+
+```py
 def f(name: str) -> None:
-    # error: [mismatched-type-name]
+    # snapshot: mismatched-type-name
     DynamicMismatch = Enum(name, "A B")
+```
 
-name = "GoodMatch"
-GoodMatch = Enum(name, "A B")
+```snapshot
+warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:11:28
+   |
+11 |     DynamicMismatch = Enum(name, "A B")
+   |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
+   |
 ```
 
 ### List/tuple of tuples
@@ -1750,6 +1778,38 @@ from enum import Enum
 Color = Enum()
 
 reveal_type(Color)  # revealed: Enum
+```
+
+### Missing `names` argument
+
+```py
+from enum import Enum
+
+# This is invalid at runtime but should not panic.
+Enum("Color")  # error: [missing-argument]
+
+# This is invalid at runtime but should not panic.
+Enum(value="Color")  # error: [missing-argument]
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum(value=123)
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", start="0")
+
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Enum("Color", type=1)
+
+# error: [missing-argument]
+# error: [unknown-argument]
+Enum("Color", bad_kwarg=True)
 ```
 
 ### Non-literal name

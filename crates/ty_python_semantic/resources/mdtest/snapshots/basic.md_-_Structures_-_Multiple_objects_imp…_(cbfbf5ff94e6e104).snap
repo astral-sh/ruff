@@ -23,7 +23,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 error[unresolved-import]: Cannot resolve imported module `does_not_exist`
  --> src/mdtest_snippet.py:2:6
   |
-1 | # error: [unresolved-import]
 2 | from does_not_exist import foo, bar, baz
   |      ^^^^^^^^^^^^^^
   |

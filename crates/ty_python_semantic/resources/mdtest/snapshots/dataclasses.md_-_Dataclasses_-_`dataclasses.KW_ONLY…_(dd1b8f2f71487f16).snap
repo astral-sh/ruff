@@ -73,12 +73,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.
 error[missing-argument]: No argument provided for required parameter `y`
   --> src/mdtest_snippet.py:13:1
    |
-11 | # error: [missing-argument]
-12 | # error: [too-many-positional-arguments]
 13 | C(3, "")
    | ^^^^^^^^
-14 |
-15 | C(3, y="")
    |
 
 ```
@@ -87,12 +83,8 @@ error[missing-argument]: No argument provided for required parameter `y`
 error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
   --> src/mdtest_snippet.py:13:6
    |
-11 | # error: [missing-argument]
-12 | # error: [too-many-positional-arguments]
 13 | C(3, "")
    |      ^^
-14 |
-15 | C(3, y="")
    |
 
 ```
@@ -101,12 +93,8 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
 error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
   --> src/mdtest_snippet.py:17:7
    |
-15 | C(3, y="")
-16 | @dataclass
 17 | class Fails:  # error: [duplicate-kw-only]
    |       ^^^^^
-18 |     a: int
-19 |     b: KW_ONLY
    |
 info: `KW_ONLY` fields: `b`, `d`
 
@@ -116,11 +104,8 @@ info: `KW_ONLY` fields: `b`, `d`
 error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
   --> src/mdtest_snippet.py:29:7
    |
-28 | @dataclass
 29 | class D:  # error: [duplicate-kw-only]
    |       ^
-30 |     x: int
-31 |     _1: KW_ONLY
    |
 info: `KW_ONLY` fields: `_1`, `_2`
 
