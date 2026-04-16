@@ -10,7 +10,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
   |    ^^^^^^^^^^^^^^^
 9 |     pass
   |
-help: Use a single compare expression
+help: Use a single compare expression.
 5  | a = int(input())
 6  | b = int(input())
 7  | c = int(input())
@@ -29,7 +29,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^
 15 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 11 | a = int(input())
 12 | b = int(input())
 13 | c = int(input())
@@ -48,7 +48,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^
 21 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 17 | a = int(input())
 18 | b = int(input())
 19 | c = int(input())
@@ -67,7 +67,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^^
 27 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 23 | a = int(input())
 24 | b = int(input())
 25 | c = int(input())
@@ -86,7 +86,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^
 37 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 33 | a = int(input())
 34 | b = int(input())
 35 | c = int(input())
@@ -105,7 +105,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^
 43 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 39 | a = int(input())
 40 | b = int(input())
 41 | c = int(input())
@@ -124,7 +124,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^
 49 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 45 | a = int(input())
 46 | b = int(input())
 47 | c = int(input())
@@ -143,7 +143,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^^^
 55 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 51 | a = int(input())
 52 | b = int(input())
 53 | c = int(input())
@@ -162,7 +162,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^
 66 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 62 | b = int(input())
 63 | c = int(input())
 64 | d = int(input())
@@ -181,7 +181,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |              ^^^^^^^^^^^^^^^
 66 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 62 | b = int(input())
 63 | c = int(input())
 64 | d = int(input())
@@ -200,7 +200,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |    ^^^^^^^^^^^^^^^
 74 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 70 | c = int(input())
 71 | d = int(input())
 72 | e = int(input())
@@ -219,7 +219,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |              ^^^^^^^^^^^^^^^
 74 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 70 | c = int(input())
 71 | d = int(input())
 72 | e = int(input())
@@ -238,7 +238,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
    |                        ^^^^^^^^^^^^^^^
 74 |     pass
    |
-help: Use a single compare expression
+help: Use a single compare expression.
 70 | c = int(input())
 71 | d = int(input())
 72 | e = int(input())
@@ -257,7 +257,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 124 | a < b and (b < c)
 125 | ((a < b) and b < c)
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 120 |     pass
 121 |
 122 | # fixes will balance parentheses
@@ -277,7 +277,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 125 | ((a < b) and b < c)
 126 | (a < b) and (b < c)
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 121 |
 122 | # fixes will balance parentheses
 123 | (a < b) and b < c
@@ -297,7 +297,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 122 | # fixes will balance parentheses
 123 | (a < b) and b < c
 124 | a < b and (b < c)
@@ -316,7 +316,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
     |  ^^^^^^^^^^^^^^^^^
 127 | (((a < b))) and (b < c)
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 123 | (a < b) and b < c
 124 | a < b and (b < c)
 125 | ((a < b) and b < c)
@@ -336,7 +336,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 128 |
 129 | (a<b) and b<c and ((c<d))
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 124 | a < b and (b < c)
 125 | ((a < b) and b < c)
 126 | (a < b) and (b < c)
@@ -356,7 +356,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 130 |
 131 | # should error and fix
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
 128 |
@@ -376,7 +376,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 130 |
 131 | # should error and fix
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 126 | (a < b) and (b < c)
 127 | (((a < b))) and (b < c)
 128 |
@@ -395,7 +395,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 133 |
 134 | # more involved examples (all should error and fix)
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 129 | (a<b) and b<c and ((c<d))
 130 |
 131 | # should error and fix
@@ -411,16 +411,16 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 134 |   # more involved examples (all should error and fix)
 135 | / a < ( # sneaky comment
 136 | |     b
-137 | |   # more comments 
+137 | |   # more comments
 138 | | ) and b < c
     | |___________^
 139 |
 140 |   (
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 135 | a < ( # sneaky comment
 136 | 	b
-137 |   # more comments 
+137 |   # more comments
     - ) and b < c
 138 + ) < c
 139 |
@@ -439,7 +439,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
     | |_____________^
 146 |   )
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 138 | ) and b < c
 139 |
 140 | (
@@ -461,10 +461,15 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 147 |
 148 | a < (b) and (((b)) < c)
     | ^^^^^^^^^^^^^^^^^^^^^^
+149 |
+150 | # ----------------------------------------------------------
     |
-help: Use a single compare expression
+help: Use a single compare expression.
 145 |     and ((c<d))
 146 | )
 147 |
     - a < (b) and (((b)) < c)
 148 + (a < (b) < c)
+149 |
+150 | # ----------------------------------------------------------
+151 | # examples where the expression could be simplified, but
