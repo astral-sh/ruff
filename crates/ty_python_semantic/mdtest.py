@@ -110,12 +110,12 @@ class MDTestRunner:
         return True
 
     def _get_executable_path_from_json(self, json_output: str) -> None:
-        for json_line in json_output.splitlines():
+        for json_line in json_output.splitlines()[::-1]:
             try:
                 data = json.loads(json_line)
             except json.JSONDecodeError:
                 continue
-            if data.get("target", {}).get("name") == "mdtest":
+            if data.get("target", {}).get("name") == "mdtest" and data["executable"]:
                 self.mdtest_executable = Path(data["executable"])
                 break
         else:
