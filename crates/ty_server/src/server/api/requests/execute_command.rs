@@ -20,7 +20,7 @@ use ty_python_core::program::Program;
 ///
 /// The `program` and `arguments` fields are provided as a convenience for clients
 /// that want to run the test command directly. The server does not use these fields
-/// when executing tests; it reconstructs the command from `test_target` and `cwd`.
+/// when executing tests, it reconstructs the command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RunTestArgs {
@@ -52,6 +52,17 @@ impl RunTestArgs {
             test_target,
         }
     }
+}
+
+pub(crate) fn python_executable(db: &dyn ty_project::Db) -> crate::Result<&SystemPath> {
+    Program::get(db)
+        .python_executable(db)
+        .as_deref()
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "No Python executable found. Set `environment.python` in your ty configuration: https://docs.astral.sh/ty/reference/configuration/#python"
+            )
+        })
 }
 
 impl std::fmt::Display for RunTestArgs {
@@ -108,10 +119,12 @@ fn run_test(
         ));
     }
     let run_test_args: RunTestArgs = serde_json::from_value(arguments.swap_remove(0))?;
-    let python_executable = session
+    let db = session
         .project_db_for_path(&run_test_args.cwd)
-        .and_then(|db| Program::get(db).python_executable(db).as_deref())
-        .ok_or_else(|| anyhow::anyhow!("No Python executable found. Set `environment.python` in your ty configuration: https://docs.astral.sh/ty/reference/configuration/#python"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("No project database found for path: {}", run_test_args.cwd)
+        })?;
+    let python_executable = python_executable(db)?;
 
     // Reconstruct the command again, to now allow client to run any program
     let run_test_args = RunTestArgs::new(
@@ -120,7 +133,6 @@ fn run_test(
         &run_test_args.test_target,
         python_executable,
     );
-
     let client = client.clone();
 
     // TODO: This thread is not joined, we need to cancel running tests on exit.
