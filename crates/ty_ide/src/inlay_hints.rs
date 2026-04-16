@@ -502,18 +502,25 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                for (index, arg_or_keyword) in call.arguments.iter_source_order().enumerate() {
-                    if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
-                        && !arg_matches_name(&arg_or_keyword, name)
-                    {
-                        // Starred args like `*t` cannot be given a keyword name (`b=*t` is
-                        // invalid syntax), so we show the hint but suppress the text edit.
-                        self.add_call_argument_name(
-                            arg_or_keyword.range().start(),
-                            name,
-                            parameter_label_offset.map(NavigationTarget::from),
-                            !arg_or_keyword.is_variadic(),
-                        );
+                // `argument_names` is keyed by positional-arg index, not source-order index,
+                // so track them separately to stay in sync after keyword args appear mid-call.
+                let mut positional_index = 0;
+                for arg_or_keyword in call.arguments.iter_source_order() {
+                    if let ArgOrKeyword::Arg(_) = arg_or_keyword {
+                        if let Some((name, parameter_label_offset)) =
+                            details.argument_names.get(&positional_index)
+                            && !arg_matches_name(&arg_or_keyword, name)
+                        {
+                            // Starred args like `*t` cannot be given a keyword name (`b=*t` is
+                            // invalid syntax), so we show the hint but suppress the text edit.
+                            self.add_call_argument_name(
+                                arg_or_keyword.range().start(),
+                                name,
+                                parameter_label_offset.map(NavigationTarget::from),
+                                !arg_or_keyword.is_variadic(),
+                            );
+                        }
+                        positional_index += 1;
                     }
                     self.visit_expr(arg_or_keyword.value());
                 }
@@ -528,9 +535,14 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 /// Given a positional argument, check if the expression is the "same name"
 /// as the function argument itself.
 ///
-/// This allows us to filter out reptitive inlay hints like `x=x`, `x=y.x`, etc.
+/// This allows us to filter out repetitive inlay hints like `x=x`, `x=y.x`, etc.,
+/// and suppresses hints for arguments that are already explicit keyword arguments.
 fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
-    // Only care about positional args
+    // Explicit keyword argument — already has a name, no hint needed.
+    if let ArgOrKeyword::Keyword(keyword) = arg_or_keyword {
+        return keyword.arg.is_some();
+    }
+
     let ArgOrKeyword::Arg(arg) = arg_or_keyword else {
         return false;
     };
