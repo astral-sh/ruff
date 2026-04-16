@@ -126,6 +126,8 @@ mod tests {
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
+    #[test_case(Rule::MissingDunderAll, Path::new("RUF074/__init__.py"))]
+    #[test_case(Rule::MissingDunderAll, Path::new("RUF074/regular_module.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

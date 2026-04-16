@@ -1,0 +1,2 @@
+class ConnectedRepository:
+    pass
