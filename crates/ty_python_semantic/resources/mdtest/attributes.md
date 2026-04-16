@@ -85,6 +85,21 @@ C.declared_and_bound = "overwritten on class"
 c_instance.declared_and_bound = 1
 ```
 
+Assignments to ordinary annotated instance attributes should remain valid even when the annotation
+is `Never`/`NoReturn`; they should not be mistaken for non-returning descriptors.
+
+```py
+from typing import NoReturn
+
+class ClassA:
+    x: NoReturn
+    y: list[NoReturn]
+
+    def __init__(self, x: NoReturn, y: list[NoReturn]) -> None:
+        self.x = x
+        self.y = y
+```
+
 #### Variable declared in class body and not bound anywhere
 
 If a variable is declared in the class body but not bound anywhere, we consider it to be accessible
