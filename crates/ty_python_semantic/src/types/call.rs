@@ -165,10 +165,8 @@ pub(super) enum CallDunderError<'db> {
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
     ///
-    /// `definition` is the binding site of the dunder on the receiver's class, when
-    /// it can be statically resolved — captured by the original lookup so diagnostics
-    /// can point to the user's own assignment rather than the type's typeshed origin.
-    /// See <https://github.com/astral-sh/ty/issues/3250>.
+    /// The binding site of the dunder on the receiver's class, when statically
+    /// resolvable. See <https://github.com/astral-sh/ty/issues/3250>.
     CallError(
         CallErrorKind,
         Box<Bindings<'db>>,
