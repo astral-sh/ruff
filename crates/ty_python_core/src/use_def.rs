@@ -1633,7 +1633,9 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot, &mut self.reachability_constraints);
+                if *current != snapshot {
+                    current.merge(snapshot, &mut self.reachability_constraints);
+                }
             } else {
                 current.merge(
                     PlaceState::undefined(snapshot.reachability),
@@ -1646,7 +1648,9 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.member_states.into_iter();
         for current in &mut self.member_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot, &mut self.reachability_constraints);
+                if *current != snapshot {
+                    current.merge(snapshot, &mut self.reachability_constraints);
+                }
             } else {
                 current.merge(
                     PlaceState::undefined(snapshot.reachability),
