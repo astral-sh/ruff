@@ -3100,7 +3100,11 @@ impl<'db> CallableBinding<'db> {
             // flag is to handle that special case of many-to-one mapping from arguments to parameters.
             let mut variadic_parameter_handled = false;
 
-            for (argument_index, argument_types) in arguments.types().iter().enumerate() {
+            for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+                if matches!(argument, Argument::Synthetic) {
+                    continue;
+                }
+
                 if variadic_parameter_handled {
                     continue;
                 }
@@ -3164,7 +3168,11 @@ impl<'db> CallableBinding<'db> {
             // corresponding parameter index in `union_parameter_types`.
             let mut skipped_parameters = 0;
 
-            for argument_index in 0..arguments.len() {
+            for (argument_index, (argument, _)) in arguments.iter().enumerate() {
+                if matches!(argument, Argument::Synthetic) {
+                    continue;
+                }
+
                 for overload_index in &matching_overload_indexes[..=upto] {
                     let overload = &self.overloads[*overload_index];
                     for parameter_index in &overload.argument_matches[argument_index].parameters {

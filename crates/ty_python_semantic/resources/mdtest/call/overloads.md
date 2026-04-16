@@ -1964,6 +1964,53 @@ def _(s: str):
 reveal_type(f((None, None, None)))  # revealed: Literal[b""]
 ```
 
+### Bound receivers participate in step 5
+
+If the remaining overloads differ only by a bound `self` or `cls` parameter, step 5 still needs to
+consider the synthetic receiver argument. Otherwise, `Any` or `Unknown` user arguments can leave a
+bound method or constructor call ambiguous even though the receiver specialization already selects a
+single overload.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    @overload
+    def __init__(self: C[int], x: Any) -> None: ...
+    @overload
+    def __init__(self: C[str], x: Any) -> None: ...
+    def __init__(self, x: Any) -> None: ...
+
+class Box(Generic[T]):
+    @overload
+    def method(self: Box[int], x: Any) -> int: ...
+    @overload
+    def method(self: Box[str], x: Any) -> str: ...
+    def method(self, x: Any) -> Any: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import Box, C
+from nonexistent_module import something_unknown  # error: [unresolved-import]
+
+def _(any: Any):
+    reveal_type(C[int](any))  # revealed: C[int]
+    reveal_type(C[str](any))  # revealed: C[str]
+    reveal_type(Box[int]().method(any))  # revealed: int
+    reveal_type(Box[str]().method(any))  # revealed: str
+
+reveal_type(C[int](something_unknown))  # revealed: C[int]
+reveal_type(C[str](something_unknown))  # revealed: C[str]
+reveal_type(Box[int]().method(something_unknown))  # revealed: int
+reveal_type(Box[str]().method(something_unknown))  # revealed: str
+```
+
 ## Bidirectional Type Inference
 
 ```toml
