@@ -923,6 +923,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.per-file-ignores`
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
+    - `lint.logger-callables`
     - `lint.preview`
     - `lint.typing-extensions`
     - `lint.future-annotations`
