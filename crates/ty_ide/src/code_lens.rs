@@ -79,6 +79,7 @@ fn test_func_codelens(
     func: &StmtFunctionDef,
     class: Option<&StmtClassDef>,
 ) -> Option<CodeLensItem> {
+    // TODO: naming customization https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions
     if !func.name.as_str().starts_with("test") {
         return None;
     }
