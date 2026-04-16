@@ -115,14 +115,85 @@ task_17 = BashOperator(
 )
 
 
-# Cases that should NOT trigger AIR201:
+# Mixed-content cases that SHOULD trigger AIR201:
 
-# Mixed content (not just xcom_pull) — the modern replacement
-# for this pattern is: bash_command="echo {{ task_1.output }}"
+# Positional arg with surrounding text (was previously non-triggering; now detected)
 task_10 = BashOperator(
     task_id="task_10",
-    bash_command="echo {{ ti.xcom_pull(task_ids='task_1') }}",
+    bash_command="echo {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
 )
+
+# task_ids= keyword with text before
+task_mc1 = BashOperator(
+    task_id="task_mc1",
+    bash_command="result: {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
+)
+
+# task_id= keyword (singular) with surrounding text
+task_mc2 = BashOperator(
+    task_id="task_mc2",
+    bash_command="echo {{ ti.xcom_pull(task_id='task_1') }}",  # AIR201
+)
+
+# list-wrapped task_ids with surrounding text
+task_mc3 = BashOperator(
+    task_id="task_mc3",
+    bash_command="echo {{ ti.xcom_pull(task_ids=['task_1']) }}",  # AIR201
+)
+
+# tuple-wrapped task_ids with surrounding text
+task_mc4 = BashOperator(
+    task_id="task_mc4",
+    bash_command="echo {{ ti.xcom_pull(task_ids=('task_1',)) }}",  # AIR201
+)
+
+# key='return_value' with surrounding text
+task_mc5 = BashOperator(
+    task_id="task_mc5",
+    bash_command="echo {{ ti.xcom_pull(task_ids='task_1', key='return_value') }}",  # AIR201
+)
+
+# task_instance receiver in mixed-content
+task_mc6 = BashOperator(
+    task_id="task_mc6",
+    bash_command="echo {{ task_instance.xcom_pull('task_1') }}",  # AIR201
+)
+
+# Two xcom_pull patterns in one string — each flagged independently (same task_id)
+task_mc7 = BashOperator(
+    task_id="task_mc7",
+    bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+)
+
+# Two xcom_pull patterns in one string referencing DIFFERENT task_ids — each
+# flagged and fixed independently, verifying the scanner handles distinct
+# task variable references within the same template string
+task_mc11 = BashOperator(
+    task_id="task_mc11",
+    bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+)
+
+# Subscript access within the Jinja block — only xcom_pull call is replaced,
+# subscript and surrounding {{ }} are preserved
+task_mc8 = BashOperator(
+    task_id="task_mc8",
+    bash_command="{{ ti.xcom_pull('task_1')['item'] }}",  # AIR201
+)
+
+# Triple-quoted string — raw-source scanner is quote-agnostic
+task_mc9 = BashOperator(
+    task_id="task_mc9",
+    bash_command="""echo {{ ti.xcom_pull('task_1') }}""",  # AIR201
+)
+
+# Mixed-content with unknown task_id (violation reported, no fix available)
+task_mc10 = BashOperator(
+    task_id="task_mc10",
+    bash_command="echo {{ ti.xcom_pull('unknown_task') }}",  # AIR201 (no fix)
+)
+
+
+# Cases that should NOT trigger AIR201:
 
 # Additional keyword arguments (non-default key)
 task_11 = BashOperator(
@@ -173,4 +244,33 @@ dag = DAG(
     dag_id="my_dag",
     schedule=None,
     description="{{ ti.xcom_pull(task_ids='task_1') }}",
+)
+
+# Non-triggering: kebab-case task ID in pure-template form (not a valid Python identifier)
+task_nt1 = BashOperator(
+    task_id="task_nt1",
+    bash_command="{{ ti.xcom_pull('kebab-task') }}",
+)
+
+# Non-triggering: kebab-case task ID in mixed-content form
+task_nt2 = BashOperator(
+    task_id="task_nt2",
+    bash_command="echo {{ ti.xcom_pull('kebab-task') }}",
+)
+
+# Non-triggering: dotted group task ID (not a valid Python identifier; future
+# rule could suggest group['task'].output once Airflow supports that syntax)
+task_nt3 = BashOperator(
+    task_id="task_nt3",
+    bash_command="{{ ti.xcom_pull('group_1.task_1') }}",
+)
+
+# Non-triggering: f-string arguments are ExprFString, not ExprStringLiteral,
+# and are excluded by as_string_literal_expr(). The runtime value of this
+# f-string is "{{ ti.xcom_pull('task_1') }}" — a valid Jinja template — but
+# the task ID is determined at runtime via {task_1.task_id}, so AIR201 cannot
+# statically analyze it.
+task_nt4 = BashOperator(
+    task_id="task_nt4",
+    bash_command=f"{{{{ ti.xcom_pull('{task_1.task_id}') }}}}",
 )

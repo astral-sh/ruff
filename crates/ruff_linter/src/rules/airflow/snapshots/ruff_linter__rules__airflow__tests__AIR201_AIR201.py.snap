@@ -311,3 +311,274 @@ AIR201 Use the `.output` attribute on the task object for "unknown_task" instead
 115 | )
     |
 help: Replace with `unknown_task.output`
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:123:18
+    |
+121 | task_10 = BashOperator(
+122 |     task_id="task_10",
+123 |     bash_command="echo {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+124 | )
+    |
+help: Replace with `{{ task_1.output }}`
+120 | # Positional arg with surrounding text (was previously non-triggering; now detected)
+121 | task_10 = BashOperator(
+122 |     task_id="task_10",
+    -     bash_command="echo {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
+123 +     bash_command="echo {{ task_1.output }}",  # AIR201
+124 | )
+125 |
+126 | # task_ids= keyword with text before
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:129:18
+    |
+127 | task_mc1 = BashOperator(
+128 |     task_id="task_mc1",
+129 |     bash_command="result: {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+130 | )
+    |
+help: Replace with `{{ task_1.output }}`
+126 | # task_ids= keyword with text before
+127 | task_mc1 = BashOperator(
+128 |     task_id="task_mc1",
+    -     bash_command="result: {{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201
+129 +     bash_command="result: {{ task_1.output }}",  # AIR201
+130 | )
+131 |
+132 | # task_id= keyword (singular) with surrounding text
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:135:18
+    |
+133 | task_mc2 = BashOperator(
+134 |     task_id="task_mc2",
+135 |     bash_command="echo {{ ti.xcom_pull(task_id='task_1') }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+136 | )
+    |
+help: Replace with `{{ task_1.output }}`
+132 | # task_id= keyword (singular) with surrounding text
+133 | task_mc2 = BashOperator(
+134 |     task_id="task_mc2",
+    -     bash_command="echo {{ ti.xcom_pull(task_id='task_1') }}",  # AIR201
+135 +     bash_command="echo {{ task_1.output }}",  # AIR201
+136 | )
+137 |
+138 | # list-wrapped task_ids with surrounding text
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:141:18
+    |
+139 | task_mc3 = BashOperator(
+140 |     task_id="task_mc3",
+141 |     bash_command="echo {{ ti.xcom_pull(task_ids=['task_1']) }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+142 | )
+    |
+help: Replace with `{{ task_1.output }}`
+138 | # list-wrapped task_ids with surrounding text
+139 | task_mc3 = BashOperator(
+140 |     task_id="task_mc3",
+    -     bash_command="echo {{ ti.xcom_pull(task_ids=['task_1']) }}",  # AIR201
+141 +     bash_command="echo {{ task_1.output }}",  # AIR201
+142 | )
+143 |
+144 | # tuple-wrapped task_ids with surrounding text
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:147:18
+    |
+145 | task_mc4 = BashOperator(
+146 |     task_id="task_mc4",
+147 |     bash_command="echo {{ ti.xcom_pull(task_ids=('task_1',)) }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+148 | )
+    |
+help: Replace with `{{ task_1.output }}`
+144 | # tuple-wrapped task_ids with surrounding text
+145 | task_mc4 = BashOperator(
+146 |     task_id="task_mc4",
+    -     bash_command="echo {{ ti.xcom_pull(task_ids=('task_1',)) }}",  # AIR201
+147 +     bash_command="echo {{ task_1.output }}",  # AIR201
+148 | )
+149 |
+150 | # key='return_value' with surrounding text
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:153:18
+    |
+151 | task_mc5 = BashOperator(
+152 |     task_id="task_mc5",
+153 |     bash_command="echo {{ ti.xcom_pull(task_ids='task_1', key='return_value') }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+154 | )
+    |
+help: Replace with `{{ task_1.output }}`
+150 | # key='return_value' with surrounding text
+151 | task_mc5 = BashOperator(
+152 |     task_id="task_mc5",
+    -     bash_command="echo {{ ti.xcom_pull(task_ids='task_1', key='return_value') }}",  # AIR201
+153 +     bash_command="echo {{ task_1.output }}",  # AIR201
+154 | )
+155 |
+156 | # task_instance receiver in mixed-content
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:159:18
+    |
+157 | task_mc6 = BashOperator(
+158 |     task_id="task_mc6",
+159 |     bash_command="echo {{ task_instance.xcom_pull('task_1') }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+160 | )
+    |
+help: Replace with `{{ task_1.output }}`
+156 | # task_instance receiver in mixed-content
+157 | task_mc6 = BashOperator(
+158 |     task_id="task_mc6",
+    -     bash_command="echo {{ task_instance.xcom_pull('task_1') }}",  # AIR201
+159 +     bash_command="echo {{ task_1.output }}",  # AIR201
+160 | )
+161 |
+162 | # Two xcom_pull patterns in one string — each flagged independently (same task_id)
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:165:18
+    |
+163 | task_mc7 = BashOperator(
+164 |     task_id="task_mc7",
+165 |     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+166 | )
+    |
+help: Replace with `{{ task_1.output }}`
+162 | # Two xcom_pull patterns in one string — each flagged independently (same task_id)
+163 | task_mc7 = BashOperator(
+164 |     task_id="task_mc7",
+    -     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+165 +     bash_command="{{ task_1.output }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+166 | )
+167 |
+168 | # Two xcom_pull patterns in one string referencing DIFFERENT task_ids — each
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:165:18
+    |
+163 | task_mc7 = BashOperator(
+164 |     task_id="task_mc7",
+165 |     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+166 | )
+    |
+help: Replace with `{{ task_1.output }}`
+162 | # Two xcom_pull patterns in one string — each flagged independently (same task_id)
+163 | task_mc7 = BashOperator(
+164 |     task_id="task_mc7",
+    -     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_1') }}",  # AIR201, AIR201
+165 +     bash_command="{{ ti.xcom_pull('task_1') }} and {{ task_1.output }}",  # AIR201, AIR201
+166 | )
+167 |
+168 | # Two xcom_pull patterns in one string referencing DIFFERENT task_ids — each
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:173:18
+    |
+171 | task_mc11 = BashOperator(
+172 |     task_id="task_mc11",
+173 |     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 | )
+    |
+help: Replace with `{{ task_1.output }}`
+170 | # task variable references within the same template string
+171 | task_mc11 = BashOperator(
+172 |     task_id="task_mc11",
+    -     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+173 +     bash_command="{{ task_1.output }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+174 | )
+175 |
+176 | # Subscript access within the Jinja block — only xcom_pull call is replaced,
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_2" instead of `xcom_pull` in a template string
+   --> AIR201.py:173:18
+    |
+171 | task_mc11 = BashOperator(
+172 |     task_id="task_mc11",
+173 |     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 | )
+    |
+help: Replace with `{{ task_2.output }}`
+170 | # task variable references within the same template string
+171 | task_mc11 = BashOperator(
+172 |     task_id="task_mc11",
+    -     bash_command="{{ ti.xcom_pull('task_1') }} and {{ ti.xcom_pull('task_2') }}",  # AIR201, AIR201
+173 +     bash_command="{{ ti.xcom_pull('task_1') }} and {{ task_2.output }}",  # AIR201, AIR201
+174 | )
+175 |
+176 | # Subscript access within the Jinja block — only xcom_pull call is replaced,
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:180:18
+    |
+178 | task_mc8 = BashOperator(
+179 |     task_id="task_mc8",
+180 |     bash_command="{{ ti.xcom_pull('task_1')['item'] }}",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+181 | )
+    |
+help: Replace with `{{ task_1.output }}`
+177 | # subscript and surrounding {{ }} are preserved
+178 | task_mc8 = BashOperator(
+179 |     task_id="task_mc8",
+    -     bash_command="{{ ti.xcom_pull('task_1')['item'] }}",  # AIR201
+180 +     bash_command="{{ task_1.output['item'] }}",  # AIR201
+181 | )
+182 |
+183 | # Triple-quoted string — raw-source scanner is quote-agnostic
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead of `xcom_pull` in a template string
+   --> AIR201.py:186:18
+    |
+184 | task_mc9 = BashOperator(
+185 |     task_id="task_mc9",
+186 |     bash_command="""echo {{ ti.xcom_pull('task_1') }}""",  # AIR201
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+187 | )
+    |
+help: Replace with `{{ task_1.output }}`
+183 | # Triple-quoted string — raw-source scanner is quote-agnostic
+184 | task_mc9 = BashOperator(
+185 |     task_id="task_mc9",
+    -     bash_command="""echo {{ ti.xcom_pull('task_1') }}""",  # AIR201
+186 +     bash_command="""echo {{ task_1.output }}""",  # AIR201
+187 | )
+188 |
+189 | # Mixed-content with unknown task_id (violation reported, no fix available)
+note: This is an unsafe fix and may change runtime behavior
+
+AIR201 Use the `.output` attribute on the task object for "unknown_task" instead of `xcom_pull` in a template string
+   --> AIR201.py:192:18
+    |
+190 | task_mc10 = BashOperator(
+191 |     task_id="task_mc10",
+192 |     bash_command="echo {{ ti.xcom_pull('unknown_task') }}",  # AIR201 (no fix)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+193 | )
+    |
+help: Replace with `{{ unknown_task.output }}`
