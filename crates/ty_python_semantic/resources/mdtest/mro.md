@@ -614,6 +614,20 @@ reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unkno
 class StarredInvalidBases(*invalid_bases): ...
 ```
 
+Per-base lint checks (e.g. `subclass-of-final-class`) also see the unpacked entries:
+
+```py
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaStarred(*(int, bool)): ...
+
+final_bases = (int, bool)
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaNamedStarred(*final_bases): ...
+```
+
 ## Inline tuple-literal starred bases point diagnostics at unpacked elements
 
 <!-- snapshot-diagnostics -->
