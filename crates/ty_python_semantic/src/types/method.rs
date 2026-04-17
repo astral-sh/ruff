@@ -69,20 +69,39 @@ impl<'db> BoundMethodType<'db> {
 
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let function = self.function(db);
-        let self_instance = self.typing_self_type(db);
-
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
         )
+    }
+
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let self_instance = self.self_instance(db);
+        let typing_self_type = self.typing_self_type(db);
+
+        let mut applicable_overloads = self
+            .function(db)
+            .signature(db)
+            .overloads
+            .iter()
+            .filter(|signature| signature.can_bind_self_to(db, self_instance))
+            .map(|signature| signature.bind_self(db, Some(typing_self_type)))
+            .peekable();
+
+        // If no overload accepts the bound receiver, keep the full overload set so a later call
+        // still reports the existing invalid-`self` diagnostic instead of becoming non-callable.
+        if applicable_overloads.peek().is_none() {
+            let function_signature = self.function(db).signature(db);
+            CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            )
+        } else {
+            CallableSignature::from_overloads(applicable_overloads)
+        }
     }
 
     pub(super) fn recursive_type_normalized_impl(

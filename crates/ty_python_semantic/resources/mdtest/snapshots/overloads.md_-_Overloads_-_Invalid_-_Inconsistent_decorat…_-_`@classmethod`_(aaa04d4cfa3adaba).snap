@@ -15,7 +15,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 ```
  1 | from __future__ import annotations
  2 | 
- 3 | from typing import overload
+ 3 | from typing import Callable, overload
  4 | 
  5 | class CheckClassMethod:
  6 |     def __init__(self, x: int) -> None:
@@ -69,6 +69,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 54 |         if isinstance(x, int):
 55 |             return cls(x)
 56 |         return None
+57 | 
+58 | class Base:
+59 |     @overload
+60 |     @classmethod
+61 |     def from_value(cls: type[Base], x: int) -> int: ...
+62 |     @overload
+63 |     @classmethod
+64 |     def from_value(cls: type[Child], x: str) -> str: ...
+65 |     @classmethod
+66 |     def from_value(cls, x: int | str) -> int | str:
+67 |         return x
+68 | 
+69 | class Child(Base): ...
+70 | 
+71 | reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
+72 | reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+73 | 
+74 | good: Callable[[int], int] = Base.from_value
+75 | # error: [invalid-assignment]
+76 | bad: Callable[[str], str] = Base.from_value
 ```
 
 # Diagnostics
@@ -125,5 +145,18 @@ error[call-non-callable]: Object of type `CheckClassMethod` is not callable
 43 |             return cls(x)
    |                    ^^^^^^
    |
+
+```
+
+```
+error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
+  --> src/mdtest_snippet.py:76:6
+   |
+76 | bad: Callable[[str], str] = Base.from_value
+   |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`
+   |      |
+   |      Declared type
+   |
+info: incompatible return types: `int` is not assignable to `str`
 
 ```
