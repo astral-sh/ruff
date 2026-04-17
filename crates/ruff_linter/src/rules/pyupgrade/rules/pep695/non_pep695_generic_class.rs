@@ -21,6 +21,11 @@ use super::{
 /// Special type parameter syntax was introduced in Python 3.12 by [PEP 695] for defining generic
 /// classes. This syntax is easier to read and provides cleaner support for generics.
 ///
+/// In particular, old-style `TypeVar` variables are typically allocated at module scope, but their
+/// semantic meaning is only valid within the context of a generic class, function, or type alias.
+/// [PEP 695] eliminates this [source of confusion] by declaring type parameters at their point of
+/// use.
+///
 /// ## Known problems
 ///
 /// The rule currently skips generic classes nested inside of other functions or classes. It also
@@ -40,7 +45,7 @@ use super::{
 /// of the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing
 /// a `TypeVar` variable with an inline type parameter may change its variance.
 ///
-/// ## Example
+/// ## Examples
 ///
 /// ```python
 /// from typing import Generic, TypeVar
@@ -57,6 +62,32 @@ use super::{
 /// ```python
 /// class GenericClass[T]:
 ///     var: T
+/// ```
+///
+/// In cases where you've intentionally defined a reusable `TypeVar` to share
+/// the bounds across multiple uses:
+///
+/// ```python
+/// from typing import Generic, TypeVar
+///
+/// ReusableT = TypeVar("ReusableT", bound=int | str | dict[int, str])
+///
+///
+/// class GenericClass1(Generic[ReusableT]): ...
+/// class GenericClass2(Generic[ReusableT]): ...
+/// class GenericClass3(Generic[ReusableT]): ...
+/// ```
+///
+/// You can instead extract the bound as a [type alias] to retain both the
+/// benefits of the PEP 695 syntax and the reuse of the bound:
+///
+/// ```python
+/// type ReusableTBound = int | str | dict[int, str]
+///
+///
+/// class GenericClass1[ReusableT: ReusableTBound]: ...
+/// class GenericClass2[ReusableT: ReusableTBound]: ...
+/// class GenericClass3[ReusableT: ReusableTBound]: ...
 /// ```
 ///
 /// ## See also
@@ -89,6 +120,8 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
+/// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
+/// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericClass {
