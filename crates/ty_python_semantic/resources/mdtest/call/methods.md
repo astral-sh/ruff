@@ -70,7 +70,7 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Expected `C`, found `Literal[1]`"
 # error: [missing-argument]
 C.f(1)
 
@@ -399,7 +399,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Argument to bound method `f` is incorrect: Expected `D`, found `<class 'D'>`"
+# error: [invalid-argument-type] "Argument to bound method `D.f` is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
 

@@ -412,7 +412,7 @@ c("wrong")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+error[invalid-argument-type]: Argument to bound method `C.__call__` is incorrect
  --> src/mdtest_snippet.py:6:3
   |
 6 | c("wrong")  # snapshot: invalid-argument-type
@@ -440,7 +440,7 @@ c.square("hello")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to bound method `square` is incorrect
+error[invalid-argument-type]: Argument to bound method `C.square` is incorrect
  --> src/mdtest_snippet.py:6:10
   |
 6 | c.square("hello")  # snapshot: invalid-argument-type

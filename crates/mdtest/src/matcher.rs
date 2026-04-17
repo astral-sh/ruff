@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 
 use colored::Colorize;
 use path_slash::PathExt;
+use ruff_db::Db;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -16,17 +17,16 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
 use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
-use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
-pub(super) struct FailuresByLine {
+pub struct FailuresByLine {
     failures: Vec<Failure>,
     lines: Vec<LineFailures>,
 }
 
 impl FailuresByLine {
-    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
+    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -35,7 +35,7 @@ impl FailuresByLine {
         })
     }
 
-    pub(super) fn push(&mut self, line_number: OneIndexed, messages: Vec<Failure>) {
+    pub fn push(&mut self, line_number: OneIndexed, messages: Vec<Failure>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
@@ -50,7 +50,7 @@ impl FailuresByLine {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct Failure {
+pub struct Failure {
     message: String,
     /// Optional diff that is shown alongside the error message.
     /// The tuple represents the (expected, actual) values for the diff.
@@ -58,7 +58,7 @@ pub(super) struct Failure {
 }
 
 impl Failure {
-    pub(super) fn new(message: impl std::fmt::Display) -> Self {
+    pub fn new(message: impl std::fmt::Display) -> Self {
         Self {
             message: message.to_string(),
             diff: None,
@@ -87,8 +87,8 @@ struct LineFailures {
     range: Range<usize>,
 }
 
-pub(super) fn match_file(
-    db: &Db,
+pub fn match_file(
+    db: &dyn Db,
     file: File,
     diagnostics: &[Diagnostic],
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
@@ -305,7 +305,7 @@ struct Matcher {
 }
 
 impl Matcher {
-    fn from_file(db: &Db, file: File) -> Self {
+    fn from_file(db: &dyn Db, file: File) -> Self {
         Self {
             line_index: line_index(db, file),
             source: source_text(db, file),
@@ -510,18 +510,15 @@ fn match_reveal_type_diagnostic(
 
 #[cfg(test)]
 mod tests {
+    use crate::tests::TestDb;
+
     use super::FailuresByLine;
-    use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_module_resolver::SearchPathSettings;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -563,17 +560,7 @@ mod tests {
     ) -> Result<Vec<Diagnostic>, FailuresByLine> {
         colored::control::set_override(false);
 
-        let mut db = crate::db::Db::setup();
-
-        let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("Valid search paths settings"),
-        };
-        Program::init_or_update(&mut db, settings);
-
+        let mut db = TestDb::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

@@ -497,30 +497,16 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Db;
+    use crate::tests::TestDb;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_module_resolver::SearchPathSettings;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
 
     fn get_assertions(source: &str) -> InlineFileAssertions<'_> {
-        let mut db = Db::setup();
-
-        let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .unwrap(),
-        };
-        Program::init_or_update(&mut db, settings);
-
+        let mut db = TestDb::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);

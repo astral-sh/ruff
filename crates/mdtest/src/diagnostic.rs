@@ -140,7 +140,6 @@ struct DiagnosticWithLine<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::line_index;
@@ -148,9 +147,11 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
 
+    use crate::tests::TestDb;
+
     #[test]
     fn sort_and_group() {
-        let mut db = Db::setup();
+        let mut db = TestDb::setup();
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);

@@ -18,6 +18,8 @@ pub trait Db: PythonCoreDb {
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
+
+    fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
 #[cfg(test)]
@@ -153,6 +155,10 @@ pub(crate) mod tests {
         fn verbose(&self) -> bool {
             false
         }
+
+        fn dyn_clone(&self) -> Box<dyn crate::Db> {
+            Box::new(self.clone())
+        }
     }
 
     #[salsa::db]
@@ -185,6 +191,11 @@ pub(crate) mod tests {
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
+            self
+        }
+
+        pub(crate) fn with_python_platform(mut self, platform: PythonPlatform) -> Self {
+            self.python_platform = platform;
             self
         }
 

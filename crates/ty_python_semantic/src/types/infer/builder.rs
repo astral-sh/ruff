@@ -73,6 +73,7 @@ use crate::types::function::{
 use crate::types::generics::{InferableTypeVars, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{nearest_enclosing_class, nearest_enclosing_function};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
@@ -2029,6 +2030,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns `true` if `property_ty` is a property whose setter returns `Never`/`NoReturn`
+    /// when called for an assignment to `object_ty` with `value_ty`.
+    fn property_setter_returns_never(
+        &self,
+        property_ty: Type<'db>,
+        object_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        property_ty.as_property_instance().is_some_and(|property| {
+            property.setter(db).is_some_and(|setter| {
+                match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
+                    Ok(result) => result.return_type(db).is_never(),
+                    Err(err) => err.return_type(db).is_never(),
+                }
+            })
+        })
+    }
+
+    /// Returns `true` if `property_ty` is a property whose deleter returns `Never`/`NoReturn`
+    /// when called for deletion on `object_ty`.
+    fn property_deleter_returns_never(&self, property_ty: Type<'db>, object_ty: Type<'db>) -> bool {
+        let db = self.db();
+        property_ty.as_property_instance().is_some_and(|property| {
+            property.deleter(db).is_some_and(|deleter| {
+                match deleter.try_call(db, &CallArguments::positional([object_ty])) {
+                    Ok(result) => result.return_type(db).is_never(),
+                    Err(err) => err.return_type(db).is_never(),
+                }
+            })
+        })
+    }
+
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
     ///
     /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
@@ -2342,6 +2376,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
                             );
 
+                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
+                            {
+                                if emit_diagnostics
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot assign to attribute `{attribute}` on type `{}` \
+                                         whose `__set__` method returns `Never`/`NoReturn`",
+                                        object_ty.display(db),
+                                    ));
+                                }
+                                return false;
+                            }
+
                             if emit_diagnostics
                                 && let Err(dunder_set_failure) = dunder_set_result.as_ref()
                             {
@@ -2537,6 +2586,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
                             );
+
+                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
+                            {
+                                if emit_diagnostics
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot assign to attribute `{attribute}` on type `{}` \
+                                         whose `__set__` method returns `Never`/`NoReturn`",
+                                        object_ty.display(db),
+                                    ));
+                                }
+                                return false;
+                            }
 
                             if emit_diagnostics
                                 && let Err(dunder_set_failure) = dunder_set_result.as_ref()
@@ -2869,6 +2933,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         CallArguments::positional([object_ty]),
                         TypeContext::default(),
                     );
+
+                    if self.property_deleter_returns_never(attr_ty, object_ty) {
+                        if emit_diagnostics
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot delete attribute `{attribute}` on type `{}` \
+                                 whose `__delete__` method returns `Never`/`NoReturn`",
+                                object_ty.display(db),
+                            ));
+                        }
+                        return false;
+                    }
 
                     match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => return true,
@@ -6446,16 +6524,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let callable_tcx = if let Some(tcx) = tcx.annotation
             // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
-            // in the union.
+            // in the union/intersection.
             && let Some(callable) = tcx
                 .filter_union(self.db(), Type::is_callable_type)
                 .as_callable()
         {
-            let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
-                panic!("`Callable` type annotations cannot be overloaded");
-            };
-
-            Some(signature)
+            match callable.signatures(self.db()).overloads.as_slice() {
+                [signature] => Some(signature),
+                // TODO: We could similarly perform multi-inference here if there are multiple overloads.
+                _ => None,
+            }
         } else {
             None
         };
@@ -7039,28 +7117,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let is_typed_dict_constructor = class.is_some_and(|class| class.is_typed_dict(self.db()));
-        let has_mixed_typed_dict_literal_argument = is_typed_dict_constructor
-            && arguments.args.len() == 1
-            && arguments.args[0].is_dict_expr()
-            && !arguments.keywords.is_empty();
-
-        // Validate `TypedDict` constructor calls before general argument inference so the field
+        // Prepare `TypedDict` constructor calls before general argument inference so the field
         // type context becomes the canonical inference for constructor values.
-        if let Some(class) = class
-            && is_typed_dict_constructor
-        {
-            let typed_dict = TypedDictType::new(class);
-            self.infer_typed_dict_constructor_values(typed_dict, arguments, func.as_ref().into());
-        }
+        let has_prepared_typed_dict_constructor = class
+            .filter(|class| class.is_typed_dict(self.db()))
+            .map(|class| {
+                let typed_dict = TypedDictType::new(class);
+                let form = TypedDictConstructorForm::from_arguments(arguments);
+                self.prepare_typed_dict_constructor(
+                    typed_dict,
+                    form,
+                    arguments,
+                    func.as_ref().into(),
+                );
+            })
+            .is_some();
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if has_mixed_typed_dict_literal_argument && expr.is_dict_expr() {
-                    builder.try_expression_type(expr).unwrap_or(Type::unknown())
-                } else if is_typed_dict_constructor {
+                if has_prepared_typed_dict_constructor {
                     builder.get_or_infer_expression(expr, tcx)
                 } else {
                     builder.infer_expression(expr, tcx)

@@ -2036,6 +2036,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3eede3bdf92f3b4f9dc04072a9ce5ab557d5ec9038773bf9ffcd5588b3cc05b"
 
 [[package]]
+name = "mdtest"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "colored 3.1.1",
+ "indexmap",
+ "insta",
+ "memchr",
+ "path-slash",
+ "regex",
+ "ruff_db",
+ "ruff_diagnostics",
+ "ruff_index",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash",
+ "rustc-stable-hash",
+ "salsa",
+ "serde",
+ "similar 3.1.0",
+ "smallvec",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2884,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.10"
+version = "0.15.11"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3145,7 +3175,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.10"
+version = "0.15.11"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3521,7 +3551,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.10"
+version = "0.15.11"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4421,6 +4451,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_python_trivia",
  "salsa",
@@ -4640,6 +4671,7 @@ dependencies = [
  "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
+ "rayon",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_index",
@@ -4745,28 +4777,17 @@ dependencies = [
  "camino",
  "colored 3.1.1",
  "dunce",
- "indexmap",
  "insta",
- "memchr",
- "path-slash",
- "regex",
+ "mdtest",
  "ruff_db",
  "ruff_diagnostics",
- "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
- "ruff_text_size",
- "rustc-hash",
- "rustc-stable-hash",
  "salsa",
  "serde",
- "similar 3.1.0",
- "smallvec",
  "tempfile",
- "thiserror 2.0.18",
- "toml 1.1.2+spec-1.1.0",
  "tracing",
  "ty_module_resolver",
  "ty_python_core",

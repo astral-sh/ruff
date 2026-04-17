@@ -69,7 +69,7 @@ info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
 
-error[missing-argument]: No argument provided for required parameter `a` of bound method `method`
+error[missing-argument]: No argument provided for required parameter `a` of bound method `Foo.method`
   --> src/main.py:14:1
    |
 14 | Foo().method()  # snapshot: missing-argument

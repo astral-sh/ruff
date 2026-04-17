@@ -180,7 +180,7 @@ impl<'a> ProjectFilesWalker<'a> {
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
         self.walker.run(|| {
-            let db = db.dyn_clone();
+            let db = Db::dyn_clone(db);
             let filter = &self.filter;
             let files = &files;
             let diagnostics = &diagnostics;

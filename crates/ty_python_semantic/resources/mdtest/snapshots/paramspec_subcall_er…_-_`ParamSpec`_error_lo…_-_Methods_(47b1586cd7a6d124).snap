@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/paramspec_subcall_error_
 # Diagnostics
 
 ```
-error[invalid-argument-type]: Argument to bound method `method` is incorrect
+error[invalid-argument-type]: Argument to bound method `Foo.method` is incorrect
   --> src/mdtest_snippet.py:13:17
    |
 13 | foo.method(fn1, "a", 2, c="c", unknown=1)
@@ -47,7 +47,7 @@ info: Method defined here
 ```
 
 ```
-error[invalid-argument-type]: Argument to bound method `method` is incorrect
+error[invalid-argument-type]: Argument to bound method `Foo.method` is incorrect
   --> src/mdtest_snippet.py:13:25
    |
 13 | foo.method(fn1, "a", 2, c="c", unknown=1)
@@ -63,7 +63,7 @@ info: Method defined here
 ```
 
 ```
-error[unknown-argument]: Argument `unknown` does not match any known parameter of bound method `method`
+error[unknown-argument]: Argument `unknown` does not match any known parameter of bound method `Foo.method`
   --> src/mdtest_snippet.py:13:32
    |
 13 | foo.method(fn1, "a", 2, c="c", unknown=1)

@@ -192,12 +192,36 @@ isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 
 ## The builtin `NotImplemented` constant is not callable
 
-<!-- snapshot-diagnostics -->
+```py
+def _():
+    # snapshot: call-non-callable
+    raise NotImplemented()
+```
+
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:3:11
+  |
+3 |     raise NotImplemented()
+  |           --------------^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+  |
+```
 
 ```py
 def _():
-    raise NotImplemented()  # error: [call-non-callable]
+    # snapshot: call-non-callable
+    raise NotImplemented("this module is not implemented yet!!!")
+```
 
-def _():
-    raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:6:11
+  |
+6 |     raise NotImplemented("this module is not implemented yet!!!")
+  |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+  |
 ```

@@ -1,25 +1,22 @@
-use crate::config::Log;
+use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use crate::db::Db;
-use crate::matcher::Failure;
-use crate::parser::{BacktickOffsets, CodeBlock, EmbeddedFileSourceMap};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use camino::Utf8Path;
 use colored::Colorize;
-use config::SystemKind;
-use parser as test_parser;
+use mdtest::matcher::{self, Failure};
+use mdtest::parser::{self, EmbeddedFileSourceMap};
+use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
+use ruff_db::cancellation::CancellationTokenSource;
+use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_db::source::line_index;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{Ranged, TextRange};
-use similar::{ChangeTag, TextDiff};
 use std::backtrace::BacktraceStatus;
-use std::fmt::{Display, Write};
+use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
@@ -29,23 +26,12 @@ use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    fix_all_diagnostics,
 };
 
-mod assertion;
 mod config;
 mod db;
-mod diagnostic;
 mod external_dependencies;
-mod matcher;
-mod parser;
-
-/// Filter which tests to run in mdtest.
-///
-/// Only tests whose names contain this filter string will be executed.
-const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
-
-/// If set to a value other than "0", updates the content of inline snapshots.
-const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
 /// If set to a value other than "0", runs tests that include external dependencies.
 const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
@@ -60,12 +46,13 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
-    output_format: OutputFormat,
 ) -> anyhow::Result<()> {
-    let suite = test_parser::parse(short_title, source)
-        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+    let output_format = output_format();
 
-    let mut db = db::Db::setup();
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+
+    let mut db = Db::setup();
     let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
@@ -180,88 +167,12 @@ pub fn run(
     }
 
     if !markdown_edits.is_empty() {
-        try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
+        mdtest::try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
     }
 
     assert!(!any_failures, "{}", &assertion);
 
     Ok(())
-}
-
-/// Defines the format in which mdtest should print an error to the terminal
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    /// The format `cargo test` should use by default.
-    Cli,
-    /// A format that will provide annotations from GitHub Actions
-    /// if mdtest fails on a PR.
-    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
-    GitHub,
-}
-
-impl OutputFormat {
-    const fn is_cli(self) -> bool {
-        matches!(self, OutputFormat::Cli)
-    }
-
-    /// Write a test error in the appropriate format.
-    ///
-    /// For CLI format, errors are appended to `assertion_buf` so they appear
-    /// in the assertion-failure message.
-    ///
-    /// For GitHub format, errors are printed directly to stdout so that GitHub
-    /// Actions can detect them as workflow commands. Workflow commands must
-    /// appear at the beginning of a line in stdout to be parsed by GitHub.
-    #[expect(clippy::print_stdout)]
-    fn write_error(
-        self,
-        assertion_buf: &mut String,
-        file: &str,
-        line: OneIndexed,
-        failure: &Failure,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let _ = writeln!(
-                    assertion_buf,
-                    "  {file_line} {message}",
-                    file_line = format!("{file}:{line}").cyan(),
-                    message = failure.message()
-                );
-                if let Some((expected, actual)) = failure.diff() {
-                    let _ = render_diff(assertion_buf, actual, expected);
-                }
-            }
-            OutputFormat::GitHub => {
-                println!(
-                    "::error file={file},line={line}::{message}",
-                    message = failure.message()
-                );
-            }
-        }
-    }
-
-    /// Write a module-resolution inconsistency in the appropriate format.
-    ///
-    /// See [`write_error`](Self::write_error) for details on why GitHub-format
-    /// messages must be printed directly to stdout.
-    #[expect(clippy::print_stdout)]
-    fn write_inconsistency(
-        self,
-        assertion_buf: &mut String,
-        fixture_path: &Utf8Path,
-        inconsistency: &impl Display,
-    ) {
-        match self {
-            OutputFormat::Cli => {
-                let info = fixture_path.to_string().cyan();
-                let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={fixture_path}::{inconsistency}");
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -276,18 +187,12 @@ impl TestOutcome {
     }
 }
 
-#[derive(Debug, Clone)]
-struct MarkdownEdit {
-    range: TextRange,
-    replacement: String,
-}
-
 fn run_test(
     db: &mut db::Db,
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
-    test: &parser::MarkdownTest,
+    test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
@@ -506,9 +411,7 @@ fn run_test(
     db.update_analysis_options(configuration.analysis.as_ref());
     db.set_verbosity(test.configuration().verbose());
 
-    // When snapshot testing is enabled, this is populated with
-    // all diagnostics. Otherwise it remains empty.
-    let mut snapshot_diagnostics = vec![];
+    let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
     let mut markdown_edits = vec![];
@@ -534,8 +437,9 @@ fn run_test(
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
                 |inline_diagnostics| {
-                    validate_inline_snapshot(
+                    mdtest::validate_inline_snapshot(
                         db,
+                        "ty",
                         test_file,
                         &inline_diagnostics,
                         &mut markdown_edits,
@@ -549,14 +453,7 @@ fn run_test(
                 }),
             };
 
-            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-            // since they make snapshots very noisy!
-            if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
-                    diagnostic.id() != DiagnosticId::RevealedType
-                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-                }));
-            }
+            all_diagnostics.extend(diagnostics);
 
             let pull_types_result = attempt_test(db, pull_types, test_file);
             match pull_types_result {
@@ -629,14 +526,26 @@ fn run_test(
         failures.push(failure);
     }
 
-    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
-        panic!(
+    if test.should_snapshot_diagnostics() {
+        assert!(
+            !all_diagnostics.is_empty(),
             "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
             test.name()
         );
-    } else if !snapshot_diagnostics.is_empty() {
-        let snapshot =
-            create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
+
+        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+        // since they make snapshots very noisy!
+        let snapshot = mdtest::create_diagnostic_snapshot(
+            db,
+            "ty",
+            relative_fixture_path,
+            test,
+            all_diagnostics.iter().filter(|diagnostic| {
+                diagnostic.id() != DiagnosticId::RevealedType
+                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+            }),
+        );
+
         let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
@@ -647,6 +556,47 @@ fn run_test(
             },
             { insta::assert_snapshot!(name, snapshot) }
         );
+    }
+
+    // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
+    // But don't try to run fixes for tests that are expected to panic.
+    if test.should_expect_panic().is_err() {
+        let token_source = CancellationTokenSource::new();
+        let result = fix_all_diagnostics(
+            db,
+            all_diagnostics,
+            Applicability::Unsafe,
+            &token_source.token(),
+        )
+        .expect("to succeed because fixing is never cancelled");
+
+        tracing::debug!("Fixed {} diagnostics", result.count);
+
+        let mut fatals = result.diagnostics;
+        fatals.retain(|diagnostic| diagnostic.id() == DiagnosticId::InternalError);
+
+        for diagnostic in fatals {
+            let ty_file = diagnostic.expect_primary_span().expect_ty_file();
+
+            let test_file = test_files
+                .iter()
+                .find(|test_file| test_file.file == ty_file)
+                .unwrap_or(&test_files[0]);
+
+            let mut by_line = matcher::FailuresByLine::default();
+            by_line.push(
+                OneIndexed::from_zero_indexed(0),
+                vec![Failure::new(format_args!(
+                    "Fixing the diagnostics caused a fatal error:\n{}",
+                    mdtest::render_diagnostic(db, "ty", &diagnostic)
+                ))],
+            );
+            let failure = FileFailures {
+                backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                by_line,
+            };
+            failures.push(failure);
+        }
     }
 
     if failures.is_empty() {
@@ -744,287 +694,6 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
     }
 }
 
-type Failures = Vec<FileFailures>;
-
-/// The failures for a single file in a test by line number.
-#[derive(Debug)]
-struct FileFailures {
-    /// Positional information about the code block(s) to reconstruct absolute line numbers.
-    backtick_offsets: Vec<BacktickOffsets>,
-
-    /// The failures by lines in the file.
-    by_line: matcher::FailuresByLine,
-}
-
-/// File in a test.
-struct TestFile<'a> {
-    file: File,
-
-    /// Information about the checkable code block(s) that compose this file.
-    code_blocks: Vec<CodeBlock<'a>>,
-}
-
-impl TestFile<'_> {
-    pub(crate) fn to_code_block_backtick_offsets(&self) -> Vec<BacktickOffsets> {
-        self.code_blocks
-            .iter()
-            .map(parser::CodeBlock::backtick_offsets)
-            .collect()
-    }
-}
-
-fn diagnostic_display_config() -> DisplayDiagnosticConfig {
-    DisplayDiagnosticConfig::new("ty")
-        .color(false)
-        .show_fix_diff(true)
-        .with_fix_applicability(Applicability::DisplayOnly)
-        // Surrounding context in source annotations can be confusing in mdtests,
-        // since you may get to see context from the *subsequent* code block (all
-        // code blocks are merged into a single file). It also leads to a lot of
-        // duplication in general. So we just set it to zero here for concise
-        // and clear snapshots.
-        .context(0)
-}
-
-fn render_diagnostic(db: &mut Db, diagnostic: &Diagnostic) -> String {
-    diagnostic
-        .display(db, &diagnostic_display_config())
-        .to_string()
-}
-
-fn render_diagnostics(db: &mut Db, diagnostics: &[Diagnostic]) -> String {
-    let mut rendered = String::new();
-    for diag in diagnostics {
-        writeln!(rendered, "{}", render_diagnostic(db, diag)).unwrap();
-    }
-
-    rendered.trim_end_matches('\n').to_string()
-}
-
-fn is_update_inline_snapshots_enabled() -> bool {
-    let is_enabled: std::sync::LazyLock<_> = std::sync::LazyLock::new(|| {
-        std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some_and(|v| v != "0")
-    });
-    *is_enabled
-}
-
-fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
-    static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
-
-    INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
-}
-
-fn validate_inline_snapshot(
-    db: &mut db::Db,
-    test_file: &TestFile<'_>,
-    inline_diagnostics: &[Diagnostic],
-    markdown_edits: &mut Vec<MarkdownEdit>,
-) -> Result<(), matcher::FailuresByLine> {
-    let update_snapshots = is_update_inline_snapshots_enabled();
-    let line_index = line_index(db, test_file.file);
-    let mut failures = matcher::FailuresByLine::default();
-    let mut inline_diagnostics = inline_diagnostics;
-
-    // Group the inline diagnostics by code block. We do this by using the code blocks
-    // start offsets. All diagnostics between the current's and next code blocks offset belong to the current code block.
-    for (index, code_block) in test_file.code_blocks.iter().enumerate() {
-        let next_block_start_offset = test_file
-            .code_blocks
-            .get(index + 1)
-            .map_or(ruff_text_size::TextSize::new(u32::MAX), |next_code_block| {
-                next_code_block.embedded_start_offset()
-            });
-
-        // Find the offset of the first diagnostic that belongs to the next code block.
-        let diagnostics_end = inline_diagnostics
-            .iter()
-            .position(|diagnostic| {
-                diagnostic
-                    .primary_span()
-                    .and_then(|span| span.range())
-                    .map(TextRange::start)
-                    .is_some_and(|offset| offset >= next_block_start_offset)
-            })
-            .unwrap_or(inline_diagnostics.len());
-
-        let (block_diagnostics, remaining_diagnostics) =
-            inline_diagnostics.split_at(diagnostics_end);
-        inline_diagnostics = remaining_diagnostics;
-
-        let failure_line = line_index.line_index(code_block.embedded_start_offset());
-
-        let Some(first_diagnostic) = block_diagnostics.first() else {
-            // If there are no inline diagnostics (no usages of `# snapshot`) but the code block has a
-            // diagnostics section, mark it as unnecessary or remove it.
-            if let Some(snapshot_code_block) = code_block.inline_snapshot_block() {
-                if update_snapshots {
-                    markdown_edits.push(MarkdownEdit {
-                        range: snapshot_code_block.range(),
-                        replacement: String::new(),
-                    });
-                } else {
-                    failures.push(
-                        failure_line,
-                        vec![Failure::new(
-                            "This code block has a `snapshot` code block but no `# snapshot` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
-                        )],
-                    );
-                }
-            }
-
-            continue;
-        };
-
-        let actual =
-            apply_snapshot_filters(&render_diagnostics(db, block_diagnostics)).into_owned();
-
-        let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
-            if update_snapshots {
-                markdown_edits.push(MarkdownEdit {
-                    range: TextRange::empty(code_block.backtick_offsets().end()),
-                    replacement: format!("\n\n```snapshot\n{actual}\n```"),
-                });
-            } else {
-                let first_range = first_diagnostic.primary_span().unwrap().range().unwrap();
-                let line = line_index.line_index(first_range.start());
-                failures.push(
-                    line,
-                    vec![Failure::new(format!(
-                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
-                    ))],
-                );
-            }
-            continue;
-        };
-
-        if snapshot_code_block.expected == actual {
-            continue;
-        }
-
-        if update_snapshots {
-            markdown_edits.push(MarkdownEdit {
-                range: snapshot_code_block.range(),
-                replacement: format!("```snapshot\n{actual}\n```"),
-            });
-        } else {
-            failures.push(
-                failure_line,
-                vec![Failure::new(format_args!(
-                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
-                    )).with_diff(snapshot_code_block.expected.to_string(), actual)],
-                );
-        }
-    }
-
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures)
-    }
-}
-
-fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std::fmt::Result {
-    let diff = TextDiff::from_lines(expected, actual);
-
-    writeln!(f, "{}", "--- expected".red())?;
-    writeln!(f, "{}", "+++ actual".green())?;
-
-    let mut unified = diff.unified_diff();
-    let unified = unified.header("expected", "actual");
-
-    for hunk in unified.iter_hunks() {
-        writeln!(f, "{}", hunk.header())?;
-
-        for change in hunk.iter_changes() {
-            let value = change.value();
-            match change.tag() {
-                ChangeTag::Equal => write!(f, " {value}")?,
-                ChangeTag::Delete => {
-                    write!(f, "{}{}", "-".red(), value.red())?;
-                }
-                ChangeTag::Insert => {
-                    write!(f, "{}{}", "+".green(), value.green()).unwrap();
-                }
-            }
-
-            if !diff.newline_terminated() || change.missing_newline() {
-                writeln!(f)?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn try_apply_markdown_edits(
-    absolute_fixture_path: &Utf8Path,
-    source: &str,
-    mut edits: Vec<MarkdownEdit>,
-) {
-    edits.sort_unstable_by_key(|edit| edit.range.start());
-
-    let mut updated = source.to_string();
-    for edit in edits.into_iter().rev() {
-        updated.replace_range(
-            edit.range.start().to_usize()..edit.range.end().to_usize(),
-            &edit.replacement,
-        );
-    }
-
-    if let Err(err) = std::fs::write(absolute_fixture_path, updated) {
-        tracing::error!("Failed to write updated inline snapshots in: {err}");
-    }
-}
-
-fn create_diagnostic_snapshot(
-    db: &mut db::Db,
-    relative_fixture_path: &Utf8Path,
-    test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = Diagnostic>,
-) -> String {
-    let mut snapshot = String::new();
-    writeln!(snapshot).unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
-    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
-    writeln!(snapshot, "---").unwrap();
-    writeln!(snapshot).unwrap();
-
-    writeln!(snapshot, "# Python source files").unwrap();
-    writeln!(snapshot).unwrap();
-    for file in test.files() {
-        writeln!(snapshot, "## {}", file.relative_path()).unwrap();
-        writeln!(snapshot).unwrap();
-        // Note that we don't use ```py here because the line numbering
-        // we add makes it invalid Python. This sacrifices syntax
-        // highlighting when you look at the snapshot on GitHub,
-        // but the line numbers are extremely useful for analyzing
-        // snapshots. So we keep them.
-        writeln!(snapshot, "```").unwrap();
-
-        let line_number_width = file.code.lines().count().to_string().len();
-        for (i, line) in file.code.lines().enumerate() {
-            let line_number = i + 1;
-            writeln!(snapshot, "{line_number:>line_number_width$} | {line}").unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot).unwrap();
-    }
-
-    writeln!(snapshot, "# Diagnostics").unwrap();
-    writeln!(snapshot).unwrap();
-    for (index, diagnostic) in diagnostics.into_iter().enumerate() {
-        if index > 0 {
-            writeln!(snapshot).unwrap();
-        }
-        writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", render_diagnostic(db, &diagnostic)).unwrap();
-        writeln!(snapshot, "```").unwrap();
-    }
-    snapshot
-}
-
 /// Run a function over an embedded test file, catching any panics that occur in the process.
 ///
 /// If no panic occurs, the result of the function is returned as an `Ok()` variant.
@@ -1105,5 +774,64 @@ impl AttemptTestError<'_> {
             backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
             by_line,
         }
+    }
+}
+
+fn parse<'s>(
+    short_title: &'s str,
+    source: &'s str,
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, MarkdownTestConfig>> {
+    let mut file_has_dependencies = false;
+    parser::parse::<MarkdownTestConfig>(short_title, source, |config| {
+        if config.dependencies().is_some() {
+            if file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            file_has_dependencies = true;
+        }
+        Ok(())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_trivia::textwrap::dedent;
+
+    #[test]
+    fn multiple_sections_with_dependencies_not_allowed() {
+        let source = dedent(
+            r#"
+            # First section
+
+            ```toml
+            [project]
+            dependencies = ["pydantic==2.12.2"]
+            ```
+
+            ```py
+            x = 1
+            ```
+
+            # Second section
+
+            ```toml
+            [project]
+            dependencies = ["numpy==2.0.0"]
+            ```
+
+            ```py
+            y = 2
+            ```
+            "#,
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+             External dependencies must be specified in a single top-level configuration block."
+        );
     }
 }
