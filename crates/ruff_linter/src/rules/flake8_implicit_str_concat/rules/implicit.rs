@@ -96,9 +96,15 @@ impl Violation for SingleLineImplicitStringConcatenation {
 pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Implicitly concatenated string literals over multiple lines".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with explicit concatenation".to_string())
     }
 }
 
@@ -159,10 +165,12 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            context.report_diagnostic_if_enabled(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
+            ) {
+                diagnostic.set_fix(fix_multiline(a_range, b_range, locator));
+            }
         } else {
             if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
@@ -267,4 +275,46 @@ fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
         odd_backslashes = !odd_backslashes;
     }
     odd_backslashes
+}
+
+/// Generate a fix for multi-line implicit string concatenation (ISC002).
+///
+/// For backslash-continued strings, removes the backslash and wraps the
+/// concatenation in parentheses. For strings already in parentheses (when
+/// `allow-multiline = false`), converts to explicit `+` concatenation.
+fn fix_multiline(
+    a_range: TextRange,
+    b_range: TextRange,
+    locator: &Locator,
+) -> Fix {
+    let between = locator.slice(TextRange::new(a_range.end(), b_range.start()));
+
+    if let Some(backslash_offset) = between.find('\\') {
+        // Backslash continuation: remove the `\` and wrap in parentheses.
+        // Also consume any whitespace before the backslash.
+        let before_backslash = &between[..backslash_offset];
+        let trimmed_len = before_backslash.trim_end().len();
+        let replace_start = a_range.end() + TextLen::text_len(&between[..trimmed_len]);
+
+        let b_line_start = locator.line_start(b_range.start());
+        let indent = locator.slice(TextRange::new(b_line_start, b_range.start()));
+
+        Fix::unsafe_edits(
+            Edit::insertion("(".to_string(), a_range.start()),
+            [
+                Edit::range_replacement(
+                    format!("\n{indent}"),
+                    TextRange::new(replace_start, b_range.start()),
+                ),
+                Edit::insertion(")".to_string(), b_range.end()),
+            ],
+        )
+    } else {
+        // No backslash (allow-multiline = false): insert ` +` after the first
+        // string to make the concatenation explicit.
+        Fix::unsafe_edit(Edit::insertion(
+            " +".to_string(),
+            a_range.end(),
+        ))
+    }
 }
