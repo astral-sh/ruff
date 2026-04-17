@@ -59,6 +59,7 @@ fn validate_typed_dict_class_body_statements(
             }
             // Pass statements are allowed.
             ast::Stmt::Pass(_) => continue,
+            // If statements are allowed; the body statements must validate.
             ast::Stmt::If(if_stmt) => {
                 validate_typed_dict_class_body_statements(context, &if_stmt.body);
                 for elif_else_clause in &if_stmt.elif_else_clauses {
