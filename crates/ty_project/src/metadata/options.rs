@@ -291,8 +291,8 @@ impl Options {
         });
 
         tracing::info!(
-            "Python version: Python {python_version}, platform: {python_platform}, executable: {python_executable:?}",
-            python_version = python_version.version,
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version.version
         );
 
         Ok(ProgramSettings {
