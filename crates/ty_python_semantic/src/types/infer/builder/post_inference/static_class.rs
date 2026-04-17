@@ -257,7 +257,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 else {
                     continue;
                 };
-                let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, previous_node) else {
+                let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, previous_node)
+                else {
                     continue;
                 };
                 let mut diagnostic = builder.into_diagnostic(
