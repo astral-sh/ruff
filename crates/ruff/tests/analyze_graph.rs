@@ -1203,3 +1203,155 @@ fn notebook_with_magic() -> Result<()> {
 
     Ok(())
 }
+
+/// In a large monorepo, there might be multiple packages with the same name in different
+/// directories. Imports should NOT resolve to these unrelated packages just because they
+/// share a name.
+#[test]
+fn no_cross_package_resolution() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create a main application that imports "foo"
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("main.py")
+        .write_str(indoc::indoc! {r#"
+        import foo  # This is meant to be a third-party library, not resolved locally
+    "#})?;
+
+    // Create an unrelated "foo" module in a completely different part of the repo
+    root.child("other")
+        .child("tools")
+        .child("foo")
+        .child("__init__.py")
+        .write_str("# Unrelated internal tool")?;
+
+    // The import should NOT resolve to the unrelated other/tools/foo module
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "other/tools/foo/__init__.py": [],
+          "ruff/__init__.py": [],
+          "ruff/main.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Test that imports in one package don't resolve to modules in sibling packages
+/// unless explicitly configured.
+#[test]
+fn no_sibling_package_resolution() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create two sibling packages that are independent
+    root.child("packages")
+        .child("alpha")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("packages")
+        .child("alpha")
+        .child("main.py")
+        .write_str(indoc::indoc! {r#"
+        import bar  # Intended to be a third-party library
+    "#})?;
+
+    root.child("packages")
+        .child("beta")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("packages")
+        .child("beta")
+        .child("bar")
+        .child("__init__.py")
+        .write_str("# Beta-specific module")?;
+
+    // alpha's `import bar` should NOT resolve to beta's bar module
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("packages/alpha").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "packages/alpha/__init__.py": [],
+          "packages/alpha/main.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Test that when src is configured, imports resolve correctly
+/// but still don't leak across to unrelated packages.
+#[test]
+fn configured_src_no_cross_resolution() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Configure src to include only the lib directory
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["lib"]
+    "#})?;
+
+    // Create the main library
+    root.child("lib")
+        .child("ruff")
+        .child("__init__.py")
+        .write_str("")?;
+    root.child("lib")
+        .child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        from ruff import b
+        import baz  # Third-party, should not resolve
+    "#})?;
+    root.child("lib")
+        .child("ruff")
+        .child("b.py")
+        .write_str("")?;
+
+    // Create an unrelated "baz" module outside the configured src
+    root.child("other")
+        .child("baz")
+        .child("__init__.py")
+        .write_str("# Unrelated module")?;
+
+    // `from ruff import b` should resolve (same package)
+    // `import baz` should NOT resolve (not in configured src)
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("lib").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "lib/ruff/__init__.py": [],
+          "lib/ruff/a.py": [
+            "lib/ruff/b.py"
+          ],
+          "lib/ruff/b.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}

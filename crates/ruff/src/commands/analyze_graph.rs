@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
@@ -86,14 +86,16 @@ pub(crate) fn analyze_graph(
             .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok()),
     );
 
-    // Add detected package roots.
-    src_roots.extend(
-        package_roots
-            .values()
-            .filter_map(|package| package.as_deref())
-            .filter_map(|path| path.parent())
-            .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
-    );
+    // Add discovered package root parents as src roots. Deduplicate to only
+    // outermost directories to avoid adding every top-level package directory
+    // as a separate search root.
+    let root_parents: Vec<SystemPathBuf> = package_roots
+        .values()
+        .filter_map(|package| package.as_deref())
+        .filter_map(|path| path.parent())
+        .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok())
+        .collect();
+    src_roots.extend(deduplicate_nested_paths(root_parents));
 
     let system = OsSystem::default();
     let db = ModuleDb::from_src_roots(
