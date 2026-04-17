@@ -37,17 +37,25 @@ async def foo():
 
 ## Error cases
 
-<!-- snapshot-diagnostics -->
-
 ### No `__aiter__` method
 
 ```py
 class NotAsyncIterable: ...
 
 async def foo():
-    # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
+    # snapshot: not-iterable
     async for x in NotAsyncIterable():
         reveal_type(x)  # revealed: Unknown
+```
+
+```snapshot
+error[not-iterable]: Object of type `NotAsyncIterable` is not async-iterable
+ --> src/mdtest_snippet.py:5:20
+  |
+5 |     async for x in NotAsyncIterable():
+  |                    ^^^^^^^^^^^^^^^^^^
+  |
+info: It has no `__aiter__` method
 ```
 
 ### Synchronously iterable, but not asynchronously iterable
@@ -62,9 +70,19 @@ async def foo():
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
+    # snapshot: not-iterable
     async for x in Iterator():
         reveal_type(x)  # revealed: Unknown
+```
+
+```snapshot
+error[not-iterable]: Object of type `Iterator` is not async-iterable
+  --> src/mdtest_snippet.py:11:20
+   |
+11 |     async for x in Iterator():
+   |                    ^^^^^^^^^^
+   |
+info: It has no `__aiter__` method
 ```
 
 ### No `__anext__` method
@@ -77,9 +95,19 @@ class AsyncIterable:
         return NoAnext()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+    # snapshot: not-iterable
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: Unknown
+```
+
+```snapshot
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+ --> src/mdtest_snippet.py:9:20
+  |
+9 |     async for x in AsyncIterable():
+  |                    ^^^^^^^^^^^^^^^
+  |
+info: Its `__aiter__` method returns an object of type `NoAnext`, which has no `__anext__` method
 ```
 
 ### Possibly missing `__anext__` method
@@ -95,9 +123,19 @@ async def foo(flag: bool):
         def __aiter__(self) -> PossiblyUnboundAnext:
             return PossiblyUnboundAnext()
 
-    # error: [not-iterable] "Object of type `AsyncIterable` may not be async-iterable"
+    # snapshot: not-iterable
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `AsyncIterable` may not be async-iterable
+  --> src/mdtest_snippet.py:12:20
+   |
+12 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+   |
+info: Its `__aiter__` method returns an object of type `PossiblyUnboundAnext`, which may not have a `__anext__` method
 ```
 
 ### Possibly missing `__aiter__` method
@@ -113,9 +151,19 @@ async def foo(flag: bool):
             def __aiter__(self) -> AsyncIterable:
                 return AsyncIterable()
 
-    # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
+    # snapshot
     async for x in PossiblyUnboundAiter():
         reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iterable
+  --> src/mdtest_snippet.py:12:20
+   |
+12 |     async for x in PossiblyUnboundAiter():
+   |                    ^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Its `__aiter__` attribute (with type `bound method PossiblyUnboundAiter.__aiter__() -> AsyncIterable`) may not be callable
 ```
 
 ### Wrong signature for `__aiter__`
@@ -130,9 +178,20 @@ class AsyncIterable:
         return AsyncIterator()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+    # snapshot: not-iterable
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+  --> src/mdtest_snippet.py:11:20
+   |
+11 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+   |
+info: Its `__aiter__` method has an invalid signature
+info: Expected signature `def __aiter__(self): ...`
 ```
 
 ### Wrong signature for `__anext__`
@@ -147,7 +206,18 @@ class AsyncIterable:
         return AsyncIterator()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+    # snapshot: not-iterable
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+  --> src/mdtest_snippet.py:11:20
+   |
+11 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+   |
+info: Its `__aiter__` method returns an object of type `AsyncIterator`, which has an invalid `__anext__` method
+info: Expected signature for `__anext__` is `def __anext__(self): ...`
 ```

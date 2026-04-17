@@ -298,8 +298,6 @@ def _(p: P) -> None:
 
 ## Snapshots of verbose diagnostics
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class A: ...
 class B[T]: ...
@@ -307,14 +305,35 @@ class B[T]: ...
 type AliasA = A
 type AliasB = B[int]
 
-# fmt: off
+# snapshot: not-subscriptable
+def _(a: AliasA[int]): ...
+```
 
-def f(
-    a: AliasA[int],  # error: [not-subscriptable]
-    b: AliasB[int],  # error: [not-subscriptable]
-): ...
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
+ --> src/mdtest_snippet.py:8:10
+  |
+8 | def _(a: AliasA[int]): ...
+  |          ------^^^^^
+  |          |
+  |          Alias to `A`, which is not generic
+  |
+```
 
-# fmt: on
+```py
+# snapshot: not-subscriptable
+def _(b: AliasB[int]): ...
+```
+
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
+  --> src/mdtest_snippet.py:10:10
+   |
+10 | def _(b: AliasB[int]): ...
+   |          ------^^^^^
+   |          |
+   |          Alias to `B[int]`, which is already specialized
+   |
 ```
 
 ## Aliases are not callable
@@ -607,25 +626,80 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
 
 ## Default type parameter after `TypeVarTuple`
 
-<!-- snapshot-diagnostics -->
-
 A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
 prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
 arguments, making any subsequent defaults meaningless.
 
 ```py
-# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+# snapshot: invalid-type-variable-default
 type Alias1[*Ts, T = int] = tuple[*Ts, T]
+```
 
-# error: [invalid-type-variable-default]
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:2:13
+  |
+2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
+  |             ---  ^^^^^^^ `T` has a default
+  |             |
+  |             `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
 type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+```
 
-# error: [invalid-type-variable-default]
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:4:17
+  |
+4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+  |                 ---  ^^^^^^^^ `T2` has a default
+  |                 |
+  |                 `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
 type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+```
 
-# error: [invalid-type-variable-default]
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:6:13
+  |
+6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+  |             ---  ^^^^^^^^  -------- `T2` also has a default
+  |             |    |
+  |             |    `T1` has a default
+  |             `Ts` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
+# snapshot: invalid-type-variable-default
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+```
 
+```snapshot
+error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+ --> src/mdtest_snippet.py:8:13
+  |
+8 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+  |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+  |             |
+  |             `Us` is a TypeVarTuple
+  |
+info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+```
+
+```py
 # These are fine:
 type Ok1[T, *Ts] = tuple[T, *Ts]
 ```

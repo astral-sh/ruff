@@ -2,16 +2,44 @@
 
 ## Basic
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import assert_type
 
 def _(x: int, y: bool):
     assert_type(x, int)  # fine
-    assert_type(x, str)  # error: [type-assertion-failure]
+    # snapshot: type-assertion-failure
+    assert_type(x, str)
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `str`
+ --> src/mdtest_snippet.py:6:5
+  |
+6 |     assert_type(x, str)
+  |     ^^^^^^^^^^^^-^^^^^^
+  |                 |
+  |                 Inferred type is `int`
+  |
+info: `str` and `int` are not equivalent types
+```
+
+```py
+def _(x: int, y: bool):
     assert_type(assert_type(x, int), int)
-    assert_type(y, int)  # error: [type-assertion-failure]
+    # snapshot: type-assertion-failure
+    assert_type(y, int)
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `int`
+  --> src/mdtest_snippet.py:10:5
+   |
+10 |     assert_type(y, int)
+   |     ^^^^^^^^^^^^-^^^^^^
+   |                 |
+   |                 Inferred type is `bool`
+   |
+info: `bool` is a subtype of `int`, but they are not equivalent
 ```
 
 ## Narrowing
@@ -55,8 +83,6 @@ def _(a: type[int]):
 
 ## Unspellable types
 
-<!-- snapshot-diagnostics -->
-
 If the actual type is an unspellable subtype, we emit `assert-type-unspellable-subtype` instead of
 `type-assertion-failure`, on the grounds that it is often useful to distinguish this from cases
 where the type assertion failure is "fixable".
@@ -69,13 +95,54 @@ class Bar: ...
 class Baz: ...
 
 def f(x: Foo):
-    assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Foo` does not match asserted type `Bar`"
-    if isinstance(x, Bar):
-        assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Foo & Bar` does not match asserted type `Bar`"
+    assert_type(x, Bar)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Bar`
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     assert_type(x, Bar)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^-^^^^^^
+  |                 |
+  |                 Inferred type is `Foo`
+  |
+info: `Bar` and `Foo` are not equivalent types
+```
+
+```py
+    if isinstance(x, Bar):
+        assert_type(x, Bar)  # snapshot: assert-type-unspellable-subtype
+```
+
+```snapshot
+error[assert-type-unspellable-subtype]: Argument does not have asserted type `Bar`
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |         assert_type(x, Bar)  # snapshot: assert-type-unspellable-subtype
+   |         ^^^^^^^^^^^^-^^^^^^
+   |                     |
+   |                     Inferred type is `Foo & Bar`
+   |
+info: `Foo & Bar` is a subtype of `Bar`, but they are not equivalent
+```
+
+```py
         # The actual type must be a subtype of the asserted type, as well as being unspellable,
         # in order for `assert-type-unspellable-subtype` to be emitted instead of `type-assertion-failure`
-        assert_type(x, Baz)  # error: [type-assertion-failure]
+        assert_type(x, Baz)  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Baz`
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |         assert_type(x, Baz)  # snapshot: type-assertion-failure
+   |         ^^^^^^^^^^^^-^^^^^^
+   |                     |
+   |                     Inferred type is `Foo & Bar`
+   |
+info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
 ## Gradual types
