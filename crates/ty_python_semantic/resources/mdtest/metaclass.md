@@ -746,14 +746,21 @@ reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 
 ## Diagnostic range
 
-<!-- snapshot-diagnostics -->
-
 ```py
 def _(n: int):
-    # error: [invalid-metaclass]
+    # snapshot: invalid-metaclass
     class B(metaclass=n):
         x = 1
         y = 2
+```
+
+```snapshot
+error[invalid-metaclass]: Metaclass type `int` is not callable
+ --> src/mdtest_snippet.py:3:13
+  |
+3 |     class B(metaclass=n):
+  |             ^^^^^^^^^^^
+  |
 ```
 
 ## Cyclic

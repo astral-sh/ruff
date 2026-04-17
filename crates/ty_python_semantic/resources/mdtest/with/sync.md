@@ -192,8 +192,6 @@ with context_expr as f:
 
 ## Accidental use of non-async `with`
 
-<!-- snapshot-diagnostics -->
-
 If a synchronous `with` statement is used on a type with `__aenter__` and `__aexit__`, we show a
 diagnostic hint that the user might have intended to use `async with` instead.
 
@@ -202,9 +200,20 @@ class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, *args): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
+# snapshot: invalid-context-manager
 with Manager():
     pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`
+ --> src/mdtest_snippet.py:6:6
+  |
+6 | with Manager():
+  |      ^^^^^^^^^
+  |
+info: Objects of type `Manager` can be used as async context managers
+info: Consider using `async with` here
 ```
 
 ## Incorrect signatures

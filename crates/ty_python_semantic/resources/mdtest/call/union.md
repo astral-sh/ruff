@@ -907,8 +907,6 @@ def _(flag: bool):
 
 ## Union of intersections with failing bindings
 
-<!-- snapshot-diagnostics -->
-
 When calling a union where one element is an intersection of callables, and all bindings in that
 intersection fail, we should report errors with both union and intersection context.
 
@@ -930,10 +928,61 @@ class BytesCaller:
 
 def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
     # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
     f(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `int`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self, x: int) -> int:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `bytes`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __call__(self, x: bytes) -> bytes:
+   |         ^^^^^^^^       -------- Parameter declared here
+   |
+info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `str`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __call__(self, x: str) -> str:
+  |         ^^^^^^^^       ------ Parameter declared here
+  |
+info: Intersection element `StrCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
 ## Union semantics with constrained callable typevars
