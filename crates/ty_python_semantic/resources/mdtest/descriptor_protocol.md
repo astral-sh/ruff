@@ -582,15 +582,14 @@ DontAssignToMe().immutable = "the properties, they are a-changing"
 
 ```snapshot
 error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
- --> src/mdtest_snippet.py:6:1
-  |
-6 | DontAssignToMe().immutable = "the properties, they are a-changing"
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
-  |
- ::: src/mdtest_snippet.py:3:9
+ --> src/mdtest_snippet.py:3:9
   |
 3 |     def immutable(self): ...
   |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # snapshot: invalid-assignment
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
   |
 ```
 

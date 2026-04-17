@@ -48,8 +48,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/paramspe
 
 ```
 error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type variable `T`
-  --> src/mdtest_snippet.py:11:20
+  --> src/mdtest_snippet.py:9:9
    |
+ 9 | def f[**P, T]():
+   |         - ParamSpec `P` defined here
+10 |     # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
 11 |     a: OnlyTypeVar[P]
    |                    ^
    |
@@ -57,11 +60,6 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
    |
  3 | class OnlyTypeVar[T]:
    |                   - Type variable `T` defined here
-   |
-  ::: src/mdtest_snippet.py:9:9
-   |
- 9 | def f[**P, T]():
-   |         - ParamSpec `P` defined here
    |
 
 ```
@@ -77,9 +75,8 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
    |
  6 | class TypeVarAndParamSpec[T, **P]:
    |                           - Type variable `T` defined here
-   |
-  ::: src/mdtest_snippet.py:9:9
-   |
+ 7 |     attr: Callable[P, T]
+ 8 |
  9 | def f[**P, T]():
    |         - ParamSpec `P` defined here
    |

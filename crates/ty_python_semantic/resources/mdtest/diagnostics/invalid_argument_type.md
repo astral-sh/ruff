@@ -141,9 +141,7 @@ info: Function defined here
   |
 1 | def foo(
   |     ^^^
-  |
- ::: src/mdtest_snippet.py:3:5
-  |
+2 |     x: int,
 3 |     y: int,
   |     ------ Parameter declared here
   |

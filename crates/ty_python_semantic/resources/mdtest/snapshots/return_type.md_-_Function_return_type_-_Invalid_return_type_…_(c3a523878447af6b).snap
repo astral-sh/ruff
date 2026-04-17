@@ -32,15 +32,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 
 ```
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.pyi:3:12
-  |
-3 |     return ...
-  |            ^^^ expected `int`, found `EllipsisType`
-  |
- ::: src/mdtest_snippet.pyi:1:12
+ --> src/mdtest_snippet.pyi:1:12
   |
 1 | def f() -> int:
   |            --- Expected `int` because of return type
+2 |     # error: [invalid-return-type]
+3 |     return ...
+  |            ^^^ expected `int`, found `EllipsisType`
   |
 
 ```

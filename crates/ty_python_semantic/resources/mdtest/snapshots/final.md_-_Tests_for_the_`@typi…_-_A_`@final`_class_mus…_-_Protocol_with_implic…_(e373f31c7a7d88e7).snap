@@ -169,15 +169,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Q` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:14:7
-   |
-14 | class Q(P): ...  # error: [abstract-method-in-final-class]
-   |       ^ `still_abstractmethod` is unimplemented
-   |
-  ::: src/mdtest_snippet.py:11:9
+  --> src/mdtest_snippet.py:11:9
    |
 11 |     def still_abstractmethod(self): ...
    |         -------------------- `still_abstractmethod` declared as abstract on superclass `P`
+12 |
+13 | @final
+14 | class Q(P): ...  # error: [abstract-method-in-final-class]
+   |       ^ `still_abstractmethod` is unimplemented
    |
 info: `P.still_abstractmethod` is implicitly abstract because `P` is a `Protocol` class and `still_abstractmethod` lacks an implementation
  --> src/mdtest_snippet.py:3:7
@@ -191,15 +190,14 @@ help: Change the body of `still_abstractmethod` to `return` or `return None` if 
 
 ```
 error[abstract-method-in-final-class]: Final class `S` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:21:7
-   |
-21 | class S(R): ...  # error: [abstract-method-in-final-class]
-   |       ^ `also_still_abstractmethod` is unimplemented
-   |
-  ::: src/mdtest_snippet.py:18:9
+  --> src/mdtest_snippet.py:18:9
    |
 18 |     def also_still_abstractmethod(self) -> None: ...
    |         ------------------------- `also_still_abstractmethod` declared as abstract on superclass `R`
+19 |
+20 | @final
+21 | class S(R): ...  # error: [abstract-method-in-final-class]
+   |       ^ `also_still_abstractmethod` is unimplemented
    |
 info: `R.also_still_abstractmethod` is implicitly abstract because `R` is a `Protocol` class and `also_still_abstractmethod` lacks an implementation
   --> src/mdtest_snippet.py:16:7
@@ -276,15 +274,14 @@ info: `Strange.weird_abstractmethod` is implicitly abstract because `Strange` is
 
 ```
 error[abstract-method-in-final-class]: Final class `HasOverloadSub` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:54:7
-   |
-54 | class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^^ `foo` is unimplemented
-   |
-  ::: src/mdtest_snippet.py:51:9
+  --> src/mdtest_snippet.py:51:9
    |
 51 |     def foo(self, x: int) -> str: ...
    |         --- `foo` declared as abstract on superclass `HasOverloads`
+52 |
+53 | @final
+54 | class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
+   |       ^^^^^^^^^^^^^^ `foo` is unimplemented
    |
 info: `HasOverloads.foo` is implicitly abstract because `HasOverloads` is a `Protocol` class and `foo` lacks an implementation
   --> src/mdtest_snippet.py:47:7
