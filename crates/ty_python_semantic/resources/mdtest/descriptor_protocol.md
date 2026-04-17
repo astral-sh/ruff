@@ -912,6 +912,8 @@ reveal_type(C.d)  # revealed: int
 
 ### Descriptors with `Concatenate` self-types on `__get__`
 
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
 ```py
 from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
 

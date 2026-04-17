@@ -371,16 +371,6 @@ impl AttributeKind {
     const fn is_data(self) -> bool {
         matches!(self, Self::DataDescriptor)
     }
-
-    fn cycle_normalized(self, previous: Self, cycle: &salsa::Cycle) -> Self {
-        if cycle.iteration() <= 1 {
-            self
-        } else if self.is_data() || previous.is_data() {
-            Self::DataDescriptor
-        } else {
-            Self::NormalOrNonDataDescriptor
-        }
-    }
 }
 
 /// This enum is used to control the behavior of the descriptor protocol implementation.
@@ -460,33 +450,6 @@ impl MemberLookupPolicy {
     /// Do not call `__getattr__` during member lookup.
     pub(crate) const fn no_getattr_lookup(self) -> bool {
         self.contains(Self::NO_GETATTR_LOOKUP)
-    }
-}
-
-#[expect(clippy::ref_option)]
-fn try_call_dunder_get_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &Option<(Type<'db>, AttributeKind)>,
-    current: Option<(Type<'db>, AttributeKind)>,
-    _self: Type<'db>,
-    _instance: Option<Type<'db>>,
-    _owner: Type<'db>,
-) -> Option<(Type<'db>, AttributeKind)> {
-    match (previous, current) {
-        (Some((previous_ty, previous_kind)), Some((current_ty, current_kind))) => Some((
-            current_ty.cycle_normalized(db, *previous_ty, cycle),
-            current_kind.cycle_normalized(*previous_kind, cycle),
-        )),
-        (Some((previous_ty, previous_kind)), None) if cycle.iteration() > 1 => Some((
-            previous_ty.recursive_type_normalized(db, cycle),
-            *previous_kind,
-        )),
-        (None, Some((current_ty, current_kind))) => Some((
-            current_ty.recursive_type_normalized(db, cycle),
-            current_kind,
-        )),
-        (_, None) => None,
     }
 }
 
@@ -2755,11 +2718,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _, _, _| Some((Type::divergent(id), AttributeKind::NormalOrNonDataDescriptor)),
-        cycle_fn=try_call_dunder_get_cycle_recover,
-        heap_size=ruff_memory_usage::heap_size
-    )]
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
