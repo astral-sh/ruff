@@ -979,7 +979,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // can.
                     error(
                         &self.context,
-                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation",),
+                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation"),
                         kwarg,
                     );
                     self.infer_expression(&kwarg.value, TypeContext::default());

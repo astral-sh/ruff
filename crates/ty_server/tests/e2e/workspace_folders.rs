@@ -675,7 +675,7 @@ fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticRepor
                 Some(DiagnosticSeverity::HINT) => "HINT",
                 None | Some(_) => "unknown",
             };
-            format!("{range}[{severity}]: {message}", message = d.message,)
+            format!("{range}[{severity}]: {message}", message = d.message)
         })
         .collect()
 }

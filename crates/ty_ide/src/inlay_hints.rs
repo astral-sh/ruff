@@ -894,7 +894,7 @@ mod tests {
                 String::new()
             };
 
-            format!("{inlay_hint_buf}{rendered_diagnostics}{fixes}",)
+            format!("{inlay_hint_buf}{rendered_diagnostics}{fixes}")
         }
 
         fn render_diagnostic<D>(&self, diagnostic: D) -> String

@@ -221,7 +221,7 @@ impl std::fmt::Display for ParseErrorType {
         match self {
             ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
             ParseErrorType::ExpectedToken { found, expected } => {
-                write!(f, "Expected {expected}, found {found}",)
+                write!(f, "Expected {expected}, found {found}")
             }
             ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {

@@ -118,7 +118,7 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
     // The following code mimics insta's logic generating the snapshot name for a test.
     let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    let full_snapshot_name = format!("black_compatibility@{test_name}.snap",);
+    let full_snapshot_name = format!("black_compatibility@{test_name}.snap");
 
     let snapshot_path = Path::new(&workspace_path)
         .join("tests/snapshots")
@@ -367,7 +367,7 @@ fn format_file(
         (Cow::Owned(without_markers), content)
     } else {
         let printed = format_module_source(source, options.clone()).unwrap_or_else(|err| {
-            panic!("Formatting `{input_path} was expected to succeed but it failed: {err}",)
+            panic!("Formatting `{input_path} was expected to succeed but it failed: {err}")
         });
         let formatted_code = printed.into_code();
 

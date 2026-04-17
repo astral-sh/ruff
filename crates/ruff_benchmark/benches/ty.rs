@@ -740,7 +740,7 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 
     code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
     for i in 0..NUM_MATCH_BRANCHES {
-        writeln!(&mut code, "        case C{i}():\n            pass",).ok();
+        writeln!(&mut code, "        case C{i}():\n            pass").ok();
     }
     code.push_str("        case _:\n            pass\n\n");
 

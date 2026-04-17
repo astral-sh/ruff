@@ -1932,7 +1932,7 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
                     );
 
                     if actual_ty.is_subtype_of(db, *asserted_ty) {
