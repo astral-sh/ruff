@@ -518,6 +518,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(_) = arg_or_keyword {
+                        // Offer an edit only for the rightmost non-starred positional arg.
                         let allow_edits = matches!(
                             arg_or_keyword,
                             ArgOrKeyword::Arg(arg)
@@ -529,10 +530,6 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(&arg_or_keyword, name)
                         {
-                            // Only the rightmost non-starred positional arg can be safely
-                            // converted to a keyword in one edit. Earlier args would leave a later
-                            // positional arg behind, and starred args like `*t` cannot be written
-                            // as `b=*t`.
                             self.add_call_argument_name(
                                 arg_or_keyword.range().start(),
                                 name,
@@ -4070,6 +4067,88 @@ Source with applied edits:
     }
 
     #[test]
+    fn test_function_call_last_plain_positional_before_starred_argument() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: int, b: int): ...
+            t: tuple[int] = (2,)
+            foo(1, *t)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: int, b: int): ...
+        t: tuple[int] = (2,)
+        foo([a=]1, [b=]*t)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: int, b: int): ...
+          |         ^
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([a=]1, [b=]*t)
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(a: int, b: int): ...
+          |                 ^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        4 | foo([a=]1, [b=]*t)
+          |             ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: int, b: int): ...
+        3 | t: tuple[int] = (2,)
+          - foo(1, *t)
+        4 + foo(a=1, *t)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_only_starred_argument_has_no_edit() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: int): ...
+            t: tuple[int] = (1,)
+            foo(*t)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: int): ...
+        t: tuple[int] = (1,)
+        foo([a=]*t)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: int): ...
+          |         ^
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([a=]*t)
+          |      ^
+          |
+        ");
+    }
+
+    #[test]
     fn test_function_call_positional_only_and_positional_or_keyword_parameters() {
         let mut test = inlay_hint_test(
             "
@@ -4540,6 +4619,73 @@ Source with applied edits:
         2 | def foo(x: int, y: str, z: bool): pass
           - foo(1, 'hello', True)
         3 + foo(1, 'hello', z=True)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_multiple_positional_arguments_before_keyword() {
+        let mut test = inlay_hint_test(
+            "
+            def add(x: int, b, y: int) -> int:
+                return x + y
+
+            total = add(3, 2, y=4)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def add(x: int, b, y: int) -> int:
+            return x + y
+
+        total[: int] = add([x=]3, [b=]2, y=4)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        348 | class int:
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:9
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |         ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def add(x: int, b, y: int) -> int:
+          |         ^
+          |
+        info: Source
+         --> main2.py:5:21
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |                     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def add(x: int, b, y: int) -> int:
+          |                 ^
+          |
+        info: Source
+         --> main2.py:5:28
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |                            ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | def add(x: int, b, y: int) -> int:
+        3 |     return x + y
+        4 |
+          - total = add(3, 2, y=4)
+        5 + total: int = add(3, b=2, y=4)
         ");
     }
 
