@@ -489,6 +489,51 @@ Record({VALUE_KEY: "x"}, count=1)
 Record({VALUE_KEY: 1}, count=1)
 ```
 
+TypedDict constructor validation should also validate nested `TypedDict` literals inside `**{...}`:
+
+```py
+from typing import Dict, TypedDict, Union
+
+class Inner(TypedDict):
+    x: int
+
+class Outer(TypedDict):
+    inner: Inner
+
+source: Inner = {"x": 1}
+
+Outer(**{"inner": {"x": 1}})
+Outer(**{"inner": dict(x=1)})
+Outer(**{"inner": {**source}})
+Outer(**{"inner": {"x": "bad", **{"x": 1}}})
+
+# error: [missing-typed-dict-key]
+Outer(**{"inner": {}})
+
+# error: [invalid-argument-type]
+Outer(**{"inner": {"x": "bad"}})
+
+class OuterWithFallback(TypedDict):
+    inner: Union[Inner, Dict[str, object]]
+
+OuterWithFallback(**{"inner": {}})
+OuterWithFallback(**{"inner": {**source}})
+```
+
+Later merged non-`TypedDict` mappings should still be able to overwrite earlier checked keys:
+
+```py
+from typing import TypedDict
+
+class NameTD(TypedDict):
+    name: str
+
+mapping: dict[str, int] = {"name": 1}
+
+# error: [invalid-argument-type]
+NameTD(**{"name": "ok", **mapping})
+```
+
 Keyword arguments should override a positional mapping, and `TypedDict` constructor inputs should
 preserve shared required keys:
 
@@ -519,6 +564,25 @@ def _(
 
     # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ChildKwargs` constructor"
     ChildKwargs(**maybe_name, count=1)
+```
+
+TypedDict constructor validation should support unpacked dict literals with non-identifier keys:
+
+```py
+from typing import TypedDict
+
+KeywordTD = TypedDict("KeywordTD", {"in": int, "x-y": int})
+
+KeywordTD(**{"in": 1, "x-y": 2})
+
+# error: [missing-typed-dict-key] "Missing required key 'x-y' in TypedDict `KeywordTD` constructor"
+KeywordTD(**{"in": 1})
+
+# error: [invalid-argument-type] "Invalid argument to key "in" with declared type `int` on TypedDict `KeywordTD`: value of type `Literal["bad"]`"
+KeywordTD(**{"in": "bad", "x-y": 2})
+
+# error: [invalid-key] "Unknown key "extra" for TypedDict `KeywordTD`"
+KeywordTD(**{"in": 1, "x-y": 2, "extra": 3})
 ```
 
 TypedDict positional arguments in mixed constructors should validate their declared keys:
@@ -699,6 +763,37 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+Merged dict literals should preserve required keys contributed by unpacked `TypedDict`s:
+
+```py
+from typing import TypedDict
+
+class MergeSource(TypedDict):
+    aaa: int
+    bbb: int
+
+class MergeTarget(TypedDict):
+    aaa: int
+    bbb: int
+    ccc: int
+
+class MergeExtraSource(TypedDict):
+    aaa: int
+    bbb: int
+    extra: int
+
+def _(source: MergeSource):
+    merged: MergeTarget = {**source, "ccc": 3}
+    MergeTarget({**source, "ccc": 3})
+
+def _(source: MergeExtraSource):
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    merged: MergeTarget = {**source, "ccc": 3}
+
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    MergeTarget({**source, "ccc": 3})
+```
+
 ## Mixed positional and unpacked keyword constructors
 
 These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
@@ -727,8 +822,6 @@ class TD(TypedDict):
     a: int
 
 def _(td: TD):
-    # TODO: this should pass like the explicit-keyword and `**TypedDict` cases below.
-    # error: [invalid-argument-type] "Invalid argument to key "a" with declared type `int` on TypedDict `TD`: value of type `Literal["foo"]`"
     TD({"a": "foo"}, **{"a": 1})
 
     TD({"a": "foo"}, a=1)
@@ -736,6 +829,25 @@ def _(td: TD):
 
 def _(x: Any):
     TD({"a": "foo"}, **x)
+```
+
+An optional key that is definitely present in a merged unpack should still relax the positional
+schema:
+
+```py
+from typing import Any, TypedDict
+from typing_extensions import NotRequired
+
+class MixedOptionalTarget(TypedDict):
+    x: int
+    opt: NotRequired[str]
+
+class MixedOptionalSource(TypedDict):
+    x: int
+    opt: int
+
+def _(source: MixedOptionalSource, kwargs: Any):
+    MixedOptionalTarget(source, **{"opt": "ok", **kwargs})
 ```
 
 ## Union of `TypedDict`
@@ -940,6 +1052,78 @@ def duplicate_name_keys(
 
     # error: [parameter-already-assigned]
     return DuplicateNeedsName(**left, **right)
+```
+
+Merged unpacked dict literals should preserve dict overwrite semantics within a single `**{...}`:
+
+```py
+from typing import TypedDict
+
+class MergeTarget(TypedDict):
+    name: str
+
+class GoodName(TypedDict):
+    name: str
+
+class BadName(TypedDict):
+    name: int
+
+class MaybeGoodName(TypedDict, total=False):
+    name: str
+
+def _(
+    good: GoodName,
+    bad: BadName,
+    maybe_good: MaybeGoodName,
+):
+    MergeTarget(**{"name": "a", **good})
+    MergeTarget(**{**bad, "name": "ok"})
+    MergeTarget(**{"name": 1, **good})
+
+    # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `MergeTarget`: value of type `Literal[1]`"
+    MergeTarget(**{"name": 1, **maybe_good})
+```
+
+Merged unpacked dict literals should stay gradual when a later `Any` or `Never` unpack may overwrite
+earlier keys:
+
+```py
+from typing import Any, Never, TypedDict
+
+class GradualMergeTarget(TypedDict):
+    name: str
+
+class GradualBadName(TypedDict):
+    name: int
+
+def _(bad: GradualBadName, dyn: Any, never: Never):
+    GradualMergeTarget(**{**bad, **dyn})
+    GradualMergeTarget(**{**bad, **never})
+    GradualMergeTarget(**{"name": 1, **dyn})
+    GradualMergeTarget(**{"name": 1, **never})
+```
+
+Definite keys inside a merged unpack should still count as guaranteed after a later `Any` or `Never`
+unpack:
+
+```py
+from typing import Any, Never, TypedDict
+
+class DuplicateAfterDynamic(TypedDict):
+    name: str
+
+class HasName(TypedDict):
+    name: str
+
+def _(left: HasName, dyn: Any, never: Never):
+    # error: [parameter-already-assigned]
+    DuplicateAfterDynamic(**{"name": "x", **dyn}, name="y")
+
+    # error: [parameter-already-assigned]
+    DuplicateAfterDynamic(**{**left, **dyn}, name="y")
+
+    # error: [parameter-already-assigned]
+    DuplicateAfterDynamic(**{"name": "x", **never}, **{"name": "y"})
 ```
 
 Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
