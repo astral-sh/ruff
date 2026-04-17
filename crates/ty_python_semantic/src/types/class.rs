@@ -9,7 +9,9 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-pub(crate) use self::static_literal::StaticClassLiteral;
+pub(crate) use self::static_literal::{
+    StaticClassLiteral, expanded_fixed_length_starred_class_base_tuple,
+};
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,

@@ -46,7 +46,7 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -461,16 +461,14 @@ impl<'db> StaticClassLiteral<'db> {
                 .bases()
                 .iter()
                 .flat_map(|base_node| {
-                    if let ast::Expr::Starred(starred) = base_node {
-                        let starred_ty =
-                            definition_expression_type(db, class_definition, &starred.value);
-                        // If the starred expression is a fixed-length tuple, unpack it.
-                        if let Some(Tuple::Fixed(tuple)) = starred_ty
-                            .tuple_instance_spec(db)
-                            .map(std::borrow::Cow::into_owned)
-                        {
-                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
-                        }
+                    if let Some(tuple) = expanded_fixed_length_starred_class_base_tuple(
+                        db,
+                        class_definition,
+                        base_node,
+                    ) {
+                        return Either::Left(tuple.owned_elements().into_vec().into_iter());
+                    }
+                    if matches!(base_node, ast::Expr::Starred(_)) {
                         // Otherwise, we can't statically determine the bases.
                         Either::Right(std::iter::once(Type::unknown()))
                     } else {
@@ -2598,6 +2596,25 @@ impl<'db> StaticClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+}
+
+/// If `base_node` is a starred class base whose value is inferred as a fixed-length tuple,
+/// returns the unpacked tuple in source order.
+pub(crate) fn expanded_fixed_length_starred_class_base_tuple<'db>(
+    db: &'db dyn Db,
+    class_definition: Definition<'db>,
+    base_node: &ast::Expr,
+) -> Option<FixedLengthTuple<Type<'db>>> {
+    let ast::Expr::Starred(starred) = base_node else {
+        return None;
+    };
+
+    let starred_ty = definition_expression_type(db, class_definition, &starred.value);
+    let tuple_spec = starred_ty.tuple_instance_spec(db)?;
+    let Tuple::Fixed(tuple) = tuple_spec.into_owned() else {
+        return None;
+    };
+    Some(tuple)
 }
 
 #[salsa::tracked]

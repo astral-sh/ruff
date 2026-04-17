@@ -4937,7 +4937,7 @@ pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: StaticClassLiteral,
     duplicate_base_error: &DuplicateBaseError,
-    bases_list: &[ast::Expr],
+    bases_list: &[&ast::Expr],
 ) {
     let db = context.db();
 
@@ -4963,16 +4963,18 @@ pub(crate) fn report_duplicate_bases(
             class.name(db)
         ),
     );
-    sub_diagnostic.annotate(
-        Annotation::secondary(context.span(&bases_list[*first_index])).message(format_args!(
-            "Class `{duplicate_name}` first included in bases list here"
-        )),
-    );
+    if let Some(first_base) = bases_list.get(*first_index) {
+        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
+            format_args!("Class `{duplicate_name}` first included in bases list here"),
+        ));
+    }
     for index in later_indices {
-        sub_diagnostic.annotate(
-            Annotation::primary(context.span(&bases_list[*index]))
-                .message(format_args!("Class `{duplicate_name}` later repeated here")),
-        );
+        if let Some(repeated_base) = bases_list.get(*index) {
+            sub_diagnostic.annotate(
+                Annotation::primary(context.span(repeated_base))
+                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
+            );
+        }
     }
 
     diagnostic.sub(sub_diagnostic);
