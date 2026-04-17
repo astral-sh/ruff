@@ -182,7 +182,7 @@ impl InlayHint {
             label: InlayHintLabel { parts: label_parts },
             text_edits: if allow_edits {
                 vec![InlayHintTextEdit {
-                    range: TextRange::new(position, position),
+                    range: TextRange::empty(position),
                     new_text: format!("{name}="),
                 }]
             } else {
