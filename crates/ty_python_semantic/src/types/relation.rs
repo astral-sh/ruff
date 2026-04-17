@@ -1141,6 +1141,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         })
                 }),
 
+            (Type::Intersection(_), Type::ProtocolInstance(target_proto))
+                if target_proto
+                    .to_nominal_instance()
+                    .is_some_and(|nominal_protocol| {
+                        nominal_protocol.known_class(db).is_some_and(|known_class| {
+                            matches!(known_class, KnownClass::Iterable | KnownClass::Iterator)
+                        })
+                    }) =>
+            {
+                let Some(nominal_protocol) = target_proto.to_nominal_instance() else {
+                    return self.never();
+                };
+                let Some(protocol_alias) = nominal_protocol.class(db).into_generic_alias() else {
+                    return self.never();
+                };
+                let Some(expected_element_ty) = protocol_alias.specialization(db).types(db).first()
+                else {
+                    return self.never();
+                };
+                let Ok(iterated) = source.try_iterate(db) else {
+                    return self.never();
+                };
+                self.check_type_pair(
+                    db,
+                    iterated.homogeneous_element_type(db),
+                    *expected_element_ty,
+                )
+            }
+
             (Type::Intersection(intersection), _) => {
                 // An intersection type is a subtype of another type if at least one of its
                 // positive elements is a subtype of that type. If there are no positive elements,

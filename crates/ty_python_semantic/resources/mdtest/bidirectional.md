@@ -447,6 +447,31 @@ A(f(1))
 A(f([]))
 ```
 
+Intersection type contexts should preserve intersection semantics when solving generic return
+types:
+
+```py
+from typing import Any, Iterable
+from ty_extensions import Intersection
+
+def first[T](it: Iterable[T]) -> T:
+    raise NotImplementedError
+
+class P: ...
+class Q: ...
+
+def _(x: Any):
+    assert isinstance(x, list)
+    reveal_type(x)  # revealed: Any & Top[list[Unknown]]
+    reveal_type(first(x))  # revealed: Any
+    reveal_type(enumerate(x))  # revealed: enumerate[Any]
+    for _, item in enumerate(x):
+        reveal_type(item)  # revealed: Any
+
+def _(i: Intersection[list[P], list[Q]]):
+    reveal_type(first(i))  # revealed: P & Q
+```
+
 ## Conditional expressions
 
 The type context is propagated through both branches of conditional expressions:

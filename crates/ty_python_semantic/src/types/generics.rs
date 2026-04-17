@@ -2189,11 +2189,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // It's important that this arm comes after the `TypeVar` arm above, so that a bare
                 // typevar bound to an intersection gets the whole thing.
                 //
-                // It's sufficient for one intersection element to satisfy the constraints here.
-                // They don't all have to.
+                // Each successful element can contribute additional constraints to inferred
+                // type variables. We therefore infer against each positive element separately,
+                // then intersect the resulting type mappings for typevars inferred by multiple
+                // matching elements.
                 let mut first_error = None;
                 let mut found_matching_element = false;
+                let original_types = self.types.clone();
+                let mut merged_inferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                    FxHashMap::default();
                 for positive in actual_intersection.iter_positive(self.db) {
+                    self.types = original_types.clone();
                     let result = self.infer_map_impl(formal, positive, polarity, f, seen);
                     if let Err(err) = result {
                         // TODO: `infer_map_impl` can have side effects even in the error case, so
@@ -2209,8 +2215,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             .is_never_satisfied(self.db)
                         {
                             found_matching_element = true;
+                            for (&identity, &inferred_ty) in &self.types {
+                                if original_types.get(&identity) == Some(&inferred_ty) {
+                                    continue;
+                                }
+                                merged_inferred
+                                    .entry(identity)
+                                    .and_modify(|existing| {
+                                        *existing = IntersectionType::from_two_elements(
+                                            self.db,
+                                            *existing,
+                                            inferred_ty,
+                                        );
+                                    })
+                                    .or_insert(inferred_ty);
+                            }
                         }
                     }
+                }
+                self.types = original_types;
+                for (identity, inferred_ty) in merged_inferred {
+                    self.types
+                        .entry(identity)
+                        .and_modify(|existing| {
+                            *existing = IntersectionType::from_two_elements(
+                                self.db,
+                                *existing,
+                                inferred_ty,
+                            );
+                        })
+                        .or_insert(inferred_ty);
                 }
                 if !found_matching_element && let Some(error) = first_error {
                     return Err(error);
@@ -2257,6 +2291,42 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         seen,
                     );
                 }
+            }
+
+            (Type::ProtocolInstance(formal_protocol), _)
+                if formal_protocol
+                    .to_nominal_instance()
+                    .is_some_and(|formal_nominal| {
+                        formal_nominal
+                            .known_class(self.db)
+                            .is_some_and(|known_class| {
+                                matches!(known_class, KnownClass::Iterable | KnownClass::Iterator)
+                            })
+                    }) =>
+            {
+                let formal_nominal = formal_protocol.to_nominal_instance().unwrap();
+                let Some(formal_alias) = formal_nominal.class(self.db).into_generic_alias() else {
+                    return Ok(());
+                };
+                let Some(formal_element_ty) =
+                    formal_alias.specialization(self.db).types(self.db).first()
+                else {
+                    return Ok(());
+                };
+                let Ok(actual_iterable) = actual.try_iterate(self.db) else {
+                    return Ok(());
+                };
+
+                let actual_element_ty = actual_iterable.homogeneous_element_type(self.db);
+                let variance = TypeVarVariance::Covariant.compose(polarity);
+                self.infer_map_impl(
+                    *formal_element_ty,
+                    actual_element_ty,
+                    variance,
+                    &mut f,
+                    seen,
+                )?;
+                return Ok(());
             }
 
             (formal, Type::NominalInstance(actual_nominal)) => {
