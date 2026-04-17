@@ -17,8 +17,8 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
-        FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
+        ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
+        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
         StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
@@ -674,7 +674,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        match &member.kind {
+        let result = match &member.kind {
             ProtocolMemberKind::Method(method) => {
                 // `__call__` members must be special cased for several reasons:
                 //
@@ -702,6 +702,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                         .place
                     else {
+                        self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name.into(),
+                            ty,
+                        });
                         return self.never();
                     };
                     attribute_type
@@ -730,16 +734,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             }
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => ConstraintSet::from_bool(
-                self.constraints,
-                matches!(
+            ProtocolMemberKind::Property(_) => {
+                let is_defined = matches!(
                     ty.member(db, member.name).place,
                     Place::Defined(DefinedPlace {
                         definedness: Definedness::AlwaysDefined,
                         ..
                     })
-                ),
-            ),
+                );
+                if !is_defined {
+                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                        member_name: member.name.into(),
+                        ty,
+                    });
+                    return self.never();
+                }
+                ConstraintSet::from_bool(self.constraints, true)
+            }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
                     ty: attribute_type,
@@ -747,6 +758,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ..
                 }) = ty.member(db, member.name).place
                 else {
+                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                        member_name: member.name.into(),
+                        ty,
+                    });
                     return self.never();
                 };
                 self.check_type_pair(db, *member_type, attribute_type).and(
@@ -755,7 +770,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     || self.check_type_pair(db, attribute_type, *member_type),
                 )
             }
+        };
+        if result.is_never_satisfied(db) {
+            self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
+                member_name: member.name.into(),
+            });
         }
+        result
     }
 
     pub(super) fn check_protocol_interface_pair(

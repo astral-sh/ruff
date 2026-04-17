@@ -24,7 +24,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
     binding_type, protocol_class::ProtocolClass,
 };
@@ -3795,6 +3795,11 @@ pub(super) fn report_invalid_assignment<'db>(
             value_ty.display(context.db()),
         ));
 
+        let error_context = value_ty.assignability_error_context(context.db(), target_ty);
+        for message in error_context.info_messages(context.db()) {
+            diag.info(message);
+        }
+
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.primary_message().to_string();
         diag.set_concise_message(message);
@@ -5560,6 +5565,7 @@ pub(super) fn report_invalid_method_override<'db>(
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
 
@@ -5583,6 +5589,10 @@ pub(super) fn report_invalid_method_override<'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
+        return;
+    };
+
     let class_name = subclass.name(db);
     let superclass_name = superclass.name(db);
 
@@ -5591,10 +5601,6 @@ pub(super) fn report_invalid_method_override<'db>(
         format!("{qualified_name}.{member}")
     } else {
         format!("{superclass_name}.{member}")
-    };
-
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
-        return;
     };
 
     let mut diagnostic =
@@ -5628,6 +5634,10 @@ pub(super) fn report_invalid_method_override<'db>(
             superclass_function_kind = superclass_function_kind.description(),
             subclass_function_kind = subclass_function_kind.description(),
         ));
+    }
+
+    for message in error_context().info_messages(context.db()) {
+        diagnostic.info(message);
     }
 
     diagnostic.info("This violates the Liskov Substitution Principle");

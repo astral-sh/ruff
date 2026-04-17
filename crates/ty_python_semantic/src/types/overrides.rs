@@ -525,6 +525,10 @@ fn check_class_declaration<'db>(
                 superclass,
                 superclass_type,
                 method_kind,
+                || {
+                    type_on_subclass_instance
+                        .assignability_error_context(db, superclass_type_as_type)
+                },
             );
 
             liskov_diagnostic_emitted = true;
