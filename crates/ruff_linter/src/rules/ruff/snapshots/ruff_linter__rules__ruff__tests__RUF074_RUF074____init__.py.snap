@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 137
+---
+RUF074 `.no_all` is missing `__all__`; `from .no_all import *` re-exports every public name
+ --> __init__.py:1:21
+  |
+1 | from .no_all import *          # RUF074 — no_all.py exists, has no __all__
+  |                     ^
+2 | from .has_all import *         # OK — has_all.py defines __all__
+3 | from .nonexistent import *     # OK — can't resolve, stay silent
+  |

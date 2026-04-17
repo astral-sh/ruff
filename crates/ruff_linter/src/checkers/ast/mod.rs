@@ -524,6 +524,11 @@ impl<'a> Checker<'a> {
         self.context.settings
     }
 
+    /// Returns the path of the file under analysis.
+    pub(crate) fn path(&self) -> &Path {
+        self.path
+    }
+
     /// Returns whether the file under analysis is an `__init__.py` file.
     pub(crate) fn in_init_module(&self) -> bool {
         *self

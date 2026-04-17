@@ -810,6 +810,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         },
                         stmt.range(),
                     );
+                    // RUF074
+                    if checker.is_rule_enabled(Rule::MissingDunderAll) {
+                        ruff::rules::missing_dunder_all(checker, import_from);
+                    }
                 }
                 if checker.is_rule_enabled(Rule::RelativeImports) {
                     flake8_tidy_imports::rules::banned_relative_import(
