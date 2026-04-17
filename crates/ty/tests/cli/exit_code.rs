@@ -42,7 +42,6 @@ fn only_info() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:3:13
       |
-    2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
       |             ^ `Literal[1]`
       |
@@ -72,7 +71,6 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:3:13
       |
-    2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
       |             ^ `Literal[1]`
       |
@@ -159,13 +157,11 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [not-subscriptable]
       |
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
-    2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
@@ -197,13 +193,11 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [not-subscriptable]
       |
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
-    2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
@@ -235,13 +229,11 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [not-subscriptable]
       |
 
     error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
-    2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
