@@ -12,7 +12,7 @@
 
 use std::slice::Iter;
 
-use itertools::{EitherOrBoth, Itertools};
+use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -843,18 +843,36 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             "Checking variance of `{tvar}` in `{self:?}`",
             tvar = typevar.typevar(db).name(db)
         );
-        itertools::chain(
-            self.parameters
-                .iter()
-                .filter_map(|parameter| match parameter.form {
-                    ParameterForm::Type => None,
-                    ParameterForm::Value => Some(
-                        parameter
-                            .annotated_type()
+
+        let parameter_variance = |parameter: &Parameter<'db>| match parameter.form {
+            ParameterForm::Type => None,
+            ParameterForm::Value => Some(
+                parameter
+                    .annotated_type()
+                    .with_polarity(TypeVarVariance::Contravariant)
+                    .variance_of(db, typevar),
+            ),
+        };
+
+        let parameter_variances = if let Some((prefix_parameters, paramspec)) =
+            self.parameters.as_paramspec_with_prefix()
+        {
+            Either::Left(
+                prefix_parameters
+                    .iter()
+                    .filter_map(parameter_variance)
+                    .chain(std::iter::once(
+                        Type::TypeVar(paramspec)
                             .with_polarity(TypeVarVariance::Contravariant)
                             .variance_of(db, typevar),
-                    ),
-                }),
+                    )),
+            )
+        } else {
+            Either::Right(self.parameters.iter().filter_map(parameter_variance))
+        };
+
+        itertools::chain(
+            parameter_variances,
             Some(self.return_ty.variance_of(db, typevar)),
         )
         .collect()
