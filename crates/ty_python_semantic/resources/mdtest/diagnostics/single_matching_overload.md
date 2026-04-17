@@ -23,6 +23,31 @@ from overloaded import f
 f("a")  # error: [invalid-argument-type]
 ```
 
+## Bound method overloads preserve original positions
+
+```py
+from typing import overload
+
+class Other:
+    pass
+
+class Base:
+    @overload
+    def f(self: Other, x: bytes) -> bytes: ...
+    @overload
+    def f(self, x: int) -> int: ...
+    @overload
+    def f(self, x: str, y: int) -> str: ...
+    def f(
+        self,
+        x: bytes | int | str,
+        y: int = 0,
+    ) -> bytes | int | str:
+        return x
+
+Base().f("ok", "bad")  # error: [invalid-argument-type]
+```
+
 ## Call to function with too many unmatched overloads
 
 This has an excessive number of overloads to the point that ty will cut off the list in the
