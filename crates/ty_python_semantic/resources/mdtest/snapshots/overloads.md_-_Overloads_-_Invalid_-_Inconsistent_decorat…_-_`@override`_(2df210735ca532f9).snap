@@ -84,35 +84,30 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:26:9
+  --> src/mdtest_snippet.py:24:5
    |
+24 |     @override
+   |     ---------
+25 |     # error: [invalid-overload]
 26 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
 27 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-   |
-  ::: src/mdtest_snippet.py:24:5
-   |
-24 |     @override
-   |     ---------
    |
 
 ```
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:34:9
-   |
-34 |     def method(self, x: int) -> int: ...
-   |         ^^^^^^
-   |
-  ::: src/mdtest_snippet.py:32:5
+  --> src/mdtest_snippet.py:32:5
    |
 32 |     @override
    |     ---------
-   |
-  ::: src/mdtest_snippet.py:37:9
-   |
+33 |     # error: [invalid-overload]
+34 |     def method(self, x: int) -> int: ...
+   |         ^^^^^^
+35 |     @overload
+36 |     def method(self, x: str) -> str: ...
 37 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
    |
@@ -121,20 +116,16 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:22:9
-   |
-22 |     def method(self, x: str) -> str: ...
-   |         ^^^^^^
-   |
-  ::: src/mdtest_snippet.pyi:18:9
+  --> src/mdtest_snippet.pyi:18:9
    |
 18 |     def method(self, x: int) -> int: ...
    |         ------ First overload defined here
-   |
-  ::: src/mdtest_snippet.pyi:20:5
-   |
+19 |     @overload
 20 |     @override
    |     ---------
+21 |     # error: [invalid-overload]
+22 |     def method(self, x: str) -> str: ...
+   |         ^^^^^^
    |
 
 ```

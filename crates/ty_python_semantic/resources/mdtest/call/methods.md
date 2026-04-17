@@ -646,15 +646,14 @@ class Bad(NotCallableInitSubclass):
 
 ```snapshot
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:39:7
-   |
-39 | class Bad(NotCallableInitSubclass):
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
-   |
-  ::: src/mdtest_snippet.py:36:5
+  --> src/mdtest_snippet.py:36:5
    |
 36 |     __init_subclass__ = None
    |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
+37 |
+38 | # snapshot: non-callable-init-subclass
+39 | class Bad(NotCallableInitSubclass):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
    |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation

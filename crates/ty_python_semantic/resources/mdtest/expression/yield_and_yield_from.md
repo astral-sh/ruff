@@ -209,15 +209,13 @@ def invalid_generator() -> Generator[int, None, None]:
 
 ```snapshot
 error[invalid-yield]: Yield expression type does not match annotation
- --> src/mdtest_snippet.py:5:11
-  |
-5 |     yield ""
-  |           ^^ expression of type `Literal[""]`, expected `int`
-  |
- ::: src/mdtest_snippet.py:3:28
+ --> src/mdtest_snippet.py:3:28
   |
 3 | def invalid_generator() -> Generator[int, None, None]:
   |                            -------------------------- Function annotated with yield type `int` here
+4 |     # snapshot: invalid-yield
+5 |     yield ""
+  |           ^^ expression of type `Literal[""]`, expected `int`
   |
 ```
 
@@ -279,15 +277,13 @@ def outer() -> Generator[int, str, None]:
 
 ```snapshot
 error[invalid-yield]: Send type does not match annotation
- --> src/mdtest_snippet.py:8:16
-  |
-8 |     yield from inner()
-  |                ^^^^^^^ generator with send type `int`, expected `str`
-  |
- ::: src/mdtest_snippet.py:6:16
+ --> src/mdtest_snippet.py:6:16
   |
 6 | def outer() -> Generator[int, str, None]:
   |                ------------------------- Function annotated with send type `str` here
+7 |     # snapshot: invalid-yield
+8 |     yield from inner()
+  |                ^^^^^^^ generator with send type `int`, expected `str`
   |
 ```
 
@@ -305,14 +301,12 @@ reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
 
 ```snapshot
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:5:12
-  |
-5 |     return 1
-  |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
-  |
- ::: src/mdtest_snippet.py:3:18
+ --> src/mdtest_snippet.py:3:18
   |
 3 | def non_gen() -> Generator[int, int, None]:
   |                  ------------------------- Expected `Generator[int, int, None]` because of return type
+4 |     # snapshot: invalid-return-type
+5 |     return 1
+  |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
   |
 ```

@@ -1572,9 +1572,7 @@ watermelon
         1 | aardvark
           | ^^^^^^^^
         2 | beetle
-          |
-         ::: animals:5:1
-          |
+        3 | canary
         4 | dog
         5 | elephant
           | ^^^^^^^^
@@ -1768,9 +1766,7 @@ watermelon
           |
         3 | beetle
           | ^^^^^^
-          |
-         ::: spacey-animals:5:1
-          |
+        4 |
         5 | canary
           | ^^^^^^
           |
@@ -2421,30 +2417,22 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-         --> animals:5:1
-          |
-        5 | elephant
-          | ^^^^^^^^ primary 5
-          |
-         ::: animals:9:1
-          |
-        9 | inchworm
-          | ^^^^^^^^ primary 9
-          |
-         ::: animals:1:1
+         --> animals:1:1
           |
         1 | aardvark
           | -------- secondary 1
-          |
-         ::: animals:3:1
-          |
+        2 | beetle
         3 | canary
           | ------ secondary 3
-          |
-         ::: animals:7:1
-          |
+        4 | dog
+        5 | elephant
+          | ^^^^^^^^ primary 5
+        6 | finch
         7 | gorilla
           | ------- secondary 7
+        8 | hippopotamus
+        9 | inchworm
+          | ^^^^^^^^ primary 9
           |
         ",
         );
@@ -2500,25 +2488,23 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:11:1
-           |
-        11 | kangaroo
-           | ^^^^^^^^ primary animals 11
-           |
-          ::: animals:1:1
+          --> animals:1:1
            |
          1 | aardvark
            | -------- secondary animals 1
-           |
-          ::: animals:3:1
-           |
+         2 | beetle
          3 | canary
            | ------ secondary animals 3
-           |
-          ::: animals:7:1
-           |
+         4 | dog
+         5 | elephant
+         6 | finch
          7 | gorilla
            | ------- secondary animals 7
+         8 | hippopotamus
+         9 | inchworm
+        10 | jackrabbit
+        11 | kangaroo
+           | ^^^^^^^^ primary animals 11
            |
           ::: fruits:10:1
            |

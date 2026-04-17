@@ -49,9 +49,7 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
   |
 6 | class Abstract(ABC):
   |       ^^^^^^^^ 10 abstract methods are unimplemented, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`
-  |
- ::: src/mdtest_snippet.py:8:9
-  |
+7 |     @abstractmethod
 8 |     def aaaaaaaaaa(self) -> int: ...
   |         ---------- `aaaaaaaaaa` declared as abstract
   |
