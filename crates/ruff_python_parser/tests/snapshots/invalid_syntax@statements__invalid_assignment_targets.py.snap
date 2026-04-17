@@ -233,7 +233,7 @@ Module(
                                         node_index: NodeIndex(None),
                                         range: 341..342,
                                         id: Name("x"),
-                                        ctx: Store,
+                                        ctx: Invalid,
                                     },
                                 ),
                             },
