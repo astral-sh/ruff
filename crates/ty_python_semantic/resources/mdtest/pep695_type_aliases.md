@@ -658,3 +658,15 @@ type CallableGuard = TypeGuard[Callable[[], CallableGuard]]
 reveal_type(CallableIs)  # revealed: TypeAliasType
 reveal_type(CallableGuard)  # revealed: TypeAliasType
 ```
+
+### Recursive alias in binary operators doesn't stack overflow
+
+```py
+from typing import reveal_type
+
+type A = int | A
+
+def foo(x: A):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(1 + x)  # revealed: int
+```
