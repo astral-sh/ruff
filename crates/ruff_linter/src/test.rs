@@ -356,9 +356,8 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.secondary_code()?.to_string(), msg)))
-        .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code).unwrap();
+        .filter_map(|mut diagnostic| {
+            let rule = Rule::from_name(diagnostic.name()).ok()?;
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
@@ -416,7 +415,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
                 }
             }
 
-            diagnostic
+            Some(diagnostic)
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
