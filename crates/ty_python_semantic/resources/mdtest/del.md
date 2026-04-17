@@ -450,10 +450,15 @@ error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `
    |       ^^^^^^
    |
 info: Field defined here
- --> src/mdtest_snippet.py:4:5
+ --> src/mdtest_snippet.py:3:7
   |
+3 | class Movie(TypedDict):
+  |       ---------------- `Movie` defined here
 4 |     name: str
-  |     --------- `name` declared as required here; consider making it `NotRequired`
+  |     ---------
+  |     |
+  |     `name` declared as required here
+  |     Consider making it `NotRequired`
   |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
@@ -485,10 +490,15 @@ error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `
    |           ^^^^^^
    |
 info: Field defined here
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:11:7
    |
+11 | class MixedMovie(TypedDict):
+   |       --------------------- `MixedMovie` defined here
 12 |     name: str
-   |     --------- `name` declared as required here; consider making it `NotRequired`
+   |     ---------
+   |     |
+   |     `name` declared as required here
+   |     Consider making it `NotRequired`
    |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
