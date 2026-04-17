@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.9
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 1
+Added: 1
+
+--- Removed ---
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+ --> invalid_characters_fstring.py:6:14
+  |
+5 | # Control char in string literal inside f-string interpolation
+6 | a = f"{'hello␈world'}"
+  |              ^
+7 |
+8 | # Control char in format spec (FStringMiddle inside interpolation)
+  |
+help: Replace with escape sequence
+
+
+
+--- Added ---
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+ --> invalid_characters_fstring.py:6:14
+  |
+5 | # Control char in string literal inside f-string interpolation
+6 | a = f"{'hello␈world'}"
+  |              ^
+7 |
+8 | # Control char in format spec (FStringMiddle inside interpolation)
+  |
+help: Replace with escape sequence
+3 | # The fix should be suppressed when target-version < 3.12.
+4 | 
+5 | # Control char in string literal inside f-string interpolation
+  - a = f"{'hello␈world'}"
+6 + a = f"{'hello\bworld'}"
+7 | 
+8 | # Control char in format spec (FStringMiddle inside interpolation)
+9 | a = f"{42:␈>10}"
