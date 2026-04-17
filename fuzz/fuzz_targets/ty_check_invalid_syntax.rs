@@ -151,6 +151,7 @@ fn setup_db() -> TestDb {
             search_paths: SearchPathSettings::new(vec![src_root])
                 .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
+            python_executable: None,
         },
     );
 
