@@ -2416,7 +2416,7 @@ pub struct IsortOptions {
     /// enabled, every aliased `import from` will be given its own line, in
     /// which case, wrapping is not necessary.
     ///
-    /// When using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default)
+    /// When using the formatter, ensure that [`format.magic-trailing-comma`](#format_magic-trailing-comma) is set to `"respect"` (default)
     /// when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.
     #[option(
         default = r#"false"#,
@@ -2462,7 +2462,8 @@ pub struct IsortOptions {
     ///
     /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
     ///
-    /// When using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default) when enabling `split-on-trailing-comma`
+    /// When using the formatter, ensure that [`format.magic-trailing-comma`](#format_magic-trailing-comma) is set to
+    /// `"respect"` (default) or `"normalize"` when enabling `split-on-trailing-comma`
     /// to avoid that the formatter removes the trailing commas.
     #[option(
         default = r#"true"#,
@@ -3848,27 +3849,52 @@ pub struct FormatOptions {
     )]
     pub nested_string_quote_style: Option<ruff_python_formatter::NestedStringQuoteStyle>,
 
-    /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
-    /// If this option is set to `true`, the magic trailing comma is ignored.
+    /// How the formatter handles trailing commas in parenthesized expressions
+    /// (function calls, function definitions, collection literals, imports, etc.).
     ///
-    /// For example, Ruff leaves the arguments separate even though
-    /// collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:
+    /// Trailing commas influence how the formatter lays out multi-line expressions.
+    /// By default, a trailing comma acts as a signal to the formatter to keep the
+    /// expression expanded (one element per line), even if it would fit on a single line.
     ///
-    /// ```python
-    /// # The arguments remain on separate lines because of the trailing comma after `b`
-    /// def test(
-    ///     a,
-    ///     b,
-    /// ): pass
-    /// ```
+    /// * `respect` (default): Existing trailing commas are treated as "magic" — the
+    ///   formatter uses them as a signal to keep expressions expanded. If a trailing
+    ///   comma is present, the formatter will not collapse the expression to a single
+    ///   line. This is the same behavior as Black's default.
     ///
-    /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
+    /// * `ignore`: Existing trailing commas are not used as expansion signals. The
+    ///   formatter may collapse expressions to a single line even if a trailing comma
+    ///   is present. However, the formatter still adds trailing commas to expressions
+    ///   it decides to keep multi-line. This is equivalent to Black's
+    ///   `--skip-magic-trailing-comma` flag.
     ///
-    /// ```python
-    /// # The arguments are collapsed to a single line because the trailing comma is ignored
-    /// def test(a, b):
-    ///     pass
-    /// ```
+    /// * `normalize`: Like `ignore`, existing trailing commas are not used as expansion
+    ///   signals. The formatter normalizes trailing commas: it adds them to expanded
+    ///   multi-line expressions and removes them from expressions collapsed to a single
+    ///   line. This mode is recommended when using the `COM812` lint rule alongside the
+    ///   formatter, as both tools converge to the same output in a single pass.
+    ///
+    /// This option replaces the deprecated `skip-magic-trailing-comma` boolean:
+    ///
+    /// * `skip-magic-trailing-comma = false` is equivalent to `magic-trailing-comma = "respect"`
+    /// * `skip-magic-trailing-comma = true` is equivalent to `magic-trailing-comma = "ignore"`
+    #[option(
+        default = r#""respect""#,
+        value_type = r#""respect" | "ignore" | "normalize""#,
+        example = r#"magic-trailing-comma = "normalize""#
+    )]
+    pub magic_trailing_comma: Option<ruff_python_formatter::MagicTrailingComma>,
+
+    /// Whether to ignore magic trailing commas.
+    ///
+    /// **Deprecated**: Use [`magic-trailing-comma`](#format_magic-trailing-comma) instead.
+    ///
+    /// * `skip-magic-trailing-comma = false` is equivalent to `magic-trailing-comma = "respect"`
+    /// * `skip-magic-trailing-comma = true` is equivalent to `magic-trailing-comma = "ignore"`
+    ///
+    /// Cannot be used together with `magic-trailing-comma`.
+    #[deprecated(
+        note = "Use `magic-trailing-comma` instead. `skip-magic-trailing-comma = true` is equivalent to `magic-trailing-comma = \"ignore\"`."
+    )]
     #[option(
         default = r#"false"#,
         value_type = r#"bool"#,

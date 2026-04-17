@@ -274,12 +274,17 @@ impl UvFormatCommand {
             self.options.line_ending().as_setting_str()
         ));
 
+        // Use the legacy `skip-magic-trailing-comma` key for compatibility with
+        // external `uv format` builds that may not recognize the new
+        // `magic-trailing-comma` setting. `Normalize` maps to `true` (skip) since
+        // `uv` has no equivalent mode.
         command.arg("--config");
         command.arg(format!(
             "format.skip-magic-trailing-comma = {}",
             match self.options.magic_trailing_comma() {
                 ruff_python_formatter::MagicTrailingComma::Respect => "false",
-                ruff_python_formatter::MagicTrailingComma::Ignore => "true",
+                ruff_python_formatter::MagicTrailingComma::Ignore
+                | ruff_python_formatter::MagicTrailingComma::Normalize => "true",
             }
         ));
 

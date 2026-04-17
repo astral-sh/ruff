@@ -1106,22 +1106,36 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
     let mut incompatible_rules = FxHashSet::default();
     for setting in resolver.settings() {
-        for rule in [
-            // Flags missing trailing commas when all arguments are on its own line:
-            // ```python
-            // def args(
-            //     aaaaaaaa, bbbbbbbbb, cccccccccc, ddddddddd, eeeeeeee, ffffff, gggggggggggg, hhhh
-            // ):
-            //     pass
-            // ```
-            Rule::MissingTrailingComma,
-            // The formatter always removes blank lines before the docstring.
-            Rule::IncorrectBlankLineBeforeClass,
-        ] {
-            if setting.linter.rules.enabled(rule) {
-                incompatible_rules.insert(rule);
-            }
+        // COM812 only converges with the formatter when `normalize` is active.
+        // With `respect` (default), the formatter uses trailing commas as expansion
+        // signals, causing oscillation. With `ignore`, the formatter can produce
+        // compact multi-line layouts without trailing commas that COM812 would flag.
+        if !setting.formatter.magic_trailing_comma.is_normalize()
+            && setting.linter.rules.enabled(Rule::MissingTrailingComma)
+        {
+            incompatible_rules.insert(Rule::MissingTrailingComma);
         }
+
+        // The formatter always removes blank lines before the docstring.
+        if setting
+            .linter
+            .rules
+            .enabled(Rule::IncorrectBlankLineBeforeClass)
+        {
+            incompatible_rules.insert(Rule::IncorrectBlankLineBeforeClass);
+        }
+    }
+
+    if incompatible_rules.contains(&Rule::MissingTrailingComma) {
+        warn_user_once!(
+            "The following rule may cause conflicts when used with the formatter: `COM812`. \
+             To avoid unexpected behavior, we recommend either setting \
+             `format.magic-trailing-comma = \"normalize\"` for compatibility, \
+             or disabling this rule by removing it from the `lint.select` or \
+             `lint.extend-select` configuration, or adding it to the `lint.ignore` \
+             configuration."
+        );
+        incompatible_rules.remove(&Rule::MissingTrailingComma);
     }
 
     if !incompatible_rules.is_empty() {
@@ -1132,11 +1146,17 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         rule_names.sort();
         if let [rule] = rule_names.as_slice() {
             warn_user_once!(
-                "The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration."
+                "The following rule may cause conflicts when used with the formatter: {rule}. \
+                 To avoid unexpected behavior, we recommend disabling this rule, either \
+                 by removing it from the `lint.select` or `lint.extend-select` configuration, \
+                 or adding it to the `lint.ignore` configuration."
             );
         } else {
             warn_user_once!(
-                "The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `lint.select` or `lint.extend-select` configuration, or adding them to the `lint.ignore` configuration.",
+                "The following rules may cause conflicts when used with the formatter: {}. \
+                 To avoid unexpected behavior, we recommend disabling these rules, either \
+                 by removing them from the `lint.select` or `lint.extend-select` configuration, \
+                 or adding them to the `lint.ignore` configuration.",
                 rule_names.join(", ")
             );
         }
@@ -1253,22 +1273,37 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 );
             }
 
-            // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
-            // This isn't relevant when using `force-single-line`, since isort will never include a trailing comma in that case.
+            // `force-wrap-aliases` conflicts with both `ignore` and `normalize` because
+            // isort forces wrapping while the formatter may collapse short imports.
+            // Not relevant with `force-single-line` since isort won't include a trailing comma.
+            if !setting.formatter.magic_trailing_comma.is_respect()
+                && !setting.linter.isort.force_single_line
+                && setting.linter.isort.force_wrap_aliases
+            {
+                warn_user_once!(
+                    "The isort option `isort.force-wrap-aliases` is incompatible with \
+                     `format.magic-trailing-comma` set to `\"ignore\"` or `\"normalize\"`. \
+                     To avoid unexpected behavior, we recommend either setting \
+                     `isort.force-wrap-aliases=false` or \
+                     `format.magic-trailing-comma=\"respect\"`."
+                );
+            }
+
+            // `split-on-trailing-comma` only conflicts with `ignore` — with `ignore`,
+            // the formatter can produce compact multi-line imports without a trailing
+            // comma, so isort's split signal is lost. With `normalize`, the formatter
+            // always adds trailing commas to multi-line imports, so they converge.
             if setting.formatter.magic_trailing_comma.is_ignore()
                 && !setting.linter.isort.force_single_line
+                && setting.linter.isort.split_on_trailing_comma
             {
-                if setting.linter.isort.force_wrap_aliases {
-                    warn_user_once!(
-                        "The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`."
-                    );
-                }
-
-                if setting.linter.isort.split_on_trailing_comma {
-                    warn_user_once!(
-                        "The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`."
-                    );
-                }
+                warn_user_once!(
+                    "The isort option `isort.split-on-trailing-comma` is incompatible with \
+                     `format.magic-trailing-comma` set to `\"ignore\"`. \
+                     To avoid unexpected behavior, we recommend either setting \
+                     `isort.split-on-trailing-comma=false` or \
+                     `format.magic-trailing-comma=\"respect\"`."
+                );
             }
         }
     }

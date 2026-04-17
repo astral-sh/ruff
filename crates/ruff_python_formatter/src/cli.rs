@@ -40,8 +40,8 @@ pub struct Cli {
     pub print_ir: bool,
     #[clap(long)]
     pub print_comments: bool,
-    #[clap(long, short = 'C')]
-    pub skip_magic_trailing_comma: bool,
+    #[clap(long, short = 'C', default_value = "respect")]
+    pub magic_trailing_comma: MagicTrailingComma,
     #[clap(long)]
     pub target_version: PythonVersion,
 }
@@ -62,11 +62,7 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         } else {
             PreviewMode::Disabled
         })
-        .with_magic_trailing_comma(if cli.skip_magic_trailing_comma {
-            MagicTrailingComma::Ignore
-        } else {
-            MagicTrailingComma::Respect
-        })
+        .with_magic_trailing_comma(cli.magic_trailing_comma)
         .with_target_version(cli.target_version);
 
     let source_code = SourceCode::new(source);

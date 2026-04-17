@@ -253,7 +253,7 @@ line-length = 84
 [format]
 indent-style = "tab"
 quote-style = "single"
-skip-magic-trailing-comma = true
+magic-trailing-comma = "ignore"
 line-ending = "cr-lf"
 "#,
     )?;
@@ -953,7 +953,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend either setting `format.magic-trailing-comma = "normalize"` for compatibility, or disabling this rule by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     "#);
     Ok(())
 }
@@ -1055,7 +1055,7 @@ multiline-quotes = "single"
 allow-multiline = false
 
 [format]
-skip-magic-trailing-comma = true
+magic-trailing-comma = "ignore"
 indent-style = "tab"
 "#,
         ),
@@ -1077,7 +1077,7 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend either setting `format.magic-trailing-comma = "normalize"` for compatibility, or disabling this rule by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.
     warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
@@ -1086,8 +1086,8 @@ def say_hy(name: str):
     warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
-    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
-    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with `format.magic-trailing-comma` set to `"ignore"` or `"normalize"`. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.magic-trailing-comma="respect"`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with `format.magic-trailing-comma` set to `"ignore"`. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.magic-trailing-comma="respect"`.
     "#);
     Ok(())
 }
@@ -1116,7 +1116,7 @@ docstring-quotes = "single"
 multiline-quotes = "single"
 
 [format]
-skip-magic-trailing-comma = true
+magic-trailing-comma = "ignore"
 indent-style = "tab"
 "#,
     )?;
@@ -1135,7 +1135,7 @@ def say_hy(name: str):
     	print(f"Hy {name}")
 
     ----- stderr -----
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend either setting `format.magic-trailing-comma = "normalize"` for compatibility, or disabling this rule by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
@@ -1143,8 +1143,8 @@ def say_hy(name: str):
     warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
-    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
-    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with `format.magic-trailing-comma` set to `"ignore"` or `"normalize"`. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.magic-trailing-comma="respect"`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with `format.magic-trailing-comma` set to `"ignore"`. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.magic-trailing-comma="respect"`.
     "#);
     Ok(())
 }
@@ -1172,7 +1172,7 @@ docstring-quotes = "double"
 multiline-quotes = "double"
 
 [format]
-skip-magic-trailing-comma = false
+magic-trailing-comma = "respect"
 quote-style = "single"
 "#,
         ),
@@ -1259,7 +1259,7 @@ def say_hy(name: str):
     assert_cmd_snapshot!(test.format_command()
         .arg("--config")
         .arg("ruff.toml")
-        .arg("test.py"), @"
+        .arg("test.py"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1268,8 +1268,8 @@ def say_hy(name: str):
     ----- stderr -----
     warning: `incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
-    ");
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend either setting `format.magic-trailing-comma = "normalize"` for compatibility, or disabling this rule by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    "#);
     Ok(())
 }
 

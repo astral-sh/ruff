@@ -148,3 +148,54 @@ x2 = lambda y,: 1
 with a:  # magic trailing comma
     ...
 ```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Normalize
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+("First entry", "Second entry", "last with trailing comma")
+
+("First entry", "Second entry", "last without trailing comma")
+
+(
+    "First entry",
+    "Second entry",
+    "third entry",
+    "fourth entry",
+    "fifth entry",
+    "sixt entry",
+    "seventh entry",
+    "eighth entry",
+)
+
+
+# Regression test: Respect setting in Arguments formatting
+def f(a):
+    pass
+
+
+def g(a):
+    pass
+
+
+x1 = lambda y: 1
+x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with a:  # magic trailing comma
+    ...
+```

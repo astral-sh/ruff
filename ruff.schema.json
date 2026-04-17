@@ -1613,6 +1613,17 @@
             }
           ]
         },
+        "magic-trailing-comma": {
+          "description": "How the formatter handles trailing commas in parenthesized expressions\n(function calls, function definitions, collection literals, imports, etc.).\n\nTrailing commas influence how the formatter lays out multi-line expressions.\nBy default, a trailing comma acts as a signal to the formatter to keep the\nexpression expanded (one element per line), even if it would fit on a single line.\n\n* `respect` (default): Existing trailing commas are treated as \"magic\" — the\n  formatter uses them as a signal to keep expressions expanded. If a trailing\n  comma is present, the formatter will not collapse the expression to a single\n  line. This is the same behavior as Black's default.\n\n* `ignore`: Existing trailing commas are not used as expansion signals. The\n  formatter may collapse expressions to a single line even if a trailing comma\n  is present. However, the formatter still adds trailing commas to expressions\n  it decides to keep multi-line. This is equivalent to Black's\n  `--skip-magic-trailing-comma` flag.\n\n* `normalize`: Like `ignore`, existing trailing commas are not used as expansion\n  signals. The formatter normalizes trailing commas: it adds them to expanded\n  multi-line expressions and removes them from expressions collapsed to a single\n  line. This mode is recommended when using the `COM812` lint rule alongside the\n  formatter, as both tools converge to the same output in a single pass.\n\nThis option replaces the deprecated `skip-magic-trailing-comma` boolean:\n\n* `skip-magic-trailing-comma = false` is equivalent to `magic-trailing-comma = \"respect\"`\n* `skip-magic-trailing-comma = true` is equivalent to `magic-trailing-comma = \"ignore\"`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MagicTrailingComma"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "nested-string-quote-style": {
           "description": "Controls the quote style for nested strings inside interpolated string expressions.\n\n- `alternating` (default): Use alternating quotes.\n- `preferred`: Use the configured [`quote-style`](#format_quote-style).\n\n```python\nf\"{data['key']}\"  # alternating (default)\nf\"{data[\"key\"]}\"  # preferred\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
           "anyOf": [
@@ -1643,11 +1654,12 @@
           ]
         },
         "skip-magic-trailing-comma": {
-          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate.\nIf this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though\ncollapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:\n\n```python\n# The arguments remain on separate lines because of the trailing comma after `b`\ndef test(\n    a,\n    b,\n): pass\n```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python\n# The arguments are collapsed to a single line because the trailing comma is ignored\ndef test(a, b):\n    pass\n```",
+          "description": "Whether to ignore magic trailing commas.\n\n**Deprecated**: Use [`magic-trailing-comma`](#format_magic-trailing-comma) instead.\n\n* `skip-magic-trailing-comma = false` is equivalent to `magic-trailing-comma = \"respect\"`\n* `skip-magic-trailing-comma = true` is equivalent to `magic-trailing-comma = \"ignore\"`\n\nCannot be used together with `magic-trailing-comma`.",
           "type": [
             "boolean",
             "null"
-          ]
+          ],
+          "deprecated": true
         }
       },
       "additionalProperties": false
@@ -1826,7 +1838,7 @@
           }
         },
         "force-wrap-aliases": {
-          "description": "Force `import from` statements with multiple members and at least one\nalias (e.g., `import A as B`) to wrap such that every line contains\nexactly one member. For example, this formatting would be retained,\nrather than condensing to a single line:\n\n```python\nfrom .utils import (\n    test_directory as test_directory,\n    test_id as test_id\n)\n```\n\nNote that this setting is only effective when combined with\n`combine-as-imports = true`. When [`combine-as-imports`](#lint_isort_combine-as-imports) isn't\nenabled, every aliased `import from` will be given its own line, in\nwhich case, wrapping is not necessary.\n\nWhen using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default)\nwhen enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.",
+          "description": "Force `import from` statements with multiple members and at least one\nalias (e.g., `import A as B`) to wrap such that every line contains\nexactly one member. For example, this formatting would be retained,\nrather than condensing to a single line:\n\n```python\nfrom .utils import (\n    test_directory as test_directory,\n    test_id as test_id\n)\n```\n\nNote that this setting is only effective when combined with\n`combine-as-imports = true`. When [`combine-as-imports`](#lint_isort_combine-as-imports) isn't\nenabled, every aliased `import from` will be given its own line, in\nwhich case, wrapping is not necessary.\n\nWhen using the formatter, ensure that [`format.magic-trailing-comma`](#format_magic-trailing-comma) is set to `\"respect\"` (default)\nwhen enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.",
           "type": [
             "boolean",
             "null"
@@ -2048,7 +2060,7 @@
           }
         },
         "split-on-trailing-comma": {
-          "description": "If a comma is placed after the last member in a multi-line import, then\nthe imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.\n\nWhen using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default) when enabling `split-on-trailing-comma`\nto avoid that the formatter removes the trailing commas.",
+          "description": "If a comma is placed after the last member in a multi-line import, then\nthe imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.\n\nWhen using the formatter, ensure that [`format.magic-trailing-comma`](#format_magic-trailing-comma) is set to\n`\"respect\"` (default) or `\"normalize\"` when enabling `split-on-trailing-comma`\nto avoid that the formatter removes the trailing commas.",
           "type": [
             "boolean",
             "null"
@@ -2650,6 +2662,14 @@
         }
       },
       "additionalProperties": false
+    },
+    "MagicTrailingComma": {
+      "type": "string",
+      "enum": [
+        "respect",
+        "ignore",
+        "normalize"
+      ]
     },
     "McCabeOptions": {
       "description": "Options for the `mccabe` plugin.",

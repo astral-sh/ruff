@@ -1,0 +1,1707 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/normalize_trailing_comma.py
+---
+## Input
+```python
+###
+# Function calls
+###
+
+# Over-wrapped with trailing comma
+result = some_function(
+    arg1,
+    arg2,
+)
+
+# Over-wrapped without trailing comma
+result = some_function(
+    arg1,
+    arg2
+)
+
+# Already on one line
+result = some_function(arg1, arg2)
+
+# Single-line trailing comma
+result = some_function(arg1, arg2,)
+
+# Genuinely long
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    fifth_argument,
+)
+
+# Compact multi-line without trailing comma
+result = some_function(
+    first_argument, second_argument, third_argument, fourth_argument
+)
+
+# Keyword args, over-wrapped
+result = func(
+    key1=value1,
+    key2=value2,
+)
+
+# Single arg with trailing comment
+result = func(
+    a,  # only arg
+)
+
+# Trailing comment without comma
+result = func(
+    arg1,
+    arg2  # no comma here
+)
+
+# Trailing comment without comma, single arg
+result = func(
+    arg1  # no comma here either
+)
+
+# Trailing comment on last arg
+result = func(
+    arg1,
+    arg2,  # important arg
+)
+
+# Trailing comments on every arg
+result = func(
+    arg1,  # first
+    arg2,  # second
+)
+
+# Interleaved comments
+result = func(
+    # group 1
+    arg1,
+    arg2,
+    # group 2
+    arg3,
+    arg4,
+)
+
+# Comment after opening paren
+result = func(
+    # this is a config call
+    arg1,
+    arg2,
+)
+
+# Comment before closing paren
+result = func(
+    arg1,
+    arg2,
+    # end of args
+)
+
+# Short args with trailing comment
+result = func(
+    a,  # keep this
+    b,
+)
+
+# noqa directives (formatter ignores them)
+result = func(
+    arg1,
+    arg2  # noqa: COM812
+)
+result = func(
+    arg1,
+    arg2,  # noqa: COM819
+)
+result = func(
+    arg1,
+    arg2,
+)  # noqa: COM812
+
+# Compact multi-line with comment above
+result = some_function(
+    # these are the important arguments
+    first_argument, second_argument, third_argument, fourth_argument
+)
+
+# Compact multi-line with comment below
+result = some_function(
+    first_argument, second_argument, third_argument, fourth_argument
+    # end of arguments
+)
+
+# Compact multi-line with trailing comment
+result = some_function(
+    first_argument, second_argument, third_argument, fourth_argument  # all on one line
+)
+
+# Nested calls
+result = outer(
+    inner(
+        a,
+        b,
+    ),
+    c,
+)
+
+# Deeply nested
+result = outer(
+    inner(
+        deep(
+            x,
+            y,
+        ),
+    ),
+)
+
+
+###
+# Function definitions
+###
+
+# Over-wrapped with trailing comma
+def foo(
+    a,
+    b,
+):
+    pass
+
+
+# Single-line trailing comma
+def baz(a, b,): pass
+
+# Compact multi-line
+def bar(
+    first_param, second_param, third_param, fourth_param, fifth_param
+):
+    pass
+
+
+# Compact multi-line with comment above
+def baz2(
+    # positional params
+    first_param, second_param, third_param, fourth_param, fifth_param
+):
+    pass
+
+
+# Compact multi-line with comment below
+def qux(
+    first_param, second_param, third_param, fourth_param, fifth_param
+    # end of params
+):
+    pass
+
+
+# Interleaved comments
+def bar2(
+    # positional args
+    a,
+    b,
+    # keyword-only args
+    *,
+    c,
+    d,
+):
+    pass
+
+
+###
+# Collection literals
+###
+
+# List, over-wrapped
+items = [
+    1,
+    2,
+]
+
+# List, single-line trailing comma
+x = [1, 2, 3,]
+
+# Dict, over-wrapped
+config = {
+    "key1": "value1",
+    "key2": "value2",
+}
+
+# Dict, single-line trailing comma
+config = {"key": "value",}
+
+# Set, over-wrapped
+unique = {
+    1,
+    2,
+}
+
+# Single-element tuple (semantic comma)
+x = (1,)
+
+# Single-element tuple, over-wrapped
+x = (
+    1,
+)
+
+# List with interleaved comments
+items = [
+    # first group
+    1,
+    2,
+    # second group
+    3,
+    4,
+]
+
+# Dict with trailing comments
+config = {
+    "key1": "value1",  # primary
+    "key2": "value2",  # secondary
+}
+
+
+###
+# Imports
+###
+
+# Over-wrapped with trailing comma
+from module import (
+    name1,
+    name2,
+)
+
+# Single name, over-wrapped
+from module import (
+    name1,
+)
+
+# Single name, no trailing comma
+from module import (
+    name1
+)
+
+# Genuinely long
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Genuinely long, missing trailing comma
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name
+)
+
+# Compact multi-line
+from very.long.module.path.that.goes.on import (
+    first_name, second_name, third_name, fourth_name
+)
+
+# Single line with trailing comma
+from module import (name1, name2,)
+
+# Star import
+from module import *
+
+# With aliases
+from module import (
+    name1 as alias1,
+    name2 as alias2,
+)
+
+# With comment
+from module import (
+    name1,
+    name2,  # keep this
+)
+
+# Very long module path, single name (fits on one line)
+from very_long_module.deeply_nested.sub_package import long_long_long_name
+
+# Very long module path, single name (exceeds line length)
+from very_long_module.deeply_nested.sub_package import some_extremely_long_name_for_function
+
+# Very long module path, multiple names (exceeds line length without parens)
+from very_long_module.deeply_nested.sub_package import first_long_name, second_long_name_x
+
+# Very long module path, multiple names (already parenthesized)
+from very_long_module.deeply_nested.sub_package import (
+    first_long_name,
+    second_long_name,
+)
+
+# Very long module path, short name with parens
+from very_long_module.deeply_nested.sub_package import (
+    short,
+)
+
+# Plain import with alias
+import very.long.module.path.name as short_name
+
+
+###
+# Subscripts
+###
+
+# Compact multi-line
+result = matrix[
+    first_long_index, second_long_index, third_long_index, fourth_long_index
+]
+
+# Over-wrapped with trailing comma
+result = matrix[
+    first_index,
+    second_index,
+    third_index,
+]
+
+# Short subscript
+result = matrix[a, b]
+
+# Single-line trailing comma
+result = matrix[a, b,]
+
+# Genuinely long
+result = very_long_matrix_name[
+    first_very_long_index_name,
+    second_very_long_index_name,
+    third_very_long_index_name,
+]
+
+
+###
+# Generators
+###
+
+# Unparenthesized sole generator — trailing comma would be SyntaxError
+result = sum(x for x in range(10))
+
+# Unparenthesized generator that wraps
+result = sum(
+    very_long_expression for very_long_expression in some_very_long_iterable_name
+)
+
+# Parenthesized generator — trailing comma is valid
+result = sum(
+    (x for x in range(10)),
+)
+
+# Parenthesized generator that wraps
+result = sum(
+    (very_long_expression for very_long_expression in some_very_long_iterable_name)
+)
+
+# Nested call as argument, compact multi-line
+result = func(
+    this_function_actually(takes, two), parameters
+)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two), parameters
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two), parameters  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two), parameters
+    # end of args
+)
+
+# Mixed: some args fit, some don't
+result = func(short, another_short, a_third_short_one)
+result = func(
+    very_long_argument_name_one,
+    very_long_argument_name_two,
+    very_long_argument_name_three,
+)
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+###
+# Function calls
+###
+
+# Over-wrapped with trailing comma
+result = some_function(
+    arg1,
+    arg2,
+)
+
+# Over-wrapped without trailing comma
+result = some_function(arg1, arg2)
+
+# Already on one line
+result = some_function(arg1, arg2)
+
+# Single-line trailing comma
+result = some_function(
+    arg1,
+    arg2,
+)
+
+# Genuinely long
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    fifth_argument,
+)
+
+# Compact multi-line without trailing comma
+result = some_function(first_argument, second_argument, third_argument, fourth_argument)
+
+# Keyword args, over-wrapped
+result = func(
+    key1=value1,
+    key2=value2,
+)
+
+# Single arg with trailing comment
+result = func(
+    a,  # only arg
+)
+
+# Trailing comment without comma
+result = func(
+    arg1,
+    arg2,  # no comma here
+)
+
+# Trailing comment without comma, single arg
+result = func(
+    arg1  # no comma here either
+)
+
+# Trailing comment on last arg
+result = func(
+    arg1,
+    arg2,  # important arg
+)
+
+# Trailing comments on every arg
+result = func(
+    arg1,  # first
+    arg2,  # second
+)
+
+# Interleaved comments
+result = func(
+    # group 1
+    arg1,
+    arg2,
+    # group 2
+    arg3,
+    arg4,
+)
+
+# Comment after opening paren
+result = func(
+    # this is a config call
+    arg1,
+    arg2,
+)
+
+# Comment before closing paren
+result = func(
+    arg1,
+    arg2,
+    # end of args
+)
+
+# Short args with trailing comment
+result = func(
+    a,  # keep this
+    b,
+)
+
+# noqa directives (formatter ignores them)
+result = func(
+    arg1,
+    arg2,  # noqa: COM812
+)
+result = func(
+    arg1,
+    arg2,  # noqa: COM819
+)
+result = func(
+    arg1,
+    arg2,
+)  # noqa: COM812
+
+# Compact multi-line with comment above
+result = some_function(
+    # these are the important arguments
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+)
+
+# Compact multi-line with comment below
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    # end of arguments
+)
+
+# Compact multi-line with trailing comment
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,  # all on one line
+)
+
+# Nested calls
+result = outer(
+    inner(
+        a,
+        b,
+    ),
+    c,
+)
+
+# Deeply nested
+result = outer(
+    inner(
+        deep(
+            x,
+            y,
+        ),
+    ),
+)
+
+
+###
+# Function definitions
+###
+
+
+# Over-wrapped with trailing comma
+def foo(
+    a,
+    b,
+):
+    pass
+
+
+# Single-line trailing comma
+def baz(
+    a,
+    b,
+):
+    pass
+
+
+# Compact multi-line
+def bar(first_param, second_param, third_param, fourth_param, fifth_param):
+    pass
+
+
+# Compact multi-line with comment above
+def baz2(
+    # positional params
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+):
+    pass
+
+
+# Compact multi-line with comment below
+def qux(
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+    # end of params
+):
+    pass
+
+
+# Interleaved comments
+def bar2(
+    # positional args
+    a,
+    b,
+    # keyword-only args
+    *,
+    c,
+    d,
+):
+    pass
+
+
+###
+# Collection literals
+###
+
+# List, over-wrapped
+items = [
+    1,
+    2,
+]
+
+# List, single-line trailing comma
+x = [
+    1,
+    2,
+    3,
+]
+
+# Dict, over-wrapped
+config = {
+    "key1": "value1",
+    "key2": "value2",
+}
+
+# Dict, single-line trailing comma
+config = {
+    "key": "value",
+}
+
+# Set, over-wrapped
+unique = {
+    1,
+    2,
+}
+
+# Single-element tuple (semantic comma)
+x = (1,)
+
+# Single-element tuple, over-wrapped
+x = (1,)
+
+# List with interleaved comments
+items = [
+    # first group
+    1,
+    2,
+    # second group
+    3,
+    4,
+]
+
+# Dict with trailing comments
+config = {
+    "key1": "value1",  # primary
+    "key2": "value2",  # secondary
+}
+
+
+###
+# Imports
+###
+
+# Over-wrapped with trailing comma
+from module import (
+    name1,
+    name2,
+)
+
+# Single name, over-wrapped
+from module import (
+    name1,
+)
+
+# Single name, no trailing comma
+from module import name1
+
+# Genuinely long
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Genuinely long, missing trailing comma
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Compact multi-line
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Single line with trailing comma
+from module import (
+    name1,
+    name2,
+)
+
+# Star import
+from module import *
+
+# With aliases
+from module import (
+    name1 as alias1,
+    name2 as alias2,
+)
+
+# With comment
+from module import (
+    name1,
+    name2,  # keep this
+)
+
+# Very long module path, single name (fits on one line)
+from very_long_module.deeply_nested.sub_package import long_long_long_name
+
+# Very long module path, single name (exceeds line length)
+from very_long_module.deeply_nested.sub_package import (
+    some_extremely_long_name_for_function,
+)
+
+# Very long module path, multiple names (exceeds line length without parens)
+from very_long_module.deeply_nested.sub_package import (
+    first_long_name,
+    second_long_name_x,
+)
+
+# Very long module path, multiple names (already parenthesized)
+from very_long_module.deeply_nested.sub_package import (
+    first_long_name,
+    second_long_name,
+)
+
+# Very long module path, short name with parens
+from very_long_module.deeply_nested.sub_package import (
+    short,
+)
+
+# Plain import with alias
+import very.long.module.path.name as short_name
+
+
+###
+# Subscripts
+###
+
+# Compact multi-line
+result = matrix[
+    first_long_index, second_long_index, third_long_index, fourth_long_index
+]
+
+# Over-wrapped with trailing comma
+result = matrix[
+    first_index,
+    second_index,
+    third_index,
+]
+
+# Short subscript
+result = matrix[a, b]
+
+# Single-line trailing comma
+result = matrix[
+    a,
+    b,
+]
+
+# Genuinely long
+result = very_long_matrix_name[
+    first_very_long_index_name,
+    second_very_long_index_name,
+    third_very_long_index_name,
+]
+
+
+###
+# Generators
+###
+
+# Unparenthesized sole generator — trailing comma would be SyntaxError
+result = sum(x for x in range(10))
+
+# Unparenthesized generator that wraps
+result = sum(
+    very_long_expression for very_long_expression in some_very_long_iterable_name
+)
+
+# Parenthesized generator — trailing comma is valid
+result = sum(
+    (x for x in range(10)),
+)
+
+# Parenthesized generator that wraps
+result = sum(
+    (very_long_expression for very_long_expression in some_very_long_iterable_name)
+)
+
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
+)
+
+# Mixed: some args fit, some don't
+result = func(short, another_short, a_third_short_one)
+result = func(
+    very_long_argument_name_one,
+    very_long_argument_name_two,
+    very_long_argument_name_three,
+)
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Ignore
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+###
+# Function calls
+###
+
+# Over-wrapped with trailing comma
+result = some_function(arg1, arg2)
+
+# Over-wrapped without trailing comma
+result = some_function(arg1, arg2)
+
+# Already on one line
+result = some_function(arg1, arg2)
+
+# Single-line trailing comma
+result = some_function(arg1, arg2)
+
+# Genuinely long
+result = some_function(
+    first_argument, second_argument, third_argument, fourth_argument, fifth_argument
+)
+
+# Compact multi-line without trailing comma
+result = some_function(first_argument, second_argument, third_argument, fourth_argument)
+
+# Keyword args, over-wrapped
+result = func(key1=value1, key2=value2)
+
+# Single arg with trailing comment
+result = func(
+    a  # only arg
+)
+
+# Trailing comment without comma
+result = func(
+    arg1,
+    arg2,  # no comma here
+)
+
+# Trailing comment without comma, single arg
+result = func(
+    arg1  # no comma here either
+)
+
+# Trailing comment on last arg
+result = func(
+    arg1,
+    arg2,  # important arg
+)
+
+# Trailing comments on every arg
+result = func(
+    arg1,  # first
+    arg2,  # second
+)
+
+# Interleaved comments
+result = func(
+    # group 1
+    arg1,
+    arg2,
+    # group 2
+    arg3,
+    arg4,
+)
+
+# Comment after opening paren
+result = func(
+    # this is a config call
+    arg1,
+    arg2,
+)
+
+# Comment before closing paren
+result = func(
+    arg1,
+    arg2,
+    # end of args
+)
+
+# Short args with trailing comment
+result = func(
+    a,  # keep this
+    b,
+)
+
+# noqa directives (formatter ignores them)
+result = func(
+    arg1,
+    arg2,  # noqa: COM812
+)
+result = func(
+    arg1,
+    arg2,  # noqa: COM819
+)
+result = func(arg1, arg2)  # noqa: COM812
+
+# Compact multi-line with comment above
+result = some_function(
+    # these are the important arguments
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+)
+
+# Compact multi-line with comment below
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    # end of arguments
+)
+
+# Compact multi-line with trailing comment
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,  # all on one line
+)
+
+# Nested calls
+result = outer(inner(a, b), c)
+
+# Deeply nested
+result = outer(inner(deep(x, y)))
+
+
+###
+# Function definitions
+###
+
+
+# Over-wrapped with trailing comma
+def foo(a, b):
+    pass
+
+
+# Single-line trailing comma
+def baz(a, b):
+    pass
+
+
+# Compact multi-line
+def bar(first_param, second_param, third_param, fourth_param, fifth_param):
+    pass
+
+
+# Compact multi-line with comment above
+def baz2(
+    # positional params
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+):
+    pass
+
+
+# Compact multi-line with comment below
+def qux(
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+    # end of params
+):
+    pass
+
+
+# Interleaved comments
+def bar2(
+    # positional args
+    a,
+    b,
+    # keyword-only args
+    *,
+    c,
+    d,
+):
+    pass
+
+
+###
+# Collection literals
+###
+
+# List, over-wrapped
+items = [1, 2]
+
+# List, single-line trailing comma
+x = [1, 2, 3]
+
+# Dict, over-wrapped
+config = {"key1": "value1", "key2": "value2"}
+
+# Dict, single-line trailing comma
+config = {"key": "value"}
+
+# Set, over-wrapped
+unique = {1, 2}
+
+# Single-element tuple (semantic comma)
+x = (1,)
+
+# Single-element tuple, over-wrapped
+x = (1,)
+
+# List with interleaved comments
+items = [
+    # first group
+    1,
+    2,
+    # second group
+    3,
+    4,
+]
+
+# Dict with trailing comments
+config = {
+    "key1": "value1",  # primary
+    "key2": "value2",  # secondary
+}
+
+
+###
+# Imports
+###
+
+# Over-wrapped with trailing comma
+from module import name1, name2
+
+# Single name, over-wrapped
+from module import name1
+
+# Single name, no trailing comma
+from module import name1
+
+# Genuinely long
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Genuinely long, missing trailing comma
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Compact multi-line
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Single line with trailing comma
+from module import name1, name2
+
+# Star import
+from module import *
+
+# With aliases
+from module import name1 as alias1, name2 as alias2
+
+# With comment
+from module import (
+    name1,
+    name2,  # keep this
+)
+
+# Very long module path, single name (fits on one line)
+from very_long_module.deeply_nested.sub_package import long_long_long_name
+
+# Very long module path, single name (exceeds line length)
+from very_long_module.deeply_nested.sub_package import (
+    some_extremely_long_name_for_function,
+)
+
+# Very long module path, multiple names (exceeds line length without parens)
+from very_long_module.deeply_nested.sub_package import (
+    first_long_name,
+    second_long_name_x,
+)
+
+# Very long module path, multiple names (already parenthesized)
+from very_long_module.deeply_nested.sub_package import first_long_name, second_long_name
+
+# Very long module path, short name with parens
+from very_long_module.deeply_nested.sub_package import short
+
+# Plain import with alias
+import very.long.module.path.name as short_name
+
+
+###
+# Subscripts
+###
+
+# Compact multi-line
+result = matrix[
+    first_long_index, second_long_index, third_long_index, fourth_long_index
+]
+
+# Over-wrapped with trailing comma
+result = matrix[first_index, second_index, third_index]
+
+# Short subscript
+result = matrix[a, b]
+
+# Single-line trailing comma
+result = matrix[a, b]
+
+# Genuinely long
+result = very_long_matrix_name[
+    first_very_long_index_name, second_very_long_index_name, third_very_long_index_name
+]
+
+
+###
+# Generators
+###
+
+# Unparenthesized sole generator — trailing comma would be SyntaxError
+result = sum(x for x in range(10))
+
+# Unparenthesized generator that wraps
+result = sum(
+    very_long_expression for very_long_expression in some_very_long_iterable_name
+)
+
+# Parenthesized generator — trailing comma is valid
+result = sum((x for x in range(10)))
+
+# Parenthesized generator that wraps
+result = sum(
+    (very_long_expression for very_long_expression in some_very_long_iterable_name)
+)
+
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
+)
+
+# Mixed: some args fit, some don't
+result = func(short, another_short, a_third_short_one)
+result = func(
+    very_long_argument_name_one,
+    very_long_argument_name_two,
+    very_long_argument_name_three,
+)
+```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Normalize
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+###
+# Function calls
+###
+
+# Over-wrapped with trailing comma
+result = some_function(arg1, arg2)
+
+# Over-wrapped without trailing comma
+result = some_function(arg1, arg2)
+
+# Already on one line
+result = some_function(arg1, arg2)
+
+# Single-line trailing comma
+result = some_function(arg1, arg2)
+
+# Genuinely long
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    fifth_argument,
+)
+
+# Compact multi-line without trailing comma
+result = some_function(first_argument, second_argument, third_argument, fourth_argument)
+
+# Keyword args, over-wrapped
+result = func(key1=value1, key2=value2)
+
+# Single arg with trailing comment
+result = func(
+    a,  # only arg
+)
+
+# Trailing comment without comma
+result = func(
+    arg1,
+    arg2,  # no comma here
+)
+
+# Trailing comment without comma, single arg
+result = func(
+    arg1,  # no comma here either
+)
+
+# Trailing comment on last arg
+result = func(
+    arg1,
+    arg2,  # important arg
+)
+
+# Trailing comments on every arg
+result = func(
+    arg1,  # first
+    arg2,  # second
+)
+
+# Interleaved comments
+result = func(
+    # group 1
+    arg1,
+    arg2,
+    # group 2
+    arg3,
+    arg4,
+)
+
+# Comment after opening paren
+result = func(
+    # this is a config call
+    arg1,
+    arg2,
+)
+
+# Comment before closing paren
+result = func(
+    arg1,
+    arg2,
+    # end of args
+)
+
+# Short args with trailing comment
+result = func(
+    a,  # keep this
+    b,
+)
+
+# noqa directives (formatter ignores them)
+result = func(
+    arg1,
+    arg2,  # noqa: COM812
+)
+result = func(
+    arg1,
+    arg2,  # noqa: COM819
+)
+result = func(arg1, arg2)  # noqa: COM812
+
+# Compact multi-line with comment above
+result = some_function(
+    # these are the important arguments
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+)
+
+# Compact multi-line with comment below
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,
+    # end of arguments
+)
+
+# Compact multi-line with trailing comment
+result = some_function(
+    first_argument,
+    second_argument,
+    third_argument,
+    fourth_argument,  # all on one line
+)
+
+# Nested calls
+result = outer(inner(a, b), c)
+
+# Deeply nested
+result = outer(inner(deep(x, y)))
+
+
+###
+# Function definitions
+###
+
+
+# Over-wrapped with trailing comma
+def foo(a, b):
+    pass
+
+
+# Single-line trailing comma
+def baz(a, b):
+    pass
+
+
+# Compact multi-line
+def bar(first_param, second_param, third_param, fourth_param, fifth_param):
+    pass
+
+
+# Compact multi-line with comment above
+def baz2(
+    # positional params
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+):
+    pass
+
+
+# Compact multi-line with comment below
+def qux(
+    first_param,
+    second_param,
+    third_param,
+    fourth_param,
+    fifth_param,
+    # end of params
+):
+    pass
+
+
+# Interleaved comments
+def bar2(
+    # positional args
+    a,
+    b,
+    # keyword-only args
+    *,
+    c,
+    d,
+):
+    pass
+
+
+###
+# Collection literals
+###
+
+# List, over-wrapped
+items = [1, 2]
+
+# List, single-line trailing comma
+x = [1, 2, 3]
+
+# Dict, over-wrapped
+config = {"key1": "value1", "key2": "value2"}
+
+# Dict, single-line trailing comma
+config = {"key": "value"}
+
+# Set, over-wrapped
+unique = {1, 2}
+
+# Single-element tuple (semantic comma)
+x = (1,)
+
+# Single-element tuple, over-wrapped
+x = (1,)
+
+# List with interleaved comments
+items = [
+    # first group
+    1,
+    2,
+    # second group
+    3,
+    4,
+]
+
+# Dict with trailing comments
+config = {
+    "key1": "value1",  # primary
+    "key2": "value2",  # secondary
+}
+
+
+###
+# Imports
+###
+
+# Over-wrapped with trailing comma
+from module import name1, name2
+
+# Single name, over-wrapped
+from module import name1
+
+# Single name, no trailing comma
+from module import name1
+
+# Genuinely long
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Genuinely long, missing trailing comma
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Compact multi-line
+from very.long.module.path.that.goes.on import (
+    first_name,
+    second_name,
+    third_name,
+    fourth_name,
+)
+
+# Single line with trailing comma
+from module import name1, name2
+
+# Star import
+from module import *
+
+# With aliases
+from module import name1 as alias1, name2 as alias2
+
+# With comment
+from module import (
+    name1,
+    name2,  # keep this
+)
+
+# Very long module path, single name (fits on one line)
+from very_long_module.deeply_nested.sub_package import long_long_long_name
+
+# Very long module path, single name (exceeds line length)
+from very_long_module.deeply_nested.sub_package import (
+    some_extremely_long_name_for_function,
+)
+
+# Very long module path, multiple names (exceeds line length without parens)
+from very_long_module.deeply_nested.sub_package import (
+    first_long_name,
+    second_long_name_x,
+)
+
+# Very long module path, multiple names (already parenthesized)
+from very_long_module.deeply_nested.sub_package import first_long_name, second_long_name
+
+# Very long module path, short name with parens
+from very_long_module.deeply_nested.sub_package import short
+
+# Plain import with alias
+import very.long.module.path.name as short_name
+
+
+###
+# Subscripts
+###
+
+# Compact multi-line
+result = matrix[
+    first_long_index,
+    second_long_index,
+    third_long_index,
+    fourth_long_index,
+]
+
+# Over-wrapped with trailing comma
+result = matrix[first_index, second_index, third_index]
+
+# Short subscript
+result = matrix[a, b]
+
+# Single-line trailing comma
+result = matrix[a, b]
+
+# Genuinely long
+result = very_long_matrix_name[
+    first_very_long_index_name,
+    second_very_long_index_name,
+    third_very_long_index_name,
+]
+
+
+###
+# Generators
+###
+
+# Unparenthesized sole generator — trailing comma would be SyntaxError
+result = sum(x for x in range(10))
+
+# Unparenthesized generator that wraps
+result = sum(
+    very_long_expression
+    for very_long_expression in some_very_long_iterable_name
+)
+
+# Parenthesized generator — trailing comma is valid
+result = sum((x for x in range(10)))
+
+# Parenthesized generator that wraps
+result = sum(
+    (very_long_expression for very_long_expression in some_very_long_iterable_name),
+)
+
+# Nested call as argument, compact multi-line
+result = func(this_function_actually(takes, two), parameters)
+
+# Nested call as argument, with comment above
+result = func(
+    # important call
+    this_function_actually(takes, two),
+    parameters,
+)
+
+# Nested call as argument, with trailing comment
+result = func(
+    this_function_actually(takes, two),
+    parameters,  # both args
+)
+
+# Nested call as argument, with comment below
+result = func(
+    this_function_actually(takes, two),
+    parameters,
+    # end of args
+)
+
+# Mixed: some args fit, some don't
+result = func(short, another_short, a_third_short_one)
+result = func(
+    very_long_argument_name_one,
+    very_long_argument_name_two,
+    very_long_argument_name_three,
+)
+```

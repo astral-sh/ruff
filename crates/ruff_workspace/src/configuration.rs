@@ -1280,13 +1280,32 @@ impl FormatConfiguration {
             indent_style: options.indent_style,
             quote_style: options.quote_style,
             nested_string_quote_style: options.nested_string_quote_style,
-            magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
-                if skip {
-                    MagicTrailingComma::Ignore
-                } else {
-                    MagicTrailingComma::Respect
+            #[expect(deprecated)]
+            magic_trailing_comma: match (
+                options.magic_trailing_comma,
+                options.skip_magic_trailing_comma,
+            ) {
+                (Some(_), Some(_)) => {
+                    return Err(anyhow!(
+                        "Cannot specify both `magic-trailing-comma` and \
+                         `skip-magic-trailing-comma`. Use `magic-trailing-comma` \
+                         instead (the `skip-magic-trailing-comma` option is deprecated)."
+                    ));
                 }
-            }),
+                (Some(mtc), None) => Some(mtc),
+                (None, Some(skip)) => {
+                    warn_user_once!(
+                        "The `format.skip-magic-trailing-comma` option is deprecated. \
+                         Use `format.magic-trailing-comma` instead."
+                    );
+                    Some(if skip {
+                        MagicTrailingComma::Ignore
+                    } else {
+                        MagicTrailingComma::Respect
+                    })
+                }
+                (None, None) => None,
+            },
             line_ending: options.line_ending,
             docstring_code_format: options.docstring_code_format.map(|yes| {
                 if yes {
