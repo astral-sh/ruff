@@ -42,8 +42,8 @@ pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
-    imported_symbol, known_module_symbol,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening,
+    builtins_module_scope, imported_symbol, known_module_symbol,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -3153,6 +3153,32 @@ impl<'db> Type<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
 
+    fn lookup_instance_member_with_fallback(
+        self,
+        db: &'db dyn Db,
+        name: &Name,
+        fallback: PlaceAndQualifiers<'db>,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let result = self.invoke_descriptor_protocol(
+            db,
+            name.as_str(),
+            fallback,
+            InstanceFallbackShadowsNonDataDescriptor::No,
+            policy,
+        );
+
+        if result.is_class_var() && self.is_typed_dict() {
+            // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
+            // They can only be accessed on `SomeTypedDict` directly.
+            return Place::Undefined.into();
+        }
+
+        let result = self.fallback_to_getattr(db, name, result, policy);
+
+        result.map_type(|ty| ty.bind_self_typevars(db, self))
+    }
+
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
     #[salsa::tracked(
@@ -3377,6 +3403,48 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(protocol),
+                ..
+            }) if !policy.no_instance_fallback()
+                && protocol.interface().includes_member(db, name_str) =>
+            {
+                let protocol_member = self.lookup_instance_member_with_fallback(
+                    db,
+                    &name,
+                    protocol
+                        .interface()
+                        .own_instance_member(db, name_str)
+                        .expect("synthesized protocols include the matched member"),
+                    policy,
+                );
+                let object_member =
+                    Type::object().member_lookup_with_policy(db, name.clone(), policy);
+
+                match (protocol_member.place, object_member.place) {
+                    (Place::Defined(protocol_place), Place::Defined(object_place)) => {
+                        Place::Defined(DefinedPlace {
+                            ty: IntersectionType::from_two_elements(
+                                db,
+                                protocol_place.ty,
+                                object_place.ty,
+                            ),
+                            origin: protocol_place.origin.merge(object_place.origin),
+                            definedness: protocol_place.definedness.max(object_place.definedness),
+                            widening: match (protocol_place.widening, object_place.widening) {
+                                (Widening::WithUnknown, _) | (_, Widening::WithUnknown) => {
+                                    Widening::WithUnknown
+                                }
+                                (Widening::None, Widening::None) => Widening::None,
+                            },
+                        })
+                        .with_qualifiers(protocol_member.qualifiers | object_member.qualifiers)
+                    }
+                    (_, Place::Undefined) => protocol_member,
+                    (Place::Undefined, _) => object_member,
+                }
+            }
+
             // If a protocol does not include a member and the policy disables falling back to
             // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
             // before we find the "fallback to attribute access on `object`" logic later on
@@ -3509,25 +3577,12 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = self.instance_member(db, name_str);
-
-                let result = self.invoke_descriptor_protocol(
+                self.lookup_instance_member_with_fallback(
                     db,
-                    name_str,
-                    fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    &name,
+                    self.instance_member(db, name_str),
                     policy,
-                );
-
-                if result.is_class_var() && self.is_typed_dict() {
-                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
-                    // They can only be accessed on `SomeTypedDict` directly.
-                    return Place::Undefined.into();
-                }
-
-                let result = self.fallback_to_getattr(db, &name, result, policy);
-
-                result.map_type(|ty| ty.bind_self_typevars(db, self))
+                )
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
