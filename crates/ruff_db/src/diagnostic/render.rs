@@ -313,6 +313,13 @@ impl<'a> ResolvedDiagnostic<'a> {
             anns.sort_by_key(|ann1| ann1.range.start());
         }
 
+        // The merge window determines how close two annotations need
+        // to be (in lines) to be rendered inside a single snippet.
+        // This is independent of `context`, which controls how many
+        // extra padding lines appear before and after each snippet.
+        const MERGE_WINDOW: usize = 2;
+        let merge_window = MERGE_WINDOW.max(context);
+
         let mut snippet_by_path: BTreeMap<&'a str, Vec<Vec<&ResolvedAnnotation<'a>>>> =
             BTreeMap::new();
         for (path, anns) in ann_by_path {
@@ -325,14 +332,14 @@ impl<'a> ResolvedDiagnostic<'a> {
 
                 let prev_context_ends = context_after(
                     &prev.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     prev.line_end,
                     prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     ann.line_start,
                     ann.notebook_index.as_ref(),
                 )
