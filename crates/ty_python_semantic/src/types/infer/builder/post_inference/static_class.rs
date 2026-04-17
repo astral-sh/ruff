@@ -19,7 +19,10 @@ use crate::{
         MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
         StaticClassLiteral, Type,
         call::Argument,
-        class::{AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind},
+        class::{
+            AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
+            expanded_class_base_entries,
+        },
         context::InferContext,
         definition_expression_type,
         diagnostic::{
@@ -387,20 +390,19 @@ pub(crate) fn check_static_class_definitions<'db>(
     match class.try_mro(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
-                let base_nodes = class_node.bases();
+                let expanded_base_entries =
+                    expanded_class_base_entries(db, class.known(db), class_node, class_definition);
                 for duplicate in duplicates {
-                    report_duplicate_bases(context, class, duplicate, base_nodes);
+                    report_duplicate_bases(context, class, duplicate, &expanded_base_entries);
                 }
             }
             StaticMroErrorKind::InvalidBases(bases) => {
-                let base_nodes = class_node.bases();
+                let expanded_base_entries =
+                    expanded_class_base_entries(db, class.known(db), class_node, class_definition);
                 for (index, base_ty) in bases {
-                    report_invalid_or_unsupported_base(
-                        context,
-                        &base_nodes[*index],
-                        *base_ty,
-                        class,
-                    );
+                    if let Some(base_node) = expanded_base_entries[*index].source_node() {
+                        report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
+                    }
                 }
             }
             StaticMroErrorKind::UnresolvableMro {
@@ -416,7 +418,10 @@ pub(crate) fn check_static_class_definitions<'db>(
                         class.name(db),
                         bases_list.iter().map(|base| base.display(db)).join(", ")
                     ));
-                    if let Some(index) = *generic_index
+                    let can_rewrite_bases = bases_list.len() == class_node.bases().len()
+                        && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
+                    if can_rewrite_bases
+                        && let Some(index) = *generic_index
                         && let [first_base, .., last_base] = class_node.bases()
                     {
                         let source = source_text(db, context.file());

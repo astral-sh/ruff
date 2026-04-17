@@ -11,7 +11,9 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
+use crate::types::class::{
+    CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
+};
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
@@ -4937,7 +4939,7 @@ pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: StaticClassLiteral,
     duplicate_base_error: &DuplicateBaseError,
-    bases_list: &[ast::Expr],
+    bases_list: &[ExpandedClassBaseEntry],
 ) {
     let db = context.db();
 
@@ -4963,16 +4965,18 @@ pub(crate) fn report_duplicate_bases(
             class.name(db)
         ),
     );
-    sub_diagnostic.annotate(
-        Annotation::secondary(context.span(&bases_list[*first_index])).message(format_args!(
-            "Class `{duplicate_name}` first included in bases list here"
-        )),
-    );
+    if let Some(first_base) = bases_list[*first_index].source_node() {
+        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
+            format_args!("Class `{duplicate_name}` first included in bases list here"),
+        ));
+    }
     for index in later_indices {
-        sub_diagnostic.annotate(
-            Annotation::primary(context.span(&bases_list[*index]))
-                .message(format_args!("Class `{duplicate_name}` later repeated here")),
-        );
+        if let Some(repeated_base) = bases_list[*index].source_node() {
+            sub_diagnostic.annotate(
+                Annotation::primary(context.span(repeated_base))
+                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
+            );
+        }
     }
 
     diagnostic.sub(sub_diagnostic);

@@ -592,6 +592,40 @@ class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
+Starred bases that expand to fixed-length tuples still report diagnostics for the unpacked base
+entries:
+
+```py
+from ty_extensions import reveal_mro
+
+duplicate_bases = (int, int)
+invalid_bases = (int, 1)
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class InlineDuplicateBases(*(int, int)): ...
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class NameDuplicateBases(*duplicate_bases): ...
+
+reveal_mro(InlineDuplicateBases)  # revealed: (<class 'InlineDuplicateBases'>, Unknown, <class 'object'>)
+reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unknown, <class 'object'>)
+
+# error: [invalid-base] "Invalid class base with type `Literal[1]`"
+class StarredInvalidBases(*invalid_bases): ...
+```
+
+## Inline tuple-literal starred bases point diagnostics at unpacked elements
+
+<!-- snapshot-diagnostics -->
+
+```py
+# error: [duplicate-base]
+class InlineTupleDuplicateBases(*(int, int)): ...
+
+# error: [invalid-base]
+class InlineTupleInvalidBases(*(int, 1)): ...
+```
+
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
 
 ```py
