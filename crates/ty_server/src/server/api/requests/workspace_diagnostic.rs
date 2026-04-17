@@ -306,11 +306,9 @@ impl ProgressReporterState<'_> {
         let total = self.total_files;
 
         #[expect(clippy::cast_possible_truncation)]
-        let percentage = if total > 0 {
-            Some((checked * 100 / total) as u32)
-        } else {
-            None
-        };
+        let percentage = (checked * 100)
+            .checked_div(total)
+            .map(|result| result as u32);
 
         work_done.report_progress(format!("{checked}/{total} files"), percentage);
 

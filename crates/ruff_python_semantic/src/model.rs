@@ -1130,22 +1130,22 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.segments() == module_path.as_slice() {
-                                if let Some(source) = binding.source {
-                                    // Verify that `sys` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::Import(Import { qualified_name })
+                            if qualified_name.segments() == module_path.as_slice() =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `sys` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -1181,22 +1181,22 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.segments().starts_with(&module_path) {
-                                if let Some(source) = binding.source {
-                                    // Verify that `os` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{module}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name })
+                            if qualified_name.segments().starts_with(&module_path) =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `os` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{module}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }

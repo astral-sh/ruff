@@ -440,12 +440,11 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             AnyNodeRef::ExprList(list) => {
                 self.add_range(list.range());
             }
-            AnyNodeRef::ExprTuple(tuple) => {
+            AnyNodeRef::ExprTuple(tuple)
                 // Only fold parenthesized tuples.
-                if tuple.parenthesized {
+                if tuple.parenthesized => {
                     self.add_range(tuple.range());
                 }
-            }
             AnyNodeRef::ExprDict(dict) => {
                 self.add_range(dict.range());
             }

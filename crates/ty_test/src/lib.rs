@@ -686,7 +686,7 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
                 " when listing modules, but `resolve_module` returned `None`",
             )?,
             Some(ref got) => {
-                write!(f, " when listing modules, but `resolve_module` returned ",)?;
+                write!(f, " when listing modules, but `resolve_module` returned ")?;
                 fmt_module(self.db, f, got)?;
             }
         }

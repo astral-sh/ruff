@@ -120,14 +120,14 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                     return QuoteStyle::Preserve;
                 }
             }
-            StringLikePart::TString(tstring) => {
+            StringLikePart::TString(tstring)
                 if is_interpolated_string_with_quoted_format_spec_and_debug(
                     &tstring.elements,
                     tstring.flags.into(),
                     self.context,
-                ) {
-                    return QuoteStyle::Preserve;
-                }
+                ) =>
+            {
+                return QuoteStyle::Preserve;
             }
             _ => {}
         }
