@@ -289,6 +289,10 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    fn member_count(self, db: &'db dyn Db) -> usize {
+        self.inner(db).len()
+    }
+
     pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
         self.members(db)
             .filter(|member| !member.is_method() && !member.ty().is_todo())
@@ -764,6 +768,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ProtocolInterface<'db>,
         target: ProtocolInterface<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if source.member_count(db) < target.member_count(db) {
+            return self.never();
+        }
+
         target
             .members(db)
             .when_all(db, self.constraints, |target_member| {
@@ -1078,11 +1086,14 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     let target_interface = protocol.interface(db);
 
     match ty {
-        Type::ProtocolInstance(source_protocol) => target_interface.members(db).all(|member| {
-            source_protocol
-                .interface(db)
-                .includes_member(db, member.name())
-        }),
+        Type::ProtocolInstance(source_protocol) => {
+            let source_interface = source_protocol.interface(db);
+
+            source_interface.member_count(db) >= target_interface.member_count(db)
+                && target_interface
+                    .members(db)
+                    .all(|member| source_interface.includes_member(db, member.name()))
+        }
         _ => target_interface.members(db).all(|member| {
             matches!(
                 ty.member(db, member.name()).place,
