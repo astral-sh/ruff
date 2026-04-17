@@ -187,12 +187,12 @@ impl<'a> Resolved<'a> {
     }
 
     /// Creates a value that is amenable to rendering directly.
-    fn to_renderable(&self, context: usize) -> Renderable<'_> {
+    fn to_renderable(&self, config: &DisplayDiagnosticConfig) -> Renderable<'_> {
         Renderable {
             diagnostics: self
                 .diagnostics
                 .iter()
-                .map(|diag| diag.to_renderable(context))
+                .map(|diag| diag.to_renderable(config))
                 .collect(),
         }
     }
@@ -304,7 +304,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     ///
     /// `context` refers to the number of lines both before and after to show
     /// for each snippet.
-    fn to_renderable<'r>(&'r self, context: usize) -> RenderableDiagnostic<'r> {
+    fn to_renderable<'r>(&'r self, config: &DisplayDiagnosticConfig) -> RenderableDiagnostic<'r> {
         let mut ann_by_path: BTreeMap<&'a str, Vec<&ResolvedAnnotation<'a>>> = BTreeMap::new();
         for ann in &self.annotations {
             ann_by_path.entry(ann.path).or_default().push(ann);
@@ -317,8 +317,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         // to be (in lines) to be rendered inside a single snippet.
         // This is independent of `context`, which controls how many
         // extra padding lines appear before and after each snippet.
-        const MERGE_WINDOW: usize = 2;
-        let merge_window = MERGE_WINDOW.max(context);
+        let merge_window = config.merge_window.max(config.context);
 
         let mut snippet_by_path: BTreeMap<&'a str, Vec<Vec<&ResolvedAnnotation<'a>>>> =
             BTreeMap::new();
@@ -391,7 +390,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         let mut snippets_by_input = vec![];
         for (path, snippets) in snippet_by_path {
-            snippets_by_input.push(RenderableSnippets::new(context, path, &snippets));
+            snippets_by_input.push(RenderableSnippets::new(config.context, path, &snippets));
         }
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
@@ -1572,7 +1571,9 @@ watermelon
         1 | aardvark
           | ^^^^^^^^
         2 | beetle
-        3 | canary
+          |
+         ::: animals:5:1
+          |
         4 | dog
         5 | elephant
           | ^^^^^^^^
@@ -1766,7 +1767,9 @@ watermelon
           |
         3 | beetle
           | ^^^^^^
-        4 |
+          |
+         ::: spacey-animals:5:1
+          |
         5 | canary
           | ^^^^^^
           |
@@ -2417,22 +2420,30 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-         --> animals:1:1
+         --> animals:5:1
+          |
+        5 | elephant
+          | ^^^^^^^^ primary 5
+          |
+         ::: animals:9:1
+          |
+        9 | inchworm
+          | ^^^^^^^^ primary 9
+          |
+         ::: animals:1:1
           |
         1 | aardvark
           | -------- secondary 1
-        2 | beetle
+          |
+         ::: animals:3:1
+          |
         3 | canary
           | ------ secondary 3
-        4 | dog
-        5 | elephant
-          | ^^^^^^^^ primary 5
-        6 | finch
+          |
+         ::: animals:7:1
+          |
         7 | gorilla
           | ------- secondary 7
-        8 | hippopotamus
-        9 | inchworm
-          | ^^^^^^^^ primary 9
           |
         ",
         );
@@ -2488,23 +2499,25 @@ watermelon
             env.render(&diag),
             @"
         error[test-diagnostic]: main diagnostic message
-          --> animals:1:1
+          --> animals:11:1
+           |
+        11 | kangaroo
+           | ^^^^^^^^ primary animals 11
+           |
+          ::: animals:1:1
            |
          1 | aardvark
            | -------- secondary animals 1
-         2 | beetle
+           |
+          ::: animals:3:1
+           |
          3 | canary
            | ------ secondary animals 3
-         4 | dog
-         5 | elephant
-         6 | finch
+           |
+          ::: animals:7:1
+           |
          7 | gorilla
            | ------- secondary animals 7
-         8 | hippopotamus
-         9 | inchworm
-        10 | jackrabbit
-        11 | kangaroo
-           | ^^^^^^^^ primary animals 11
            |
           ::: fruits:10:1
            |
@@ -2532,10 +2545,14 @@ watermelon
         ///
         /// This uses the default diagnostic rendering configuration.
         pub(super) fn new() -> TestEnvironment {
-            TestEnvironment {
+            let mut env = TestEnvironment {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::new("ty"),
-            }
+            };
+            // Default to a merge window of 0 for testing purposes,
+            // even though this is not the default for user-facing diagnostics.
+            env.merge_window(0);
+            env
         }
 
         /// Set the number of contextual lines to include for each snippet
@@ -2547,6 +2564,15 @@ watermelon
             // configuration. So just deal with this inconvenience for now.
             let config = self.config.clone();
             self.config = config.context(lines);
+        }
+
+        /// Set the "merge window" for annotations in this test.
+        ///
+        /// If two annotations have fewer than this number of lines between them,
+        /// they will be merged into a single annotation.
+        fn merge_window(&mut self, lines: usize) {
+            let config = self.config.clone();
+            self.config = config.merge_window(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.
