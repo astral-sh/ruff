@@ -1093,6 +1093,33 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn unwrap_block_if_refactor_without_newline() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                if True<START><END>: foo; bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:12
+          |
+        2 | if 1:
+        3 |     if True: foo; bar()
+          |            ^
+        4 |     ...
+          |
+        1 |
+        2 | if 1:
+          -     if True: foo; bar()
+        3 +     foo; bar()
+        4 |     ...
+        ");
+    }
+
     pub(super) struct CodeActionTest {
         pub(super) db: ty_project::TestDb,
         pub(super) file: File,
