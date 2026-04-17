@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default,
-    is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_bytes_path, is_file_descriptor,
+    is_keyword_only_argument_non_default, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -81,8 +81,9 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     // ```
     let path_arg = call.arguments.find_argument_value("path", 0);
 
-    if path_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-        || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
+    if path_arg.is_some_and(|expr| {
+        is_file_descriptor(expr, checker.semantic()) || is_bytes_path(expr, checker.semantic())
+    }) || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
     {
         return;
     }
