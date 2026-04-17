@@ -5587,6 +5587,10 @@ pub(super) fn report_invalid_method_override<'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
+        return;
+    };
+
     let class_name = subclass.name(db);
     let superclass_name = superclass.name(db);
 
@@ -5595,10 +5599,6 @@ pub(super) fn report_invalid_method_override<'db>(
         format!("{qualified_name}.{member}")
     } else {
         format!("{superclass_name}.{member}")
-    };
-
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
-        return;
     };
 
     let mut diagnostic =
