@@ -1,0 +1,57 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: single_matching_overload.md - Single matching overload - Bound method overloads preserve original positions
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | class Other:
+ 4 |     pass
+ 5 | 
+ 6 | class Base:
+ 7 |     @overload
+ 8 |     def f(self: Other, x: bytes) -> bytes: ...
+ 9 |     @overload
+10 |     def f(self, x: int) -> int: ...
+11 |     @overload
+12 |     def f(self, x: str, y: int) -> str: ...
+13 |     def f(
+14 |         self,
+15 |         x: bytes | int | str,
+16 |         y: int = 0,
+17 |     ) -> bytes | int | str:
+18 |         return x
+19 | 
+20 | Base().f("ok", "bad")  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `Base.f` is incorrect
+  --> src/mdtest_snippet.py:20:16
+   |
+20 | Base().f("ok", "bad")  # error: [invalid-argument-type]
+   |                ^^^^^ Expected `int`, found `Literal["bad"]`
+   |
+info: Matching overload defined here
+  --> src/mdtest_snippet.py:12:9
+   |
+12 |     def f(self, x: str, y: int) -> str: ...
+   |         ^               ------ Parameter declared here
+   |
+info: Non-matching overloads for bound method `f`:
+info:   (self: Other, x: bytes) -> bytes
+info:   (self, x: int) -> int
+
+```
