@@ -1,12 +1,14 @@
-# Invalid assignment diagnostics
+# Error context for diagnostics involving assignability checks
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
-This file contains various scenarios of `invalid-assignment` (and related) diagnostics where we
-(attempt to) do better than just report "type X is not assignable to type Y".
+A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
+(`invalid-assignment`, `invalid-argument-type` or `invalid-method-override`). Types can be complex,
+and so we can often help users understand the incompatibility by focusing on the relevant parts of
+the two types that are being compared.
 
 ## Basic
 
