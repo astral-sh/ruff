@@ -586,6 +586,52 @@ impl<'db> GenericContext<'db> {
         Some(Self::from_typevar_instances(db, variables))
     }
 
+    /// Creates a generic context from the bound type variables that appear directly in a callable
+    /// signature's parameter and return types.
+    pub(crate) fn from_signature_types(
+        db: &'db dyn Db,
+        parameters: &Parameters<'db>,
+        return_type: Type<'db>,
+    ) -> Option<Self> {
+        #[derive(Default)]
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let bound_typevar = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db)
+                } else {
+                    bound_typevar
+                };
+                self.typevars.borrow_mut().insert(bound_typevar);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let visitor = CollectTypeVars::default();
+        for parameter in parameters {
+            visitor.visit_type(db, parameter.annotated_type());
+        }
+        visitor.visit_type(db, return_type);
+
+        let typevars = visitor.typevars.into_inner();
+        (!typevars.is_empty()).then(|| Self::from_typevar_instances(db, typevars))
+    }
+
     pub(crate) fn remove_callable_only_typevars(
         db: &'db dyn Db,
         generic_context: Option<Self>,

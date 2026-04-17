@@ -2204,7 +2204,7 @@ specializations. That means that a generic callable is a subtype of any particul
 the generic callable.)
 
 ```py
-from typing import Callable
+from typing import Callable, Generic, TypeVar
 from ty_extensions import RegularCallableTypeOf, TypeOf, is_subtype_of, static_assert
 
 def identity[T](t: T) -> T:
@@ -2229,6 +2229,23 @@ static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[int], int
 # error: [static-assert-error]
 static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], str]))
 static_assert(not is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], int]))
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_subtype_of(Callable[[T], T], Callable[[U], U]))
+static_assert(is_subtype_of(Callable[[U], U], Callable[[T], T]))
+
+class A(Generic[T]):
+    def m(self, x: T) -> T:
+        return x
+
+class B(Generic[U]):
+    def m(self, x: U) -> U:
+        return x
+
+static_assert(is_subtype_of(RegularCallableTypeOf[A.m], RegularCallableTypeOf[B.m]))
+static_assert(is_subtype_of(RegularCallableTypeOf[B.m], RegularCallableTypeOf[A.m]))
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any

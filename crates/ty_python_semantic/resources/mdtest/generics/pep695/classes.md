@@ -667,7 +667,7 @@ class C[T]:
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[Self@method]
 reveal_type(generic_context(C.method))
-# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method, T@C]
 reveal_type(generic_context(C.generic_method))
 # revealed: None
 reveal_type(generic_context(C[int]))
@@ -896,9 +896,9 @@ class Impl[S, R](A[S, R]):
     def foo(self, s: S) -> S:
         return self.set(s, self.get(s))
 
-reveal_type(generic_context(A.get))  # revealed: ty_extensions.GenericContext[Self@get]
-reveal_type(generic_context(A.merge))  # revealed: ty_extensions.GenericContext[Self@merge, R2@merge]
-reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions.GenericContext[Self@foo]
+reveal_type(generic_context(A.get))  # revealed: ty_extensions.GenericContext[Self@get, S@A, R@A]
+reveal_type(generic_context(A.merge))  # revealed: ty_extensions.GenericContext[Self@merge, R2@merge, S@A, R@A]
+reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions.GenericContext[Self@foo, S@Impl]
 ```
 
 ## Tuple as a PEP-695 generic class

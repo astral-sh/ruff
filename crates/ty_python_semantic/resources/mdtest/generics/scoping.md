@@ -152,9 +152,12 @@ already solved and specialized when the class was specialized:
 from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
+reveal_type(Legacy.m)  # revealed: def m[S, T](self, x: T, y: S) -> S
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
 # revealed: ty_extensions.GenericContext[T@Legacy]
 reveal_type(generic_context(Legacy))
+# revealed: ty_extensions.GenericContext[Self@m, S@m, T@Legacy]
+reveal_type(generic_context(Legacy.m))
 # revealed: ty_extensions.GenericContext[Self@m, S@m]
 reveal_type(generic_context(legacy.m))
 ```
@@ -162,11 +165,16 @@ reveal_type(generic_context(legacy.m))
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
 
 ```py
+from ty_extensions import generic_context
+
 class C[T]:
     def m[S](self, x: T, y: S) -> S:
         return y
 
 c: C[int] = C()
+reveal_type(C.m)  # revealed: def m[S, T](self, x: T, y: S) -> S
+# revealed: ty_extensions.GenericContext[Self@m, S@m, T@C]
+reveal_type(generic_context(C.m))
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 

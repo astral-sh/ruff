@@ -278,6 +278,22 @@ static_assert(
 )
 ```
 
+Generic callables are equivalent modulo renaming of their own type parameters:
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_assignable_to(Callable[[T], T], Callable[[U], U]))
+static_assert(is_assignable_to(Callable[[U], U], Callable[[T], T]))
+static_assert(is_subtype_of(Callable[[T], T], Callable[[U], U]))
+static_assert(is_subtype_of(Callable[[U], U], Callable[[T], T]))
+static_assert(is_equivalent_to(Callable[[T], T], Callable[[U], U]))
+```
+
 ### Not equivalent
 
 There are multiple cases when two callable types are not equivalent which are enumerated below.

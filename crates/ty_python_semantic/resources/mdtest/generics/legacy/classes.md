@@ -825,7 +825,7 @@ class C(Generic[T]):
 reveal_type(generic_context(C))
 # revealed: ty_extensions.GenericContext[Self@method]
 reveal_type(generic_context(C.method))
-# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method, T@C]
 reveal_type(generic_context(C.generic_method))
 # revealed: None
 reveal_type(generic_context(C[int]))
