@@ -135,17 +135,12 @@ pub(crate) fn compound_statements(
     // Use an iterator to allow passing it around.
     let mut token_iter = tokens.iter_with_context();
 
-    loop {
-        let Some(token) = token_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = token_iter.next() {
         match token.kind() {
-            TokenKind::Ellipsis
-                if allow_ellipsis => {
-                    allow_ellipsis = false;
-                    continue;
-                }
+            TokenKind::Ellipsis if allow_ellipsis => {
+                allow_ellipsis = false;
+                continue;
+            }
             TokenKind::Indent => {
                 indent = indent.saturating_add(1);
             }

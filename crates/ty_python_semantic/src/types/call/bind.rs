@@ -2131,7 +2131,7 @@ impl<'db> Bindings<'db> {
                             };
 
                             let return_type = parse_struct_format(db, format_literal.value(db))
-                                .map(|elements| Type::heterogeneous_tuple(db, elements.into_iter()))
+                                .map(|elements| Type::heterogeneous_tuple(db, elements))
                                 .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
 
                             overload.set_return_type(return_type);

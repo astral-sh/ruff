@@ -1363,13 +1363,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // Here, `fn` is positional-only parameter because of the `/` while `x` is a
                     // positional-or-keyword parameter.
 
-                    loop {
-                        let Some(EitherOrBoth::Both(source_param, target_param)) =
-                            parameters.next()
-                        else {
-                            break;
-                        };
-
+                    while let Some(EitherOrBoth::Both(source_param, target_param)) =
+                        parameters.next()
+                    {
                         match (source_param.kind(), target_param.kind()) {
                             (
                                 ParameterKind::PositionalOnly {
@@ -1526,11 +1522,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
-                    loop {
-                        let Some(next_parameter) = parameters.next() else {
-                            break;
-                        };
-
+                    while let Some(next_parameter) = parameters.next() {
                         match next_parameter {
                             EitherOrBoth::Left(_) => {
                                 // If the non-Concatenate callable has remaining parameters, they
@@ -1604,11 +1596,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             return result;
                                         }
 
-                                        loop {
-                                            let Some(target_param) = parameters.peek_target()
-                                            else {
-                                                break;
-                                            };
+                                        while let Some(target_param) = parameters.peek_target() {
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
@@ -1683,11 +1671,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
 
                     if target.parameters.kind() != ParametersKind::Gradual {
-                        loop {
-                            let Some(next_parameter) = parameters.next() else {
-                                break;
-                            };
-
+                        while let Some(next_parameter) = parameters.next() {
                             match next_parameter {
                                 EitherOrBoth::Left(_) => {
                                     return self.never();
@@ -1909,11 +1893,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_iter: target_prefix_params.iter(),
                     };
 
-                    loop {
-                        let Some(parameter) = parameters.next() else {
-                            break;
-                        };
-
+                    while let Some(parameter) = parameters.next() {
                         match parameter {
                             EitherOrBoth::Left(_) => {
                                 // Once the right (other) iterator is exhausted, all the remaining
@@ -1956,11 +1936,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             return result;
                                         }
 
-                                        loop {
-                                            let Some(target_param) = parameters.peek_target()
-                                            else {
-                                                break;
-                                            };
+                                        while let Some(target_param) = parameters.peek_target() {
                                             if !check_types(
                                                 target_param.annotated_type(),
                                                 source_param.annotated_type(),
@@ -2135,10 +2111,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // So, any remaining positional parameters in `target` would need to be
                             // checked against the variadic parameter in `source`. This loop does
                             // that by only moving the `other` iterator forward.
-                            loop {
-                                let Some(target_parameter) = parameters.peek_target() else {
-                                    break;
-                                };
+                            while let Some(target_parameter) = parameters.peek_target() {
                                 match target_parameter.kind() {
                                     ParameterKind::PositionalOrKeyword { .. } => {
                                         target_keywords.push(target_parameter);

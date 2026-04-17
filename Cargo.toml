@@ -249,6 +249,7 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+collapsible_match = "allow"  # Not always an improvement in readability, quite opinionated
 needless_continue = "allow" # An explicit continue can be more readable, especially if the alternative is an empty block.
 unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250

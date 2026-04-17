@@ -4249,7 +4249,7 @@ pub(crate) fn report_invalid_exception_raised(
     };
     if raise_type.is_notimplemented(context.db()) {
         let mut diagnostic =
-            builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`",));
+            builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
         diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
         diagnostic.info("Can only raise an instance or subclass of `BaseException`");
     } else {
@@ -4798,7 +4798,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     let db = context.db();
     let class_name = protocol.name(db);
     let mut diagnostic =
-        builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`",));
+        builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`"));
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
@@ -4919,7 +4919,7 @@ pub(crate) fn report_undeclared_protocol_member(
     );
     class_def_diagnostic.annotate(
         Annotation::primary(protocol_class.definition_span(db))
-            .message(format_args!("`{class_name}` declared as a protocol here",)),
+            .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
 
@@ -4950,7 +4950,7 @@ pub(crate) fn report_duplicate_bases(
     let duplicate_name = duplicate_base.name(db);
 
     let mut diagnostic =
-        builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
+        builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
     let mut sub_diagnostic = SubDiagnostic::new(
         SubDiagnosticSeverity::Info,
@@ -5724,8 +5724,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 "It is recommended for `{member}` to work with arbitrary objects, for example:",
             ),
             format_args!(""),
-            format_args!("    def {member}(self, other: object) -> bool:",),
-            format_args!("        if not isinstance(other, {class_name}):",),
+            format_args!("    def {member}(self, other: object) -> bool:"),
+            format_args!("        if not isinstance(other, {class_name}):"),
             format_args!("            return False"),
             format_args!("        return <logic to compare two `{class_name}` instances>"),
             format_args!(""),
