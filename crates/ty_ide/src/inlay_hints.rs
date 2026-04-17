@@ -169,6 +169,7 @@ impl InlayHint {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
+        allow_edits: bool,
     ) -> Self {
         let label_parts = vec![
             InlayHintLabelPart::new(name).with_target(navigation_target),
@@ -179,7 +180,14 @@ impl InlayHint {
             position,
             kind: InlayHintKind::CallArgumentName,
             label: InlayHintLabel { parts: label_parts },
-            text_edits: vec![],
+            text_edits: if allow_edits {
+                vec![InlayHintTextEdit {
+                    range: TextRange::empty(position),
+                    new_text: format!("{name}="),
+                }]
+            } else {
+                vec![]
+            },
         }
     }
 
@@ -402,6 +410,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
+        allow_edits: bool,
     ) {
         if !self.settings.call_argument_names {
             return;
@@ -411,7 +420,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
+        let inlay_hint =
+            InlayHint::call_argument_name(position, name, navigation_target, allow_edits);
 
         self.hints.push(inlay_hint);
     }
@@ -492,16 +502,45 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                for (index, arg_or_keyword) in call.arguments.iter_source_order().enumerate() {
-                    if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
-                        && !arg_matches_name(&arg_or_keyword, name)
-                    {
-                        self.add_call_argument_name(
-                            arg_or_keyword.range().start(),
-                            name,
-                            parameter_label_offset.map(NavigationTarget::from),
+                let last_editable_arg_start = call
+                    .arguments
+                    .iter_source_order()
+                    .filter_map(|arg_or_keyword| match arg_or_keyword {
+                        ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => {
+                            Some(arg.range().start())
+                        }
+                        _ => None,
+                    })
+                    .last();
+
+                // `argument_names` is keyed by positional-arg index, not source-order index,
+                // so track them separately to stay in sync after keyword args appear mid-call.
+                let mut positional_index = 0;
+                for arg_or_keyword in call.arguments.iter_source_order() {
+                    if let ArgOrKeyword::Arg(_) = arg_or_keyword {
+                        // Offer an edit only for the rightmost non-starred positional arg.
+                        let allow_edits = matches!(
+                            arg_or_keyword,
+                            ArgOrKeyword::Arg(arg)
+                                if !arg.is_starred_expr()
+                                    && Some(arg.range().start()) == last_editable_arg_start
                         );
+
+                        if let Some((name, parameter_label_offset)) =
+                            details.argument_names.get(&positional_index)
+                            && !arg_matches_name(&arg_or_keyword, name)
+                        {
+                            self.add_call_argument_name(
+                                arg_or_keyword.range().start(),
+                                name,
+                                parameter_label_offset.map(NavigationTarget::from),
+                                allow_edits,
+                            );
+                        }
+
+                        positional_index += 1;
                     }
+
                     self.visit_expr(arg_or_keyword.value());
                 }
             }
@@ -515,9 +554,15 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 /// Given a positional argument, check if the expression is the "same name"
 /// as the function argument itself.
 ///
-/// This allows us to filter out reptitive inlay hints like `x=x`, `x=y.x`, etc.
+/// This allows us to filter out repetitive inlay hints like `x=x`, `x=y.x`, etc.,
+/// and suppresses hints for arguments that are already explicit keyword arguments.
 fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
-    // Only care about positional args
+    // Explicit keyword argument already has a name, no hint needed.
+    if let ArgOrKeyword::Keyword(keyword) = arg_or_keyword {
+        return keyword.arg.is_some();
+    }
+
+    // Only care about positional args.
     let ArgOrKeyword::Arg(arg) = arg_or_keyword else {
         return false;
     };
@@ -749,6 +794,8 @@ mod tests {
         source::source_text,
     };
     use ruff_diagnostics::{Edit, Fix};
+    use ruff_python_ast::PySourceType;
+    use ruff_python_parser::parse_unchecked_source;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
 
@@ -829,6 +876,9 @@ mod tests {
             let hints = inlay_hints(&self.db, self.file, self.range, settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut text_edit_buf = inlay_hint_buf.clone();
+            let source_has_errors =
+                parse_unchecked_source(&text_edit_buf, PySourceType::Python).has_invalid_syntax();
 
             let mut tbd_diagnostics = Vec::new();
 
@@ -858,7 +908,28 @@ mod tests {
 
                 inlay_hint_buf.insert_str(end_position, &hint_str);
             }
+            let mut edit_offset = 0;
 
+            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
+                let start = edit.range.start().to_usize() + edit_offset;
+                let end = edit.range.end().to_usize() + edit_offset;
+
+                text_edit_buf.replace_range(start..end, &edit.new_text);
+
+                edit_offset += edit.new_text.len() - edit.range.len().to_usize();
+            }
+
+            let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
+            if edited.has_invalid_syntax() && !source_has_errors {
+                let syntax_errors = edited.errors().iter().map(|error| &error.error).join("\n");
+
+                panic!(
+                    "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated inlay hint edits:
+{syntax_errors}
+Source with applied edits:
+{text_edit_buf}"
+                );
+            }
             self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
             let inlayed_file =
                 system_path_to_file(&self.db, "main2.py").expect("newly written file to existing");
@@ -2052,7 +2123,8 @@ mod tests {
           -         self.y = y
         6 +         self.y: Unknown = y
         7 |
-        8 | a = A(2)
+          - a = A(2)
+        8 + a = A(y=2)
         9 | a.y = int(3)
         ");
     }
@@ -3393,10 +3465,12 @@ mod tests {
         6  |
            - x = MyClass([42], ("a", "b"))
            - y = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        7  + x: MyClass[int, str] = MyClass([42], ("a", "b"))
-        8  + y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        9  | a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
-        10 | c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+           - a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
+           - c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+        7  + x: MyClass[int, str] = MyClass([42], y=("a", "b"))
+        8  + y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b")))
+        9  + a, b = MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b"))
+        10 + c, d = (MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b")))
         "#);
     }
 
@@ -3451,6 +3525,14 @@ mod tests {
         3 | foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int): pass
+          - foo(1)
+        3 + foo(x=1)
         ");
     }
 
@@ -3485,6 +3567,15 @@ mod tests {
         6 | foo([x=]y)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        3 | x = 1
+        4 | y = 2
+        5 | foo(x)
+          - foo(y)
+        6 + foo(x=y)
         ");
     }
 
@@ -3527,6 +3618,15 @@ mod tests {
         10 | foo([x=]val.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        7  | val = MyClass()
+        8  |
+        9  | foo(val.x)
+           - foo(val.y)
+        10 + foo(x=val.y)
         ");
     }
 
@@ -3570,6 +3670,15 @@ mod tests {
         10 | foo([x=]x.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        7  | x = MyClass()
+        8  |
+        9  | foo(x.x)
+           - foo(x.y)
+        10 + foo(x=x.y)
         ");
     }
 
@@ -3616,6 +3725,15 @@ mod tests {
         12 | foo([x=]val.y())
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        9  | val = MyClass()
+        10 |
+        11 | foo(val.x())
+           - foo(val.y())
+        12 + foo(x=val.y())
         ");
     }
 
@@ -3666,6 +3784,15 @@ mod tests {
         14 | foo([x=]val.y()[1])
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        11 | val = MyClass()
+        12 |
+        13 | foo(val.x()[0])
+           - foo(val.y()[1])
+        14 + foo(x=val.y()[1])
         ");
     }
 
@@ -3766,7 +3893,8 @@ mod tests {
         4 + y: list[int] = [2]
         5 |
         6 | foo(x[0])
-        7 | foo(y[0])
+          - foo(y[0])
+        7 + foo(x=y[0])
         ");
     }
 
@@ -3860,6 +3988,15 @@ mod tests {
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+        3 | t: tuple[int, int] = (23, 42)
+          - foo('foo', *t, d='bar')
+        4 + foo(a='foo', *t, d='bar')
         ");
     }
 
@@ -3917,6 +4054,97 @@ mod tests {
         4 | foo([a=]'foo', [b=]*t, [c=]'bar')
           |                         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+          - foo('foo', *t, 'bar')
+        4 + foo('foo', *t, c='bar')
+        ");
+    }
+
+    #[test]
+    fn test_function_call_last_plain_positional_before_starred_argument() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: int, b: int): ...
+            t: tuple[int] = (2,)
+            foo(1, *t)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: int, b: int): ...
+        t: tuple[int] = (2,)
+        foo([a=]1, [b=]*t)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: int, b: int): ...
+          |         ^
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([a=]1, [b=]*t)
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(a: int, b: int): ...
+          |                 ^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        4 | foo([a=]1, [b=]*t)
+          |             ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: int, b: int): ...
+        3 | t: tuple[int] = (2,)
+          - foo(1, *t)
+        4 + foo(a=1, *t)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_only_starred_argument_has_no_edit() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: int): ...
+            t: tuple[int] = (1,)
+            foo(*t)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: int): ...
+        t: tuple[int] = (1,)
+        foo([a=]*t)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: int): ...
+          |         ^
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([a=]*t)
+          |      ^
+          |
         ");
     }
 
@@ -3945,6 +4173,14 @@ mod tests {
         3 | foo(1, [y=]2)
           |         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int, /, y: int): pass
+          - foo(1, 2)
+        3 + foo(1, y=2)
         ");
     }
 
@@ -4020,6 +4256,17 @@ mod tests {
         5 | f = Foo([x=]1)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | class Foo:
+        3 |     def __init__(self, x: int): pass
+          - Foo(1)
+          - f = Foo(1)
+        4 + Foo(x=1)
+        5 + f = Foo(x=1)
         ");
     }
 
@@ -4065,6 +4312,17 @@ mod tests {
         5 | f = Foo([x=]1)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | class Foo:
+        3 |     def __new__(cls, x: int): pass
+          - Foo(1)
+          - f = Foo(1)
+        4 + Foo(x=1)
+        5 + f = Foo(x=1)
         ");
     }
 
@@ -4099,6 +4357,15 @@ mod tests {
         6 | Foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        3 |     def __call__(self, x: int): pass
+        4 | class Foo(metaclass=MetaFoo):
+        5 |     pass
+          - Foo(1)
+        6 + Foo(x=1)
         ");
     }
 
@@ -4146,6 +4413,15 @@ mod tests {
         4 | Foo().bar([y=]2)
           |            ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | class Foo:
+        3 |     def bar(self, y: int): pass
+          - Foo().bar(2)
+        4 + Foo().bar(y=2)
         ");
     }
 
@@ -4178,6 +4454,15 @@ mod tests {
         5 | Foo.bar([y=]2)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | class Foo:
+        3 |     @classmethod
+        4 |     def bar(cls, y: int): pass
+          - Foo.bar(2)
+        5 + Foo.bar(y=2)
         ");
     }
 
@@ -4210,6 +4495,15 @@ mod tests {
         5 | Foo.bar([y=]2)
           |          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | class Foo:
+        3 |     @staticmethod
+        4 |     def bar(y: int): pass
+          - Foo.bar(2)
+        5 + Foo.bar(y=2)
         ");
     }
 
@@ -4253,6 +4547,16 @@ mod tests {
         4 | foo([x=]'abc')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int | str): pass
+          - foo(1)
+          - foo('abc')
+        3 + foo(x=1)
+        4 + foo(x='abc')
         ");
     }
 
@@ -4307,6 +4611,81 @@ mod tests {
         3 | foo([x=]1, [y=]'hello', [z=]True)
           |                          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int, y: str, z: bool): pass
+          - foo(1, 'hello', True)
+        3 + foo(1, 'hello', z=True)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_multiple_positional_arguments_before_keyword() {
+        let mut test = inlay_hint_test(
+            "
+            def add(x: int, b, y: int) -> int:
+                return x + y
+
+            total = add(3, 2, y=4)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def add(x: int, b, y: int) -> int:
+            return x + y
+
+        total[: int] = add([x=]3, [b=]2, y=4)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        348 | class int:
+            |       ^^^
+            |
+        info: Source
+         --> main2.py:5:9
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |         ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def add(x: int, b, y: int) -> int:
+          |         ^
+          |
+        info: Source
+         --> main2.py:5:21
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |                     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def add(x: int, b, y: int) -> int:
+          |                 ^
+          |
+        info: Source
+         --> main2.py:5:28
+          |
+        5 | total[: int] = add([x=]3, [b=]2, y=4)
+          |                            ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | def add(x: int, b, y: int) -> int:
+        3 |     return x + y
+        4 |
+          - total = add(3, 2, y=4)
+        5 + total: int = add(3, b=2, y=4)
         ");
     }
 
@@ -4335,6 +4714,52 @@ mod tests {
         3 | foo([x=]1, z=True, y='hello')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int, y: str, z: bool): pass
+          - foo(1, z=True, y='hello')
+        3 + foo(x=1, z=True, y='hello')
+        ");
+    }
+
+    #[test]
+    fn test_function_call_positional_after_keyword_in_source_order() {
+        // ty should continue to map positional args correctly in invalid or in-progress code,
+        // even if a keyword arg appears earlier in source order.
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: int, y: str): pass
+            foo(y='hello', 1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(x: int, y: str): pass
+        foo(y='hello', [y=]1)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(x: int, y: str): pass
+          |                 ^
+          |
+        info: Source
+         --> main2.py:3:17
+          |
+        3 | foo(y='hello', [y=]1)
+          |                 ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int, y: str): pass
+          - foo(y='hello', 1)
+        3 + foo(y='hello', y=1)
         ");
     }
 
@@ -4432,6 +4857,18 @@ mod tests {
         5 | foo([x=]1, [y=]'custom', [z=]True)
           |                           ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int, y: str = 'default', z: bool = False): pass
+          - foo(1)
+          - foo(1, 'custom')
+          - foo(1, 'custom', True)
+        3 + foo(x=1)
+        4 + foo(1, y='custom')
+        5 + foo(1, 'custom', z=True)
         ");
     }
 
@@ -4539,6 +4976,15 @@ mod tests {
         10 | baz([a=]foo([x=]5), [b=]bar([y=]bar([y=]'test')), [c=]True)
            |                                                    ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        7  |
+        8  | def baz(a: int, b: str, c: bool): pass
+        9  |
+           - baz(foo(5), bar(bar('test')), True)
+        10 + baz(foo(x=5), bar(y=bar(y='test')), c=True)
         ");
     }
 
@@ -4590,6 +5036,15 @@ mod tests {
         8 | A().foo([value=]42).bar([name=]'test').baz()
           |                          ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        5 |     def bar(self, name: str) -> 'A':
+        6 |         return self
+        7 |     def baz(self): pass
+          - A().foo(42).bar('test').baz()
+        8 + A().foo(value=42).bar(name='test').baz()
         ");
     }
 
@@ -4624,6 +5079,15 @@ mod tests {
         5 | bar(y=foo([x=]'test'))
           |            ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        2 | def foo(x: str) -> str:
+        3 |     return x
+        4 | def bar(y: int): pass
+          - bar(y=foo('test'))
+        5 + bar(y=foo(x='test'))
         ");
     }
 
@@ -4669,6 +5133,17 @@ mod tests {
         3 | bar[: (a, b) -> Unknown] = lambda a, b: a + b
           |                 ^^^^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | foo = lambda x: x * 2
+        3 | bar = lambda a, b: a + b
+          - foo(5)
+          - bar(1, 2)
+        4 + foo(x=5)
+        5 + bar(1, b=2)
         ");
     }
 
@@ -5042,6 +5517,16 @@ mod tests {
         4 | foo(1, 'pos', [c=]3.14, e=42, f='custom')
           |                ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+          - foo(1, 'pos', 3.14, False, e=42)
+          - foo(1, 'pos', 3.14, e=42, f='custom')
+        3 + foo(1, 'pos', 3.14, d=False, e=42)
+        4 + foo(1, 'pos', c=3.14, e=42, f='custom')
         ");
     }
 
@@ -5079,6 +5564,15 @@ mod tests {
         4 | bar([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from foo import bar
+        3 |
+          - bar(1)
+        4 + bar(x=1)
         ");
     }
 
@@ -5138,6 +5632,17 @@ mod tests {
         12 | foo([x=]'hello')
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        8  | def foo(x):
+        9  |     return x
+        10 |
+           - foo(42)
+           - foo('hello')
+        11 + foo(x=42)
+        12 + foo(x='hello')
         ");
     }
 
@@ -5257,6 +5762,15 @@ mod tests {
         11 | f([x=][])
            |    ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        8  | def f(x):
+        9  |     return x
+        10 |
+           - f([])
+        11 + f(x=[])
         ");
     }
 
@@ -5307,6 +5821,16 @@ mod tests {
         4 | foo([x=]1)
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(x: int): pass
+        3 | def bar(y: int): pass
+          - foo(1)
+        4 + foo(x=1)
+        5 | bar(2)
         ");
     }
 
@@ -5335,6 +5859,14 @@ mod tests {
         3 | foo(1, [y=]2)
           |         ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(_x: int, y: int): pass
+          - foo(1, 2)
+        3 + foo(1, y=2)
         ");
     }
 
@@ -5384,6 +5916,15 @@ mod tests {
         7 | foo([x=]1, [y=]2)
           |             ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        4 |     y: int
+        5 | ): ...
+        6 |
+          - foo(1, 2)
+        7 + foo(1, y=2)
         ");
     }
 
@@ -5817,6 +6358,17 @@ mod tests {
         6 | Y[: <NewType pseudo-class 'N'>] = N
           |                            ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from typing import NewType
+        3 |
+          - N = NewType('N', str)
+        4 + N = NewType('N', tp=str)
+        5 |
+        6 | Y = N
         ");
     }
 
@@ -5914,6 +6466,15 @@ mod tests {
         4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from typing import Protocol, TypeVar
+          - T = TypeVar('T')
+        3 + T = TypeVar(name='T')
+        4 | Strange = Protocol[T]
         ");
     }
 
@@ -5942,6 +6503,14 @@ mod tests {
         3 | P = ParamSpec([name=]'P')
           |                ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from typing import ParamSpec
+          - P = ParamSpec('P')
+        3 + P = ParamSpec(name='P')
         ");
     }
 
@@ -5983,6 +6552,14 @@ mod tests {
         3 | A = TypeAliasType([name=]'A', [value=]str)
           |                                ^^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from typing_extensions import TypeAliasType
+          - A = TypeAliasType('A', str)
+        3 + A = TypeAliasType('A', value=str)
         ");
     }
 
@@ -6011,6 +6588,14 @@ mod tests {
         3 | Ts = TypeVarTuple([name=]'Ts')
           |                    ^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | from typing_extensions import TypeVarTuple
+          - Ts = TypeVarTuple('Ts')
+        3 + Ts = TypeVarTuple(name='Ts')
         ");
     }
 
@@ -6503,7 +7088,7 @@ mod tests {
         4 | class Baz: ...
         5 |
           - a = D(Baz)
-        6 + a: D[Baz] = D(Baz)
+        6 + a: D[Baz] = D(x=Baz)
         ");
     }
 
@@ -6956,7 +7541,7 @@ mod tests {
         9  |     x: T
         10 |
            - b = B(foo.A())
-        11 + b: B[foo.A] = B(foo.A())
+        11 + b: B[foo.A] = B(x=foo.A())
         ");
     }
 
