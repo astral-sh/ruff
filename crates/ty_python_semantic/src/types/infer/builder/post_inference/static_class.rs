@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 
 use crate::attribute_assignments;
 use crate::{
-    Db, TypeQualifiers,
+    TypeQualifiers,
     diagnostic::format_enumeration,
     place::{place_from_bindings, place_from_declarations},
     types::{
@@ -21,7 +21,7 @@ use crate::{
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
-            expanded_fixed_length_starred_class_base_tuple,
+            expanded_class_base_entries,
         },
         context::InferContext,
         definition_expression_type,
@@ -387,20 +387,22 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that the class's MRO is resolvable
-    let expanded_base_nodes = expanded_class_base_nodes(db, class_node, index);
     match class.try_mro(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
+                let expanded_base_entries =
+                    expanded_class_base_entries(db, class.known(db), class_node, class_definition);
                 for duplicate in duplicates {
-                    report_duplicate_bases(context, class, duplicate, &expanded_base_nodes);
+                    report_duplicate_bases(context, class, duplicate, &expanded_base_entries);
                 }
             }
             StaticMroErrorKind::InvalidBases(bases) => {
+                let expanded_base_entries =
+                    expanded_class_base_entries(db, class.known(db), class_node, class_definition);
                 for (index, base_ty) in bases {
-                    let Some(base_node) = expanded_base_nodes.get(*index) else {
-                        continue;
-                    };
-                    report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
+                    if let Some(base_node) = expanded_base_entries[*index].source_node() {
+                        report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
+                    }
                 }
             }
             StaticMroErrorKind::UnresolvableMro {
@@ -1182,36 +1184,6 @@ fn check_final_class_abstract_methods<'db>(
             }
         }
     }
-}
-
-/// Returns the raw base-expression nodes expanded to match the indexing of
-/// [`StaticClassLiteral::explicit_bases`].
-///
-/// For a starred base that unpacks a fixed-length tuple, this repeats the original starred
-/// expression once per unpacked element so MRO diagnostics can map semantic base indices back to
-/// source spans.
-fn expanded_class_base_nodes<'a, 'db>(
-    db: &'db dyn Db,
-    class_node: &'a ast::StmtClassDef,
-    index: &SemanticIndex<'db>,
-) -> Vec<&'a ast::Expr> {
-    let class_definition = index.expect_single_definition(class_node);
-    let mut expanded_base_nodes = Vec::with_capacity(class_node.bases().len());
-
-    for base_node in class_node.bases() {
-        if let Some(tuple) =
-            expanded_fixed_length_starred_class_base_tuple(db, class_definition, base_node)
-        {
-            for _ in 0..tuple.len() {
-                expanded_base_nodes.push(base_node);
-            }
-            continue;
-        }
-
-        expanded_base_nodes.push(base_node);
-    }
-
-    expanded_base_nodes
 }
 
 /// Check for `Final`-qualified declarations in a class body scope that are never
