@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_mkdir_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_keyword_only_argument_non_default,
+    has_unknown_keywords_or_starred_expr, is_bytes_path, is_keyword_only_argument_non_default,
     is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
@@ -82,12 +82,16 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsMkdir, call.func.range());
-
     let Some(path) = call.arguments.find_argument_value("path", 0) else {
         return;
     };
+
+    if is_bytes_path(path, checker.semantic()) {
+        return;
+    }
+
+    let range = call.range();
+    let mut diagnostic = checker.report_diagnostic(OsMkdir, call.func.range());
 
     if !is_fix_os_mkdir_enabled(checker.settings()) {
         return;
