@@ -35,6 +35,7 @@ use crate::types::typed_dict::{
     extract_unpacked_typed_dict_keys_from_value_type,
 };
 use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
@@ -866,17 +867,20 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
+        let removed_receiver = parameters.peek().is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        if parameters.peek().is_some_and(Parameter::is_positional) {
+        if removed_receiver {
             parameters.next();
         }
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        if let Some(self_type) = self_type {
+        if let Some(self_type) = self_type
+            && self.needs_self_mapping(db, removed_receiver)
+        {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
             parameters = parameters.apply_type_mapping_impl(
@@ -897,7 +901,72 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns `true` if this signature's first parameter can accept the bound `self` type.
+    ///
+    /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
+    /// If a signature has no positional first parameter, we conservatively keep it.
+    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        if self_type.is_dynamic() {
+            return true;
+        }
+
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return true;
+        };
+
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // `Self`-like typevars in the receiver annotation are bound using the concrete receiver.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
+
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some(self_specialization) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            if accepts_any_or_exact_self(expected_self_ty) {
+                return true;
+            }
+        }
+
+        let inferable = self.inferable_typevars(db);
+        let constraints = ConstraintSetBuilder::new();
+        if any_over_type(db, self_type, false, Type::is_union) {
+            // A union receiver can bind an overload that accepts any possible receiver
+            // alternative; whole-type assignability would only keep overloads that accept all of
+            // them.
+            return !self_type
+                .when_disjoint_from(db, expected_self_ty, &constraints, inferable)
+                .is_always_satisfied(db);
+        }
+
+        self_type
+            .when_assignable_to(db, expected_self_ty, &constraints, inferable)
+            .is_always_satisfied(db)
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        if !self.needs_self_mapping(db, false) {
+            return self.clone();
+        }
+
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
             db,
             self_type,
@@ -1064,6 +1133,16 @@ impl<'db> Signature<'db> {
                 })
             }),
         ))
+    }
+
+    fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
+        self.return_ty.contains_self(db)
+            || self
+                .parameters
+                .iter()
+                .enumerate()
+                .skip(usize::from(receiver_is_removed))
+                .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
