@@ -3100,7 +3100,7 @@ impl<'db> CallableBinding<'db> {
             // flag is to handle that special case of many-to-one mapping from arguments to parameters.
             let mut variadic_parameter_handled = false;
 
-            for (argument_index, argument_types) in arguments.types().iter().enumerate() {
+            for (argument_index, (_argument, argument_types)) in arguments.iter().enumerate() {
                 if variadic_parameter_handled {
                     continue;
                 }
