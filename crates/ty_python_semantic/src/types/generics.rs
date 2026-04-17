@@ -1494,77 +1494,98 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        let source_top =
-            source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
-        let source_bottom = source_type.materialize(
-            db,
-            MaterializationKind::Bottom,
-            self.materialization_visitor,
-        );
-        let target_top =
-            target_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
-        let target_bottom = target_type.materialize(
-            db,
-            MaterializationKind::Bottom,
-            self.materialization_visitor,
-        );
+        self.materialization_visitor.visit_invariant_relation(
+            source_type,
+            target_type,
+            || self.check_type_pair(db, source_type, target_type),
+            || {
+                let source_top = source_type.materialize(
+                    db,
+                    MaterializationKind::Top,
+                    self.materialization_visitor,
+                );
+                let source_bottom = source_type.materialize(
+                    db,
+                    MaterializationKind::Bottom,
+                    self.materialization_visitor,
+                );
+                let target_top = target_type.materialize(
+                    db,
+                    MaterializationKind::Top,
+                    self.materialization_visitor,
+                );
+                let target_bottom = target_type.materialize(
+                    db,
+                    MaterializationKind::Bottom,
+                    self.materialization_visitor,
+                );
 
-        let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
-            // TODO:
-            // This should be removed and properly handled in the respective
-            // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-            // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
-            // return `self.always()` from that branch, as that leads to union
-            // simplification, which means that we lose track of type variables
-            // without recording the constraints under which the relation holds.
-            if matches!(target, Type::TypeVar(_)) || matches!(source, Type::TypeVar(_)) {
-                return self.always();
-            }
+                let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
+                    // TODO:
+                    // This should be removed and properly handled in the respective
+                    // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
+                    // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
+                    // return `self.always()` from that branch, as that leads to union
+                    // simplification, which means that we lose track of type variables
+                    // without recording the constraints under which the relation holds.
+                    if matches!(target, Type::TypeVar(_)) || matches!(source, Type::TypeVar(_)) {
+                        return self.always();
+                    }
 
-            self.check_type_pair(db, source, target)
-        };
-        match (source_materialization, target_materialization) {
-            // `source` is a subtype of `target` if the range of materializations covered by `source`
-            // is a subset of the range covered by `target`.
-            (MaterializationKind::Top, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
-                    is_subtype_of(source_top, target_top)
-                })
-            }
-            // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-            (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
-                is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
-                    is_subtype_of(target_top, source_top)
-                })
-            }
-            // The bottom materialization of `source` is a subtype of the top materialization
-            // of `target` if there is some type that is both within the
-            // range of types covered by derived and within the range covered by base, because if such a type
-            // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
-            (MaterializationKind::Bottom, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom)
-                    .and(db, self.constraints, || {
-                        is_subtype_of(source_bottom, target_top)
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_top, target_top)
+                    self.check_type_pair(db, source, target)
+                };
+                match (source_materialization, target_materialization) {
+                    // `source` is a subtype of `target` if the range of materializations covered by `source`
+                    // is a subset of the range covered by `target`.
+                    (MaterializationKind::Top, MaterializationKind::Top) => {
+                        is_subtype_of(target_bottom, source_bottom).and(
+                            db,
+                            self.constraints,
+                            || is_subtype_of(source_top, target_top),
+                        )
+                    }
+                    // One bottom is a subtype of another if it covers a strictly larger set of materializations.
+                    (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
+                        is_subtype_of(source_bottom, target_bottom).and(
+                            db,
+                            self.constraints,
+                            || is_subtype_of(target_top, source_top),
+                        )
+                    }
+                    // The bottom materialization of `source` is a subtype of the top materialization
+                    // of `target` if there is some type that is both within the
+                    // range of types covered by derived and within the range covered by base, because if such a type
+                    // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
+                    (MaterializationKind::Bottom, MaterializationKind::Top) => {
+                        is_subtype_of(target_bottom, source_bottom)
+                            .and(db, self.constraints, || {
+                                is_subtype_of(source_bottom, target_top)
+                            })
+                            .or(db, self.constraints, || {
+                                is_subtype_of(target_bottom, source_top).and(
+                                    db,
+                                    self.constraints,
+                                    || is_subtype_of(source_top, target_top),
+                                )
+                            })
+                            .or(db, self.constraints, || {
+                                is_subtype_of(target_top, source_top).and(
+                                    db,
+                                    self.constraints,
+                                    || is_subtype_of(source_bottom, target_top),
+                                )
+                            })
+                    }
+                    // A top materialization is a subtype of a bottom materialization only if both original
+                    // un-materialized types are the same fully static type.
+                    (MaterializationKind::Top, MaterializationKind::Bottom) => {
+                        is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
+                            is_subtype_of(target_top, source_bottom)
                         })
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_bottom, target_top)
-                        })
-                    })
-            }
-            // A top materialization is a subtype of a bottom materialization only if both original
-            // un-materialized types are the same fully static type.
-            (MaterializationKind::Top, MaterializationKind::Bottom) => {
-                is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
-                    is_subtype_of(target_top, source_bottom)
-                })
-            }
-        }
+                    }
+                }
+            },
+        )
     }
 }
 

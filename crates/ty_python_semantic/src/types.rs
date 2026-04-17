@@ -4,7 +4,8 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
+use std::hash::Hash;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -18,6 +19,7 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
@@ -245,6 +247,89 @@ struct ApplyMaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
 
+#[derive(Debug, Default, Clone, Copy)]
+struct ActiveMaterializationKinds {
+    top: u32,
+    bottom: u32,
+}
+
+impl ActiveMaterializationKinds {
+    fn contains(self, kind: MaterializationKind) -> bool {
+        match kind {
+            MaterializationKind::Top => self.top > 0,
+            MaterializationKind::Bottom => self.bottom > 0,
+        }
+    }
+
+    fn insert(&mut self, kind: MaterializationKind) {
+        match kind {
+            MaterializationKind::Top => self.top += 1,
+            MaterializationKind::Bottom => self.bottom += 1,
+        }
+    }
+
+    fn remove(&mut self, kind: MaterializationKind) {
+        match kind {
+            MaterializationKind::Top => self.top -= 1,
+            MaterializationKind::Bottom => self.bottom -= 1,
+        }
+    }
+
+    fn is_empty(self) -> bool {
+        self.top == 0 && self.bottom == 0
+    }
+}
+
+#[derive(Debug)]
+struct MaterializationPolarityDetector<T> {
+    seen: RefCell<FxHashMap<T, ActiveMaterializationKinds>>,
+}
+
+impl<T> Default for MaterializationPolarityDetector<T> {
+    fn default() -> Self {
+        Self {
+            seen: RefCell::new(FxHashMap::default()),
+        }
+    }
+}
+
+impl<T: Hash + Eq + Clone> MaterializationPolarityDetector<T> {
+    fn visit<R>(
+        &self,
+        item: &T,
+        materialization_kind: MaterializationKind,
+        on_cycle: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        {
+            let mut seen = self.seen.borrow_mut();
+            if seen
+                .get(item)
+                .is_some_and(|active| active.contains(materialization_kind.flip()))
+            {
+                return on_cycle();
+            }
+
+            seen.entry(item.clone())
+                .or_default()
+                .insert(materialization_kind);
+        }
+
+        let ret = func();
+
+        let mut seen = self.seen.borrow_mut();
+        let entry = seen
+            .get_mut(item)
+            .expect("active materialization entry must exist");
+        entry.remove(materialization_kind);
+        if entry.is_empty() {
+            seen.remove(item);
+        }
+
+        ret
+    }
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Materialization is the only mapping mode that needs to visit the same type under two different
@@ -254,7 +339,9 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    materialization_polarity: OnceCell<MaterializationPolarityDetector<Type<'db>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    invariant_relation: OnceCell<ActiveRecursionDetector<(Type<'db>, Type<'db>)>>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
@@ -263,8 +350,19 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             .get_or_init(|| Rc::new(CycleDetector::new(true)))
     }
 
+    fn materialization_polarity(&self) -> &MaterializationPolarityDetector<Type<'db>> {
+        self.materialization_polarity
+            .get_or_init(MaterializationPolarityDetector::default)
+    }
+
+    fn invariant_relation(&self) -> &ActiveRecursionDetector<(Type<'db>, Type<'db>)> {
+        self.invariant_relation
+            .get_or_init(ActiveRecursionDetector::default)
+    }
+
     pub(crate) fn visit(
         &self,
+        _db: &'db dyn Db,
         ty: Type<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
@@ -285,6 +383,35 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         }
     }
 
+    fn visit_materialization_polarity(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        materialization_kind: MaterializationKind,
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        let polarity_key = ty.expand_eagerly(db);
+        self.materialization_polarity().visit(
+            &polarity_key,
+            materialization_kind,
+            || {
+                let cycle = DivergentType::new(InternedType::new(db, polarity_key).as_id())
+                    .materialized(materialization_kind);
+                Type::Divergent(cycle)
+            },
+            || match materialization_kind {
+                MaterializationKind::Top => self
+                    .top_materialization
+                    .get_or_init(TypeTransformer::default)
+                    .visit(ty, func),
+                MaterializationKind::Bottom => self
+                    .bottom_materialization
+                    .get_or_init(TypeTransformer::default)
+                    .visit(ty, func),
+            },
+        )
+    }
+
     pub(crate) fn is_equivalent_to_materialization(
         &self,
         db: &'db dyn Db,
@@ -294,6 +421,17 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         self.materialization_equivalence().visit((left, right), || {
             left.is_equivalent_to_with_materialization_visitor(db, right, self)
         })
+    }
+
+    pub(crate) fn visit_invariant_relation<R>(
+        &self,
+        source: Type<'db>,
+        target: Type<'db>,
+        on_cycle: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        self.invariant_relation()
+            .visit(&(source, target), on_cycle, func)
     }
 
     pub(crate) fn for_new_materialization_root(&self) -> Self {
@@ -306,7 +444,9 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            materialization_polarity: OnceCell::new(),
             materialization_equivalence,
+            invariant_relation: OnceCell::new(),
         }
     }
 }
@@ -317,7 +457,9 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            materialization_polarity: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
+            invariant_relation: OnceCell::new(),
         }
     }
 }
@@ -1331,6 +1473,21 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
+    }
+
+    pub(crate) fn has_divergent_eager_expansion(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self.expand_eagerly(db), false, |ty| ty.is_divergent())
+    }
+
+    pub(crate) fn has_materialization_oscillation(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, true, |ty| {
+            matches!(ty, Type::Intersection(intersection)
+                if intersection.is_simple_negation(db)
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .any(|negative| negative.has_divergent_eager_expansion(db)))
+        })
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
@@ -5725,7 +5882,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
+            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5773,7 +5930,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, type_mapping, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -5841,25 +5998,42 @@ impl<'db> Type<'db> {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
-                for positive in intersection.positive(db) {
-                    builder =
-                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-                }
-                // Promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when promotion is enabled.
-                if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
-                    for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
-                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                let apply_mapping = || {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for positive in intersection.positive(db) {
+                        builder = builder.add_positive(
+                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                         );
                     }
+                    // Promotion should remove negative contributions from intersections,
+                    // so we don't preserve them here when promotion is enabled.
+                    if !matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, _)) {
+                        for negative in intersection.negative(db) {
+                            builder = builder.add_negative(negative.apply_type_mapping_impl(
+                                db,
+                                &type_mapping.flip(),
+                                tcx,
+                                visitor,
+                            ));
+                        }
+                    }
+                    builder.build()
+                };
+
+                match type_mapping {
+                    TypeMapping::Materialize(materialization_kind) => visitor
+                        .visit_materialization_polarity(
+                            db,
+                            self,
+                            *materialization_kind,
+                            apply_mapping,
+                        ),
+                    _ => visitor.visit(db, self, type_mapping, apply_mapping),
                 }
-                builder.build()
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
+            Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
@@ -5868,7 +6042,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
+            Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5892,7 +6066,7 @@ impl<'db> Type<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, type_mapping, || {
+                let mapped = visitor.visit(db, self, type_mapping, || {
                     match type_mapping {
                         TypeMapping::EagerExpansion => unreachable!("handled above"),
 
@@ -5903,7 +6077,8 @@ impl<'db> Type<'db> {
                     }
                 });
 
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
+                let is_recursive = alias.raw_value_type(db).has_divergent_eager_expansion(db)
+                    || any_over_type(db, mapped, false, |ty| ty == self);
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                 //
@@ -5912,6 +6087,13 @@ impl<'db> Type<'db> {
                 // incomplete.
                 if !is_recursive && alias.value_type(db) == mapped {
                     self
+                } else if is_recursive
+                    && matches!(type_mapping, TypeMapping::Materialize(_))
+                    && alias
+                        .raw_value_type(db)
+                        .has_materialization_oscillation(db)
+                {
+                    mapped.expand_eagerly(db)
                 } else {
                     mapped
                 }
