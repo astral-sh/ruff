@@ -614,6 +614,35 @@ reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unkno
 class StarredInvalidBases(*invalid_bases): ...
 ```
 
+Per-base lint checks also see the unpacked entries:
+
+```py
+from typing import Generic, NamedTuple, Protocol
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaStarred(*(int, bool)): ...
+
+final_bases = (int, bool)
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaNamedStarred(*final_bases): ...
+
+# error: [instance-layout-conflict]
+# error: [invalid-named-tuple]
+# error: [invalid-named-tuple]
+class NamedTupleWithStarredBases(NamedTuple, *(int, str)): ...
+
+# error: [inconsistent-mro]
+# error: [invalid-protocol]
+# error: [invalid-protocol]
+class ProtocolWithStarredBases(Protocol, *(int, str)): ...
+
+# error: [invalid-base]
+class BareGenericInStarred(*(int, Generic)): ...
+```
+
 ## Inline tuple-literal starred bases point diagnostics at unpacked elements
 
 <!-- snapshot-diagnostics -->
