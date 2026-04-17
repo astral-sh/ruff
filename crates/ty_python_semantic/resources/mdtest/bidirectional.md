@@ -407,10 +407,7 @@ def f7(y: object) -> object:
 x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
 
-# TODO: We should not error here once call inference can conjoin constraints
-# from all call arguments.
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
-    # error: [invalid-return-type]
     return tuple(map(abspath, xs))
 
 T2 = TypeVar("T2")

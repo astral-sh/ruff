@@ -4355,7 +4355,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(self.db);
                         if let Some(&ty) = preferred.get(&identity) {
-                            builder.insert_type_mapping(binding.bound_typevar, ty);
+                            builder.add_type_mapping(
+                                binding.bound_typevar,
+                                ty,
+                                TypeVarVariance::Invariant,
+                            );
                         }
                     }
                 }
@@ -4426,6 +4430,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     return None;
                 }
 
+                // With the pending-constraint solve path, upper-bound-only constraints expose a
+                // vacuous lower bound of `Never`. That indicates that no concrete lower-bound
+                // information was inferred for this path, so we must not treat it as a candidate
+                // for literal promotion.
+                if lower.is_never() {
+                    return None;
+                }
+
                 let promoted = lower.promote(self.db);
 
                 // If the TypeVar has an upper bound, only use the promoted type if it
@@ -4439,7 +4451,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Some(promoted)
             };
 
-        let specialization = builder.build_with(generic_context, maybe_promote);
+        let choose_solution =
+            |typevar: BoundTypeVarInstance<'db>, lower: Type<'db>, upper: Type<'db>| {
+                if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(self.db))
+                    && lower.is_assignable_to(self.db, preferred_ty)
+                {
+                    return Some(preferred_ty);
+                }
+
+                maybe_promote(typevar, lower, upper)
+            };
+
+        let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
@@ -4452,8 +4475,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
-        let mut assignable_to_declared_type = true;
-
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
@@ -4463,27 +4484,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             {
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
-
-                let specialization_result = builder.infer_map(
+                let specialization_result = builder.infer(
                     declared_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, _, inferred_ty)| {
-                        // Avoid widening the inferred type if it is already assignable to the
-                        // preferred declared type.
-                        if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
-                            if inferred_ty.is_assignable_to(self.db, *preferred_ty) {
-                                return None;
-                            }
-
-                            // If this is a partially specialized type, the type we infer may still
-                            // be assignable to it once fully specialized.
-                            if !partially_specialized_declared_type.contains(&identity) {
-                                assignable_to_declared_type = false;
-                            }
-                        }
-
-                        Some(inferred_ty)
-                    },
                 );
 
                 if let Err(error) = specialization_result {
@@ -4495,7 +4498,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        assignable_to_declared_type
+        preferred_type_mappings
+            .iter()
+            .all(|(&identity, &preferred_ty)| {
+                partially_specialized_declared_type.contains(&identity)
+                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+            })
     }
 
     fn check_argument_type(

@@ -575,8 +575,7 @@ be able to unify the two assignments to `A`.
 ```py
 from functions import invoke, Covariant, head_covariant, lift_covariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_covariant, Covariant[int]()))
 # revealed: Covariant[Literal[1]]
 reveal_type(invoke(lift_covariant, 1))
