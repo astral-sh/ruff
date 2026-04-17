@@ -142,23 +142,23 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         || target
                             .as_name_expr()
                             .is_some_and(|name| class_var_targets.contains(&name.id))
-                }) && is_mutable_expr(value, checker.semantic())
-                => {
-                    // The `_fields_` property of a `ctypes.Structure` base class has its
-                    // immutability enforced  by the base class itself which will throw an error if
-                    // it's set a second time
-                    // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
-                    if is_ctypes_structure_fields(class_def, checker.semantic(), targets) {
-                        return;
-                    }
-
-                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
-                    if has_default_copy_semantics(class_def, checker.semantic()) {
-                        return;
-                    }
-
-                    checker.report_diagnostic(MutableClassDefault, value.range());
+                }) && is_mutable_expr(value, checker.semantic()) =>
+            {
+                // The `_fields_` property of a `ctypes.Structure` base class has its
+                // immutability enforced  by the base class itself which will throw an error if
+                // it's set a second time
+                // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
+                if is_ctypes_structure_fields(class_def, checker.semantic(), targets) {
+                    return;
                 }
+
+                // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
+                if has_default_copy_semantics(class_def, checker.semantic()) {
+                    return;
+                }
+
+                checker.report_diagnostic(MutableClassDefault, value.range());
+            }
             _ => (),
         }
     }

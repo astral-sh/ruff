@@ -867,9 +867,10 @@ impl<'m> ContextCursor<'m> {
                     }
                 }
                 ast::AnyNodeRef::ExceptHandlerExceptHandler(handler)
-                    if handler.type_.as_deref().is_some_and(contains) => {
-                        return Some(except_ty);
-                    }
+                    if handler.type_.as_deref().is_some_and(contains) =>
+                {
+                    return Some(except_ty);
+                }
                 _ => {}
             }
             if node.is_statement() {

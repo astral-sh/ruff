@@ -112,13 +112,15 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
     for token in tokens {
         match token.kind() {
             // For multi-line strings, we expect `noqa` directives on the last line of the string.
-            TokenKind::String if token.is_triple_quoted_string()
-                && locator.contains_line_break(token.range()) => {
-                    string_mappings.push(TextRange::new(
-                        locator.line_start(token.start()),
-                        token.end(),
-                    ));
-                }
+            TokenKind::String
+                if token.is_triple_quoted_string()
+                    && locator.contains_line_break(token.range()) =>
+            {
+                string_mappings.push(TextRange::new(
+                    locator.line_start(token.start()),
+                    token.end(),
+                ));
+            }
 
             _ => {}
         }

@@ -340,10 +340,10 @@ fn is_valid_default_value_with_annotation(
                     if semantic
                         .resolve_qualified_name(operand)
                         .as_ref()
-                        .is_some_and(is_allowed_negated_math_attribute)
-                    => {
-                        return true;
-                    }
+                        .is_some_and(is_allowed_negated_math_attribute) =>
+                {
+                    return true;
+                }
                 _ => {}
             }
         }
@@ -390,10 +390,10 @@ fn is_valid_default_value_with_annotation(
             if semantic
                 .resolve_qualified_name(default)
                 .as_ref()
-                .is_some_and(is_allowed_math_attribute)
-            => {
-                return true;
-            }
+                .is_some_and(is_allowed_math_attribute) =>
+        {
+            return true;
+        }
         _ => {}
     }
     false

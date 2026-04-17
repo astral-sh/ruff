@@ -60,10 +60,9 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
                 }
             }
         }
-        Expr::Name(ast::ExprName { id, .. })
-            if id == "NotImplemented" => {
-                return Some(expr);
-            }
+        Expr::Name(ast::ExprName { id, .. }) if id == "NotImplemented" => {
+            return Some(expr);
+        }
         _ => {}
     }
     None

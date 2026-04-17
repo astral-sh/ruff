@@ -178,63 +178,65 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     | Expr::EllipsisLiteral(_)
                     | Expr::Tuple(_)
                     | Expr::FString(_)
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) => {
-                            let mut diagnostic = checker.report_diagnostic(
-                                MultiValueRepeatedKeyLiteral {
-                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                                    existing: SourceCodeSnippet::from_str(
-                                        checker.locator().slice(*seen_key),
-                                    ),
-                                },
-                                key.range(),
-                            );
-                            if !seen_values.insert(comparable_value) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                    parenthesized_range(
-                                        dict.value(i - 1).into(),
-                                        dict.into(),
-                                        checker.tokens(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i - 1).range())
-                                    .end(),
-                                    parenthesized_range(
-                                        dict.value(i).into(),
-                                        dict.into(),
-                                        checker.tokens(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i).range())
-                                    .end(),
-                                )));
-                            }
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
+                    {
+                        let mut diagnostic = checker.report_diagnostic(
+                            MultiValueRepeatedKeyLiteral {
+                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                                existing: SourceCodeSnippet::from_str(
+                                    checker.locator().slice(*seen_key),
+                                ),
+                            },
+                            key.range(),
+                        );
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                parenthesized_range(
+                                    dict.value(i - 1).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i - 1).range())
+                                .end(),
+                                parenthesized_range(
+                                    dict.value(i).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i).range())
+                                .end(),
+                            )));
                         }
+                    }
                     Expr::Name(_)
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) => {
-                            let mut diagnostic = checker.report_diagnostic(
-                                MultiValueRepeatedKeyVariable {
-                                    name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                                },
-                                key.range(),
-                            );
-                            let comparable_value: ComparableExpr = dict.value(i).into();
-                            if !seen_values.insert(comparable_value) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                    parenthesized_range(
-                                        dict.value(i - 1).into(),
-                                        dict.into(),
-                                        checker.tokens(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i - 1).range())
-                                    .end(),
-                                    parenthesized_range(
-                                        dict.value(i).into(),
-                                        dict.into(),
-                                        checker.tokens(),
-                                    )
-                                    .unwrap_or_else(|| dict.value(i).range())
-                                    .end(),
-                                )));
-                            }
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) =>
+                    {
+                        let mut diagnostic = checker.report_diagnostic(
+                            MultiValueRepeatedKeyVariable {
+                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                            },
+                            key.range(),
+                        );
+                        let comparable_value: ComparableExpr = dict.value(i).into();
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                                parenthesized_range(
+                                    dict.value(i - 1).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i - 1).range())
+                                .end(),
+                                parenthesized_range(
+                                    dict.value(i).into(),
+                                    dict.into(),
+                                    checker.tokens(),
+                                )
+                                .unwrap_or_else(|| dict.value(i).range())
+                                .end(),
+                            )));
                         }
+                    }
                     _ => {}
                 }
             }

@@ -4248,8 +4248,7 @@ pub(crate) fn report_invalid_exception_raised(
         return;
     };
     if raise_type.is_notimplemented(context.db()) {
-        let mut diagnostic =
-            builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
+        let mut diagnostic = builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
         diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
         diagnostic.info("Can only raise an instance or subclass of `BaseException`");
     } else {

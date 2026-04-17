@@ -1203,24 +1203,23 @@ fn suspicious_function(
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         Some(Expr::Call(ExprCall {
                             func, arguments, ..
-                        }))
-                            if checker
-                                .semantic()
-                                .resolve_qualified_name(func.as_ref())
-                                .is_some_and(|name| {
-                                    name.segments() == ["urllib", "request", "Request"]
-                                })
-                            => {
-                                if let Some(url_expr) = arguments.find_argument_value("url", 0)
-                                    && expression_starts_with_http_prefix(
-                                        url_expr,
-                                        checker.semantic(),
-                                        checker.settings(),
-                                    )
-                                {
-                                    return;
-                                }
+                        })) if checker
+                            .semantic()
+                            .resolve_qualified_name(func.as_ref())
+                            .is_some_and(|name| {
+                                name.segments() == ["urllib", "request", "Request"]
+                            }) =>
+                        {
+                            if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                                && expression_starts_with_http_prefix(
+                                    url_expr,
+                                    checker.semantic(),
+                                    checker.settings(),
+                                )
+                            {
+                                return;
                             }
+                        }
 
                         // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr)
@@ -1228,9 +1227,10 @@ fn suspicious_function(
                                 expr,
                                 checker.semantic(),
                                 checker.settings(),
-                            ) => {
-                                return;
-                            }
+                            ) =>
+                        {
+                            return;
+                        }
 
                         _ => {}
                     }

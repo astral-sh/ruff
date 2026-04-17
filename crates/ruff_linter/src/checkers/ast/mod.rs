@@ -913,9 +913,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
                 | Stmt::While(ast::StmtWhile { orelse, .. })
-                    if !orelse.contains(child) => {
-                        return true;
-                    }
+                    if !orelse.contains(child) =>
+                {
+                    return true;
+                }
                 Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                     break;
                 }
@@ -1163,59 +1164,57 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 range: _,
                 node_index: _,
-            })
-                if !self.semantic.scope_id.is_global() => {
-                    for name in names {
-                        let binding_id = self.semantic.global_scope().get(name);
+            }) if !self.semantic.scope_id.is_global() => {
+                for name in names {
+                    let binding_id = self.semantic.global_scope().get(name);
 
-                        // Mark the binding in the global scope as "rebound" in the current scope.
-                        if let Some(binding_id) = binding_id {
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-                        }
+                    // Mark the binding in the global scope as "rebound" in the current scope.
+                    if let Some(binding_id) = binding_id {
+                        self.semantic
+                            .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                    }
+
+                    // Add a binding to the current scope.
+                    let binding_id = self.semantic.push_binding(
+                        name.range(),
+                        BindingKind::Global(binding_id),
+                        BindingFlags::GLOBAL,
+                    );
+                    let scope = self.semantic.current_scope_mut();
+                    scope.add(name, binding_id);
+                }
+            }
+            Stmt::Nonlocal(ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            }) if !self.semantic.scope_id.is_global() => {
+                for name in names {
+                    if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                        // Mark the binding as "used", since the `nonlocal` requires an existing
+                        // binding.
+                        self.semantic.add_local_reference(
+                            binding_id,
+                            ExprContext::Load,
+                            name.range(),
+                        );
+
+                        // Mark the binding in the enclosing scope as "rebound" in the current
+                        // scope.
+                        self.semantic
+                            .add_rebinding_scope(binding_id, self.semantic.scope_id);
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
                             name.range(),
-                            BindingKind::Global(binding_id),
-                            BindingFlags::GLOBAL,
+                            BindingKind::Nonlocal(binding_id, scope_id),
+                            BindingFlags::NONLOCAL,
                         );
                         let scope = self.semantic.current_scope_mut();
                         scope.add(name, binding_id);
                     }
                 }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            })
-                if !self.semantic.scope_id.is_global() => {
-                    for name in names {
-                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used", since the `nonlocal` requires an existing
-                            // binding.
-                            self.semantic.add_local_reference(
-                                binding_id,
-                                ExprContext::Load,
-                                name.range(),
-                            );
-
-                            // Mark the binding in the enclosing scope as "rebound" in the current
-                            // scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-
-                            // Add a binding to the current scope.
-                            let binding_id = self.semantic.push_binding(
-                                name.range(),
-                                BindingKind::Nonlocal(binding_id, scope_id),
-                                BindingFlags::NONLOCAL,
-                            );
-                            let scope = self.semantic.current_scope_mut();
-                            scope.add(name, binding_id);
-                        }
-                    }
-                }
+            }
             _ => {}
         }
 
@@ -1618,11 +1617,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-                    if target.is_name_expr() => {
-                        self.docstring_state =
-                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
-                    }
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
+                    self.docstring_state =
+                        DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                }
                 _ => {}
             }
         }

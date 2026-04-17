@@ -125,9 +125,10 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                     &tstring.elements,
                     tstring.flags.into(),
                     self.context,
-                ) => {
-                    return QuoteStyle::Preserve;
-                }
+                ) =>
+            {
+                return QuoteStyle::Preserve;
+            }
             _ => {}
         }
 

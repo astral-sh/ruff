@@ -187,9 +187,10 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
         };
         match expr.as_ref() {
             Expr::Name(_) | Expr::Attribute(_)
-                if is_alias(expr, checker.semantic(), checker.target_version()) => {
-                    atom_diagnostic(checker, expr);
-                }
+                if is_alias(expr, checker.semantic(), checker.target_version()) =>
+            {
+                atom_diagnostic(checker, expr);
+            }
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];

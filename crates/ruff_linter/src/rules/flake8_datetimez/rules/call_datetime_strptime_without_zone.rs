@@ -107,9 +107,10 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
     if let Some(expr) = call.arguments.args.get(1) {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-                if value.to_str().contains("%z") => {
-                    return;
-                }
+                if value.to_str().contains("%z") =>
+            {
+                return;
+            }
             Expr::FString(ast::ExprFString { value, .. }) => {
                 for f_string_part in value {
                     match f_string_part {

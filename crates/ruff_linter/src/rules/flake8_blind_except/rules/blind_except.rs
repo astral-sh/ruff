@@ -255,19 +255,19 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 func,
                                 self.semantic,
                                 self.logger_objects,
-                            )
-                                && match attr.as_str() {
-                                    "exception" => true,
-                                    _ if is_logger_method_name(attr) => is_exc_info_enabled(
-                                        attr,
-                                        arguments,
-                                        self.semantic,
-                                        self.settings,
-                                    ),
-                                    _ => false,
-                                } => {
-                                    self.seen = true;
-                                }
+                            ) && match attr.as_str() {
+                                "exception" => true,
+                                _ if is_logger_method_name(attr) => is_exc_info_enabled(
+                                    attr,
+                                    arguments,
+                                    self.semantic,
+                                    self.settings,
+                                ),
+                                _ => false,
+                            } =>
+                        {
+                            self.seen = true;
+                        }
                         Expr::Name(ast::ExprName { .. })
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
@@ -282,9 +282,10 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                     }
                                     _ => false,
                                 },
-                            ) => {
-                                self.seen = true;
-                            }
+                            ) =>
+                        {
+                            self.seen = true;
+                        }
                         _ => {}
                     }
                 }

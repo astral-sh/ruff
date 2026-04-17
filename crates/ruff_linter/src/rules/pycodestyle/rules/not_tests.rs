@@ -97,44 +97,42 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
     };
 
     match &**ops {
-        [CmpOp::In]
-            if checker.is_rule_enabled(Rule::NotInTest) => {
-                let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    pad(
-                        generate_comparison(
-                            left,
-                            &[CmpOp::NotIn],
-                            comparators,
-                            unary_op.into(),
-                            checker.tokens(),
-                            checker.source(),
-                        ),
-                        unary_op.range(),
-                        checker.locator(),
+        [CmpOp::In] if checker.is_rule_enabled(Rule::NotInTest) => {
+            let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                pad(
+                    generate_comparison(
+                        left,
+                        &[CmpOp::NotIn],
+                        comparators,
+                        unary_op.into(),
+                        checker.tokens(),
+                        checker.source(),
                     ),
                     unary_op.range(),
-                )));
-            }
-        [CmpOp::Is]
-            if checker.is_rule_enabled(Rule::NotIsTest) => {
-                let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    pad(
-                        generate_comparison(
-                            left,
-                            &[CmpOp::IsNot],
-                            comparators,
-                            unary_op.into(),
-                            checker.tokens(),
-                            checker.source(),
-                        ),
-                        unary_op.range(),
-                        checker.locator(),
+                    checker.locator(),
+                ),
+                unary_op.range(),
+            )));
+        }
+        [CmpOp::Is] if checker.is_rule_enabled(Rule::NotIsTest) => {
+            let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                pad(
+                    generate_comparison(
+                        left,
+                        &[CmpOp::IsNot],
+                        comparators,
+                        unary_op.into(),
+                        checker.tokens(),
+                        checker.source(),
                     ),
                     unary_op.range(),
-                )));
-            }
+                    checker.locator(),
+                ),
+                unary_op.range(),
+            )));
+        }
         _ => {}
     }
 }

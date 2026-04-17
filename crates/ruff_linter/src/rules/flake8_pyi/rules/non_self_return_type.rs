@@ -209,16 +209,16 @@ pub(crate) fn non_self_return_type(
     match name {
         "__iter__"
             if is_iterable_or_iterator(returns, semantic)
-                && subclasses_iterator(class_def, semantic)
-            => {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
+        }
         "__aiter__"
             if is_async_iterable_or_iterator(returns, semantic)
-                && subclasses_async_iterator(class_def, semantic)
-            => {
-                add_diagnostic(checker, stmt, returns, class_def, name);
-            }
+                && subclasses_async_iterator(class_def, semantic) =>
+        {
+            add_diagnostic(checker, stmt, returns, class_def, name);
+        }
         _ => {}
     }
 }

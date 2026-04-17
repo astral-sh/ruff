@@ -333,14 +333,12 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Break(ast::StmtBreak { range, .. })
-                if !ctx.in_loop_context() => {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
-                }
-            Stmt::Continue(ast::StmtContinue { range, .. })
-                if !ctx.in_loop_context() => {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
-                }
+            Stmt::Break(ast::StmtBreak { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
+            }
+            Stmt::Continue(ast::StmtContinue { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
+            }
             _ => {}
         }
 

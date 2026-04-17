@@ -106,9 +106,10 @@ fn contains_message(expr: &Expr) -> bool {
             }
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-            if value.chars().any(char::is_whitespace) => {
-                return true;
-            }
+            if value.chars().any(char::is_whitespace) =>
+        {
+            return true;
+        }
         _ => {}
     }
 

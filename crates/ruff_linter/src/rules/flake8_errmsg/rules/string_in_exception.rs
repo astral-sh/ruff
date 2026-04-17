@@ -203,26 +203,59 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
             // Check for string literals.
             Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. })
                 if checker.is_rule_enabled(Rule::RawStringInException)
-                    && string.len() >= checker.settings().flake8_errmsg.max_string_length => {
-                        let mut diagnostic =
-                            checker.report_diagnostic(RawStringInException, first.range());
-                        if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
-                            diagnostic.set_fix(generate_fix(
-                                stmt,
-                                first,
-                                indentation,
-                                checker.stylist(),
-                                checker.locator(),
-                                checker.semantic(),
-                            ));
-                        }
-                    }
+                    && string.len() >= checker.settings().flake8_errmsg.max_string_length =>
+            {
+                let mut diagnostic = checker.report_diagnostic(RawStringInException, first.range());
+                if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
+                    diagnostic.set_fix(generate_fix(
+                        stmt,
+                        first,
+                        indentation,
+                        checker.stylist(),
+                        checker.locator(),
+                        checker.semantic(),
+                    ));
+                }
+            }
             // Check for byte string literals.
             Expr::BytesLiteral(ast::ExprBytesLiteral { value: bytes, .. })
                 if checker.settings().rules.enabled(Rule::RawStringInException)
-                    && bytes.len() >= checker.settings().flake8_errmsg.max_string_length => {
+                    && bytes.len() >= checker.settings().flake8_errmsg.max_string_length =>
+            {
+                let mut diagnostic = checker.report_diagnostic(RawStringInException, first.range());
+                if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
+                    diagnostic.set_fix(generate_fix(
+                        stmt,
+                        first,
+                        indentation,
+                        checker.stylist(),
+                        checker.locator(),
+                        checker.semantic(),
+                    ));
+                }
+            }
+            // Check for f-strings.
+            Expr::FString(_) if checker.is_rule_enabled(Rule::FStringInException) => {
+                let mut diagnostic = checker.report_diagnostic(FStringInException, first.range());
+                if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
+                    diagnostic.set_fix(generate_fix(
+                        stmt,
+                        first,
+                        indentation,
+                        checker.stylist(),
+                        checker.locator(),
+                        checker.semantic(),
+                    ));
+                }
+            }
+            // Check for .format() calls.
+            Expr::Call(ast::ExprCall { func, .. })
+                if checker.is_rule_enabled(Rule::DotFormatInException) =>
+            {
+                if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+                    if attr == "format" && value.is_literal_expr() {
                         let mut diagnostic =
-                            checker.report_diagnostic(RawStringInException, first.range());
+                            checker.report_diagnostic(DotFormatInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
@@ -234,44 +267,8 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                             ));
                         }
                     }
-            // Check for f-strings.
-            Expr::FString(_)
-                if checker.is_rule_enabled(Rule::FStringInException) => {
-                    let mut diagnostic =
-                        checker.report_diagnostic(FStringInException, first.range());
-                    if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
-                        diagnostic.set_fix(generate_fix(
-                            stmt,
-                            first,
-                            indentation,
-                            checker.stylist(),
-                            checker.locator(),
-                            checker.semantic(),
-                        ));
-                    }
                 }
-            // Check for .format() calls.
-            Expr::Call(ast::ExprCall { func, .. })
-                if checker.is_rule_enabled(Rule::DotFormatInException) => {
-                    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
-                        if attr == "format" && value.is_literal_expr() {
-                            let mut diagnostic =
-                                checker.report_diagnostic(DotFormatInException, first.range());
-                            if let Some(indentation) =
-                                whitespace::indentation(checker.source(), stmt)
-                            {
-                                diagnostic.set_fix(generate_fix(
-                                    stmt,
-                                    first,
-                                    indentation,
-                                    checker.stylist(),
-                                    checker.locator(),
-                                    checker.semantic(),
-                                ));
-                            }
-                        }
-                    }
-                }
+            }
             _ => {}
         }
     }

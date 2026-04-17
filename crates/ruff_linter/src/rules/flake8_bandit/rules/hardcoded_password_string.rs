@@ -95,7 +95,9 @@ pub(crate) fn compare_to_hardcoded_password_string(
 
 /// S105
 pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
-    if string_literal(value).as_ref().is_some_and(|string| !string.is_empty())
+    if string_literal(value)
+        .as_ref()
+        .is_some_and(|string| !string.is_empty())
     {
         for target in targets {
             if let Some(name) = password_target(target) {
