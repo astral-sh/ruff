@@ -11,6 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
 
     use super::settings::{Convention, Settings};
     use crate::test::test_path;
@@ -217,6 +218,19 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d421() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D421.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::PropertyDocstringStartsWithVerb)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
