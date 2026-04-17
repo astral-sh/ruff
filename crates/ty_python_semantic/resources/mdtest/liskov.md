@@ -1460,6 +1460,32 @@ class BadChild(Base):
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Overloaded methods with receiver-specific overloads
+
+When a superclass method overload can only bind to a specific receiver type, Liskov checks should
+ignore that overload for subclasses whose receiver type cannot match it.
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @overload
+    def method(self, arg: T) -> None: ...
+    @overload
+    def method(self: Base[str], arg: str, extra: str) -> None: ...
+    def method(self, arg: Any, extra: str = "") -> None: ...
+
+class GoodChild(Base[T]):
+    def method(self, arg: T, extra: str = "") -> None: ...
+
+class BadChild(Base[T]):
+    # TODO: We should emit [invalid-method-override] here because the override is incompatible
+    # with `Base[str].method(self: Base[str], arg: str, extra: str)`.
+    def method(self, arg: T) -> None: ...
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably

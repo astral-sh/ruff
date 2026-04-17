@@ -7,7 +7,7 @@ Reference: <https://typing.python.org/en/latest/spec/overload.html>
 The definition of `typing.overload` in typeshed is an identity function.
 
 ```py
-from typing import overload
+from typing import Callable, overload
 
 def foo(x: int) -> int:
     return x
@@ -20,7 +20,7 @@ reveal_type(bar)  # revealed: def foo(x: int) -> int
 ## Functions
 
 ```py
-from typing import overload
+from typing import Callable, overload
 
 @overload
 def add() -> None: ...
@@ -138,6 +138,97 @@ class Foo3:
 foo3 = Foo3()
 reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
+
+class Base:
+    @overload
+    def narrowed(self: "Base", x: int) -> int: ...
+    @overload
+    def narrowed(self: "Child", x: str) -> str: ...
+    def narrowed(self, x: int | str) -> int | str:
+        return x
+
+class Child(Base): ...
+
+reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> int
+reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+class Box[T]:
+    # Use the class type parameter so specializations remain meaningful.
+    x: T
+
+    @overload
+    def specialized(self: "Box[str]", x: str) -> str: ...
+    @overload
+    def specialized(self, x: int) -> int: ...
+    def specialized(self, x: str | int) -> str | int:
+        return x
+
+reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specialized(x: int) -> int
+reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
+
+class BaseForAny[T]:
+    value: T
+
+    @overload
+    def g(self: "ChildForAny") -> bytes: ...
+    @overload
+    def g(self) -> int: ...
+    def g(self) -> bytes | int:
+        return 1
+
+class ChildForAny(BaseForAny[int]): ...
+
+def accepts_bytes_callback(cb: Callable[[], bytes]) -> None: ...
+def takes_base_any(base: BaseForAny[Any]) -> None:
+    reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
+    reveal_type(base.g())  # revealed: int
+    accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+
+class BaseWithNoMatchingReceiver[T]:
+    value: T
+
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[bytes]") -> bytes: ...
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[str]") -> str: ...
+    def g(self) -> str | bytes:
+        return ""
+
+def takes_str_callback(cb: Callable[[], str]) -> None: ...
+def no_matching_receiver(y: BaseWithNoMatchingReceiver[int]) -> None:
+    takes_str_callback(y.g)  # error: [invalid-argument-type]
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Generic[T_co]):
+    @overload
+    def get(self: "Reader[int]", default: int) -> int: ...
+    @overload
+    def get(self: "Reader[str]", default: str) -> str: ...
+    def get(self, default: object) -> object:
+        return default
+
+def union_receiver(reader: Reader[int | str]):
+    reveal_type(reader.get)  # revealed: Overload[]
+
+class ReceiverGeneric[T]:
+    @overload
+    def method[S](self: "ReceiverGeneric[S]", value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 ```
 
 ## Constructor
@@ -576,7 +667,7 @@ similarly decorated. The implementation, if present, must also have a consistent
 ```py
 from __future__ import annotations
 
-from typing import overload
+from typing import Callable, overload
 
 class CheckStaticMethod:
     @overload
@@ -628,7 +719,7 @@ The same rules apply for `@classmethod` as for [`@staticmethod`](#staticmethod).
 ```py
 from __future__ import annotations
 
-from typing import overload
+from typing import Callable, overload
 
 class CheckClassMethod:
     def __init__(self, x: int) -> None:
@@ -682,6 +773,26 @@ class CheckClassMethod:
         if isinstance(x, int):
             return cls(x)
         return None
+
+class Base:
+    @overload
+    @classmethod
+    def from_value(cls: type[Base], x: int) -> int: ...
+    @overload
+    @classmethod
+    def from_value(cls: type[Child], x: str) -> str: ...
+    @classmethod
+    def from_value(cls, x: int | str) -> int | str:
+        return x
+
+class Child(Base): ...
+
+reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
+reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+
+good: Callable[[int], int] = Base.from_value
+# error: [invalid-assignment]
+bad: Callable[[str], str] = Base.from_value
 ```
 
 #### `@final`

@@ -2705,9 +2705,24 @@ impl<'db> CallableBinding<'db> {
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Self {
+        Self::from_indexed_overloads(signature_type, overloads.into_iter().enumerate())
+    }
+
+    /// Constructs a callable binding from overloads while preserving each overload's position in
+    /// the defining function's overload list.
+    ///
+    /// The preserved indexes are used for diagnostics so filtered or reordered bindings can still
+    /// point back to the correct overload declaration.
+    pub(crate) fn from_indexed_overloads(
+        signature_type: Type<'db>,
+        overloads: impl IntoIterator<Item = (usize, Signature<'db>)>,
+    ) -> Self {
         let overloads = overloads
             .into_iter()
-            .map(|signature| Binding::single(signature_type, signature))
+            .map(|(source_overload_index, signature)| {
+                Binding::single(signature_type, signature)
+                    .with_source_overload_index(source_overload_index)
+            })
             .collect();
         Self {
             callable_type: signature_type,
@@ -2879,6 +2894,14 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
+    }
+
+    /// Returns the overload indexes that should be shown in diagnostics.
+    fn diagnostic_overload_indexes(&self) -> SmallVec<[usize; 1]> {
+        self.overloads
+            .iter()
+            .map(Binding::source_overload_index)
+            .collect()
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -3352,8 +3375,8 @@ impl<'db> CallableBinding<'db> {
             .max()
             .unwrap_or(0);
 
-        let mut participating_slot_indices = HashSet::new();
-        for slot_index in 0..max_slot_count {
+        let mut participating_slot_indices = vec![false; max_slot_count];
+        for (slot_index, is_participating) in participating_slot_indices.iter_mut().enumerate() {
             let mut first_parameter_type: Option<Type<'db>> = None;
             for (_, overload_slots) in &matching_overload_slots {
                 let current_parameter_type =
@@ -3364,11 +3387,11 @@ impl<'db> CallableBinding<'db> {
                             .when_equivalent_to(db, current_parameter_type, constraints)
                             .is_always_satisfied(db)
                         {
-                            participating_slot_indices.insert(slot_index);
+                            *is_participating = true;
                         }
                     }
                     (Some(_), None) => {
-                        participating_slot_indices.insert(slot_index);
+                        *is_participating = true;
                     }
                     (None, Some(current_parameter_type)) => {
                         first_parameter_type = Some(current_parameter_type);
@@ -3381,6 +3404,7 @@ impl<'db> CallableBinding<'db> {
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
         let mut filter_remaining_overloads = false;
+        let mut assignability_cache = FxHashMap::default();
 
         for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
             if filter_remaining_overloads {
@@ -3396,7 +3420,7 @@ impl<'db> CallableBinding<'db> {
 
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         let argument_type = slot.variadic_argument.unwrap_or_else(|| {
                             current_slots
                                 .get(slot_index)
@@ -3426,7 +3450,7 @@ impl<'db> CallableBinding<'db> {
                 .collect::<Vec<_>>();
             for (_, slots) in &matching_overload_slots[..=upto] {
                 for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
+                    if participating_slot_indices[slot_index] {
                         union_parameter_types[slot_index].add_in_place(slot.parameter);
                     }
                 }
@@ -3443,7 +3467,13 @@ impl<'db> CallableBinding<'db> {
                 }),
             );
 
-            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
+            let is_assignable = *assignability_cache
+                .entry((top_materialized_argument_type, parameter_types))
+                .or_insert_with(|| {
+                    top_materialized_argument_type.is_assignable_to(db, parameter_types)
+                });
+
+            if is_assignable {
                 filter_remaining_overloads = true;
             }
         }
@@ -3686,9 +3716,10 @@ impl<'db> CallableBinding<'db> {
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
-                            index: matching_overload_index,
+                            index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
+                            candidate_indexes: self.diagnostic_overload_indexes(),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3711,9 +3742,10 @@ impl<'db> CallableBinding<'db> {
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
-                            index: matching_overload_index,
+                            index: self.overloads[matching_overload_index].source_overload_index(),
                             kind,
                             function,
+                            candidate_indexes: self.diagnostic_overload_indexes(),
                         });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
@@ -3758,8 +3790,13 @@ impl<'db> CallableBinding<'db> {
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
+                    let diagnostic_overload_indexes = self.diagnostic_overload_indexes();
+                    let possible_overloads = diagnostic_overload_indexes
+                        .iter()
+                        .filter_map(|&index| overloads.get(index).copied())
+                        .collect_vec();
 
-                    if let Some(overload) = overloads.first() {
+                    if let Some(overload) = possible_overloads.first() {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
@@ -3784,16 +3821,16 @@ impl<'db> CallableBinding<'db> {
                         function.name(context.db())
                     ));
 
-                    for overload in overloads.iter().take(MAXIMUM_OVERLOADS) {
+                    for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
                             "  {}",
                             overload.signature(context.db()).display(context.db())
                         ));
                     }
-                    if overloads.len() > MAXIMUM_OVERLOADS {
+                    if possible_overloads.len() > MAXIMUM_OVERLOADS {
                         diag.info(format_args!(
                             "... omitted {remaining} overloads",
-                            remaining = overloads.len() - MAXIMUM_OVERLOADS
+                            remaining = possible_overloads.len() - MAXIMUM_OVERLOADS
                         ));
                     }
 
@@ -5347,6 +5384,13 @@ pub(crate) struct UnknownParameterNameError;
 pub(crate) struct Binding<'db> {
     pub(crate) signature: Signature<'db>,
 
+    /// The overload's position in the underlying function definition list.
+    ///
+    /// For example, if a function defines overloads at indexes `0`, `1`, and `2`, and we later
+    /// filter a bound method down to only the last two overloads, those bindings still store `1`
+    /// and `2` here so diagnostics can point at the source declarations.
+    source_overload_index: usize,
+
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
 
@@ -5388,6 +5432,7 @@ impl<'db> Binding<'db> {
         let return_ty = signature.return_ty;
         Binding {
             signature,
+            source_overload_index: 0,
             callable_type: signature_type,
             signature_type,
             return_ty,
@@ -5399,6 +5444,17 @@ impl<'db> Binding<'db> {
             parameter_tys: Box::from([]),
             errors: vec![],
         }
+    }
+
+    /// Records the overload's source definition index for later diagnostics.
+    fn with_source_overload_index(mut self, source_overload_index: usize) -> Self {
+        self.source_overload_index = source_overload_index;
+        self
+    }
+
+    /// Returns the overload's source position in the defining function's overload list.
+    fn source_overload_index(&self) -> usize {
+        self.source_overload_index
     }
 
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
@@ -6354,11 +6410,9 @@ impl<'db> BindingError<'db> {
                             matching_overload.kind,
                             matching_overload.function.name(context.db())
                         ));
-                        let (overloads, _) = matching_overload
-                            .function
-                            .overloads_and_implementation(context.db());
-                        for (overload_index, overload) in
-                            overloads.iter().enumerate().take(MAXIMUM_OVERLOADS)
+                        for (overload_index, overload) in matching_overload
+                            .candidate_overloads(context.db())
+                            .take(MAXIMUM_OVERLOADS)
                         {
                             if overload_index == matching_overload.index {
                                 continue;
@@ -6368,10 +6422,10 @@ impl<'db> BindingError<'db> {
                                 overload.signature(context.db()).display(context.db())
                             ));
                         }
-                        if overloads.len() > MAXIMUM_OVERLOADS {
+                        if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {
                             diag.info(format_args!(
                                 "... omitted {remaining} overloads",
-                                remaining = overloads.len() - MAXIMUM_OVERLOADS
+                                remaining = matching_overload.candidate_count() - MAXIMUM_OVERLOADS
                             ));
                         }
                     }
@@ -6903,6 +6957,8 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
 struct MatchingOverloadLiteral<'db> {
     /// The position of the matching overload in the list of overloads.
     index: usize,
+    /// The source overload positions that remained after any callable-specific filtering.
+    candidate_indexes: SmallVec<[usize; 1]>,
     /// The kind of function this overload is for.
     kind: FunctionKind,
     /// The function literal that this overload belongs to.
@@ -6923,6 +6979,26 @@ impl<'db> MatchingOverloadLiteral<'db> {
         // above, we get an empty list of overloads because the implementation of that method
         // relies on it existing in the file.
         overloads.get(self.index).copied()
+    }
+
+    /// Iterates the overload literals that remain diagnostic candidates, paired with their
+    /// source overload-definition index.
+    fn candidate_overloads(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (usize, OverloadLiteral<'db>)> + '_ {
+        let (overloads, _) = self.function.overloads_and_implementation(db);
+        self.candidate_indexes.iter().filter_map(|&index| {
+            overloads
+                .get(index)
+                .copied()
+                .map(|overload| (index, overload))
+        })
+    }
+
+    /// Returns the number of overloads considered diagnostic candidates.
+    fn candidate_count(&self) -> usize {
+        self.candidate_indexes.len()
     }
 }
 
