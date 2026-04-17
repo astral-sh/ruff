@@ -910,6 +910,33 @@ class C:
 reveal_type(C.d)  # revealed: int
 ```
 
+### Descriptors with `Concatenate` self-types on `__get__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+P2 = ParamSpec("P2")
+T = TypeVar("T")
+
+class FunctionWrapper(Generic[P]):
+    def __get__(
+        self: "FunctionWrapper[Concatenate[T, P2]]",
+        instance: T,
+    ) -> None:
+        raise NotImplementedError
+
+def wrapper(fn: Callable[P, Any]) -> FunctionWrapper[P]:
+    raise NotImplementedError
+
+class Example:
+    @wrapper
+    def __call__(self) -> None:
+        pass
+```
+
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
 [precedence chain]: https://github.com/python/cpython/blob/3.13/Objects/typeobject.c#L5393-L5481
 [simple example]: https://docs.python.org/3/howto/descriptor.html#simple-example-a-descriptor-that-returns-a-constant
