@@ -614,6 +614,18 @@ reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unkno
 class StarredInvalidBases(*invalid_bases): ...
 ```
 
+## Inline tuple-literal starred bases point diagnostics at unpacked elements
+
+<!-- snapshot-diagnostics -->
+
+```py
+# error: [duplicate-base]
+class InlineTupleDuplicateBases(*(int, int)): ...
+
+# error: [invalid-base]
+class InlineTupleInvalidBases(*(int, 1)): ...
+```
+
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
 
 ```py

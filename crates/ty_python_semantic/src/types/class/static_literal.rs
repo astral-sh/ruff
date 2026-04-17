@@ -2624,6 +2624,25 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                 if let Some(tuple) =
                     expanded_fixed_length_starred_class_base_tuple(db, class_definition, base_node)
                 {
+                    if let ast::Expr::Starred(starred) = base_node
+                        && let Some(tuple_literal) = starred.value.as_tuple_expr()
+                        && tuple_literal.len() == tuple.len()
+                        && tuple_literal
+                            .iter()
+                            .all(|element| !element.is_starred_expr())
+                    {
+                        expanded_bases.extend(
+                            tuple_literal
+                                .iter()
+                                .zip(tuple.owned_elements().into_vec())
+                                .map(|(node, ty)| ExpandedClassBaseEntry::SourceBacked {
+                                    node,
+                                    ty,
+                                }),
+                        );
+                        continue;
+                    }
+
                     expanded_bases.extend(tuple.owned_elements().into_vec().into_iter().map(
                         |ty| ExpandedClassBaseEntry::SourceBacked {
                             node: base_node,

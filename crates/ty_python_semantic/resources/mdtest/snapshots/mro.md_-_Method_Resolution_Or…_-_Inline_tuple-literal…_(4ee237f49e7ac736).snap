@@ -1,0 +1,52 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: mro.md - Method Resolution Order tests - Inline tuple-literal starred bases point diagnostics at unpacked elements
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # error: [duplicate-base]
+2 | class InlineTupleDuplicateBases(*(int, int)): ...
+3 | 
+4 | # error: [invalid-base]
+5 | class InlineTupleInvalidBases(*(int, 1)): ...
+```
+
+# Diagnostics
+
+```
+error[duplicate-base]: Duplicate base class `int`
+ --> src/mdtest_snippet.py:2:7
+  |
+2 | class InlineTupleDuplicateBases(*(int, int)): ...
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: The definition of class `InlineTupleDuplicateBases` will raise `TypeError` at runtime
+ --> src/mdtest_snippet.py:2:35
+  |
+2 | class InlineTupleDuplicateBases(*(int, int)): ...
+  |                                   ---  ^^^ Class `int` later repeated here
+  |                                   |
+  |                                   Class `int` first included in bases list here
+  |
+
+```
+
+```
+error[invalid-base]: Invalid class base with type `Literal[1]`
+ --> src/mdtest_snippet.py:5:38
+  |
+5 | class InlineTupleInvalidBases(*(int, 1)): ...
+  |                                      ^
+  |
+info: Definition of class `InlineTupleInvalidBases` will raise `TypeError` at runtime
+
+```
