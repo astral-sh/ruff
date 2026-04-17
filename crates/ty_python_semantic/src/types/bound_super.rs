@@ -836,6 +836,7 @@ impl<'db> BoundSuperType<'db> {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Callable(_)
+            | Type::TypedDictTop
             | Type::DataclassTransformer(_) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,

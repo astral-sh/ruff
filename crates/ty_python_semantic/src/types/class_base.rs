@@ -174,6 +174,7 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
+            | Type::TypedDictTop
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -228,6 +229,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::Optional
                 | SpecialFormType::Not
                 | SpecialFormType::Top
+                | SpecialFormType::TypedDictTop
                 | SpecialFormType::Bottom
                 | SpecialFormType::Intersection
                 | SpecialFormType::TypeOf

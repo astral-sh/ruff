@@ -2150,6 +2150,28 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## `reversed()` on Python 3.7
+
+`TypedDict` should not be treated as reversible before dictionaries gained `__reversed__` in Python
+3.8.
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+def _(movie: Movie) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(reversed(movie))  # revealed: Unknown
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
@@ -3827,17 +3849,8 @@ static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
-
-# TODO: We approximate disjointness with other types `T` by asking whether `dict[str, Any]` is
-# assignable to `T`. That covers common cases like the ones above, but does it have some false
-# negatives with `dict` types. A `TypedDict` is almost never assignable to a `dict` (or vice versa),
-# even when all of the `TypedDict`'s field types match the `dict`'s value type (and are mutable).
-# The problem is that the `TypedDict` could have been assigned to from *another* `TypedDict` with
-# additional fields, and we don't usually know anything about the types or mutability of those. On
-# the other hand, the assignment to `dict` can be allowed if the `TypedDict` has mutable
-# `extra_items` of a compatible type. See: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-with-dict
-static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-error]
-static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(TD, dict[str, int]))
+static_assert(is_disjoint_from(TD, dict[str, str]))
 ```
 
 ## Narrowing tagged unions of `TypedDict`s
@@ -3970,9 +3983,7 @@ We can still narrow `Literal` tags even when non-`TypedDict` types are present i
 ```py
 def _(u: Foo | Bar | dict):
     if u["tag"] == "foo":
-        # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
-        # false negative in `is_disjoint_impl`.
-        reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+        reveal_type(u)  # revealed: Foo | dict[Unknown, Unknown]
 
 # The negation(s) will simplify out if we add something to the union that doesn't inherit from
 # `dict`. It just needs to support indexing with a string key.
@@ -4207,9 +4218,7 @@ We can still narrow `Literal` tags even when non-`TypedDict` types are present i
 def match_with_dict(u: Foo | Bar | dict):
     match u["tag"]:
         case "foo":
-            # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
-            # false negative in `is_disjoint_impl`.
-            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+            reveal_type(u)  # revealed: Foo | dict[Unknown, Unknown]
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
