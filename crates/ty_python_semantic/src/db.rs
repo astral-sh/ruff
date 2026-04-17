@@ -194,6 +194,11 @@ pub(crate) mod tests {
             self
         }
 
+        pub(crate) fn with_python_platform(mut self, platform: PythonPlatform) -> Self {
+            self.python_platform = platform;
+            self
+        }
+
         pub(crate) fn with_file(
             mut self,
             path: &'a (impl AsRef<SystemPath> + ?Sized),
