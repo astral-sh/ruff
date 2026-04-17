@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 172
 ---
 PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
  --> PTH205.py:6:1
@@ -18,24 +19,6 @@ help: Replace with `Path.stat(...).st_ctime`
 7 | os.path.getctime(b"filename")
 8 | os.path.getctime(Path("filename"))
 9 |
-
-PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
- --> PTH205.py:7:1
-  |
-6 | os.path.getctime("filename")
-7 | os.path.getctime(b"filename")
-  | ^^^^^^^^^^^^^^^^
-8 | os.path.getctime(Path("filename"))
-  |
-help: Replace with `Path.stat(...).st_ctime`
-4  |
-5  |
-6  | os.path.getctime("filename")
-   - os.path.getctime(b"filename")
-7  + Path(b"filename").stat().st_ctime
-8  | os.path.getctime(Path("filename"))
-9  |
-10 | getctime("filename")
 
 PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
   --> PTH205.py:8:1
@@ -74,22 +57,6 @@ help: Replace with `Path.stat(...).st_ctime`
    - getctime("filename")
 10 + Path("filename").stat().st_ctime
 11 | getctime(b"filename")
-12 | getctime(Path("filename"))
-
-PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
-  --> PTH205.py:11:1
-   |
-10 | getctime("filename")
-11 | getctime(b"filename")
-   | ^^^^^^^^
-12 | getctime(Path("filename"))
-   |
-help: Replace with `Path.stat(...).st_ctime`
-8  | os.path.getctime(Path("filename"))
-9  |
-10 | getctime("filename")
-   - getctime(b"filename")
-11 + Path(b"filename").stat().st_ctime
 12 | getctime(Path("filename"))
 
 PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
