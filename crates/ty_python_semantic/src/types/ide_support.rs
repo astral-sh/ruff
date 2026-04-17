@@ -4,7 +4,9 @@ use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
-use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
+use crate::types::class::{
+    CodeGeneratorKind, DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor, FieldKind,
+};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
@@ -515,6 +517,32 @@ pub fn definitions_for_keyword_argument<'db>(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Go to field definitions if the type is a dataclass-like type, a named tuple or a typed dict. Only do so if no definition was found,
+    // as having existing definition(s) would mean a custom constructor is defined and as such takes priority:
+    if resolved_definitions.is_empty()
+        && let Some(class_literal) = func_type.as_class_literal()
+        && let Some(static_class_literal) = class_literal.as_static()
+        && let Some(field_policy) = CodeGeneratorKind::from_class(db, class_literal, None)
+    {
+        for (field_name, field) in static_class_literal.fields(db, None, field_policy) {
+            let Some(definition) = field.first_declaration else {
+                continue;
+            };
+
+            let alias = match &field.kind {
+                FieldKind::Dataclass { alias, .. } => alias.as_ref(),
+                _ => None,
+            };
+
+            if keyword_name == alias.map_or(field_name.as_str(), |a| a.as_ref()) {
+                let module = parsed_module(db, definition.file(db)).load(db);
+                resolved_definitions.push(ResolvedDefinition::FileWithRange(
+                    definition.focus_range(db, &module),
+                ));
             }
         }
     }

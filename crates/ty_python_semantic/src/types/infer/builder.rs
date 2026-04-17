@@ -171,7 +171,7 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
 /// [`finish_expression()`](TypeInferenceBuilder::finish_expression), [`finish_definition()`](TypeInferenceBuilder::finish_definition), or [`finish_scope()`](TypeInferenceBuilder::finish_scope) on it, which returns
-/// type inference result..
+/// type inference result.
 ///
 /// There are a few different kinds of methods in the type inference builder, and the naming
 /// distinctions are a bit subtle.
