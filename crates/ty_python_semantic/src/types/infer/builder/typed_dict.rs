@@ -15,10 +15,9 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    MappingStringKeys, TypedDictSchema, collect_guaranteed_keyword_keys,
-    extract_unpacked_mapping_key_value_types, extract_unpacked_typed_dict_keys_from_value_type,
-    functional_typed_dict_field, infer_unpacked_keyword_types, mapping_string_keys,
-    typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
+    TypedDictSchema, collect_guaranteed_keyword_keys, extract_unpacked_mapping_key_value_types,
+    extract_unpacked_typed_dict_keys_from_value_type, functional_typed_dict_field,
+    typed_dict_with_relaxed_keys, unpacked_keyword_is_gradual, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
@@ -74,6 +73,111 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    fn typed_dict_field_uses_default_context(
+        &mut self,
+        expr: &ast::Expr,
+        declared_ty: Type<'db>,
+    ) -> bool {
+        let ast::Expr::Call(call) = expr else {
+            return false;
+        };
+        let ast::Expr::Name(name) = call.func.as_ref() else {
+            return false;
+        };
+        if name.id.as_str() != "dict" {
+            return false;
+        }
+
+        let Type::Union(union) = declared_ty.resolve_type_alias(self.db()) else {
+            return false;
+        };
+
+        let union_elements = union.elements(self.db());
+        union_elements.iter().any(Type::is_typed_dict)
+            && union_elements.iter().any(|element| {
+                !element.is_typed_dict() && element.is_instance_of(self.db(), KnownClass::Dict)
+            })
+    }
+
+    fn infer_typed_dict_value_expression(
+        &mut self,
+        expr: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let tcx = if let Some(declared_ty) = tcx.annotation
+            && self.typed_dict_field_uses_default_context(expr, declared_ty)
+        {
+            TypeContext::default()
+        } else {
+            tcx
+        };
+
+        if tcx.annotation.is_some()
+            && matches!(expr, ast::Expr::Call(_))
+            && self
+                .try_expression_type(expr)
+                .is_some_and(|ty| ty.is_instance_of(self.db(), KnownClass::Dict))
+        {
+            let mut speculative_builder = self.speculate();
+            let ty = speculative_builder.infer_expression(expr, tcx);
+            self.extend(speculative_builder);
+            ty
+        } else {
+            self.get_or_infer_expression(expr, tcx)
+        }
+    }
+
+    fn infer_merged_typed_dict_literal_values(
+        &mut self,
+        typed_dict: TypedDictType<'db>,
+        dict_expr: &ast::ExprDict,
+        shadowed_keys: &mut OrderSet<Name>,
+    ) {
+        let items = typed_dict.items(self.db());
+
+        for item in dict_expr.items.iter().rev() {
+            if let Some(key_expr) = &item.key {
+                let key_ty = self.get_or_infer_expression(key_expr, TypeContext::default());
+                if let Some(key) = key_ty
+                    .as_string_literal()
+                    .map(|key| Name::new(key.value(self.db())))
+                    && !shadowed_keys.contains(&key)
+                {
+                    shadowed_keys.insert(key.clone());
+                    if let Some(field) = items.get(key.as_str()) {
+                        self.infer_typed_dict_value_expression(
+                            &item.value,
+                            TypeContext::new(Some(field.declared_ty)),
+                        );
+                    } else {
+                        self.get_or_infer_expression(&item.value, TypeContext::default());
+                    }
+                } else {
+                    self.get_or_infer_expression(&item.value, TypeContext::default());
+                }
+            } else if let ast::Expr::Dict(nested_dict_expr) = &item.value {
+                self.infer_merged_typed_dict_literal_values(
+                    typed_dict,
+                    nested_dict_expr,
+                    shadowed_keys,
+                );
+            } else {
+                let unpacked_ty = self.get_or_infer_expression(&item.value, TypeContext::default());
+                if unpacked_keyword_is_gradual(self.db(), unpacked_ty) {
+                    shadowed_keys.extend(items.keys().cloned());
+                } else if let Some(unpacked_keys) =
+                    extract_unpacked_typed_dict_keys_from_value_type(self.db(), unpacked_ty)
+                {
+                    for (key, unpacked_key) in unpacked_keys {
+                        if unpacked_key.is_required() {
+                            shadowed_keys.insert(key);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn execute_typed_dict_constructor_value_plan(
         &mut self,
         plan: Vec<TypedDictConstructorValuePlanStep<'_, 'db>>,
@@ -81,7 +185,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for step in plan {
             match step {
                 TypedDictConstructorValuePlanStep::Infer { expr, tcx } => {
-                    self.get_or_infer_expression(expr, tcx);
+                    self.infer_typed_dict_value_expression(expr, tcx);
                 }
                 TypedDictConstructorValuePlanStep::StoreUnknown { expr } => {
                     if self.try_expression_type(expr).is_none() {
@@ -349,7 +453,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let Some(key) = key_ty.as_string_literal()
                 && let Some(field) = typed_dict_items.get(key.value(self.db()))
             {
-                self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
+                self.infer_typed_dict_value_expression(
+                    &item.value,
+                    TypeContext::new(Some(field.declared_ty)),
+                )
             } else {
                 self.infer_expression(&item.value, TypeContext::default())
             };
@@ -357,12 +464,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             item_types.insert(item.value.node_index().load(), value_ty);
         }
 
-        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
-            item_types
-                .get(&expr.node_index().load())
-                .copied()
-                .unwrap_or(Type::unknown())
-        })
+        for item in items {
+            if item.key.is_none()
+                && let ast::Expr::Dict(nested_dict_expr) = &item.value
+            {
+                let mut shadowed_keys = OrderSet::new();
+                self.infer_merged_typed_dict_literal_values(
+                    typed_dict,
+                    nested_dict_expr,
+                    &mut shadowed_keys,
+                );
+            }
+        }
+
+        validate_typed_dict_dict_literal(
+            &self.context,
+            typed_dict,
+            dict,
+            dict.into(),
+            &mut |expr: &ast::Expr, tcx: TypeContext<'db>| {
+                item_types
+                    .get(&expr.node_index().load())
+                    .copied()
+                    .or_else(|| self.try_expression_type(expr))
+                    .unwrap_or_else(|| {
+                        let _ = tcx;
+                        Type::unknown()
+                    })
+            },
+        )
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
     }
@@ -392,10 +522,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.get_or_infer_expression(argument, TypeContext::new(Some(target_ty)));
             }
             TypedDictConstructorForm::MixedPositionalAndKeywords => {
-                let unpacked_keyword_types =
-                    infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
-                        self.get_or_infer_expression(expr, tcx)
-                    });
+                let unpacked_keyword_types = arguments
+                    .keywords
+                    .iter()
+                    .map(|keyword| {
+                        (keyword.arg.is_none() && !keyword.value.is_dict_expr()).then(|| {
+                            self.get_or_infer_expression(&keyword.value, TypeContext::default())
+                        })
+                    })
+                    .collect::<Vec<_>>();
                 let keyword_keys = collect_guaranteed_keyword_keys(
                     self.db(),
                     typed_dict,
@@ -482,28 +617,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn shadow_typed_dict_constructor_keys_from_mapping(
-        &self,
-        typed_dict: TypedDictType<'db>,
-        key_ty: Type<'db>,
-        shadowed_keys: &mut OrderSet<Name>,
-    ) {
-        let typed_dict_items = typed_dict.items(self.db());
-        match mapping_string_keys(self.db(), key_ty) {
-            MappingStringKeys::NoString => {}
-            MappingStringKeys::Exact(keys) => {
-                for key in keys {
-                    if typed_dict_items.contains_key(&key) {
-                        shadowed_keys.insert(key);
-                    }
-                }
-            }
-            MappingStringKeys::AnyString => {
-                shadowed_keys.extend(typed_dict_items.keys().cloned());
-            }
-        }
-    }
-
     /// Walks a merged `**{...}` literal from right to left so overwrite semantics match runtime.
     fn plan_typed_dict_constructor_merged_unpacked_keyword_values<'expr>(
         &mut self,
@@ -565,7 +678,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } else {
                         let unpacked_ty =
                             self.get_or_infer_expression(&item.value, TypeContext::default());
-                        if unpacked_ty.is_never() || unpacked_ty.is_dynamic() {
+                        if unpacked_keyword_is_gradual(self.db(), unpacked_ty) {
                             shadowed_keys.extend(items.keys().cloned());
                         } else if let Some(unpacked_keys) =
                             extract_unpacked_typed_dict_keys_from_value_type(self.db(), unpacked_ty)
@@ -575,14 +688,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     shadowed_keys.insert(key);
                                 }
                             }
-                        } else if let Some((key_ty, _)) =
-                            extract_unpacked_mapping_key_value_types(self.db(), unpacked_ty)
+                        } else if extract_unpacked_mapping_key_value_types(self.db(), unpacked_ty)
+                            .is_some()
                         {
-                            self.shadow_typed_dict_constructor_keys_from_mapping(
-                                typed_dict,
-                                key_ty,
-                                shadowed_keys,
-                            );
+                            // General mappings can omit any candidate key, so they don't
+                            // definitely shadow earlier items during constructor inference.
                         }
                     }
                 }
@@ -615,7 +725,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .and_then(|key| items.get(key.value(self.db())))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
-            self.get_or_infer_expression(&item.value, value_tcx);
+            self.infer_typed_dict_value_expression(&item.value, value_tcx);
+        }
+
+        for item in &dict_expr.items {
+            if item.key.is_none()
+                && let ast::Expr::Dict(nested_dict_expr) = &item.value
+            {
+                let mut shadowed_keys = OrderSet::new();
+                self.infer_merged_typed_dict_literal_values(
+                    typed_dict,
+                    nested_dict_expr,
+                    &mut shadowed_keys,
+                );
+            }
         }
     }
 
