@@ -56,8 +56,8 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
         .filter_map(|param| param.default.as_deref())
     {
         match default {
-            Expr::Name(ast::ExprName { id, range, .. }) => {
-                if is_insecure_protocol(id.as_str()) {
+            Expr::Name(ast::ExprName { id, range, .. })
+                if is_insecure_protocol(id.as_str()) => {
                     checker.report_diagnostic(
                         SslWithBadDefaults {
                             protocol: id.to_string(),
@@ -65,9 +65,8 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
                         *range,
                     );
                 }
-            }
-            Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
-                if is_insecure_protocol(attr.as_str()) {
+            Expr::Attribute(ast::ExprAttribute { attr, range, .. })
+                if is_insecure_protocol(attr.as_str()) => {
                     checker.report_diagnostic(
                         SslWithBadDefaults {
                             protocol: attr.to_string(),
@@ -75,7 +74,6 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
                         *range,
                     );
                 }
-            }
             _ => {}
         }
     }

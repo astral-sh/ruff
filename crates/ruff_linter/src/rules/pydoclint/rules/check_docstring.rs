@@ -1277,7 +1277,7 @@ pub(crate) fn check_docstring(
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
-                        Some(returns) => {
+                        Some(returns)
                             // Ignore it if it's annotated as returning `None`
                             // or it's a generator function annotated as returning `None`,
                             // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
@@ -1287,11 +1287,10 @@ pub(crate) fn check_docstring(
                                     returns,
                                     semantic,
                                 )
-                            {
+                            => {
                                 checker
                                     .report_diagnostic(DocstringMissingReturns, docstring.range());
                             }
-                        }
                         None if body_entries
                             .returns
                             .iter()

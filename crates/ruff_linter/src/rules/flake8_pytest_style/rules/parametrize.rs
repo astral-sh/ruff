@@ -769,8 +769,8 @@ fn handle_value_rows(
 ) {
     for elt in elts {
         match elt {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if values_row_type != types::ParametrizeValuesRowType::Tuple {
+            Expr::Tuple(ast::ExprTuple { elts, .. })
+                if values_row_type != types::ParametrizeValuesRowType::Tuple => {
                     let mut diagnostic = checker.report_diagnostic(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
@@ -810,9 +810,8 @@ fn handle_value_rows(
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
                 }
-            }
-            Expr::List(ast::ExprList { elts, .. }) => {
-                if values_row_type != types::ParametrizeValuesRowType::List {
+            Expr::List(ast::ExprList { elts, .. })
+                if values_row_type != types::ParametrizeValuesRowType::List => {
                     let mut diagnostic = checker.report_diagnostic(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
@@ -853,7 +852,6 @@ fn handle_value_rows(
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
                 }
-            }
             _ => {}
         }
     }

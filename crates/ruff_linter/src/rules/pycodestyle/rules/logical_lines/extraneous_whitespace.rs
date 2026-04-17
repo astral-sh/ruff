@@ -181,9 +181,8 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                     }
                 }
                 BracketOrPunctuation::CloseBracket(symbol)
-                    if symbol != '}' || interpolated_strings == 0 =>
-                {
-                    if !matches!(prev_token, Some(TokenKind::Comma)) {
+                    if (symbol != '}' || interpolated_strings == 0)
+                    && !matches!(prev_token, Some(TokenKind::Comma)) => {
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
                         {
@@ -196,9 +195,8 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                             }
                         }
                     }
-                }
-                BracketOrPunctuation::Punctuation(symbol) => {
-                    if !matches!(prev_token, Some(TokenKind::Comma)) {
+                BracketOrPunctuation::Punctuation(symbol)
+                    if !matches!(prev_token, Some(TokenKind::Comma)) => {
                         let whitespace = line.leading_whitespace(token);
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             whitespace
@@ -312,7 +310,6 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                             }
                         }
                     }
-                }
                 _ => {}
             }
         }

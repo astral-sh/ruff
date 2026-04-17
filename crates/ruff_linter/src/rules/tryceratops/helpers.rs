@@ -26,14 +26,13 @@ impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(call) = expr {
             match call.func.as_ref() {
-                Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                Expr::Attribute(ast::ExprAttribute { attr, .. })
                     if logging::is_logger_candidate(&call.func, self.semantic, self.logger_objects)
-                    {
+                    => {
                         if let Some(logging_level) = LoggingLevel::from_attribute(attr) {
                             self.calls.push((call, logging_level));
                         }
                     }
-                }
                 Expr::Name(_) => {
                     if let Some(qualified_name) =
                         self.semantic.resolve_qualified_name(call.func.as_ref())

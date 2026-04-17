@@ -1320,11 +1320,10 @@ fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> 
                     _ => (),
                 }
             }
-            Expr::Name(name) => {
-                if name.range() == binding.range() {
+            Expr::Name(name)
+                if name.range() == binding.range() => {
                     return Some(value);
                 }
-            }
             _ => (),
         }
     }

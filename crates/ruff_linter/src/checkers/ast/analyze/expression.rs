@@ -1391,16 +1391,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::duplicate_value(checker, set);
             }
         }
-        Expr::Yield(_) => {
-            if checker.is_rule_enabled(Rule::YieldInInit) {
+        Expr::Yield(_)
+            if checker.is_rule_enabled(Rule::YieldInInit) => {
                 pylint::rules::yield_in_init(checker, expr);
             }
-        }
-        Expr::YieldFrom(_) => {
-            if checker.is_rule_enabled(Rule::YieldInInit) {
+        Expr::YieldFrom(_)
+            if checker.is_rule_enabled(Rule::YieldInInit) => {
                 pylint::rules::yield_in_init(checker, expr);
             }
-        }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {
             if checker.is_rule_enabled(Rule::FStringMissingPlaceholders) {
                 pyflakes::rules::f_string_missing_placeholders(checker, f_string_expr);
@@ -1428,11 +1426,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             left,
             op: Operator::RShift,
             ..
-        }) => {
-            if checker.is_rule_enabled(Rule::InvalidPrintSyntax) {
+        })
+            if checker.is_rule_enabled(Rule::InvalidPrintSyntax) => {
                 pyflakes::rules::invalid_print_syntax(checker, left);
             }
-        }
         Expr::BinOp(
             bin_op @ ast::ExprBinOp {
                 left,

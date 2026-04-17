@@ -750,7 +750,7 @@ impl TestServer {
                     Some("ty") => match serde_json::to_value(options) {
                         Ok(value) => value,
                         Err(err) => {
-                            panic!("Failed to deserialize workspace configuration options: {err}",)
+                            panic!("Failed to deserialize workspace configuration options: {err}")
                         }
                     },
                     Some(section) => {

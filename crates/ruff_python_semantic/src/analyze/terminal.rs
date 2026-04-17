@@ -310,30 +310,28 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                 body,
                 elif_else_clauses,
                 ..
-            }) => {
+            })
                 if std::iter::once(body)
                     .chain(elif_else_clauses.iter().map(|clause| &clause.body))
                     .any(|body| sometimes_breaks(body, semantic))
-                {
+                => {
                     return true;
                 }
-            }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. })
                 if cases
                     .iter()
                     .any(|case| sometimes_breaks(&case.body, semantic))
-                {
+                => {
                     return true;
                 }
-            }
             Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
                 ..
-            }) => {
-                if sometimes_breaks(body, semantic)
+            })
+                if (sometimes_breaks(body, semantic)
                     || handlers.iter().any(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
@@ -342,16 +340,14 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                         sometimes_breaks(body, semantic)
                     })
                     || sometimes_breaks(orelse, semantic)
-                    || sometimes_breaks(finalbody, semantic)
-                {
+                    || sometimes_breaks(finalbody, semantic))
+                => {
                     return true;
                 }
-            }
-            Stmt::With(ast::StmtWith { body, .. }) => {
-                if sometimes_breaks(body, semantic) {
+            Stmt::With(ast::StmtWith { body, .. })
+                if sometimes_breaks(body, semantic) => {
                     return true;
                 }
-            }
             Stmt::Break(_) => return true,
             Stmt::Return(_) => return false,
             Stmt::Raise(_) => return false,

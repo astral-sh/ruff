@@ -103,19 +103,16 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),
         // Ex `"".encode(encoding)`
-        ([arg], []) => {
-            if is_utf8_encoding_arg(arg) {
+        ([arg], [])
+            if is_utf8_encoding_arg(arg) => {
                 return Some(EncodingArg::Positional(arg));
             }
-        }
         // Ex `"".encode(kwarg=kwarg)`
-        ([], [keyword]) => {
-            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding") {
-                if is_utf8_encoding_arg(&keyword.value) {
+        ([], [keyword])
+            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding")
+                && is_utf8_encoding_arg(&keyword.value) => {
                     return Some(EncodingArg::Keyword(keyword));
                 }
-            }
-        }
         // Ex `"".encode(*args, **kwargs)`
         _ => {}
     }

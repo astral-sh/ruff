@@ -333,16 +333,14 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Break(ast::StmtBreak { range, .. }) => {
-                if !ctx.in_loop_context() {
+            Stmt::Break(ast::StmtBreak { range, .. })
+                if !ctx.in_loop_context() => {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
                 }
-            }
-            Stmt::Continue(ast::StmtContinue { range, .. }) => {
-                if !ctx.in_loop_context() {
+            Stmt::Continue(ast::StmtContinue { range, .. })
+                if !ctx.in_loop_context() => {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
                 }
-            }
             _ => {}
         }
 
@@ -1273,7 +1271,7 @@ impl Display for SemanticSyntaxError {
                 )
             }
             SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
-                write!(f, "attribute name `{name}` repeated in class pattern",)
+                write!(f, "attribute name `{name}` repeated in class pattern")
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")

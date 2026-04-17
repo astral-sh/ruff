@@ -912,11 +912,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         for parent in self.semantic.current_statements().skip(1) {
             match parent {
                 Stmt::For(ast::StmtFor { orelse, .. })
-                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                    if !orelse.contains(child) {
+                | Stmt::While(ast::StmtWhile { orelse, .. })
+                    if !orelse.contains(child) => {
                         return true;
                     }
-                }
                 Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                     break;
                 }
@@ -1164,8 +1163,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 names,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.semantic.scope_id.is_global() {
+            })
+                if !self.semantic.scope_id.is_global() => {
                     for name in names {
                         let binding_id = self.semantic.global_scope().get(name);
 
@@ -1185,13 +1184,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         scope.add(name, binding_id);
                     }
                 }
-            }
             Stmt::Nonlocal(ast::StmtNonlocal {
                 names,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.semantic.scope_id.is_global() {
+            })
+                if !self.semantic.scope_id.is_global() => {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used", since the `nonlocal` requires an existing
@@ -1218,7 +1216,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                 }
-            }
             _ => {}
         }
 
@@ -1621,12 +1618,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if target.is_name_expr() {
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+                    if target.is_name_expr() => {
                         self.docstring_state =
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
-                }
                 _ => {}
             }
         }
@@ -2778,16 +2774,15 @@ impl<'a> Checker<'a> {
 
         match parent {
             Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })
                 // TODO: It is a bit unfortunate that we do this check twice
                 //       maybe we should change how we visit this statement
                 //       so the semantic flag for the type alias sticks around
                 //       until after we've handled this store, so we can check
                 //       the flag instead of duplicating this check
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") => {
                     flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
                 }
-            }
             _ => {}
         }
 

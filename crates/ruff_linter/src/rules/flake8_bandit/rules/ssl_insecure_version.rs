@@ -67,8 +67,8 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
     };
 
     match &keyword.value {
-        Expr::Name(ast::ExprName { id, .. }) => {
-            if is_insecure_protocol(id) {
+        Expr::Name(ast::ExprName { id, .. })
+            if is_insecure_protocol(id) => {
                 checker.report_diagnostic(
                     SslInsecureVersion {
                         protocol: id.to_string(),
@@ -76,9 +76,8 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
                     keyword.range(),
                 );
             }
-        }
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if is_insecure_protocol(attr) {
+        Expr::Attribute(ast::ExprAttribute { attr, .. })
+            if is_insecure_protocol(attr) => {
                 checker.report_diagnostic(
                     SslInsecureVersion {
                         protocol: attr.to_string(),
@@ -86,7 +85,6 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
                     keyword.range(),
                 );
             }
-        }
         _ => {}
     }
 }

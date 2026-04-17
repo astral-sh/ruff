@@ -113,12 +113,11 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 value: Some(value),
                 range: _,
                 node_index: _,
-            }) => {
+            })
                 // Mark `return lambda: x` as safe.
-                if value.is_lambda_expr() {
+                if value.is_lambda_expr() => {
                     self.safe_functions.push(value);
                 }
-            }
             _ => {}
         }
         visitor::walk_stmt(self, stmt);
@@ -148,8 +147,8 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             }
                         }
                     }
-                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                        if attr == "reduce" {
+                    Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                        if attr == "reduce" => {
                             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                                 if id == "functools" {
                                     for arg in &*arguments.args {
@@ -160,7 +159,6 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 }
                             }
                         }
-                    }
                     _ => {}
                 }
 
@@ -177,8 +175,8 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 body,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.safe_functions.contains(&expr) {
+            })
+                if !self.safe_functions.contains(&expr) => {
                     // Collect all loaded variable names.
                     let mut visitor = LoadedNamesVisitor::default();
                     visitor.visit_expr(body);
@@ -202,7 +200,6 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
                     return;
                 }
-            }
             _ => {}
         }
         visitor::walk_expr(self, expr);

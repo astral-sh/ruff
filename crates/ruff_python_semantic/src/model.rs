@@ -1130,8 +1130,8 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.segments() == module_path.as_slice() {
+                        BindingKind::Import(Import { qualified_name })
+                            if qualified_name.segments() == module_path.as_slice() => {
                                 if let Some(source) = binding.source {
                                     // Verify that `sys` isn't bound in an inner scope.
                                     if self
@@ -1148,7 +1148,6 @@ impl<'a> SemanticModel<'a> {
                                     }
                                 }
                             }
-                        }
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `from os.path import join`          -> `join`
                         // `from os.path import join as join2` -> `join2`
@@ -1181,8 +1180,8 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.segments().starts_with(&module_path) {
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name })
+                            if qualified_name.segments().starts_with(&module_path) => {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -1199,7 +1198,6 @@ impl<'a> SemanticModel<'a> {
                                     }
                                 }
                             }
-                        }
                         // Non-imports.
                         _ => {}
                     }

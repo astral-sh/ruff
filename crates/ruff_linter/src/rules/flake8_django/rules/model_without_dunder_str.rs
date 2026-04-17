@@ -98,19 +98,17 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
         }
         for element in body {
             match element {
-                Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                Stmt::Assign(ast::StmtAssign { targets, value, .. })
                     if targets
                         .iter()
                         .any(|target| is_abstract_true_assignment(target, Some(value)))
-                    {
+                    => {
                         return true;
                     }
-                }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                    if is_abstract_true_assignment(target, value.as_deref()) {
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. })
+                    if is_abstract_true_assignment(target, value.as_deref()) => {
                         return true;
                     }
-                }
                 _ => {}
             }
         }

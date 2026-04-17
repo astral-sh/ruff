@@ -177,8 +177,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     | Expr::NoneLiteral(_)
                     | Expr::EllipsisLiteral(_)
                     | Expr::Tuple(_)
-                    | Expr::FString(_) => {
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                    | Expr::FString(_)
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) => {
                             let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyLiteral {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
@@ -207,9 +207,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                 )));
                             }
                         }
-                    }
-                    Expr::Name(_) => {
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) {
+                    Expr::Name(_)
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) => {
                             let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyVariable {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
@@ -236,7 +235,6 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                 )));
                             }
                         }
-                    }
                     _ => {}
                 }
             }

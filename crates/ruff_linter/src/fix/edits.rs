@@ -485,54 +485,49 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. }) => {
-            if is_only(body, child) {
+        | Stmt::With(ast::StmtWith { body, .. })
+            if is_only(body, child) => {
                 return true;
             }
-        }
         Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            if is_only(body, child) || is_only(orelse, child) {
+        | Stmt::While(ast::StmtWhile { body, orelse, .. })
+            if (is_only(body, child) || is_only(orelse, child)) => {
                 return true;
             }
-        }
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
-        }) => {
-            if is_only(body, child)
+        })
+            if (is_only(body, child)
                 || elif_else_clauses
                     .iter()
-                    .any(|ast::ElifElseClause { body, .. }| is_only(body, child))
-            {
+                    .any(|ast::ElifElseClause { body, .. }| is_only(body, child)))
+            => {
                 return true;
             }
-        }
         Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
             ..
-        }) => {
-            if is_only(body, child)
+        })
+            if (is_only(body, child)
                 || is_only(orelse, child)
                 || is_only(finalbody, child)
                 || handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => is_only(body, child),
-                })
-            {
+                }))
+            => {
                 return true;
             }
-        }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            if cases.iter().any(|case| is_only(&case.body, child)) {
+        Stmt::Match(ast::StmtMatch { cases, .. })
+            if cases.iter().any(|case| is_only(&case.body, child)) => {
                 return true;
             }
-        }
         _ => {}
     }
     false

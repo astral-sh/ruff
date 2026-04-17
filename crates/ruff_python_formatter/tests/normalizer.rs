@@ -59,8 +59,8 @@ impl Transformer for Normalizer {
         // but not joining here doesn't play nicely with other string normalizations done in the
         // Normalizer.
         match expr {
-            Expr::StringLiteral(string) => {
-                if string.value.is_implicit_concatenated() {
+            Expr::StringLiteral(string)
+                if string.value.is_implicit_concatenated() => {
                     let can_join = string.value.iter().all(|literal| {
                         !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
                     });
@@ -74,10 +74,9 @@ impl Transformer for Normalizer {
                         });
                     }
                 }
-            }
 
-            Expr::BytesLiteral(bytes) => {
-                if bytes.value.is_implicit_concatenated() {
+            Expr::BytesLiteral(bytes)
+                if bytes.value.is_implicit_concatenated() => {
                     let can_join = bytes.value.iter().all(|literal| {
                         !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
                     });
@@ -91,10 +90,9 @@ impl Transformer for Normalizer {
                         });
                     }
                 }
-            }
 
-            Expr::FString(fstring) => {
-                if fstring.value.is_implicit_concatenated() {
+            Expr::FString(fstring)
+                if fstring.value.is_implicit_concatenated() => {
                     let can_join = fstring.value.iter().all(|part| match part {
                         FStringPart::Literal(literal) => {
                             !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
@@ -177,7 +175,6 @@ impl Transformer for Normalizer {
                         });
                     }
                 }
-            }
 
             _ => {}
         }

@@ -77,18 +77,16 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                     continue;
                 }
                 match value.as_ref() {
-                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                        if value == "__all__" {
+                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                        if value == "__all__" => {
                             checker.report_diagnostic(DjangoAllWithModelForm, element.range());
                             return;
                         }
-                    }
-                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                        if value == "__all__".as_bytes() {
+                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
+                        if value == "__all__".as_bytes() => {
                             checker.report_diagnostic(DjangoAllWithModelForm, element.range());
                             return;
                         }
-                    }
                     _ => (),
                 }
             }

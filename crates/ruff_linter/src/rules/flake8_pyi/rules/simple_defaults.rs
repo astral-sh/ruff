@@ -336,15 +336,14 @@ fn is_valid_default_value_with_annotation(
                 // Ex) `-1`, `-3.14`, `2j`
                 Expr::NumberLiteral(_) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
-                Expr::Attribute(_) => {
+                Expr::Attribute(_)
                     if semantic
                         .resolve_qualified_name(operand)
                         .as_ref()
                         .is_some_and(is_allowed_negated_math_attribute)
-                    {
+                    => {
                         return true;
                     }
-                }
                 _ => {}
             }
         }
@@ -387,15 +386,14 @@ fn is_valid_default_value_with_annotation(
             }
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
-        Expr::Attribute(_) => {
+        Expr::Attribute(_)
             if semantic
                 .resolve_qualified_name(default)
                 .as_ref()
                 .is_some_and(is_allowed_math_attribute)
-            {
+            => {
                 return true;
             }
-        }
         _ => {}
     }
     false

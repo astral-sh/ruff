@@ -153,21 +153,19 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
             _ => {}
         },
         // Check for f-strings.
-        Expr::FString(f_string) => {
-            if checker.is_rule_enabled(Rule::LoggingFString) {
+        Expr::FString(f_string)
+            if checker.is_rule_enabled(Rule::LoggingFString) => {
                 logging_f_string(checker, msg, f_string, arguments, msg_pos);
             }
-        }
         // Check for .format() calls.
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            if checker.is_rule_enabled(Rule::LoggingStringFormat) {
+        Expr::Call(ast::ExprCall { func, .. })
+            if checker.is_rule_enabled(Rule::LoggingStringFormat) => {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_literal_expr() {
                         checker.report_diagnostic(LoggingStringFormat, msg.range());
                     }
                 }
             }
-        }
         _ => {}
     }
 }
@@ -194,8 +192,8 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
             func,
             arguments: Arguments { keywords, .. },
             ..
-        }) => {
-            if checker.semantic().match_builtin_expr(func, "dict") {
+        })
+            if checker.semantic().match_builtin_expr(func, "dict") => {
                 for keyword in keywords {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
@@ -207,7 +205,6 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
                     }
                 }
             }
-        }
         _ => {}
     }
 }

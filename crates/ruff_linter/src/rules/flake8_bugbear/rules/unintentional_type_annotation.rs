@@ -45,11 +45,10 @@ pub(crate) fn unintentional_type_annotation(
         return;
     }
     match target {
-        Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-            if value.is_name_expr() {
+        Expr::Subscript(ast::ExprSubscript { value, .. })
+            if value.is_name_expr() => {
                 checker.report_diagnostic(UnintentionalTypeAnnotation, stmt.range());
             }
-        }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                 if id != "self" {

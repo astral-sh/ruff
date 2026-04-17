@@ -136,14 +136,14 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                     checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
-            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+            Stmt::Assign(ast::StmtAssign { value, targets, .. })
                 if !targets.iter().all(|target| {
                     is_special_attribute(target)
                         || target
                             .as_name_expr()
                             .is_some_and(|name| class_var_targets.contains(&name.id))
                 }) && is_mutable_expr(value, checker.semantic())
-                {
+                => {
                     // The `_fields_` property of a `ctypes.Structure` base class has its
                     // immutability enforced  by the base class itself which will throw an error if
                     // it's set a second time
@@ -159,7 +159,6 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
 
                     checker.report_diagnostic(MutableClassDefault, value.range());
                 }
-            }
             _ => (),
         }
     }

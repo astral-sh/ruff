@@ -355,11 +355,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::property_without_return(checker, function_def);
             }
         }
-        Stmt::Return(_) => {
-            if checker.is_rule_enabled(Rule::ReturnInInit) {
+        Stmt::Return(_)
+            if checker.is_rule_enabled(Rule::ReturnInInit) => {
                 pylint::rules::return_in_init(checker, stmt);
             }
-        }
         Stmt::ClassDef(
             class_def @ ast::StmtClassDef {
                 name,
@@ -1654,11 +1653,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             cases,
             range: _,
             node_index: _,
-        }) => {
-            if checker.is_rule_enabled(Rule::NanComparison) {
+        })
+            if checker.is_rule_enabled(Rule::NanComparison) => {
                 pylint::rules::nan_comparison_match(checker, cases);
             }
-        }
         _ => {}
     }
     if checker.is_rule_enabled(Rule::NonEmptyInitModule) {

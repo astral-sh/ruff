@@ -141,12 +141,11 @@ pub(crate) fn compound_statements(
         };
 
         match token.kind() {
-            TokenKind::Ellipsis => {
-                if allow_ellipsis {
+            TokenKind::Ellipsis
+                if allow_ellipsis => {
                     allow_ellipsis = false;
                     continue;
                 }
-            }
             TokenKind::Indent => {
                 indent = indent.saturating_add(1);
             }
