@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 use std::str::FromStr;
 use ty_project::Db as _;
-use ty_python_semantic::Program;
+use ty_python_core::program::Program;
 
 /// Arguments for the `ty.runTest` command.
 ///
