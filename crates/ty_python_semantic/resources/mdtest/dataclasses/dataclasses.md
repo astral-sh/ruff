@@ -620,9 +620,7 @@ del frozen.x  # TODO this should emit an [invalid-assignment]
 If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
 catch this error:
 
-<!-- snapshot-diagnostics -->
-
-`a.py`:
+`foo.py`:
 
 ```py
 from dataclasses import dataclass
@@ -632,14 +630,37 @@ class FrozenBase:
     x: int
 
 @dataclass
-# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+# snapshot: invalid-frozen-dataclass-subclass
 class Child(FrozenBase):
     y: int
 ```
 
+```snapshot
+error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
+ --> src/foo.py:9:7
+  |
+9 | class Child(FrozenBase):
+  |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
+  |
+ ::: src/foo.py:7:1
+  |
+7 | @dataclass
+  | ---------- `Child` dataclass parameters
+  |
+info: This causes the class creation to fail
+info: Base class definition
+ --> src/foo.py:3:1
+  |
+3 | @dataclass(frozen=True)
+  | ----------------------- `FrozenBase` dataclass parameters
+4 | class FrozenBase:
+  |       ^^^^^^^^^^ `FrozenBase` definition
+  |
+```
+
 Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
 
-`b.py`:
+`bar.py`:
 
 ```py
 from dataclasses import dataclass
@@ -1535,8 +1556,6 @@ asdict(Foo)
 
 ## `dataclasses.KW_ONLY`
 
-<!-- snapshot-diagnostics -->
-
 If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
 `__init__` of the class. Instead, this special marker annotation causes Python at runtime to ensure
 that all annotations following it have keyword-only parameters generated for them in the class's
@@ -1558,11 +1577,28 @@ class C:
 
 reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
 
-# error: [missing-argument]
-# error: [too-many-positional-arguments]
+# snapshot: missing-argument
+# snapshot: too-many-positional-arguments
 C(3, "")
 
 C(3, y="")
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y`
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | C(3, "")
+   | ^^^^^^^^
+   |
+
+
+error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+  --> src/mdtest_snippet.py:13:6
+   |
+13 | C(3, "")
+   |      ^^
+   |
 ```
 
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
