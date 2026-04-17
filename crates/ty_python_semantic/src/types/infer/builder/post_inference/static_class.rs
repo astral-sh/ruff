@@ -253,24 +253,24 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(new_context)) => {
-                let Some((prior_node, previous_context)) = protocol_base_with_generic_context
+                let Some((previous_node, previous_context)) = protocol_base_with_generic_context
                 else {
                     continue;
                 };
-                let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, prior_node) else {
+                let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, previous_node) else {
                     continue;
                 };
                 let mut diagnostic = builder.into_diagnostic(
                     "Cannot both inherit from subscripted `Protocol` \
                                 and subscripted `Generic`",
                 );
-                if let ast::Expr::Subscript(prior_node) = prior_node
+                if let ast::Expr::Subscript(previous_node) = previous_node
                     && new_context == previous_context
                 {
                     diagnostic.help("Remove the type parameters from the `Protocol` base");
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
-                        prior_node.value.end(),
-                        prior_node.end(),
+                        previous_node.value.end(),
+                        previous_node.end(),
                     ))));
                 }
                 continue;
