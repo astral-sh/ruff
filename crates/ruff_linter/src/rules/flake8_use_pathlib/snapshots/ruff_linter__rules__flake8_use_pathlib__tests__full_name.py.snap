@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 57
 ---
 PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
  --> full_name.py:7:5
@@ -372,42 +373,6 @@ PTH123 `open()` should be replaced by `Path.open()`
 47 | open(p, 'r', - 1, None, None, None, True, None)
    | ^^^^
 48 | open(p, 'r', - 1, None, None, None, False, opener)
-   |
-help: Replace with `Path.open()`
-
-PTH123 `open()` should be replaced by `Path.open()`
-  --> full_name.py:65:1
-   |
-63 | open(f())
-64 |
-65 | open(b"foo")
-   | ^^^^
-66 | byte_str = b"bar"
-67 | open(byte_str)
-   |
-help: Replace with `Path.open()`
-
-PTH123 `open()` should be replaced by `Path.open()`
-  --> full_name.py:67:1
-   |
-65 | open(b"foo")
-66 | byte_str = b"bar"
-67 | open(byte_str)
-   | ^^^^
-68 |
-69 | def bytes_str_func() -> bytes:
-   |
-help: Replace with `Path.open()`
-
-PTH123 `open()` should be replaced by `Path.open()`
-  --> full_name.py:71:1
-   |
-69 | def bytes_str_func() -> bytes:
-70 |     return b"foo"
-71 | open(bytes_str_func())
-   | ^^^^
-72 |
-73 | # https://github.com/astral-sh/ruff/issues/17693
    |
 help: Replace with `Path.open()`
 
