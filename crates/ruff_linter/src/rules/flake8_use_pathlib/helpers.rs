@@ -67,6 +67,10 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
         return;
     };
 
+    if is_bytes_path(arg, checker.semantic()) {
+        return;
+    }
+
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();
 
@@ -134,6 +138,23 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
+/// Returns `true` if the given expression looks like a bytes path.
+pub(crate) fn is_bytes_path(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(expr, Expr::BytesLiteral(_)) {
+        return true;
+    }
+
+    let Some(name) = get_name_expr(expr) else {
+        return false;
+    };
+
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_bytes(binding, semantic)
+}
+
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
@@ -145,6 +166,17 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     violation: impl Violation,
     applicability: Applicability,
 ) {
+    if let (Some(path_expr), Some(second_expr)) = (
+        call.arguments.find_argument_value(path_arg, 0),
+        call.arguments.find_argument_value(second_arg, 1),
+    ) {
+        if is_bytes_path(path_expr, checker.semantic())
+            || is_bytes_path(second_expr, checker.semantic())
+        {
+            return;
+        }
+    }
+
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
