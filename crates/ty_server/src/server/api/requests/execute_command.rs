@@ -119,7 +119,9 @@ fn run_test(
         .as_deref()
         .ok_or_else(|| anyhow::anyhow!("No Python executable found."))?;
 
-    // Reconstruct the command again, to now allow client to run any program
+    // We reconstruct the command using the server's known python executable so the client
+    // cannot choose an arbitrary program to execute. However the risk still remains as we take
+    // input from the client.
     let run_test_args = RunTestArgs::new(
         &run_test_args.cwd,
         run_test_args.file_path,
