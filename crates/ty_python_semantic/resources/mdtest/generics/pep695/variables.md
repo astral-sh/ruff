@@ -867,7 +867,7 @@ class SomeClass[T: int | str]:
     def narrowed1(self) -> None:
         narrowed: int | str
         assert not isinstance(self.field, int)
-        reveal_type(self.field)  # revealed: T@SomeClass & ~int
+        reveal_type(self.field)  # revealed: T@SomeClass & str
         narrowed = self.field
 
     def narrowed2(self) -> None:
@@ -1077,7 +1077,7 @@ However, they are lazily evaluated and can cyclically refer to their own type:
 class G[T: list[G]]:
     x: T
 
-reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown & list[Divergent]]]
 ```
 
 An invalid specialization in a recursive bound doesn't cause a panic:
@@ -1089,7 +1089,7 @@ class Node[T: "Node[int]"]:
 
 # error: [invalid-type-arguments]
 def _(n: Node[str]):
-    reveal_type(n)  # revealed: Node[Unknown]
+    reveal_type(n)  # revealed: Node[Unknown & Node[Unknown & Node[int]]]
 ```
 
 ### Defaults

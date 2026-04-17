@@ -9,9 +9,9 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        any_over_type, binding_type, definition_expression_type, tuple::Tuple,
+        IntersectionType, KnownClass, KnownInstanceType, MaterializationKind, Parameter,
+        Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        UnionType, any_over_type, binding_type, definition_expression_type, tuple::Tuple,
         variance::VarianceInferable, visitor,
     },
 };
@@ -632,6 +632,22 @@ impl<'db> TypeVarInstance<'db> {
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
         GenericContext::of_node(db, child.node(), index)?.binds_typevar(db, self)
+    }
+
+    pub(crate) fn intersect_with_bound(self, db: &'db dyn Db, other: Type<'db>) -> Type<'db> {
+        match self.bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                IntersectionType::from_two_elements(db, other, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => UnionType::from_elements(
+                db,
+                constraints
+                    .elements(db)
+                    .iter()
+                    .map(|&constraint| IntersectionType::from_two_elements(db, constraint, other)),
+            ),
+            None => other,
+        }
     }
 }
 

@@ -239,10 +239,10 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-reveal_type(Bounded[str]())  # revealed: Bounded[Unknown]
+reveal_type(Bounded[str]())  # revealed: Bounded[Unknown & int]
 
 # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown]
+reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown & int]
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
 reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]
@@ -270,7 +270,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
-reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
+reveal_type(Constrained[object]())  # revealed: Constrained[(int & Unknown) | (str & Unknown)]
 ```
 
 If the type variable has a default, it can be omitted:

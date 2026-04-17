@@ -177,6 +177,24 @@ info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> in
 ```
 
 ```
+error[invalid-argument-type]: Argument to function `f4` is incorrect
+  --> src/mdtest_snippet.py:60:11
+   |
+60 |     x = f(3)
+   |           ^ Expected `Unknown & str`, found `Literal[3]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:13:5
+   |
+13 | def f4[T: str](x: T) -> int:
+   |     ^^         ---- Parameter declared here
+   |
+info: Union variant `def f4[T](x: T) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
+
+```
+
+```
 error[invalid-argument-type]: Argument to function `f5` is incorrect
   --> src/mdtest_snippet.py:60:11
    |

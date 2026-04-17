@@ -200,7 +200,7 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
 # snapshot: invalid-argument-type
-reveal_type(f("string"))  # revealed: Unknown
+reveal_type(f("string"))  # revealed: Unknown & int
 ```
 
 ```snapshot
@@ -1033,5 +1033,5 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> 
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # TODO: We only report the first error here, but we should report both.
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
-    reveal_type(first(x))  # revealed: Unknown
+    reveal_type(first(x))  # revealed: Unknown & Base
 ```

@@ -338,10 +338,10 @@ class BoundedGenericFinal[T: int]:
     x: T  # invariant
 
 def g(x: type[BoundedGenericFinal]):
-    reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+    reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown & int]'>
 
     if issubclass(x, BoundedGenericFinal):
-        reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+        reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown & int]'>
     else:
         reveal_type(x)  # revealed: Never
 ```

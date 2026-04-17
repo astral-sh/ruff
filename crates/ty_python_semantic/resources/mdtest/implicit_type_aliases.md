@@ -501,7 +501,7 @@ def _(
 ):
     reveal_type(list_of_ints)  # revealed: list[int]
     reveal_type(subclass_of_int)  # revealed: type[int]
-    reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
+    reveal_type(type_or_list)  # revealed: type[Any] | list[Any & int]
 ```
 
 If a generic implicit type alias is used unspecialized in a type expression, we use the default

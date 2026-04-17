@@ -307,6 +307,7 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -787,6 +788,21 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
+    #[salsa::tracked(
+        heap_size=ruff_memory_usage::heap_size,
+        cycle_initial=|db, id, self_: GenericContext<'db>, _| {
+            Specialization::new(
+                db,
+                self_,
+                vec![Type::divergent(id); self_.len(db)].into_boxed_slice(),
+                None,
+                None
+            )
+        },
+        cycle_fn=|db, cycle, previous: &Specialization<'db>, current: Specialization<'db>, _, _| {
+            current.cycle_normalized(db, *previous, cycle)
+        },
+    )]
     pub(crate) fn default_specialization(
         self,
         db: &'db dyn Db,
@@ -862,9 +878,7 @@ impl<'db> GenericContext<'db> {
         T: Into<Cow<'t, [Type<'db>]>>,
         'db: 't,
     {
-        let types = types.into();
-
-        assert_eq!(self.len(db), types.len());
+        let types: Box<[Type<'db>]> = self.cap_by_upper_bound(db, types.into().iter().map(Some));
         Specialization::new(db, self, types, None, None)
     }
 
@@ -916,7 +930,7 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        let types = self.fill_in_defaults(db, types);
+        let types = self.cap_by_upper_bound(db, types);
         specialize_recursive_impl(db, self, types)
     }
 
@@ -930,9 +944,10 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
     }
 
-    fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
+    fn cap_by_upper_bound<I, T>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
     where
-        I: IntoIterator<Item = Option<Type<'db>>>,
+        I: IntoIterator<Item = Option<T>>,
+        T: Into<Type<'db>>,
         I::IntoIter: ExactSizeIterator,
     {
         let types = types.into_iter();
@@ -952,13 +967,19 @@ impl<'db> GenericContext<'db> {
             if typevar.is_paramspec(db) {
                 expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
             } else {
-                expanded.push(Type::unknown());
+                expanded.push(
+                    typevar
+                        .typevar(db)
+                        .intersect_with_bound(db, Type::unknown()),
+                );
             }
         }
 
         for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
+            let typevar = typevar.typevar(db);
+
             if let Some(ty) = ty {
-                expanded[idx] = ty;
+                expanded[idx] = typevar.intersect_with_bound(db, ty.into());
                 continue;
             }
 
@@ -993,7 +1014,7 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
+        Specialization::new(db, self, self.cap_by_upper_bound(db, types), None, None)
     }
 }
 
@@ -1061,6 +1082,26 @@ impl<'db> Specialization<'db> {
             self.materialization_kind(db),
             None,
         ))
+    }
+
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        Self::new(
+            db,
+            self.generic_context(db),
+            self.types(db)
+                .iter()
+                .zip(previous.types(db))
+                .map(|(&this, &prev)| {
+                    if this.is_nominal_instance() {
+                        this
+                    } else {
+                        this.cycle_normalized(db, prev, cycle)
+                    }
+                })
+                .collect::<Box<_>>(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 
     /// Returns the tuple spec for a specialization of the `tuple` class.
