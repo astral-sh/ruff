@@ -763,6 +763,37 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+Merged dict literals should preserve required keys contributed by unpacked `TypedDict`s:
+
+```py
+from typing import TypedDict
+
+class MergeSource(TypedDict):
+    aaa: int
+    bbb: int
+
+class MergeTarget(TypedDict):
+    aaa: int
+    bbb: int
+    ccc: int
+
+class MergeExtraSource(TypedDict):
+    aaa: int
+    bbb: int
+    extra: int
+
+def _(source: MergeSource):
+    merged: MergeTarget = {**source, "ccc": 3}
+    MergeTarget({**source, "ccc": 3})
+
+def _(source: MergeExtraSource):
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    merged: MergeTarget = {**source, "ccc": 3}
+
+    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    MergeTarget({**source, "ccc": 3})
+```
+
 ## Mixed positional and unpacked keyword constructors
 
 These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should

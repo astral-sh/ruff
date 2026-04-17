@@ -357,12 +357,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             item_types.insert(item.value.node_index().load(), value_ty);
         }
 
-        validate_typed_dict_dict_literal(&self.context, typed_dict, dict, dict.into(), |expr| {
-            item_types
-                .get(&expr.node_index().load())
-                .copied()
-                .unwrap_or(Type::unknown())
-        })
+        validate_typed_dict_dict_literal(
+            &self.context,
+            typed_dict,
+            dict,
+            dict.into(),
+            &mut |expr: &ast::Expr, tcx: TypeContext<'db>| {
+                item_types
+                    .get(&expr.node_index().load())
+                    .copied()
+                    .or_else(|| self.try_expression_type(expr))
+                    .unwrap_or_else(|| {
+                        let _ = tcx;
+                        Type::unknown()
+                    })
+            },
+        )
         .ok()
         .map(|_| Type::TypedDict(typed_dict))
     }

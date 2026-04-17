@@ -1186,8 +1186,9 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
     nodes: TypedDictAssignmentNodes<'ast>,
     full_object_ty: Option<Type<'db>>,
     ignored_keys: &OrderSet<Name>,
-) -> OrderSet<Name> {
+) -> (OrderSet<Name>, bool) {
     let mut provided_keys = OrderSet::new();
+    let mut valid = true;
 
     for (key_name, unpacked_key) in unpacked_keys {
         if ignored_keys.contains(key_name) {
@@ -1196,7 +1197,7 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
         if unpacked_key.is_required {
             provided_keys.insert(key_name.clone());
         }
-        TypedDictKeyAssignment {
+        valid &= TypedDictKeyAssignment {
             context,
             typed_dict,
             full_object_ty,
@@ -1211,7 +1212,7 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
         .validate();
     }
 
-    provided_keys
+    (provided_keys, valid)
 }
 
 /// Validates a mixed-constructor positional argument when its type can be viewed as a `TypedDict`.
@@ -1236,18 +1237,21 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
         .filter(|(key_name, _)| typed_dict_items.contains_key(key_name))
         .collect();
 
-    Some(validate_extracted_typed_dict_keys(
-        context,
-        typed_dict,
-        &unpacked_keys,
-        TypedDictAssignmentNodes {
-            typed_dict: typed_dict_node,
-            key: arg.into(),
-            value: arg.into(),
-        },
-        full_object_ty_annotation(arg_ty),
-        ignored_keys,
-    ))
+    Some(
+        validate_extracted_typed_dict_keys(
+            context,
+            typed_dict,
+            &unpacked_keys,
+            TypedDictAssignmentNodes {
+                typed_dict: typed_dict_node,
+                key: arg.into(),
+                value: arg.into(),
+            },
+            full_object_ty_annotation(arg_ty),
+            ignored_keys,
+        )
+        .0,
+    )
 }
 
 fn report_duplicate_typed_dict_constructor_key<'db, 'ast>(
@@ -1459,45 +1463,32 @@ fn validate_from_dict_literal<'db, 'ast>(
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
     ignored_keys: &OrderSet<Name>,
 ) -> OrderSet<Name> {
-    let mut provided_keys = OrderSet::new();
-    let items = typed_dict.items(context.db());
-
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
-        // Validate dict entries
-        for dict_item in &dict_expr.items {
-            if let Some(ref key_expr) = dict_item.key
-                && let Some(key_value) =
-                    expression_type_fn(key_expr, TypeContext::default()).as_string_literal()
-            {
-                let key = key_value.value(context.db());
-                if ignored_keys.contains(key) {
-                    continue;
-                }
-                provided_keys.insert(Name::new(key));
+        let dict_node: AnyNodeRef<'ast> = dict_expr.into();
+        let mut provided_keys = BTreeMap::new();
+        let mut shadowed_keys = ignored_keys.clone();
+        let mut valid = true;
 
-                let value_tcx = items
-                    .get(key)
-                    .map(|field| TypeContext::new(Some(field.declared_ty)))
-                    .unwrap_or_default();
-                let value_ty = expression_type_fn(&dict_item.value, value_tcx);
-                TypedDictKeyAssignment {
-                    context,
-                    typed_dict,
-                    full_object_ty: None,
-                    key,
-                    value_ty,
-                    typed_dict_node,
-                    key_node: key_expr.into(),
-                    value_node: (&dict_item.value).into(),
-                    assignment_kind: TypedDictAssignmentKind::Constructor,
-                    emit_diagnostic: true,
-                }
-                .validate();
-            }
-        }
+        validate_merged_dict_literal(
+            context,
+            typed_dict,
+            dict_expr,
+            TypedDictAssignmentNodes {
+                typed_dict: typed_dict_node,
+                key: dict_node,
+                value: dict_node,
+            },
+            &mut provided_keys,
+            &mut shadowed_keys,
+            expression_type_fn,
+            false,
+            &mut valid,
+        );
+
+        return provided_keys.into_keys().collect();
     }
 
-    provided_keys
+    OrderSet::new()
 }
 
 /// Validates a `TypedDict` constructor call with keywords
@@ -1592,6 +1583,7 @@ fn validate_unpacked_keyword_argument<'db, 'ast>(
 ) {
     let mut unpacked_guaranteed_keys = BTreeMap::new();
     let mut shadowed_keys = OrderSet::new();
+    let mut valid = true;
     validate_merged_unpacked_keyword_argument(
         context,
         typed_dict,
@@ -1601,6 +1593,8 @@ fn validate_unpacked_keyword_argument<'db, 'ast>(
         &mut unpacked_guaranteed_keys,
         &mut shadowed_keys,
         expression_type_fn,
+        true,
+        &mut valid,
     );
 
     for (key_name, key_node) in unpacked_guaranteed_keys {
@@ -1618,6 +1612,90 @@ fn validate_unpacked_keyword_argument<'db, 'ast>(
     }
 }
 
+#[expect(clippy::too_many_arguments)]
+fn validate_merged_dict_literal<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    dict_expr: &'ast ast::ExprDict,
+    nodes: TypedDictAssignmentNodes<'ast>,
+    guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
+    shadowed_keys: &mut OrderSet<Name>,
+    expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+    validate_nested_literals: bool,
+    valid: &mut bool,
+) {
+    let db = context.db();
+    let items = typed_dict.items(db);
+
+    for item in dict_expr.items.iter().rev() {
+        if let Some(key_expr) = &item.key {
+            let key_ty = expression_type_fn(key_expr, TypeContext::default());
+            let Some(key_literal) = key_ty.as_string_literal() else {
+                continue;
+            };
+
+            let key = Name::new(key_literal.value(db));
+            let is_shadowed = shadowed_keys.contains(&key);
+
+            if !is_shadowed {
+                let field = items.get(key.as_str());
+                let value_tcx = field
+                    .map(|field| TypeContext::new(Some(field.declared_ty)))
+                    .unwrap_or_default();
+                let value_ty = expression_type_fn(&item.value, value_tcx);
+                if validate_nested_literals {
+                    validate_nested_unpacked_typed_dict_literal(
+                        context,
+                        field.map(|field| field.declared_ty),
+                        &item.value,
+                        expression_type_fn,
+                    );
+                }
+                *valid &= TypedDictKeyAssignment {
+                    context,
+                    typed_dict,
+                    full_object_ty: None,
+                    key: key.as_str(),
+                    value_ty,
+                    typed_dict_node: nodes.typed_dict,
+                    key_node: key_expr.into(),
+                    value_node: (&item.value).into(),
+                    assignment_kind: TypedDictAssignmentKind::Constructor,
+                    emit_diagnostic: true,
+                }
+                .validate();
+            }
+            guaranteed_keys
+                .entry(key.clone())
+                .and_modify(|node| {
+                    if node.is_none() {
+                        *node = Some(key_expr.into());
+                    }
+                })
+                .or_insert(Some(key_expr.into()));
+            shadowed_keys.insert(key);
+        } else {
+            let nested_ty = expression_type_fn(&item.value, TypeContext::default());
+            validate_merged_unpacked_keyword_argument(
+                context,
+                typed_dict,
+                &item.value,
+                nested_ty,
+                TypedDictAssignmentNodes {
+                    typed_dict: nodes.typed_dict,
+                    key: (&item.value).into(),
+                    value: (&item.value).into(),
+                },
+                guaranteed_keys,
+                shadowed_keys,
+                expression_type_fn,
+                validate_nested_literals,
+                valid,
+            );
+        }
+    }
+}
+
 /// Validates one unpacked constructor argument while preserving merged `**{...}` overwrite
 /// semantics.
 #[expect(clippy::too_many_arguments)]
@@ -1630,75 +1708,24 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
     guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
     shadowed_keys: &mut OrderSet<Name>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
+    validate_nested_literals: bool,
+    valid: &mut bool,
 ) {
     let db = context.db();
     let items = typed_dict.items(db);
 
     if let ast::Expr::Dict(dict_expr) = expr {
-        for item in dict_expr.items.iter().rev() {
-            if let Some(key_expr) = &item.key {
-                let key_ty = expression_type_fn(key_expr, TypeContext::default());
-                let Some(key_literal) = key_ty.as_string_literal() else {
-                    continue;
-                };
-
-                let key = Name::new(key_literal.value(db));
-                let is_shadowed = shadowed_keys.contains(&key);
-
-                if !is_shadowed {
-                    let field = items.get(key.as_str());
-                    let value_tcx = items
-                        .get(key.as_str())
-                        .map(|field| TypeContext::new(Some(field.declared_ty)))
-                        .unwrap_or_default();
-                    let value_ty = expression_type_fn(&item.value, value_tcx);
-                    validate_nested_unpacked_typed_dict_literal(
-                        context,
-                        field.map(|field| field.declared_ty),
-                        &item.value,
-                        expression_type_fn,
-                    );
-                    TypedDictKeyAssignment {
-                        context,
-                        typed_dict,
-                        full_object_ty: None,
-                        key: key.as_str(),
-                        value_ty,
-                        typed_dict_node: nodes.typed_dict,
-                        key_node: key_expr.into(),
-                        value_node: (&item.value).into(),
-                        assignment_kind: TypedDictAssignmentKind::Constructor,
-                        emit_diagnostic: true,
-                    }
-                    .validate();
-                }
-                guaranteed_keys
-                    .entry(key.clone())
-                    .and_modify(|node| {
-                        if node.is_none() {
-                            *node = Some(key_expr.into());
-                        }
-                    })
-                    .or_insert(Some(key_expr.into()));
-                shadowed_keys.insert(key);
-            } else {
-                let nested_ty = expression_type_fn(&item.value, TypeContext::default());
-                validate_merged_unpacked_keyword_argument(
-                    context,
-                    typed_dict,
-                    &item.value,
-                    nested_ty,
-                    TypedDictAssignmentNodes {
-                        typed_dict: nodes.typed_dict,
-                        key: (&item.value).into(),
-                        value: (&item.value).into(),
-                    },
-                    guaranteed_keys,
-                    shadowed_keys,
-                    expression_type_fn,
-                );
-            }
-        }
+        validate_merged_dict_literal(
+            context,
+            typed_dict,
+            dict_expr,
+            nodes,
+            guaranteed_keys,
+            shadowed_keys,
+            expression_type_fn,
+            validate_nested_literals,
+            valid,
+        );
         return;
     }
 
@@ -1713,7 +1740,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         }
     } else if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(db, unpacked_type) {
         let ignored_keys = shadowed_keys.clone();
-        validate_extracted_typed_dict_keys(
+        let (_, unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
             typed_dict,
             &unpacked_keys,
@@ -1721,6 +1748,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             full_object_ty_annotation(unpacked_type),
             &ignored_keys,
         );
+        *valid &= unpacked_valid;
 
         for (key_name, unpacked_key) in unpacked_keys {
             if unpacked_key.is_required() {
@@ -1746,6 +1774,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             value_ty,
             nodes,
             shadowed_keys,
+            valid,
         );
     }
 }
@@ -1785,6 +1814,7 @@ pub(super) fn extract_unpacked_mapping_key_value_types<'db>(
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn validate_mapping_overwrite<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -1793,19 +1823,20 @@ fn validate_mapping_overwrite<'db, 'ast>(
     value_ty: Type<'db>,
     nodes: TypedDictAssignmentNodes<'ast>,
     shadowed_keys: &mut OrderSet<Name>,
+    valid: &mut bool,
 ) {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
 
     match mapping_string_keys(db, key_ty) {
-        MappingStringKeys::NoString => return,
+        MappingStringKeys::NoString => (),
         MappingStringKeys::Exact(keys) => {
             for key in keys {
                 if shadowed_keys.contains(&key) {
                     continue;
                 }
                 if typed_dict_items.contains_key(&key) {
-                    TypedDictKeyAssignment {
+                    *valid &= TypedDictKeyAssignment {
                         context,
                         typed_dict,
                         full_object_ty: full_object_ty_annotation(unpacked_type),
@@ -1827,7 +1858,7 @@ fn validate_mapping_overwrite<'db, 'ast>(
                 if shadowed_keys.contains(key_name) {
                     continue;
                 }
-                TypedDictKeyAssignment {
+                *valid &= TypedDictKeyAssignment {
                     context,
                     typed_dict,
                     full_object_ty: full_object_ty_annotation(unpacked_type),
@@ -1931,36 +1962,29 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &ast::ExprDict,
     typed_dict_node: AnyNodeRef,
-    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+    mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> Result<OrderSet<Name>, OrderSet<Name>> {
     let mut valid = true;
-    let mut provided_keys = OrderSet::new();
+    let mut provided_keys = BTreeMap::new();
+    let mut shadowed_keys = OrderSet::new();
 
-    // Validate each key-value pair in the dictionary literal
-    for item in &dict_expr.items {
-        if let Some(key_expr) = &item.key
-            && let Some(key_str) = expression_type_fn(key_expr).as_string_literal()
-        {
-            let key = key_str.value(context.db());
-            provided_keys.insert(Name::new(key));
+    validate_merged_dict_literal(
+        context,
+        typed_dict,
+        dict_expr,
+        TypedDictAssignmentNodes {
+            typed_dict: typed_dict_node,
+            key: typed_dict_node,
+            value: typed_dict_node,
+        },
+        &mut provided_keys,
+        &mut shadowed_keys,
+        &mut expression_type_fn,
+        false,
+        &mut valid,
+    );
 
-            let value_ty = expression_type_fn(&item.value);
-
-            valid &= TypedDictKeyAssignment {
-                context,
-                typed_dict,
-                full_object_ty: None,
-                key,
-                value_ty,
-                typed_dict_node,
-                key_node: key_expr.into(),
-                value_node: (&item.value).into(),
-                assignment_kind: TypedDictAssignmentKind::Constructor,
-                emit_diagnostic: true,
-            }
-            .validate();
-        }
-    }
+    let provided_keys: OrderSet<Name> = provided_keys.into_keys().collect();
 
     valid &=
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, typed_dict_node);
