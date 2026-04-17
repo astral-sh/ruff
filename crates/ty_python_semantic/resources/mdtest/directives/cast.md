@@ -31,13 +31,13 @@ cast(str, b"ar", "foo")
 def function_returning_int() -> int:
     return 10
 
-# error: [redundant-cast] "Value is already of type `int`"
+# error: [redundant-cast] "Redundant cast: value is already of type `int`"
 cast(int, function_returning_int())
 
 def function_returning_any() -> Any:
     return "blah"
 
-# error: [redundant-cast] "Value is already of type `Any`"
+# error: [redundant-cast] "Redundant cast: value is already of type `Any`"
 cast(Any, function_returning_any())
 ```
 
@@ -108,11 +108,11 @@ cast(int, secrets.randbelow(10))
 ```
 
 ```snapshot
-warning[redundant-cast]: Value is already of type `int`
- --> src/mdtest_snippet.py:5:1
+warning[redundant-cast]: Redundant cast to type `int`
+ --> src/mdtest_snippet.py:5:11
   |
 5 | cast(int, secrets.randbelow(10))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           ^^^^^^^^^^^^^^^^^^^^^ Value is already of type `int`
   |
 ```
 
@@ -122,10 +122,10 @@ cast(val=secrets.randbelow(10), typ=int)
 ```
 
 ```snapshot
-warning[redundant-cast]: Value is already of type `int`
- --> src/mdtest_snippet.py:7:1
+warning[redundant-cast]: Redundant cast to type `int`
+ --> src/mdtest_snippet.py:7:10
   |
 7 | cast(val=secrets.randbelow(10), typ=int)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |          ^^^^^^^^^^^^^^^^^^^^^ Value is already of type `int`
   |
 ```
