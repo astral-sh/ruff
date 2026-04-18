@@ -320,6 +320,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0604") => rules::pylint::rules::GlobalAtModuleLevel,
         (Pylint, "W0642") => rules::pylint::rules::SelfOrClsAssignment,
         (Pylint, "W0711") => rules::pylint::rules::BinaryOpException,
+        (Pylint, "W0717") => rules::pylint::rules::TooManyStatementsInTryClause,
         (Pylint, "W1501") => rules::pylint::rules::BadOpenMode,
         (Pylint, "W1507") => rules::pylint::rules::ShallowCopyEnviron,
         (Pylint, "W1508") => rules::pylint::rules::InvalidEnvvarDefault,
