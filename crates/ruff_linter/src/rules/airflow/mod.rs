@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_context.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_decorator.py"))]
     #[test_case(Rule::Airflow31Moved, Path::new("AIR321_names.py"))]
+    #[test_case(Rule::Airflow32Removal, Path::new("AIR331_names.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_amazon.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_celery.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_common_sql.py"))]
