@@ -3,7 +3,7 @@ use super::{Signature, Type, TypeContext};
 use crate::Db;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 
 mod arguments;
 pub(crate) mod bind;
@@ -133,29 +133,13 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> CallDunderOutcome<'db> {
-        #[salsa::tracked]
-        fn dunder_call_outcome_impl<'db>(
-            db: &'db dyn Db,
-            receiver: Type<'db>,
-            name: Name,
-            arguments: SimpleCallArguments<'db>,
-            tcx: TypeContext<'db>,
-            policy: MemberLookupPolicy,
-        ) -> CallDunderOutcome<'db> {
-            let mut arguments = arguments.into_call_arguments();
-            CallDunderOutcome::from_result(
-                db,
-                receiver.try_call_dunder_with_policy(
-                    db,
-                    name.as_str(),
-                    &mut arguments,
-                    tcx,
-                    policy,
-                ),
-            )
-        }
-
-        dunder_call_outcome_impl(db, self, Name::new_static(name), arguments, tcx, policy)
+        // Avoid memoizing full dunder-call outcomes: these queries can participate in semantic
+        // cycles while inferring class bases, decorators, and iterables.
+        let mut arguments = arguments.into_call_arguments();
+        CallDunderOutcome::from_result(
+            db,
+            self.try_call_dunder_with_policy(db, name, &mut arguments, tcx, policy),
+        )
     }
 
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical

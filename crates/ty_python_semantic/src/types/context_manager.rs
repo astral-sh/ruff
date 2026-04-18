@@ -39,7 +39,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         mode: EvaluationMode,
-    ) -> Result<Type<'db>, ContextManagerError<'db>> {
+    ) -> Result<Type<'db>, Box<ContextManagerError<'db>>> {
         let (enter_method, exit_method) = match mode {
             EvaluationMode::Async => ("__aenter__", "__aexit__"),
             EvaluationMode::Sync => ("__enter__", "__exit__"),
@@ -67,24 +67,26 @@ impl<'db> Type<'db> {
                     ty
                 })
             }
-            (CallDunderOutcome::ReturnType(ty), exit_error) => Err(ContextManagerError::Exit {
-                enter_return_type: if mode.is_async() {
-                    ty.try_await(db).unwrap_or(Type::unknown())
-                } else {
-                    ty
-                },
-                exit_error,
-                mode,
-            }),
+            (CallDunderOutcome::ReturnType(ty), exit_error) => {
+                Err(Box::new(ContextManagerError::Exit {
+                    enter_return_type: if mode.is_async() {
+                        ty.try_await(db).unwrap_or(Type::unknown())
+                    } else {
+                        ty
+                    },
+                    exit_error,
+                    mode,
+                }))
+            }
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
             (enter_error, CallDunderOutcome::ReturnType(_)) => {
-                Err(ContextManagerError::Enter(enter_error, mode))
+                Err(Box::new(ContextManagerError::Enter(enter_error, mode)))
             }
-            (enter_error, exit_error) => Err(ContextManagerError::EnterAndExit {
+            (enter_error, exit_error) => Err(Box::new(ContextManagerError::EnterAndExit {
                 enter_error,
                 exit_error,
                 mode,
-            }),
+            })),
         }
     }
 }
