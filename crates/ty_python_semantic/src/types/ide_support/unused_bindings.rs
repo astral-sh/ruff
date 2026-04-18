@@ -20,9 +20,8 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::AnnotatedAssignment(_)
         | DefinitionKind::For(_)
         | DefinitionKind::Comprehension(_)
-        | DefinitionKind::VariadicPositionalParameter(_)
-        | DefinitionKind::VariadicKeywordParameter(_)
         | DefinitionKind::Parameter(_)
+        | DefinitionKind::LambdaParameter { .. }
         | DefinitionKind::WithItem(_)
         | DefinitionKind::MatchPattern(_)
         | DefinitionKind::ExceptHandler(_) => true,
