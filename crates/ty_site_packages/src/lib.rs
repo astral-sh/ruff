@@ -281,6 +281,14 @@ impl PythonEnvironment {
     pub fn is_virtual(&self) -> bool {
         matches!(self, Self::Virtual(_))
     }
+
+    /// Returns the `sys.prefix` path for this environment.
+    pub fn sys_prefix(&self) -> &SystemPath {
+        match self {
+            Self::Virtual(env) => &env.root_path.inner,
+            Self::System(env) => &env.root_path.inner,
+        }
+    }
 }
 
 /// Enumeration of the subdirectories of `sys.prefix` that could contain a

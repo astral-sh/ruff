@@ -508,6 +508,33 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns whether this class is a `unittest.TestCase` subclass that contains
+    /// at least one test method.
+    pub fn is_unittest_test_case(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(class) => {
+                // https://docs.python.org/3/library/unittest.html#organizing-test-code
+                // TODO: naming customization https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions
+                let has_test_method = place_table(db, class.body_scope(db))
+                    .symbols()
+                    .any(|sym| sym.name().starts_with("test"));
+
+                if !has_test_method {
+                    return false;
+                }
+
+                let Some(test_case) = KnownClass::UnittestTestCase.try_to_class_literal(db) else {
+                    return false;
+                };
+                class.is_subclass_of(db, None, test_case.default_specialization(db))
+            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_)
+            | Self::DynamicEnum(_) => false,
+        }
+    }
+
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {

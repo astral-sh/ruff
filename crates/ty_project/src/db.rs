@@ -659,6 +659,7 @@ pub(crate) mod tests {
                     },
                     python_platform: PythonPlatform::default(),
                     search_paths,
+                    python_executable: None,
                 },
             );
 

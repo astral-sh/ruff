@@ -136,6 +136,8 @@ pub enum KnownClass {
     Template,
     // pathlib
     Path,
+    // unittest
+    UnittestTestCase,
     // ty_extensions
     ConstraintSet,
     GenericContext,
@@ -187,7 +189,8 @@ impl KnownClass {
             | Self::CoroutineType
             | Self::BuiltinFunctionType
             | Self::Template
-            | Self::Path => Some(Truthiness::AlwaysTrue),
+            | Self::Path
+            | Self::UnittestTestCase => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -350,7 +353,8 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::UnittestTestCase => false,
         }
     }
 
@@ -443,7 +447,8 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::UnittestTestCase => false,
         }
     }
 
@@ -535,7 +540,8 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::UnittestTestCase => false,
         }
     }
 
@@ -639,6 +645,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::UnittestTestCase
             | Self::Mapping
             | Self::Sequence => false,
         }
@@ -735,7 +742,8 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
-            | KnownClass::Specialization => false,
+            | KnownClass::Specialization
+            | KnownClass::UnittestTestCase => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
@@ -856,6 +864,7 @@ impl KnownClass {
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
+            Self::UnittestTestCase => "TestCase",
             Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
@@ -1239,6 +1248,7 @@ impl KnownClass {
             | Self::Specialization => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
+            Self::UnittestTestCase => KnownModule::UnittestCase,
         }
     }
 
@@ -1333,7 +1343,8 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | Self::Path => Some(false),
+            | Self::Path
+            | Self::UnittestTestCase => Some(false),
 
             Self::Tuple => None,
         }
@@ -1431,7 +1442,8 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | Self::Path => false,
+            | Self::Path
+            | Self::UnittestTestCase => false,
         }
     }
 
@@ -1542,6 +1554,7 @@ impl KnownClass {
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
+            "TestCase" => &[Self::UnittestTestCase],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             _ => return None,
         };
@@ -1627,7 +1640,8 @@ impl KnownClass {
             | Self::Generator
             | Self::AsyncGenerator
             | Self::Template
-            | Self::Path => module == self.canonical_module(db),
+            | Self::Path
+            | Self::UnittestTestCase => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType
