@@ -11,7 +11,7 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     let snapshot_path = crate_dir.join("resources").join("mdtest").join("snapshots");
     let absolute_fixture_path = crate_dir.join(fixture_path);
-    let workspace_relative_fixture_path = Utf8Path::new("crates/ty_python_semantic")
+    let workspace_relative_fixture_path = Utf8Path::new("crates/ruff_linter")
         .join(fixture_path.strip_prefix(".").unwrap_or(fixture_path));
 
     let test_name = fixture_path
@@ -19,24 +19,15 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    // Limit multithreading in tests to avoid that they compete
-    // for the same resources (tests are run concurrently most of the time).
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(1)
-        .build()
-        .unwrap();
-
-    pool.install(|| {
-        ty_test::run(
-            &absolute_fixture_path,
-            &workspace_relative_fixture_path,
-            &content,
-            &snapshot_path,
-            short_title,
-            test_name,
-            "ty_python_semantic",
-        )
-    })?;
+    ruff_test::run(
+        &absolute_fixture_path,
+        &workspace_relative_fixture_path,
+        &content,
+        &snapshot_path,
+        short_title,
+        test_name,
+        "ruff_linter",
+    )?;
 
     Ok(())
 }
