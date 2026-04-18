@@ -131,16 +131,6 @@ help: Remove unused suppression
 48 |
 49 | def f():
 
-E741 Ambiguous variable name: `I`
-  --> suppressions.py:47:5
-   |
-45 |     # An usued suppression diagnostic should also be logged.
-46 |     # ruff: disable[E501]
-47 |     I = 1
-   |     ^
-48 |     # ruff: enable[E501]
-   |
-
 F841 [*] Local variable `I` is assigned to but never used
   --> suppressions.py:47:5
    |
@@ -160,6 +150,16 @@ help: Remove assignment to unused variable `I`
 49 |
 50 |
 note: This is an unsafe fix and may change runtime behavior
+
+E741 Ambiguous variable name: `I`
+  --> suppressions.py:47:5
+   |
+45 |     # An usued suppression diagnostic should also be logged.
+46 |     # ruff: disable[E501]
+47 |     I = 1
+   |     ^
+48 |     # ruff: enable[E501]
+   |
 
 RUF100 [*] Unused `noqa` directive (unused: `E741`, `F841`)
   --> suppressions.py:55:12
@@ -406,21 +406,97 @@ help: Remove suppression comment
 112 |
 note: This is an unsafe fix and may change runtime behavior
 
-RUF100 [*] Unused suppression (non-enabled: `F401`)
-   --> suppressions.py:116:1
+F841 [*] Local variable `bar` is assigned to but never used
+   --> suppressions.py:118:5
     |
-114 | # Ensure LAST suppression in file is reported.
-115 | # https://github.com/astral-sh/ruff/issues/23235
-116 | # ruff:disable[F401]
+116 |     # ruff: ignore[F841]
+117 |     foo = 0
+118 |     bar = 0
+    |     ^^^
+    |
+help: Remove assignment to unused variable `bar`
+115 |     # Should only cover the first statement, leaving a single diagnostic for bar
+116 |     # ruff: ignore[F841]
+117 |     foo = 0
+    -     bar = 0
+118 |
+119 |
+120 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `bar` is assigned to but never used
+   --> suppressions.py:124:5
+    |
+122 |     # Should only cover the first statement, leaving a single diagnostic for bar
+123 |     foo = 0  # ruff: ignore[F841]
+124 |     bar = 0
+    |     ^^^
+    |
+help: Remove assignment to unused variable `bar`
+121 | def f():
+122 |     # Should only cover the first statement, leaving a single diagnostic for bar
+123 |     foo = 0  # ruff: ignore[F841]
+    -     bar = 0
+124 |
+125 |
+126 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `bar` is assigned to but never used
+   --> suppressions.py:132:5
+    |
+130 |         value
+131 |     """  # ruff: ignore[F841]
+132 |     bar = 0
+    |     ^^^
+    |
+help: Remove assignment to unused variable `bar`
+129 |     foo = """
+130 |         value
+131 |     """  # ruff: ignore[F841]
+    -     bar = 0
+132 |
+133 |
+134 | # ruff: ignore[ARG001]  should cover the entire def
+note: This is an unsafe fix and may change runtime behavior
+
+ARG001 Unused function argument: `bar`
+   --> suppressions.py:153:5
+    |
+151 |     # ruff: ignore[ARG001]  should only cover the first argument
+152 |     foo,
+153 |     bar,
+    |     ^^^
+154 | ):
+155 |     print("hello")
+    |
+
+ARG001 Unused function argument: `bar`
+   --> suppressions.py:160:5
+    |
+158 | def f(
+159 |     foo,  # ruff: ignore[ARG001]  should only cover the first argument
+160 |     bar,
+    |     ^^^
+161 | ):
+162 |     print("hello")
+    |
+
+RUF100 [*] Unused suppression (non-enabled: `F401`)
+   --> suppressions.py:167:1
+    |
+165 | # Ensure LAST suppression in file is reported.
+166 | # https://github.com/astral-sh/ruff/issues/23235
+167 | # ruff:disable[F401]
     | ^^^^^^^^^^^^^^^^^^^^
-117 | print("goodbye")
-118 | # ruff:enable[F401]
+168 | print("goodbye")
+169 | # ruff:enable[F401]
     | -------------------
     |
 help: Remove unused suppression
-113 |
-114 | # Ensure LAST suppression in file is reported.
-115 | # https://github.com/astral-sh/ruff/issues/23235
+164 |
+165 | # Ensure LAST suppression in file is reported.
+166 | # https://github.com/astral-sh/ruff/issues/23235
     - # ruff:disable[F401]
-116 | print("goodbye")
+167 | print("goodbye")
     - # ruff:enable[F401]

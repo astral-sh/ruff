@@ -332,7 +332,7 @@ The full inline comment specification is as follows:
   `#noqa` with optional whitespace after the `#` symbol, followed by either: the
   end of the comment, the beginning of a new comment (`#`), or whitespace
   followed by any character other than `:`.
-- An inline rule suppression is given by first finding a case-insensitive match
+- An inline `noqa` suppression is given by first finding a case-insensitive match
   for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
   after `noqa`, and followed by the symbol `:`. After this we are expected to
   have a list of rule codes which is given by sequences of uppercase ASCII
@@ -340,6 +340,73 @@ The full inline comment specification is as follows:
   list ends at the last valid code. We will attempt to interpret rules with a
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
+
+*The following is currently only available in [preview mode](`preview.md`).*
+
+To ignore one or more violations within a single "logical" line (a statement or
+block header), an "ignore" comment can be placed either above or at the end of
+the logical line, like so:
+
+```python
+import sys  # ruff: ignore[F401]  # Covers this line
+
+# ruff: ignore[E741, F841]  # Covers the next line
+i = 1
+```
+
+To cover an entire multi-line statement or header, the comment must either be
+placed above the first line, or as a trailing comment on the last line:
+
+```python
+# ruff: ignore[ARG001]  # Covers the entire function signature
+def foo(
+    arg1,
+    arg2,
+):
+    pass
+
+def bar():
+    """
+    This function goes places.
+    """  # ruff: ignore[D404]  # Covers the entire docstring
+    pass
+```
+
+Otherwise, only a single "physical" line will be covered, leaving the rest of the
+multi-line statement or header uncovered:
+
+```python
+def foo(
+    arg1,
+    # ruff: ignore[ARG001]  # Only covers `arg2`
+    arg2,
+):
+    pass
+
+things = [
+    "really long string literal ...",  # ruff: ignore[E501]  # Only covers this line
+    "really long string literal ...",
+]
+```
+
+Ignore comments can also be "stacked" with other comments or pragmas, and will
+still cover the next logical line:
+
+```python
+# ruff: ignore[E741]
+# ruff: ignore[F841]
+# I definitely know what I'm doing.
+i = 1
+```
+The full line-level suppression comment specification is as follows:
+
+- An own-line or trailing comment starting with case sensitive `#ruff:`, with
+  optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
+  any codes to be suppressed, and ending with `]`.
+- Codes to be suppressed must be separated by commas, with optional whitespace
+  before or after each code, and may be followed by an optional trailing comma
+  after the last code.
+
 
 #### Block-level
 
