@@ -5195,9 +5195,18 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     ));
                 } else {
                     diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
-                    diagnostic.set_concise_message(format_args!(
-                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
-                    ));
+                    if let Some(full_ty) = full_object_ty
+                        .filter(|ty| matches!(ty, Type::Union(_) | Type::Intersection(_)))
+                    {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
+                            full_ty = full_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.set_concise_message(format_args!(
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
+                        ));
+                    }
                 }
             }
             _ => {
