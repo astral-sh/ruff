@@ -65,7 +65,7 @@ reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ## Mixed dict
 
 ```py
-# revealed: dict[str, int | tuple[int, int] | tuple[int, int, int]]
+# revealed: dict[str, int | tuple[int, ...]]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 

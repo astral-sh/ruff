@@ -5971,6 +5971,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
+        let mut tuple_size_promotion_candidates: FxHashMap<
+            BoundTypeVarIdentity<'db>,
+            Vec<(Type<'db>, usize)>,
+        > = FxHashMap::default();
 
         for elt_ty in elt_tys.clone() {
             let elt_ty_identity = elt_ty.identity(self.db());
@@ -6076,6 +6080,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // which the constraint solver struggles with.
                 let inferred_elt_ty = inferred_elt_ty.promote(self.db());
 
+                if elt_tcx_constraints.is_empty()
+                    && !elt.is_starred_expr()
+                    && let ast::Expr::Tuple(tuple) = elt
+                    && !tuple.iter().any(ast::Expr::is_starred_expr)
+                    && let Some((element_type, length)) =
+                        inferred_elt_ty.homogeneous_fixed_tuple_instance(self.db())
+                    && tuple.len() == length
+                {
+                    tuple_size_promotion_candidates
+                        .entry(elt_ty_identity)
+                        .or_default()
+                        .push((element_type, length));
+                }
+
                 builder
                     .infer(
                         Type::TypeVar(elt_ty),
@@ -6094,10 +6112,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
-                builder.build_with(generic_context, |_, lower, _| {
+                builder.build_with(generic_context, |typevar, lower, _| {
                     // Promote singleton types to `T | Unknown` in inferred type parameters,
                     // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
                     if elt_tcx_constraints.is_empty() {
+                        let typevar_identity = typevar.identity(self.db());
+                        let should_promote_tuple_size = tuple_size_promotion_candidates
+                            .get(&typevar_identity)
+                            .is_some_and(|candidates| {
+                                candidates.iter().enumerate().any(
+                                    |(index, (element_type, length))| {
+                                        candidates[index + 1..].iter().any(
+                                            |(other_element_type, other_length)| {
+                                                length != other_length
+                                                    && element_type.is_equivalent_to(
+                                                        self.db(),
+                                                        *other_element_type,
+                                                    )
+                                            },
+                                        )
+                                    },
+                                )
+                            });
+
+                        let lower = if should_promote_tuple_size {
+                            lower.promote_differently_sized_homogeneous_tuple_unions(self.db())
+                        } else {
+                            lower
+                        };
+
                         return Some(lower.promote_singletons_recursively(self.db()));
                     }
                     None

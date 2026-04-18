@@ -863,6 +863,12 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+struct HomogeneousTuplePromotionGroup<'db> {
+    element_type: Type<'db>,
+    lengths: Vec<usize>,
+    elements: Vec<Type<'db>>,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_field_names)]
 struct GeneratorTypes<'db> {
@@ -1295,6 +1301,27 @@ impl<'db> Type<'db> {
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
+    }
+
+    pub(crate) fn homogeneous_fixed_tuple_instance(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(Type<'db>, usize)> {
+        let tuple_spec = self.exact_tuple_instance_spec(db)?;
+        let TupleSpec::Fixed(tuple) = tuple_spec.as_ref() else {
+            return None;
+        };
+
+        let length = tuple.len();
+        if length == 0 {
+            return None;
+        }
+
+        let mut elements = tuple.iter_all_elements();
+        let element_type = elements.next()?;
+        elements
+            .all(|element| element.is_equivalent_to(db, element_type))
+            .then_some((element_type, length))
     }
 
     /// Returns the materialization of this type depending on the given `variance`.
@@ -1923,6 +1950,69 @@ impl<'db> Type<'db> {
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
             TypeContext::default(),
         )
+    }
+
+    /// Promote unions of non-empty homogeneous fixed-length tuples with different lengths to a
+    /// variable-length homogeneous tuple.
+    ///
+    /// This deliberately only applies after a union exists; a standalone fixed-length tuple keeps
+    /// its shape.
+    pub(crate) fn promote_differently_sized_homogeneous_tuple_unions(
+        self,
+        db: &'db dyn Db,
+    ) -> Type<'db> {
+        let Type::Union(union) = self else {
+            return self;
+        };
+
+        let mut other_elements = Vec::new();
+        let mut groups: Vec<HomogeneousTuplePromotionGroup<'db>> = Vec::new();
+
+        for element in union.elements(db).iter().copied() {
+            if let Some((element_type, length)) = element.homogeneous_fixed_tuple_instance(db) {
+                if let Some(group) = groups
+                    .iter_mut()
+                    .find(|group| group.element_type.is_equivalent_to(db, element_type))
+                {
+                    group.elements.push(element);
+                    if !group.lengths.contains(&length) {
+                        group.lengths.push(length);
+                    }
+                } else {
+                    groups.push(HomogeneousTuplePromotionGroup {
+                        element_type,
+                        lengths: vec![length],
+                        elements: vec![element],
+                    });
+                }
+            } else {
+                other_elements.push(element);
+            }
+        }
+
+        if groups.iter().all(|group| group.lengths.len() == 1) {
+            return self;
+        }
+
+        let mut builder = UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .recursively_defined(union.recursively_defined(db));
+
+        for element in other_elements {
+            builder = builder.add(element);
+        }
+
+        for group in groups {
+            if group.lengths.len() > 1 {
+                builder = builder.add(Type::homogeneous_tuple(db, group.element_type));
+            } else {
+                for element in group.elements {
+                    builder = builder.add(element);
+                }
+            }
+        }
+
+        builder.build()
     }
 
     /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
