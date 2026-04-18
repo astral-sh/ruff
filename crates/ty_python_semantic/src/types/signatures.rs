@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::collections::BTreeMap;
 use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
@@ -25,6 +26,10 @@ use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_con
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
+use crate::types::typed_dict::{
+    UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+    extract_unpacked_typed_dict_keys_from_value_type,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
@@ -2487,9 +2492,11 @@ pub(crate) enum ParametersKind<'db> {
 /// The way this is represented internally is a bit subtle given that both `value` and `kind` fields
 /// need to follow certain invariants to correctly represent the different forms of parameter lists.
 ///
-/// The `value` field should always contain the full list of parameters regardless of the `kind`
-/// variant. For example, even if this represents a `Gradual` form, the `value` field should still
-/// contain the `*args: Any` and `**kwargs: Any` parameter.
+/// The `value` field should contain the parameters that participate in the callable signature
+/// proper. For example, even if this represents a `Gradual` form, the `value` field should still
+/// contain the `*args: Any` and `**kwargs: Any` parameter. One exception is
+/// `**kwargs: Unpack[TypedDict]`, whose original parameter is stored separately so that the
+/// signature itself only retains the synthetic keyword-only parameters exposed to callers.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -2500,7 +2507,45 @@ pub(crate) enum ParametersKind<'db> {
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Vec<Parameter<'db>>,
+    unpacked: Option<Unpacked<'db>>,
     kind: ParametersKind<'db>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Unpacked<'db> {
+    name: Name,
+    annotated_type: Type<'db>,
+}
+
+impl<'db> Unpacked<'db> {
+    fn from_parameter(db: &'db dyn Db, parameter: &Parameter<'db>) -> Self {
+        debug_assert!(parameter.is_unpacked(db));
+        Self {
+            name: parameter
+                .name()
+                .expect("keyword variadic parameter always has a name")
+                .clone(),
+            annotated_type: parameter.annotated_type(),
+        }
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            name: self.name.clone(),
+            annotated_type: self.annotated_type.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
+        }
+    }
 }
 
 impl<'db> Parameters<'db> {
@@ -2510,11 +2555,23 @@ impl<'db> Parameters<'db> {
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
     /// `ParamSpec`, or a `Concatenate` form.
+    ///
+    /// Callers that need to retain `**kwargs: Unpack[TypedDict]` metadata separately from the
+    /// signature surface should use [`Self::from_value_and_unpacked`].
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        Self::from_value_and_unpacked(db, parameters.into_iter().collect(), None)
+    }
+
+    pub(crate) fn from_value_and_unpacked(
+        db: &'db dyn Db,
+        value: Vec<Parameter<'db>>,
+        unpacked: Option<Unpacked<'db>>,
+    ) -> Self {
+        debug_assert!(value.iter().all(|parameter| !parameter.is_unpacked(db)));
+
         let mut kind = ParametersKind::Standard;
 
         let variadic_param = value
@@ -2590,13 +2647,18 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        Parameters { value, kind }
+        Parameters {
+            value,
+            unpacked,
+            kind,
+        }
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
         Self {
             value: Vec::new(),
+            unpacked: None,
             kind: ParametersKind::Standard,
         }
     }
@@ -2667,6 +2729,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
+            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2684,6 +2747,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
+            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2698,6 +2762,7 @@ impl<'db> Parameters<'db> {
                     Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
                 ),
             ],
+            unpacked: None,
             kind: ParametersKind::ParamSpec(typevar),
         }
     }
@@ -2727,6 +2792,7 @@ impl<'db> Parameters<'db> {
         ]);
         Self {
             value: prefix_params,
+            unpacked: None,
             kind: ParametersKind::Concatenate(concatenate_tail),
         }
     }
@@ -2745,6 +2811,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
+            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2758,6 +2825,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
+            unpacked: None,
             kind: ParametersKind::Standard,
         }
     }
@@ -2777,6 +2845,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
+            unpacked: None,
             kind: ParametersKind::Top,
         }
     }
@@ -2875,26 +2944,48 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let keywords = kwarg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
+        let mut value = positional_only
+            .into_iter()
+            .chain(positional_or_keyword)
+            .chain(variadic)
+            .chain(keyword_only)
+            .collect::<Vec<_>>();
+        let mut unpacked = None;
+
+        if let Some(arg) = kwarg.as_ref() {
+            let keywords = Parameter::from_node_and_kind(
                 db,
                 definition,
                 arg,
                 ParameterKind::KeywordVariadic {
                     name: arg.name.id.clone(),
                 },
-            )
-        });
+            );
 
-        Self::new(
-            db,
-            positional_only
-                .into_iter()
-                .chain(positional_or_keyword)
-                .chain(variadic)
-                .chain(keyword_only)
-                .chain(keywords),
-        )
+            if let Some(unpacked_keys) = keywords.unpacked_typed_dict_keys(db) {
+                for (name, unpacked_key) in unpacked_keys {
+                    if value
+                        .iter()
+                        .any(|parameter| parameter.callable_by_name(name.as_str()))
+                    {
+                        continue;
+                    }
+
+                    value.push(
+                        Parameter::keyword_only(name)
+                            .with_annotated_type(unpacked_key.value_ty)
+                            .with_optional_default_type(
+                                (!unpacked_key.is_required).then_some(Type::unknown()),
+                            ),
+                    );
+                }
+                unpacked = Some(Unpacked::from_parameter(db, &keywords));
+            } else {
+                value.push(keywords);
+            }
+        }
+
+        Self::from_value_and_unpacked(db, value, unpacked)
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -2931,6 +3022,10 @@ impl<'db> Parameters<'db> {
                 .iter()
                 .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
                 .collect(),
+            unpacked: self
+                .unpacked
+                .as_ref()
+                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
             kind: self.kind,
         }
     }
@@ -3041,6 +3136,9 @@ pub(crate) struct Parameter<'db> {
     /// so this must be propagated upwards.
     has_starred_annotation: bool,
 
+    /// Whether this parameter was declared as `**kwargs: Unpack[TypedDict]`.
+    has_unpacked_kwargs_annotation: bool,
+
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
 }
@@ -3051,6 +3149,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
             has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: false,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -3064,6 +3163,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
             has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: false,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -3077,6 +3177,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
             has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: false,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -3087,6 +3188,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
             has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: false,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -3100,6 +3202,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
             has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: false,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -3157,6 +3260,7 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             has_starred_annotation: self.has_starred_annotation,
+            has_unpacked_kwargs_annotation: self.has_unpacked_kwargs_annotation,
             form: self.form,
         }
     }
@@ -3172,6 +3276,7 @@ impl<'db> Parameter<'db> {
             annotated_type,
             inferred_annotation: self.inferred_annotation,
             has_starred_annotation: self.has_starred_annotation,
+            has_unpacked_kwargs_annotation: self.has_unpacked_kwargs_annotation,
             kind,
             form: self.form,
         }
@@ -3186,6 +3291,7 @@ impl<'db> Parameter<'db> {
         let Parameter {
             annotated_type,
             has_starred_annotation,
+            has_unpacked_kwargs_annotation,
             inferred_annotation,
             kind,
             form,
@@ -3247,6 +3353,7 @@ impl<'db> Parameter<'db> {
             annotated_type,
             inferred_annotation: *inferred_annotation,
             has_starred_annotation: *has_starred_annotation,
+            has_unpacked_kwargs_annotation: *has_unpacked_kwargs_annotation,
             kind,
             form: *form,
         })
@@ -3268,10 +3375,22 @@ impl<'db> Parameter<'db> {
             } else {
                 (Type::unknown(), true, false)
             };
+        let has_unpacked_kwargs_annotation = matches!(&kind, ParameterKind::KeywordVariadic { .. })
+            && parameter.annotation().is_some_and(|annotation| {
+                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                    db,
+                    definition.file(db),
+                    annotation,
+                    annotated_type,
+                    |expr| function_signature_expression_type(db, definition, expr),
+                )
+                .is_some()
+            });
         Self {
             annotated_type,
             kind,
             has_starred_annotation,
+            has_unpacked_kwargs_annotation,
             form: ParameterForm::Value,
             inferred_annotation,
         }
@@ -3325,6 +3444,23 @@ impl<'db> Parameter<'db> {
             } => param_name == name,
             _ => false,
         }
+    }
+
+    /// Returns the unpacked `TypedDict` keys if this is a `**kwargs: Unpack[TypedDict]`
+    /// parameter.
+    pub(crate) fn unpacked_typed_dict_keys(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+        (self.is_keyword_variadic() && self.has_unpacked_kwargs_annotation)
+            .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+            .flatten()
+    }
+
+    /// Returns `true` if this parameter is a `**kwargs: Unpack[TypedDict]` parameter that accepts
+    /// only the named keys of the unpacked `TypedDict`.
+    pub(crate) fn is_unpacked(&self, db: &'db dyn Db) -> bool {
+        self.unpacked_typed_dict_keys(db).is_some()
     }
 
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
