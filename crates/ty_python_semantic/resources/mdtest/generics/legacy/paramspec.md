@@ -143,6 +143,26 @@ P4 = ExtParamSpec("P4", default=P3)
 P5 = ExtParamSpec("P5", default=int)
 ```
 
+### `typing_extensions.ParamSpec` defaults specialize generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, assert_type
+from typing_extensions import ParamSpec
+
+DefaultP = ParamSpec("DefaultP", default=[str, int])
+
+class ClassParamSpec(Generic[DefaultP]):
+    x: Callable[DefaultP, None]
+
+assert_type(ClassParamSpec(), ClassParamSpec[str, int])
+assert_type(ClassParamSpec[[bool, bool]](), ClassParamSpec[bool, bool])
+```
+
 ### Forward references in stub files
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are

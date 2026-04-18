@@ -7,8 +7,11 @@ python-version = "3.12"
 
 Type variables have a property called _variance_ that affects the subtyping and assignability
 relations. Much more detail can be found in the [spec]. To summarize, each typevar is either
-**covariant**, **contravariant**, **invariant**, or **bivariant**. (Note that bivariance is not
-currently mentioned in the typing spec, but is a fourth case that we must consider.)
+**covariant**, **contravariant**, or **invariant**. Our inference lattice also has an internal
+**bivariant** state; if a PEP 695 type parameter would otherwise infer to bivariance, we fall back
+to covariance instead. (Bivariance is technically correct when a typevar is unused, but it is
+confusing since it makes all specializations equivalent, it's not practically useful, and it's not
+in the spec, so we avoid it.)
 
 For all of the examples below, we will consider typevars `T` and `U`, two generic classes using
 those typevars `C[T]` and `D[U]`, and two types `A` and `B`.
@@ -281,15 +284,10 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
-## Bivariance
+## Bivariant Fallback
 
-With a bivariant typevar, _all_ specializations of the generic class are assignable to (and in fact,
-gradually equivalent to) each other, and all specializations are subtypes of (and equivalent to)
-each other.
-
-This is a bit of pathological case, which really only happens when the class doesn't use the typevar
-at all. (If it did, it would have to be covariant, contravariant, or invariant, depending on _how_
-the typevar was used.)
+If inference for a PEP 695 type parameter would otherwise conclude bivariance because the type
+parameter is unused, we fall back to covariance instead.
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
@@ -305,7 +303,7 @@ class D[U](C[U]):
     pass
 
 static_assert(is_assignable_to(C[B], C[A]))
-static_assert(is_assignable_to(C[A], C[B]))
+static_assert(not is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
 static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
@@ -313,37 +311,37 @@ static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(is_assignable_to(D[B], C[A]))
 static_assert(is_subtype_of(C[A], C[A]))
-static_assert(is_assignable_to(D[A], C[B]))
+static_assert(not is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
 static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
 static_assert(is_subtype_of(C[B], C[A]))
-static_assert(is_subtype_of(C[A], C[B]))
-static_assert(is_subtype_of(C[A], C[Any]))
-static_assert(is_subtype_of(C[B], C[Any]))
-static_assert(is_subtype_of(C[Any], C[A]))
-static_assert(is_subtype_of(C[Any], C[B]))
-static_assert(is_subtype_of(C[Any], C[Any]))
-static_assert(is_subtype_of(C[object], C[Any]))
-static_assert(is_subtype_of(C[Any], C[Never]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(C[A], C[Any]))
+static_assert(not is_subtype_of(C[B], C[Any]))
+static_assert(not is_subtype_of(C[Any], C[A]))
+static_assert(not is_subtype_of(C[Any], C[B]))
+static_assert(not is_subtype_of(C[Any], C[Any]))
+static_assert(not is_subtype_of(C[object], C[Any]))
+static_assert(not is_subtype_of(C[Any], C[Never]))
 
 static_assert(is_subtype_of(D[B], C[A]))
-static_assert(is_subtype_of(D[A], C[B]))
-static_assert(is_subtype_of(D[A], C[Any]))
-static_assert(is_subtype_of(D[B], C[Any]))
-static_assert(is_subtype_of(D[Any], C[A]))
-static_assert(is_subtype_of(D[Any], C[B]))
+static_assert(not is_subtype_of(D[A], C[B]))
+static_assert(not is_subtype_of(D[A], C[Any]))
+static_assert(not is_subtype_of(D[B], C[Any]))
+static_assert(not is_subtype_of(D[Any], C[A]))
+static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
-static_assert(is_equivalent_to(C[B], C[A]))
-static_assert(is_equivalent_to(C[A], C[B]))
-static_assert(is_equivalent_to(C[A], C[Any]))
-static_assert(is_equivalent_to(C[B], C[Any]))
-static_assert(is_equivalent_to(C[Any], C[A]))
-static_assert(is_equivalent_to(C[Any], C[B]))
+static_assert(not is_equivalent_to(C[B], C[A]))
+static_assert(not is_equivalent_to(C[A], C[B]))
+static_assert(not is_equivalent_to(C[A], C[Any]))
+static_assert(not is_equivalent_to(C[B], C[Any]))
+static_assert(not is_equivalent_to(C[Any], C[A]))
+static_assert(not is_equivalent_to(C[Any], C[B]))
 
 static_assert(not is_equivalent_to(D[A], C[A]))
 static_assert(not is_equivalent_to(D[B], C[B]))
@@ -704,10 +702,11 @@ class C[T]:
     def __new__(self, x: T): ...
 
 static_assert(is_subtype_of(C[B], C[A]))
-static_assert(is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
-This example is then bivariant because it doesn't use `T` outside of the two exempted methods.
+This example would otherwise be bivariant because it doesn't use `T` outside of the two exempted
+methods, so we fall back to covariance.
 
 This holds likewise for dataclasses with synthesized `__init__`:
 
@@ -937,17 +936,17 @@ static_assert(not is_subtype_of(InvariantLiteral1, InvariantInt))
 static_assert(not is_subtype_of(MyInvariant[Literal[1]], MyInvariant[int]))
 static_assert(not is_subtype_of(MyInvariant[int], MyInvariant[Literal[1]]))
 
-class Bivariant[T]:
+class WouldBeBivariant[T]:
     pass
 
-type BivariantLiteral1 = Bivariant[Literal[1]]
-type BivariantInt = Bivariant[int]
-type MyBivariant[T] = Bivariant[T]
+type WouldBeBivariantLiteral1 = WouldBeBivariant[Literal[1]]
+type WouldBeBivariantInt = WouldBeBivariant[int]
+type MyWouldBeBivariant[T] = WouldBeBivariant[T]
 
-static_assert(is_subtype_of(BivariantInt, BivariantLiteral1))
-static_assert(is_subtype_of(BivariantLiteral1, BivariantInt))
-static_assert(is_subtype_of(MyBivariant[Literal[1]], MyBivariant[int]))
-static_assert(is_subtype_of(MyBivariant[int], MyBivariant[Literal[1]]))
+static_assert(not is_subtype_of(WouldBeBivariantInt, WouldBeBivariantLiteral1))
+static_assert(is_subtype_of(WouldBeBivariantLiteral1, WouldBeBivariantInt))
+static_assert(is_subtype_of(MyWouldBeBivariant[Literal[1]], MyWouldBeBivariant[int]))
+static_assert(not is_subtype_of(MyWouldBeBivariant[int], MyWouldBeBivariant[Literal[1]]))
 ```
 
 ## Inheriting from generic classes with inferred variance

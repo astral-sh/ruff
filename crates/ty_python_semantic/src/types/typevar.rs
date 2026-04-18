@@ -577,7 +577,10 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if known_class == Some(KnownClass::ParamSpec) {
+                if matches!(
+                    known_class,
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+                ) {
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
@@ -821,14 +824,24 @@ impl<'db> BoundTypeVarInstance<'db> {
         polarity: TypeVarVariance,
     ) -> TypeVarVariance {
         let _span = tracing::trace_span!("variance_with_polarity").entered();
+
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
-            None => match self.binding_context(db) {
-                BindingContext::Definition(definition) => binding_type(db, definition)
-                    .with_polarity(polarity)
-                    .variance_of(db, self),
-                BindingContext::Synthetic => TypeVarVariance::Invariant,
-            },
+            None => {
+                let inferred_variance = match self.binding_context(db) {
+                    BindingContext::Definition(definition) => {
+                        binding_type(db, definition).variance_of(db, self)
+                    }
+                    BindingContext::Synthetic => TypeVarVariance::Invariant,
+                };
+
+                match inferred_variance {
+                    // bivariance is confusing and not useful; fall back to covariant
+                    TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                    variance => variance,
+                }
+                .compose(polarity)
+            }
         }
     }
 
