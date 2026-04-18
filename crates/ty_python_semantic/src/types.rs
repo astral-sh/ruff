@@ -21,6 +21,7 @@ use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
+pub(crate) use self::call::{CallBindingSummary, CallDunderOutcome, SimpleCallArguments};
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;

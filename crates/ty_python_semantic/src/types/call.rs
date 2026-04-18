@@ -3,14 +3,161 @@ use super::{Signature, Type, TypeContext};
 use crate::Db;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 
 mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum SimpleCallArguments<'db> {
+    None,
+    Unary(Type<'db>),
+    Ternary(Type<'db>, Type<'db>, Type<'db>),
+}
+
+impl<'db> SimpleCallArguments<'db> {
+    fn into_call_arguments(self) -> CallArguments<'static, 'db> {
+        match self {
+            Self::None => CallArguments::none(),
+            Self::Unary(arg) => CallArguments::positional([arg]),
+            Self::Ternary(arg1, arg2, arg3) => CallArguments::positional([arg1, arg2, arg3]),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct CallBindingSummary<'db> {
+    callable_type: Type<'db>,
+    return_type: Option<Type<'db>>,
+    is_single: bool,
+}
+
+impl<'db> CallBindingSummary<'db> {
+    fn from_bindings(bindings: &Bindings<'db>, return_type: Option<Type<'db>>) -> Self {
+        Self {
+            callable_type: bindings.callable_type(),
+            return_type,
+            is_single: bindings.is_single(),
+        }
+    }
+
+    pub(crate) fn callable_type(self) -> Type<'db> {
+        self.callable_type
+    }
+
+    pub(crate) fn return_type(self) -> Option<Type<'db>> {
+        self.return_type
+    }
+
+    pub(crate) fn fallback_return_type(self) -> Type<'db> {
+        self.return_type.unwrap_or(Type::unknown())
+    }
+
+    pub(crate) fn is_single(self) -> bool {
+        self.is_single
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum CallDunderOutcome<'db> {
+    ReturnType(Type<'db>),
+    CallError(CallErrorKind, CallBindingSummary<'db>),
+    PossiblyUnbound(CallBindingSummary<'db>),
+    MethodNotAvailable,
+}
+
+impl<'db> CallDunderOutcome<'db> {
+    pub(super) fn from_error(db: &'db dyn Db, error: CallDunderError<'db>) -> Self {
+        match error {
+            CallDunderError::CallError(kind, bindings) => Self::CallError(
+                kind,
+                CallBindingSummary::from_bindings(
+                    &bindings,
+                    (kind != CallErrorKind::NotCallable).then(|| bindings.return_type(db)),
+                ),
+            ),
+            CallDunderError::PossiblyUnbound(bindings) => Self::PossiblyUnbound(
+                CallBindingSummary::from_bindings(&bindings, Some(bindings.return_type(db))),
+            ),
+            CallDunderError::MethodNotAvailable => Self::MethodNotAvailable,
+        }
+    }
+
+    fn from_result(db: &'db dyn Db, result: Result<Bindings<'db>, CallDunderError<'db>>) -> Self {
+        match result {
+            Ok(bindings) => Self::ReturnType(bindings.return_type(db)),
+            Err(error) => Self::from_error(db, error),
+        }
+    }
+
+    pub(crate) fn successful_return_type(self) -> Option<Type<'db>> {
+        match self {
+            Self::ReturnType(return_type) => Some(return_type),
+            Self::CallError(_, _) | Self::PossiblyUnbound(_) | Self::MethodNotAvailable => None,
+        }
+    }
+
+    pub(crate) fn return_type(self) -> Option<Type<'db>> {
+        match self {
+            Self::ReturnType(return_type) => Some(return_type),
+            Self::CallError(_, summary) | Self::PossiblyUnbound(summary) => summary.return_type(),
+            Self::MethodNotAvailable => None,
+        }
+    }
+}
+
 impl<'db> Type<'db> {
+    pub(crate) fn dunder_call_outcome(
+        self,
+        db: &'db dyn Db,
+        name: &'static str,
+        arguments: SimpleCallArguments<'db>,
+        tcx: TypeContext<'db>,
+    ) -> CallDunderOutcome<'db> {
+        self.dunder_call_outcome_with_policy(
+            db,
+            name,
+            arguments,
+            tcx,
+            MemberLookupPolicy::default(),
+        )
+    }
+
+    pub(crate) fn dunder_call_outcome_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &'static str,
+        arguments: SimpleCallArguments<'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> CallDunderOutcome<'db> {
+        #[salsa::tracked]
+        fn dunder_call_outcome_impl<'db>(
+            db: &'db dyn Db,
+            receiver: Type<'db>,
+            name: Name,
+            arguments: SimpleCallArguments<'db>,
+            tcx: TypeContext<'db>,
+            policy: MemberLookupPolicy,
+        ) -> CallDunderOutcome<'db> {
+            let mut arguments = arguments.into_call_arguments();
+            CallDunderOutcome::from_result(
+                db,
+                receiver.try_call_dunder_with_policy(
+                    db,
+                    name.as_str(),
+                    &mut arguments,
+                    tcx,
+                    policy,
+                ),
+            )
+        }
+
+        dunder_call_outcome_impl(db, self, Name::new_static(name), arguments, tcx, policy)
+    }
+
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical
     /// expressions don't re-run overload selection at every call site.
     pub(crate) fn try_call_bin_op_return_type(
@@ -169,7 +316,7 @@ impl<'db> CallError<'db> {
 }
 
 /// The reason why calling a type failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CallErrorKind {
     /// The type is not callable. For a union type, _none_ of the union elements are callable.
     NotCallable,

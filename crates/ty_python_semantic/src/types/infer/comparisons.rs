@@ -3,15 +3,14 @@ use ruff_text_size::TextRange;
 use smallvec::SmallVec;
 
 use crate::Db;
-use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    CallDunderOutcome, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    SimpleCallArguments, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -834,15 +833,14 @@ fn infer_rich_comparison<'db>(
     // The following resource has details about the rich comparison algorithm:
     // https://snarky.ca/unravelling-rich-comparison-operators/
     let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-        left.try_call_dunder_with_policy(
+        left.dunder_call_outcome_with_policy(
             db,
             op.dunder(),
-            &mut CallArguments::positional([right]),
+            SimpleCallArguments::Unary(right),
             TypeContext::default(),
             policy,
         )
-        .map(|outcome| outcome.return_type(db))
-        .ok()
+        .successful_return_type()
     };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -884,22 +882,22 @@ fn infer_membership_test_comparison<'db>(
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let compare_result_opt = match right.try_call_dunder(
+    let compare_result_opt = match right.dunder_call_outcome(
         db,
         "__contains__",
-        CallArguments::positional([left]),
+        SimpleCallArguments::Unary(left),
         TypeContext::default(),
     ) {
         // If `__contains__` is available, it is used directly for the membership test.
-        Ok(bindings) => Some(bindings.return_type(db)),
+        CallDunderOutcome::ReturnType(return_type) => Some(return_type),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
-        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+        CallDunderOutcome::MethodNotAvailable | CallDunderOutcome::PossiblyUnbound(_) => right
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),
         // `__contains__` exists but can't be called with the given arguments.
-        Err(CallDunderError::CallError(..)) => None,
+        CallDunderOutcome::CallError(..) => None,
     };
 
     compare_result_opt

@@ -4,9 +4,10 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
-        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
+        CallDunderOutcome, ClassType, CycleDetector, KnownClass, KnownInstanceType,
+        LiteralValueTypeKind, SimpleCallArguments, SubclassOfInner, Type, TypeContext,
+        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+        constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
@@ -61,14 +62,13 @@ impl<'db> Type<'db> {
         };
 
         let try_dunders = || {
-            match self.try_call_dunder(
+            match self.dunder_call_outcome(
                 db,
                 "__bool__",
-                CallArguments::none(),
+                SimpleCallArguments::None,
                 TypeContext::default(),
             ) {
-                Ok(outcome) => {
-                    let return_type = outcome.return_type(db);
+                CallDunderOutcome::ReturnType(return_type) => {
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
@@ -80,13 +80,13 @@ impl<'db> Type<'db> {
                     Ok(type_to_truthiness(return_type))
                 }
 
-                Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                    let return_type = outcome.return_type(db);
+                CallDunderOutcome::PossiblyUnbound(summary) => {
+                    let return_type = summary.fallback_return_type();
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
-                            return_type: outcome.return_type(db),
+                            return_type,
                             not_boolable_type: *self,
                         });
                     }
@@ -95,7 +95,7 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
-                Err(CallDunderError::MethodNotAvailable) => {
+                CallDunderOutcome::MethodNotAvailable => {
                     // We only consider `__len__` for tuples and `@final` types,
                     // since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
@@ -108,14 +108,13 @@ impl<'db> Type<'db> {
                         if let Some(tuple_spec) = instance.tuple_spec(db) {
                             Ok(tuple_spec.truthiness())
                         } else if instance.class(db).is_final(db) {
-                            match self.try_call_dunder(
+                            match self.dunder_call_outcome(
                                 db,
                                 "__len__",
-                                CallArguments::none(),
+                                SimpleCallArguments::None,
                                 TypeContext::default(),
                             ) {
-                                Ok(outcome) => {
-                                    let return_type = outcome.return_type(db);
+                                CallDunderOutcome::ReturnType(return_type) => {
                                     if return_type.is_assignable_to(
                                         db,
                                         KnownClass::SupportsIndex.to_instance(db),
@@ -128,12 +127,13 @@ impl<'db> Type<'db> {
                                     }
                                 }
                                 // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
-                                Err(CallDunderError::MethodNotAvailable) => {
-                                    Ok(Truthiness::AlwaysTrue)
-                                }
+                                CallDunderOutcome::MethodNotAvailable => Ok(Truthiness::AlwaysTrue),
                                 // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
                                 // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
-                                Err(_) => Ok(Truthiness::Ambiguous),
+                                CallDunderOutcome::CallError(..)
+                                | CallDunderOutcome::PossiblyUnbound(_) => {
+                                    Ok(Truthiness::Ambiguous)
+                                }
                             }
                         } else {
                             Ok(Truthiness::Ambiguous)
@@ -143,20 +143,20 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                CallDunderOutcome::CallError(CallErrorKind::BindingError, summary) => {
                     Err(BoolError::IncorrectArguments {
-                        truthiness: type_to_truthiness(bindings.return_type(db)),
+                        truthiness: type_to_truthiness(summary.fallback_return_type()),
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
+                CallDunderOutcome::CallError(CallErrorKind::NotCallable, _) => {
                     Err(BoolError::NotCallable {
                         not_boolable_type: *self,
                     })
                 }
 
-                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                CallDunderOutcome::CallError(CallErrorKind::PossiblyNotCallable, _) => {
                     Err(BoolError::Other {
                         not_boolable_type: *self,
                     })

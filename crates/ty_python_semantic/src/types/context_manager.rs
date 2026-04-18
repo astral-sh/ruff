@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
-        context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
+        CallDunderOutcome, SimpleCallArguments, Type, TypeContext, context::InferContext,
+        diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
@@ -45,44 +45,42 @@ impl<'db> Type<'db> {
             EvaluationMode::Sync => ("__enter__", "__exit__"),
         };
 
-        let enter = self.try_call_dunder(
+        let enter = self.dunder_call_outcome(
             db,
             enter_method,
-            CallArguments::none(),
+            SimpleCallArguments::None,
             TypeContext::default(),
         );
-        let exit = self.try_call_dunder(
+        let exit = self.dunder_call_outcome(
             db,
             exit_method,
-            CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            SimpleCallArguments::Ternary(Type::none(db), Type::none(db), Type::none(db)),
             TypeContext::default(),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (Ok(enter), Ok(_)) => {
-                let ty = enter.return_type(db);
+            (CallDunderOutcome::ReturnType(ty), CallDunderOutcome::ReturnType(_)) => {
                 Ok(if mode.is_async() {
                     ty.try_await(db).unwrap_or(Type::unknown())
                 } else {
                     ty
                 })
             }
-            (Ok(enter), Err(exit_error)) => {
-                let ty = enter.return_type(db);
-                Err(ContextManagerError::Exit {
-                    enter_return_type: if mode.is_async() {
-                        ty.try_await(db).unwrap_or(Type::unknown())
-                    } else {
-                        ty
-                    },
-                    exit_error,
-                    mode,
-                })
-            }
+            (CallDunderOutcome::ReturnType(ty), exit_error) => Err(ContextManagerError::Exit {
+                enter_return_type: if mode.is_async() {
+                    ty.try_await(db).unwrap_or(Type::unknown())
+                } else {
+                    ty
+                },
+                exit_error,
+                mode,
+            }),
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-            (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error, mode)),
-            (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
+            (enter_error, CallDunderOutcome::ReturnType(_)) => {
+                Err(ContextManagerError::Enter(enter_error, mode))
+            }
+            (enter_error, exit_error) => Err(ContextManagerError::EnterAndExit {
                 enter_error,
                 exit_error,
                 mode,
@@ -94,15 +92,15 @@ impl<'db> Type<'db> {
 /// Error returned if a type is not (or may not be) a context manager.
 #[derive(Debug)]
 pub(super) enum ContextManagerError<'db> {
-    Enter(CallDunderError<'db>, EvaluationMode),
+    Enter(CallDunderOutcome<'db>, EvaluationMode),
     Exit {
         enter_return_type: Type<'db>,
-        exit_error: CallDunderError<'db>,
+        exit_error: CallDunderOutcome<'db>,
         mode: EvaluationMode,
     },
     EnterAndExit {
-        enter_error: CallDunderError<'db>,
-        exit_error: CallDunderError<'db>,
+        enter_error: CallDunderOutcome<'db>,
+        exit_error: CallDunderOutcome<'db>,
         mode: EvaluationMode,
     },
 }
@@ -114,7 +112,7 @@ impl<'db> ContextManagerError<'db> {
 
     /// Returns the `__enter__` or `__aenter__` return type if it is known,
     /// or `None` if the type never has a callable `__enter__` or `__aenter__` attribute
-    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn enter_type(&self, _db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Exit {
                 enter_return_type,
@@ -126,14 +124,7 @@ impl<'db> ContextManagerError<'db> {
                 enter_error,
                 exit_error: _,
                 mode: _,
-            } => match enter_error {
-                CallDunderError::PossiblyUnbound(call_outcome) => {
-                    Some(call_outcome.return_type(db))
-                }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => None,
-                CallDunderError::CallError(_, bindings) => Some(bindings.return_type(db)),
-                CallDunderError::MethodNotAvailable => None,
-            },
+            } => enter_error.return_type(),
         }
     }
 
@@ -159,33 +150,36 @@ impl<'db> ContextManagerError<'db> {
             EvaluationMode::Sync => ("__enter__", "__exit__"),
         };
 
-        let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
+        let format_call_dunder_error = |call_dunder_error: &CallDunderOutcome<'db>, name: &str| {
             match call_dunder_error {
-                CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderOutcome::MethodNotAvailable => format!("it does not implement `{name}`"),
+                CallDunderOutcome::PossiblyUnbound(_) => {
                     format!("the method `{name}` may be missing")
                 }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
                 //  distinguish between a not callable `__enter__` attribute and a wrong signature.
-                CallDunderError::CallError(_, _) => {
+                CallDunderOutcome::CallError(_, _) => {
                     format!("it does not correctly implement `{name}`")
+                }
+                CallDunderOutcome::ReturnType(_) => {
+                    format!("it has an inconsistent `{name}` implementation")
                 }
             }
         };
 
-        let format_call_dunder_errors = |error_a: &CallDunderError<'db>,
+        let format_call_dunder_errors = |error_a: &CallDunderOutcome<'db>,
                                          name_a: &str,
-                                         error_b: &CallDunderError<'db>,
+                                         error_b: &CallDunderOutcome<'db>,
                                          name_b: &str| {
             match (error_a, error_b) {
-                (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
+                (CallDunderOutcome::PossiblyUnbound(_), CallDunderOutcome::PossiblyUnbound(_)) => {
                     format!("the methods `{name_a}` and `{name_b}` are possibly missing")
                 }
-                (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
+                (CallDunderOutcome::MethodNotAvailable, CallDunderOutcome::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
                 }
-                (CallDunderError::CallError(_, _), CallDunderError::CallError(_, _)) => {
+                (CallDunderOutcome::CallError(_, _), CallDunderOutcome::CallError(_, _)) => {
                     format!("it does not correctly implement `{name_a}` or `{name_b}`")
                 }
                 (_, _) => format!(
@@ -231,22 +225,26 @@ impl<'db> ContextManagerError<'db> {
             EvaluationMode::Async => ("sync", "__enter__", "__exit__", "with"),
         };
 
-        let alt_enter = context_expression_type.try_call_dunder(
+        let alt_enter = context_expression_type.dunder_call_outcome(
             db,
             alt_enter_method,
-            CallArguments::none(),
+            SimpleCallArguments::None,
             TypeContext::default(),
         );
-        let alt_exit = context_expression_type.try_call_dunder(
+        let alt_exit = context_expression_type.dunder_call_outcome(
             db,
             alt_exit_method,
-            CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+            SimpleCallArguments::Ternary(Type::unknown(), Type::unknown(), Type::unknown()),
             TypeContext::default(),
         );
 
-        if (alt_enter.is_ok() || matches!(alt_enter, Err(CallDunderError::CallError(..))))
-            && (alt_exit.is_ok() || matches!(alt_exit, Err(CallDunderError::CallError(..))))
-        {
+        if matches!(
+            alt_enter,
+            CallDunderOutcome::ReturnType(_) | CallDunderOutcome::CallError(..)
+        ) && matches!(
+            alt_exit,
+            CallDunderOutcome::ReturnType(_) | CallDunderOutcome::CallError(..)
+        ) {
             diag.info(format_args!(
                 "Objects of type `{}` can be used as {} context managers",
                 context_expression_type.display(db),
