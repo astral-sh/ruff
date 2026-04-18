@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use smallvec::SmallVec;
 
 use crate::{
     Db,
@@ -69,20 +70,57 @@ impl<'db> BoundMethodType<'db> {
 
     #[salsa::tracked(cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let function = self.function(db);
-        let self_instance = self.typing_self_type(db);
-
         CallableType::new(
             db,
-            CallableSignature::from_overloads(
-                function
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .map(|signature| signature.bind_self(db, Some(self_instance))),
-            ),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
         )
+    }
+
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let function = self.function(db);
+        let self_instance = self.typing_self_type(db);
+        let function_signature = function.signature(db);
+
+        let mut applicable_overloads: SmallVec<[Signature<'db>; 1]> = self
+            .applicable_overloads(db)
+            .into_iter()
+            .map(|signature| signature.bind_self(db, Some(self_instance)))
+            .collect();
+
+        // If no overload accepts the bound receiver, keep the full overload set so a later call
+        // still reports the existing invalid-`self` diagnostic instead of becoming non-callable.
+        if applicable_overloads.is_empty() {
+            applicable_overloads = function_signature
+                .overloads
+                .iter()
+                .map(|signature| signature.bind_self(db, Some(self_instance)))
+                .collect();
+        }
+
+        CallableSignature::from_overloads(applicable_overloads)
+    }
+
+    pub(crate) fn applicable_overloads_with_indexes(
+        self,
+        db: &'db dyn Db,
+    ) -> SmallVec<[(usize, Signature<'db>); 1]> {
+        let self_instance = self.self_instance(db);
+        self.function(db)
+            .signature(db)
+            .overloads
+            .iter()
+            .enumerate()
+            .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
+            .map(|(index, signature)| (index, signature.clone()))
+            .collect()
+    }
+
+    pub(crate) fn applicable_overloads(self, db: &'db dyn Db) -> SmallVec<[Signature<'db>; 1]> {
+        self.applicable_overloads_with_indexes(db)
+            .into_iter()
+            .map(|(_, signature)| signature)
+            .collect()
     }
 
     pub(super) fn recursive_type_normalized_impl(

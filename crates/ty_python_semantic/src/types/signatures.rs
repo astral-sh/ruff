@@ -728,6 +728,39 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns `true` if this signature's first parameter can accept the bound `self` type.
+    ///
+    /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
+    /// If a signature has no positional first parameter, we conservatively keep it.
+    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return true;
+        };
+
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        let expected_self_ty = first_parameter
+            .annotated_type()
+            .bind_self_typevars(db, self_type)
+            .apply_optional_specialization(db, self_type.class_specialization(db));
+
+        if expected_self_ty.is_unknown() {
+            return true;
+        }
+
+        let constraints = ConstraintSetBuilder::new();
+        self_type
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
+            .is_always_satisfied(db)
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
             db,
