@@ -1,3 +1,4 @@
+use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
 use rustc_hash::FxHashSet;
 
@@ -128,9 +129,11 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //     return x
                         // ```
                         Stmt::Assign(stmt_assign) => {
-                            self.stack
-                                .assignment_return
-                                .push((stmt_assign, stmt_return, stmt));
+                            if !is_observed_by_enclosing_try(stmt_assign, &self.parents) {
+                                self.stack
+                                    .assignment_return
+                                    .push((stmt_assign, stmt_return, stmt));
+                            }
                         }
                         // Example:
                         // ```python
@@ -143,7 +146,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                             if let Some(stmt_assign) =
                                 with.body.last().and_then(Stmt::as_assign_stmt)
                             {
-                                if !has_conditional_body(with, self.semantic) {
+                                if !has_conditional_body(with, self.semantic)
+                                    && !is_observed_by_enclosing_try(stmt_assign, &self.parents)
+                                {
                                     self.stack.assignment_return.push((
                                         stmt_assign,
                                         stmt_return,
@@ -222,4 +227,30 @@ pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticMode
         }
         false
     })
+}
+
+/// Returns `true` if the `finally` clause of a `try` enclosing the pending
+/// `return` reads the assigned name. The `finally` runs after the `return`,
+/// so removing the assignment would hide the value from it (issue #17292).
+///
+/// `except` handlers are **not** checked: they are alternative control-flow
+/// paths to the `return`. If an exception fires, the assignment never
+/// completed, so the handler reads whatever value the name had before the
+/// `try` either way — removing the assignment does not change that.
+fn is_observed_by_enclosing_try(stmt_assign: &ast::StmtAssign, parents: &[&Stmt]) -> bool {
+    let [Expr::Name(target)] = stmt_assign.targets.as_slice() else {
+        return false;
+    };
+    let name = target.id.as_str();
+    let name_read = |expr: &Expr| {
+        matches!(
+            expr,
+            Expr::Name(ast::ExprName { id, ctx, .. })
+                if ctx.is_load() && id == name
+        )
+    };
+    parents
+        .iter()
+        .filter_map(|stmt| stmt.as_try_stmt())
+        .any(|stmt_try| any_over_body(&stmt_try.finalbody, &name_read))
 }
