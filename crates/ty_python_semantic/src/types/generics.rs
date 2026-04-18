@@ -812,6 +812,17 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types)
     }
 
+    /// Returns a specialization of this generic context where each typevar is mapped to the same
+    /// type.
+    pub(crate) fn repeat_specialization(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Specialization<'db> {
+        let types: Vec<Type> = self.variables(db).map(|_| ty).collect();
+        self.specialize(db, types)
+    }
+
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         match self.len(db) {
             0 => self.specialize(db, &[]),

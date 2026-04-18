@@ -1316,7 +1316,7 @@ impl<'db> LoopHeaderReachability<'db> {
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
         // See [`Type::cycle_normalized`] for more details.
-        let reachable_bindings = if cycle.iteration() <= 1 {
+        let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
             self.reachable_bindings
         } else {
             let previous_bindings = previous.reachable_bindings.iter().copied();

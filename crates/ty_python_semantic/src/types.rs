@@ -889,6 +889,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
+    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+        match self {
+            Type::Divergent(divergent) => Some(divergent),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
@@ -1007,7 +1014,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= 1 {
+        if cycle.iteration() <= crate::TAINTED_CYCLES {
             self
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
@@ -1184,30 +1191,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
-    pub(crate) fn known_specialization(
-        &self,
-        db: &'db dyn Db,
-        known_class: KnownClass,
-    ) -> Option<Specialization<'db>> {
-        let class_literal = known_class.try_to_class_literal(db)?;
-        self.specialization_of(db, class_literal)
-    }
-
-    /// If the type is a specialized instance of the given class, returns the specialization.
-    pub(crate) fn specialization_of(
-        self,
-        db: &'db dyn Db,
-        expected_class: StaticClassLiteral<'_>,
-    ) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, Some(expected_class))
-    }
-
-    /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, None)
-    }
-
     /// If this type is a class instance, returns its class.
     pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
@@ -1227,19 +1210,36 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn specialization_of_optional(
+    /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
+    pub(crate) fn known_specialization(
+        &self,
+        db: &'db dyn Db,
+        known_class: KnownClass,
+    ) -> Option<Specialization<'db>> {
+        let class_literal = known_class.try_to_class_literal(db)?;
+        self.specialization_of(db, class_literal)
+    }
+
+    /// If the type is a specialized instance of the given class, returns the specialization.
+    pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
-        expected_class: Option<StaticClassLiteral<'_>>,
+        expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        let class_type = self.nominal_class(db)?;
+        self.nominal_class(db)?
+            .static_class_literal(db)
+            .filter(|(class_literal, _)| *class_literal == expected_class)
+            .and_then(|(_, specialization)| specialization)
+    }
 
-        let (class_literal, specialization) = class_type.static_class_literal(db)?;
-        if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
-            return None;
-        }
-
-        specialization
+    /// If this type is a class instance, returns the class and its specialization.
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        self.nominal_class(db)?
+            .static_class_literal(db)
+            .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
     }
 
     /// Returns `true` if this type may contain preferred type mappings when provided as type context
@@ -2101,7 +2101,7 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Some(specialization) = self.class_specialization(db) else {
+        let Some((_, specialization)) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
@@ -3774,7 +3774,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let signature = bound_method.function(db).signature(db).clone();
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                     .with_bound_type(bound_method.self_instance(db))
                     .into()

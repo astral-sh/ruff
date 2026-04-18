@@ -52,7 +52,7 @@ pub struct AstNodeRef<T> {
 }
 
 impl<T> AstNodeRef<T> {
-    pub(crate) fn index(&self) -> NodeIndex {
+    pub fn index(&self) -> NodeIndex {
         self.index
     }
 }

@@ -43,6 +43,8 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use std::collections::hash_map::Entry;
+
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -50,7 +52,6 @@ use salsa;
 use salsa::plumbing::AsId;
 use ty_python_core::statement::StatementInner;
 
-use crate::Db;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -59,6 +60,8 @@ use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
     declaration_type,
 };
+use crate::{Db, FxIndexSet};
+
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::Definition;
@@ -692,6 +695,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -719,6 +725,29 @@ impl<'db> ScopeInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        }
+
+        if let Some(extra) = &mut self.extra {
+            for types in &mut extra.use_contexts.values_mut() {
+                *types = types
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized(db, cycle))
+                    .collect();
+            }
+        }
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(prev_extra) = &previous_inference.extra
+        {
+            for (def, prev_types) in &prev_extra.use_contexts {
+                let extra = self.extra.get_or_insert_default();
+
+                match extra.use_contexts.entry(*def) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(prev_types.clone());
+                    }
+                    Entry::Occupied(mut entry) => entry.get_mut().extend(prev_types),
+                }
+            }
         }
 
         self
@@ -793,6 +822,9 @@ struct DefinitionInferenceExtra<'db> {
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
 
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -862,6 +894,28 @@ impl<'db> DefinitionInference<'db> {
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
         }
+        if let Some(extra) = &mut self.extra {
+            for types in &mut extra.use_contexts.values_mut() {
+                *types = types
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized(db, cycle))
+                    .collect();
+            }
+        }
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(prev_extra) = &previous_inference.extra
+        {
+            for (def, prev_types) in &prev_extra.use_contexts {
+                let extra = self.extra.get_or_insert_default();
+
+                match extra.use_contexts.entry(*def) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(prev_types.clone());
+                    }
+                    Entry::Occupied(mut entry) => entry.get_mut().extend(prev_types),
+                }
+            }
+        }
 
         self
     }
@@ -879,6 +933,13 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        self.extra.as_ref()?.use_contexts.get(&definition)
     }
 
     /// Get qualifiers for an annotation expression
@@ -965,6 +1026,9 @@ struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
+
     /// The types of every binding in this expression region.
     ///
     /// Only very few expression regions have bindings (around 0.1%).
@@ -1010,6 +1074,27 @@ impl<'db> ExpressionInference<'db> {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
             }
+
+            for types in &mut extra.use_contexts.values_mut() {
+                *types = types
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized(db, cycle))
+                    .collect();
+            }
+            if cycle.iteration() > crate::TAINTED_CYCLES
+                && let Some(prev_extra) = &previous.extra
+            {
+                for (def, prev_types) in &prev_extra.use_contexts {
+                    let extra = self.extra.get_or_insert_default();
+
+                    match extra.use_contexts.entry(*def) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(prev_types.clone());
+                        }
+                        Entry::Occupied(mut entry) => entry.get_mut().extend(prev_types),
+                    }
+                }
+            }
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -1035,6 +1120,13 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        self.extra.as_ref()?.use_contexts.get(&definition)
+    }
+
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
@@ -1057,6 +1149,21 @@ impl<'db> StatementInference<'db> {
             StatementInference::Expression(inference) => inference.expression_type(expression),
             StatementInference::Definition(inference) => inference.expression_type(expression),
             StatementInference::Other(inference) => inference.expression_type(expression),
+        }
+    }
+
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        match self {
+            StatementInference::Expression(inference) => {
+                inference.definition_use_contexts(definition)
+            }
+            StatementInference::Definition(inference) => {
+                inference.definition_use_contexts(definition)
+            }
+            StatementInference::Other(inference) => inference.definition_use_contexts(definition),
         }
     }
 }
@@ -1088,6 +1195,9 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
+
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -1155,6 +1265,28 @@ impl<'db> StatementInferenceInner<'db> {
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
             }
         }
+        if let Some(extra) = &mut self.extra {
+            for types in &mut extra.use_contexts.values_mut() {
+                *types = types
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized(db, cycle))
+                    .collect();
+            }
+        }
+        if cycle.iteration() > crate::TAINTED_CYCLES
+            && let Some(prev_extra) = &previous_inference.extra
+        {
+            for (def, prev_types) in &prev_extra.use_contexts {
+                let extra = self.extra.get_or_insert_default();
+
+                match extra.use_contexts.entry(*def) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(prev_types.clone());
+                    }
+                    Entry::Occupied(mut entry) => entry.get_mut().extend(prev_types),
+                }
+            }
+        }
 
         self
     }
@@ -1172,6 +1304,13 @@ impl<'db> StatementInferenceInner<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&FxIndexSet<Type<'db>>> {
+        self.extra.as_ref()?.use_contexts.get(&definition)
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {

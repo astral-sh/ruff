@@ -1,4 +1,4 @@
-//! # Reachability evaluation
+//! # Reachability evaluationreacha
 //!
 //! During semantic index building, we record so-called reachability constraints that keep track
 //! of a set of conditions that need to apply in order for a certain statement or expression to
@@ -202,10 +202,11 @@ use crate::{
         UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
     },
 };
+use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    SemanticIndex, Truthiness, UseDefMap,
+    SemanticIndex, Statement, Truthiness, UseDefMap,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
@@ -214,13 +215,14 @@ use ty_python_core::{
         Predicates,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    semantic_index,
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
     let ty = match singleton {
-        ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(false),
+        ast::Singleton::None => Type::none(db),
+        ast::Singleton::True => Type::bool_literal(true),
+        ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
@@ -687,6 +689,24 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             call_expr,
             is_await,
         }) => {
+            let index = semantic_index(db, callable.file(db));
+
+            // Short-circuit if this is a use of an unannotated collection literal.
+            // Without this short-circuit, calling `infer_expression_type` below
+            // can lead to quadratic blowup of cycle dependencies during full-scope
+            // collection inference, as Salsa flattens the dependencies of all
+            // cycle participants, and the reachability analysis of a given use of
+            // the collection may create dependencies on all previous uses, leading
+            // to significant performance regressions.
+            //
+            // TODO: We could check this if this is a bound-method call on a collection
+            // via. the AST, which is more precisely what we want to short-circuit on, but
+            // adding a call to `parsed_module` here leads to >5x performance regressions
+            // on some ecosystem projects.
+            if index.is_collection_use(Statement::Expression(call_expr)) {
+                return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
+            }
+
             // We first infer just the type of the callable. In the most likely case that the
             // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
             // doing so allows us to avoid the more expensive work of inferring the entire call
