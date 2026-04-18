@@ -84,6 +84,7 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::CallableSignature;
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
+use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
@@ -6165,6 +6166,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
+        let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
+
         for elt_ty in elt_tys.clone() {
             let elt_ty_identity = elt_ty.identity(self.db());
             let elt_tcx = elt_tcx_constraints
@@ -6174,6 +6177,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // the order of any unions as written in the type annotation.
                 .get(&elt_ty_identity)
                 .copied();
+
+            if elt_tcx.is_some_and(|elt_tcx| !elt_tcx.is_dynamic()) {
+                // Record type annotations that provide concrete shape information in order to
+                // disqualify this typevar from tuple size promotion.
+                tuple_size_promotion_constraints.record_declared_type(elt_ty_identity);
+            }
 
             // Avoid unnecessarily widening the return type based on a covariant
             // type parameter from the type context.
@@ -6221,6 +6230,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
+                    tuple_size_promotion_constraints.record_unpromotable_type(
+                        self.db(),
+                        key_ty.identity(self.db()),
+                        unpacked_key_ty.promote(self.db()),
+                    );
+                    tuple_size_promotion_constraints.record_unpromotable_type(
+                        self.db(),
+                        value_ty.identity(self.db()),
+                        unpacked_value_ty.promote(self.db()),
+                    );
+
                     builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
 
                     builder
@@ -6269,17 +6289,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // which the constraint solver struggles with.
                 let inferred_elt_ty = inferred_elt_ty.promote(self.db());
 
+                let inferred_type_for_typevar = if elt.is_starred_expr() {
+                    inferred_elt_ty
+                        .iterate(self.db())
+                        .homogeneous_element_type(self.db())
+                } else {
+                    inferred_elt_ty
+                };
+
+                tuple_size_promotion_constraints.record_inferred_expression_type(
+                    self.db(),
+                    elt_ty_identity,
+                    elt,
+                    inferred_type_for_typevar,
+                );
+
                 builder
-                    .infer(
-                        Type::TypeVar(elt_ty),
-                        if elt.is_starred_expr() {
-                            inferred_elt_ty
-                                .iterate(self.db())
-                                .homogeneous_element_type(self.db())
-                        } else {
-                            inferred_elt_ty
-                        },
-                    )
+                    .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
                     .ok()?;
             }
         }
@@ -6287,14 +6313,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
-                builder.build_with(generic_context, |_, bounds| {
+                builder.build_with(generic_context, |current_typevar, bounds| {
                     let (lower, _upper) = bounds?;
-                    // Promote singleton types to `T | Unknown` in inferred type parameters,
-                    // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
-                    if elt_tcx_constraints.is_empty() {
-                        return Some(lower.promote_singletons_recursively(self.db()));
-                    }
-                    None
+
+                    let lower = if tuple_size_promotion_constraints
+                        .allow(current_typevar.identity(self.db()))
+                    {
+                        lower.promote_tuple_size_in_union(self.db())
+                    } else {
+                        lower
+                    };
+
+                    let lower = if elt_tcx_constraints.is_empty() {
+                        lower
+                            // Promote singleton types to `T | Unknown` in inferred type parameters,
+                            // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
+                            .promote_singletons_recursively(self.db())
+                    } else {
+                        lower
+                    };
+
+                    Some(lower)
                 })
             });
 
