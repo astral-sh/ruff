@@ -303,3 +303,13 @@ def fail_nested_raise_bypasses_else(outer, inner):
                 raise ValueError
         else:
             return
+
+# should not error - the `break` is unreachable, so `else` always runs and `return` exits
+def pass_nested_continue_before_dead_break(outer, inner):
+    for x in outer:
+        outer.append(x)
+        for y in inner:
+            continue
+            break
+        else:
+            return

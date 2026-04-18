@@ -134,6 +134,19 @@ struct SkipsElseFinder {
 }
 
 impl StatementVisitor<'_> for SkipsElseFinder {
+    fn visit_body(&mut self, body: &[Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            // After a terminator, remaining statements are unreachable.
+            if matches!(
+                stmt,
+                Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_) | Stmt::Raise(_)
+            ) {
+                break;
+            }
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if self.found {
             return;
