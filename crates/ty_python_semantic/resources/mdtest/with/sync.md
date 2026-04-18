@@ -142,6 +142,8 @@ with Manager():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def _(flag: bool):
     class Manager1:
@@ -154,6 +156,60 @@ def _(flag: bool):
     context_expr = Manager1() if flag else NotAContextManager()
 
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+## Context expression with overlapping possibly-unbound union variants
+
+<!-- snapshot-diagnostics -->
+
+```py
+def _(flag1: bool, flag2: bool):
+    class GoodManager:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class MissingExitManager:
+        def __enter__(self) -> str:
+            return "bar"
+
+    class NotAContextManager: ...
+    context_expr = GoodManager() if flag1 else MissingExitManager() if flag2 else NotAContextManager()
+
+    # error: [invalid-context-manager] "Object of type `GoodManager | MissingExitManager | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+## Context expression where one union variant has a non-callable dunder
+
+<!-- snapshot-diagnostics -->
+
+If every union element implements the context manager protocol but at least one implements it
+incorrectly (e.g. with a non-callable `__exit__` attribute), the diagnostic should reflect that —
+*not* report the dunder as "possibly missing".
+
+```py
+def _(flag: bool):
+    class GoodManager:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class BadManager:
+        def __enter__(self) -> str:
+            return "bar"
+
+        # `__exit__` is present but not callable
+        __exit__: int = 32
+
+    context_expr = GoodManager() if flag else BadManager()
+
+    # error: [invalid-context-manager] "Object of type `GoodManager | BadManager` cannot be used with `with` because it does not correctly implement `__exit__`"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
