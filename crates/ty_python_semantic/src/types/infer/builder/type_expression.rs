@@ -15,6 +15,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use crate::types::typed_dict::resolve_unpacked_typed_dict_kwargs_annotation_target;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -2143,6 +2144,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::Unpack => {
                 let inner_ty = self.infer_type_expression(arguments_slice);
+
+                if self
+                    .inference_flags
+                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
+                {
+                    if resolve_unpacked_typed_dict_kwargs_annotation_target(self.db(), inner_ty)
+                        .is_some()
+                    {
+                        return inner_ty;
+                    }
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        let diag = builder.into_diagnostic(format_args!(
+                            "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
+                            inner_ty.display(self.db())
+                        ));
+                        diagnostic::add_type_expression_reference_link(diag);
+                    }
+                    return Type::unknown();
+                }
 
                 // When the argument is a tuple type, return it directly so that
                 // `Unpack[tuple[int, ...]]` behaves identically to `*tuple[int, ...]`.
