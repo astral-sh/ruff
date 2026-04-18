@@ -75,6 +75,32 @@ pub struct Lexer<'src> {
 
     /// Errors encountered while lexing.
     errors: Vec<LexicalError>,
+
+    /// Cell offsets for Jupyter notebook sources. This tracks the byte offsets where each
+    /// cell begins in the concatenated source. Empty slice for non-notebook sources.
+    cell_offsets: &'src [TextSize],
+
+    /// The index of the current cell being lexed.
+    current_cell: usize,
+
+    /// The absolute byte offset where the current cell starts in the full source.
+    cell_start_offset: TextSize,
+
+    /// Precomputed `cell_start_offset + cell_text_len`. Used by `offset()` to avoid
+    /// an extra addition per token compared to the original `source.len()` - `cursor.text_len()`.
+    cell_end_offset: TextSize,
+
+    /// Whether cell offsets are set (non-empty). Used to skip cell logic for regular files.
+    has_cells: bool,
+
+    /// The text length of the current cell. Used to compute absolute cursor offset
+    /// since `cursor.source_length` is modified by `start_token()`.
+    cell_text_len: TextSize,
+
+    /// When set, `next_token()` uses this range instead of computing it from the cursor.
+    /// Used when `consume_end()` advances to a new cell, since `token_range()` would then
+    /// use the new cell's cursor coordinates.
+    range_from_consume_end: Option<TextRange>,
 }
 
 impl<'src> Lexer<'src> {
@@ -109,6 +135,13 @@ impl<'src> Lexer<'src> {
             mode,
             interpolated_strings: InterpolatedStrings::default(),
             errors: Vec::new(),
+            cell_offsets: &[],
+            current_cell: 0,
+            cell_start_offset: TextSize::new(0),
+            cell_end_offset: source.text_len(),
+            has_cells: false,
+            cell_text_len: source.text_len(),
+            range_from_consume_end: None,
         };
 
         if start_offset == TextSize::new(0) {
@@ -119,6 +152,47 @@ impl<'src> Lexer<'src> {
         }
 
         lexer
+    }
+
+    /// Set cell offsets for notebook cell boundary awareness.
+    ///
+    /// When the lexer crosses a cell boundary and the indent stack is not at root level,
+    /// it will emit `Dedent` tokens to flush the stack.
+    pub(crate) fn set_cell_offsets(&mut self, cell_offsets: &'src [TextSize]) {
+        self.has_cells = !cell_offsets.is_empty();
+        self.cell_offsets = cell_offsets;
+
+        if self.has_cells {
+            // Create a cursor for the first cell.
+            let first_cell_end = cell_offsets
+                .get(1)
+                .copied()
+                .unwrap_or_else(|| self.source.text_len());
+            let first_cell_text = &self.source[..first_cell_end.to_usize()];
+            self.cell_text_len = first_cell_text.text_len();
+            self.cell_end_offset = self.cell_text_len;
+            self.cursor = Cursor::new(first_cell_text);
+            self.current_cell = 0;
+            self.cell_start_offset = TextSize::new(0);
+        }
+    }
+
+    /// Advance to the next notebook cell by creating a new cursor for it.
+    #[cold]
+    #[inline(never)]
+    fn advance_to_next_cell(&mut self) {
+        self.current_cell += 1;
+        let cell_start = self.cell_offsets[self.current_cell];
+        let cell_end = self
+            .cell_offsets
+            .get(self.current_cell + 1)
+            .copied()
+            .unwrap_or_else(|| self.source.text_len());
+        let cell_text = &self.source[cell_start.to_usize()..cell_end.to_usize()];
+        self.cell_start_offset = cell_start;
+        self.cell_text_len = cell_text.text_len();
+        self.cell_end_offset = cell_start + self.cell_text_len;
+        self.cursor = Cursor::new(cell_text);
     }
 
     /// Returns the kind of the current token.
@@ -163,6 +237,15 @@ impl<'src> Lexer<'src> {
         if !matches!(self.current_kind, TokenKind::Unknown) {
             self.current_range = self.token_range();
         }
+        // Cell-boundary fixup: if consume_end() advanced to a new cell, the cursor
+        // range would be wrong. Only check on EOF/Dedent (the only kinds that can
+        // appear at cell boundaries) to avoid overhead on every token.
+        if self.current_kind.is_eof() || self.current_kind == TokenKind::Dedent {
+            if let Some(range) = self.range_from_consume_end.take() {
+                self.current_range = range;
+            }
+        }
+
         self.current_kind
     }
 
@@ -1407,8 +1490,10 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    #[cold]
+    #[inline(never)]
     fn consume_end(&mut self) -> TokenKind {
-        // We reached end of file.
+        let at_cell_boundary = self.has_cells && self.current_cell + 1 < self.cell_offsets.len();
 
         // First, finish any unterminated interpolated-strings.
         while let Some(interpolated_string) = self.interpolated_strings.pop() {
@@ -1430,19 +1515,85 @@ impl<'src> Lexer<'src> {
         if self.nesting > init_nesting {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
+            if at_cell_boundary {
+                // At a cell boundary, report the nesting error and advance past the boundary.
+                // Save the range BEFORE advancing since the cursor will be replaced.
+                self.range_from_consume_end = Some(self.token_range());
+                self.advance_to_next_cell();
+                return self
+                    .push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+            }
             return self.push_error(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
-        // Next, insert a trailing newline, if required.
+        // At a cell boundary with open indent levels, clear the stack silently and
+        // advance to the next cell. Do NOT emit Dedent tokens — they would tell the
+        // parser the block is properly closed when it isn't. The parser should see
+        // the compound statement as having no body (it will recover when it encounters
+        // the next token from the new cell).
+        if at_cell_boundary && *self.indentations.current() != Indentation::root() {
+            while self.indentations.dedent().is_some() {
+                // Silently discard all dedents.
+            }
+            // Also discard the pending newline if we haven't flushed it yet.
+            if self.state.is_after_newline() {
+                // Already at a logical line start, no newline to discard.
+            } else {
+                self.state = State::AfterNewline;
+            }
+            self.range_from_consume_end = Some(self.token_range());
+            self.advance_to_next_cell();
+            return self.lex_token();
+        }
+
+        let end_token = if at_cell_boundary {
+            TokenKind::Dedent
+        } else {
+            TokenKind::EndOfFile
+        };
+
+        let token = self.flush_to_logical_line_start(end_token);
+
+        // When all dedents are flushed at a cell boundary, advance past it.
+        // Save the range BEFORE advancing since the cursor will be replaced.
+        // This triggers when flush returns the expected end_token OR when it
+        // collapses a boundary Dedent to EndOfFile (stack already at root).
+        if at_cell_boundary && (token == end_token || token == TokenKind::EndOfFile) {
+            // At root level, the flush returned a spurious Dedent (no actual
+            // dedent happened).  Skip it — re-enter lex_token for the next
+            // cell instead of emitting a Dedent the parser can't handle.
+            if token == TokenKind::Dedent && *self.indentations.current() == Indentation::root() {
+                self.advance_to_next_cell();
+                return self.lex_token();
+            }
+            self.range_from_consume_end = Some(self.token_range());
+            self.advance_to_next_cell();
+        }
+
+        token
+    }
+
+    /// Flush the lexer state to a logical line boundary by emitting a trailing newline
+    /// (if needed) and then dedenting the indent stack to zero.
+    ///
+    /// This is shared between EOF handling (`consume_end`) and notebook cell boundary
+    /// handling to ensure consistent cleanup of nesting, interpolated strings, and
+    /// indentation state.
+    ///
+    /// `end_token` is returned when the indent stack is fully flushed (typically
+    /// `TokenKind::EndOfFile` at EOF or `TokenKind::Dedent` at cell boundaries where
+    /// the caller will continue lexing).
+    fn flush_to_logical_line_start(&mut self, end_token: TokenKind) -> TokenKind {
+        // Insert a trailing newline, if required.
         if !self.state.is_new_logical_line() {
             self.state = State::AfterNewline;
             TokenKind::Newline
         }
-        // Next, flush the indentation stack to zero.
+        // Flush the indentation stack to zero.
         else if self.indentations.dedent().is_some() {
             TokenKind::Dedent
         } else {
-            TokenKind::EndOfFile
+            end_token
         }
     }
 
@@ -1665,11 +1816,9 @@ impl<'src> Lexer<'src> {
     }
 
     /// Retrieves the current offset of the cursor within the source code.
-    // SAFETY: Lexer doesn't allow files larger than 4GB
-    #[expect(clippy::cast_possible_truncation)]
     #[inline]
     fn offset(&self) -> TextSize {
-        TextSize::new(self.source.len() as u32) - self.cursor.text_len()
+        self.cell_end_offset - self.cursor.text_len()
     }
 
     #[inline]
@@ -1710,15 +1859,44 @@ impl<'src> Lexer<'src> {
             errors_position,
         } = checkpoint;
 
-        let mut cursor = Cursor::new(self.source);
-        // We preserve the previous char using this method.
-        cursor.skip_bytes(cursor_offset.to_usize());
+        if self.has_cells {
+            // Use bisection to find the cell containing the target offset.
+            // cell_offsets[current_cell] <= cursor_offset
+            let cell_idx = self
+                .cell_offsets
+                .partition_point(|&offset| offset <= cursor_offset)
+                .saturating_sub(1);
+
+            let cell_start = self.cell_offsets[cell_idx];
+            let cell_end = self
+                .cell_offsets
+                .get(cell_idx + 1)
+                .copied()
+                .unwrap_or_else(|| self.source.text_len());
+            let cell_text = &self.source[cell_start.to_usize()..cell_end.to_usize()];
+
+            let mut cursor = Cursor::new(cell_text);
+            let relative_offset = (cursor_offset - cell_start).to_usize();
+            if relative_offset > 0 {
+                cursor.skip_bytes(relative_offset);
+            }
+
+            self.current_cell = cell_idx;
+            self.cell_start_offset = cell_start;
+            self.cell_text_len = cell_text.text_len();
+            self.cell_end_offset = cell_start + self.cell_text_len;
+            self.cursor = cursor;
+        } else {
+            let mut cursor = Cursor::new(self.source);
+            cursor.skip_bytes(cursor_offset.to_usize());
+            self.cursor = cursor;
+            self.cell_end_offset = self.source.text_len();
+        }
 
         self.current_value = value;
         self.current_kind = current_kind;
         self.current_range = current_range;
         self.current_flags = current_flags;
-        self.cursor = cursor;
         self.state = state;
         self.nesting = nesting;
         self.indentations.rewind(indentations_checkpoint);
