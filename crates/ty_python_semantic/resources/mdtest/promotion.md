@@ -90,6 +90,80 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
 ```
 
+## Differently-sized homogeneous tuple unions are promoted in invariant positions
+
+When a promotable position combines homogeneous fixed-size tuples of different lengths, the tuple
+length is widened to arbitrary length after element promotion:
+
+```py
+class Invariant[T]:
+    x: T
+
+    def __init__(self, value: T): ...
+
+def promote[T](x: T) -> list[T]:
+    return [x]
+
+def make_invariant[T](x: T) -> Invariant[T]:
+    return Invariant(x)
+
+reveal_type([(1, 2), (3, 4, 5)])  # revealed: list[tuple[int, ...]]
+reveal_type({".py": (".py", ".pyi"), ".js": (".js", ".jsx", ".ts", ".tsx")})  # revealed: dict[str, tuple[str, ...]]
+reveal_type({(1, 2), (3, 4, 5)})  # revealed: set[tuple[int, ...]]
+
+languages = {
+    "python": (".py", ".pyi"),
+    "javascript": (".js", ".jsx", ".ts", ".tsx"),
+}
+reveal_type(languages)  # revealed: dict[str, tuple[str, ...]]
+languages["ruby"] = (".rb",)
+```
+
+Tuple-size promotion only applies when a promotable position sees differently-sized homogeneous
+tuples. Plain tuple literals stay fixed and literal-precise, same-sized homogeneous tuples stay
+fixed, heterogeneous tuples stay fixed, and empty tuples are not promoted on their own:
+
+```py
+reveal_type((1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(promote((1, 2)))  # revealed: list[tuple[int, int]]
+reveal_type(make_invariant((1, 2)))  # revealed: Invariant[tuple[int, int]]
+reveal_type([(1, "a"), (2, "b")])  # revealed: list[tuple[int, str]]
+reveal_type([(1, 2), ("a", "b", "c")])  # revealed: list[tuple[int, int] | tuple[str, str, str]]
+reveal_type([()])  # revealed: list[tuple[()]]
+
+places_of_interest = {
+    "home": (0, 0),
+    "palm-tree": (10, 8),
+}
+reveal_type(places_of_interest)  # revealed: dict[str, tuple[int, int]]
+places_of_interest["treasure"] = (5, 6, -10)  # error: [invalid-assignment]
+```
+
+Tuple-size promotion is based on tuple literal elements in the collection. Explicit finite tuple
+unions are not widened just because they are inferred into a collection:
+
+```py
+def get_padding() -> int | tuple[int] | tuple[int, int] | tuple[int, int, int, int]:
+    return (0, 1)
+
+def get_segment() -> tuple[int] | tuple[int, int, int, int] | tuple[int, int, int, int, int]:
+    return (0,)
+
+reveal_type([get_padding()])  # revealed: list[int | tuple[int] | tuple[int, int] | tuple[int, int, int, int]]
+reveal_type([get_segment()])  # revealed: list[tuple[int] | tuple[int, int, int, int] | tuple[int, int, int, int, int]]
+
+def accepts_padding(padding: int | tuple[int] | tuple[int, int] | tuple[int, int, int, int]) -> None: ...
+
+class UsesPadding:
+    def __init__(self, padding: int | tuple[int] | tuple[int, int] | tuple[int, int, int, int]):
+        self.padding = padding
+
+    def check(self) -> None:
+        accepts_padding(self.padding)
+
+UsesPadding(get_padding()).check()
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
@@ -253,6 +327,9 @@ reveal_type(x13)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
 
 x14: list[tuple[int, str, int]] = [(1, "2", 3), (4, "5", 6)]
 reveal_type(x14)  # revealed: list[tuple[int, str, int]]
+
+x14a: list[tuple[int, int]] = [(1, 2), (3, 4)]
+reveal_type(x14a)  # revealed: list[tuple[int, int]]
 
 x15: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
 reveal_type(x15)  # revealed: list[tuple[Literal[1], ...]]
