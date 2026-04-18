@@ -202,10 +202,13 @@ use crate::{
         UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
     },
 };
+use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     SemanticIndex, Truthiness, UseDefMap,
+    ast_ids::HasScopedUseId,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
@@ -214,13 +217,14 @@ use ty_python_core::{
         Predicates,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    semantic_index,
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
     let ty = match singleton {
-        ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(false),
+        ast::Singleton::None => Type::none(db),
+        ast::Singleton::True => Type::bool_literal(true),
+        ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
@@ -687,6 +691,32 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             call_expr,
             is_await,
         }) => {
+            let index = semantic_index(db, callable.file(db));
+            let module = parsed_module(db, callable.file(db)).load(db);
+            let use_def = index.use_def_map(callable.file_scope(db));
+
+            // Short-circuit if this is a use of an unannotated collection literal.
+            // Without this short-circuit, calling `infer_expression_type` below
+            // can lead to quadratic blowup of cycle dependencies during full-scope
+            // collection inference, as Salsa flattens the dependencies of all
+            // cycle participants, and the reachability analysis of a given use of
+            // the collection may create dependencies on all previous uses, leading
+            // to significant performance regressions.
+            if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) =
+                callable.node_ref(db).node(&module)
+                && let Some(use_id) = value.try_scoped_use_id(db, callable.scope(db))
+            {
+                for binding in use_def.bindings_at_use(use_id) {
+                    if let Some(definition) = binding.binding.definition()
+                        && definition
+                            .kind(db)
+                            .is_unannotated_collection_literal(&module)
+                    {
+                        return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
+                    }
+                }
+            }
+
             // We first infer just the type of the callable. In the most likely case that the
             // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
             // doing so allows us to avoid the more expensive work of inferring the entire call
