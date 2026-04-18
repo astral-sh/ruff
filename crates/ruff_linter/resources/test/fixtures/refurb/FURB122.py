@@ -214,3 +214,27 @@ def _():
     with open("file", "w") as f:
         for line in ((1,) if True else (2,)):
             f.write(f"{line}")
+
+
+# Suppress fix when walrus operator rebinds comprehension variable
+# https://github.com/astral-sh/ruff/issues/21107
+def _():
+    with open("file", "w", encoding="utf-8") as src:
+        with open("file.txt", "w", encoding="utf-8") as dst:
+            for line in src:
+                dst.write(line := line.upper())  # walrus target `line` is the loop variable
+
+
+def _():
+    with open("file", "w", encoding="utf-8") as src:
+        with open("file.txt", "w", encoding="utf-8") as dst:
+            for first, *rest in src:
+                dst.write(rest := "".join(rest))  # walrus target `rest` is a loop variable
+
+
+def _():
+    with open("file", "w") as f:
+        for x in items:  # type: ignore
+            f.write(y := process(x))  # OK: walrus target `y` is NOT a loop variable, should still trigger FURB122
+
+
