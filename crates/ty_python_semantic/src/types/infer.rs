@@ -623,6 +623,8 @@ pub(crate) struct ScopeInference<'db> {
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -675,6 +677,15 @@ impl<'db> ScopeInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
+    pub(crate) fn try_expected_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.expected_types.get(&expression.into()).copied())
+    }
+
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
@@ -721,6 +732,8 @@ pub(crate) struct DefinitionInference<'db> {
 struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
@@ -896,6 +909,8 @@ pub(crate) struct ExpressionInference<'db> {
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    /// Expected types for expression nodes tracked for IDE completion.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The types of every binding in this expression region.
     ///

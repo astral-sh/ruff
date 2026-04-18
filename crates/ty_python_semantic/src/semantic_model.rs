@@ -15,7 +15,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -500,12 +500,92 @@ pub struct Completion<'db> {
     pub builtin: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct ExpectedStringLiteralCompletion<'db> {
+    pub value: String,
+    pub ty: Type<'db>,
+}
+
+impl<'db> SemanticModel<'db> {
+    /// Returns completion candidates for a string-literal expression based on its expected type.
+    pub fn expected_string_literal_completions(
+        &self,
+        string_expr: &ast::ExprStringLiteral,
+    ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+        struct StringLiteralCandidates;
+        type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            StringLiteralCandidates,
+            Type<'db>,
+            Vec<ExpectedStringLiteralCompletion<'db>>,
+        >;
+
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &StringLiteralCandidatesVisitor<'db>,
+        ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+            match ty {
+                Type::LiteralValue(literal) => literal
+                    .as_string()
+                    .map(|string_literal| {
+                        let value = string_literal.value(db).to_string();
+                        vec![ExpectedStringLiteralCompletion {
+                            ty: Type::string_literal(db, &value),
+                            value,
+                        }]
+                    })
+                    .unwrap_or_default(),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .flat_map(|element| collect(db, *element, visitor))
+                    .collect(),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                }
+                _ => Vec::new(),
+            }
+        }
+
+        let Some(expected_ty) = string_expr.expected_type(self) else {
+            return Vec::new();
+        };
+
+        let mut candidates = collect(
+            self.db,
+            expected_ty,
+            &StringLiteralCandidatesVisitor::default(),
+        );
+        candidates.sort_by(|left, right| left.value.cmp(&right.value));
+        candidates.dedup_by(|left, right| left.value == right.value);
+        candidates
+    }
+}
+
 pub trait HasType {
     /// Returns the inferred type of `self`.
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>>;
+}
+
+/// Returns contextual expected type information for expressions.
+///
+/// Note: This is used for implementing IDE features like string-literal
+/// completion, and is not intended to be a universal expected-type query
+/// for every expression in the program.
+pub trait HasExpectedType {
+    /// Returns the expected type for `self`, if tracked by inference.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>>;
 }
 
 pub trait HasDefinition {
@@ -538,6 +618,16 @@ impl HasType for ast::ExprRef<'_> {
     }
 }
 
+impl HasExpectedType for ast::ExprRef<'_> {
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let index = semantic_index(model.db, model.file);
+        let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
+        let scope = file_scope.to_scope_id(model.db, model.file);
+
+        infer_complete_scope_types(model.db, scope).try_expected_type(*self)
+    }
+}
+
 macro_rules! impl_expression_has_type {
     ($ty: ty) => {
         impl HasType for $ty {
@@ -545,6 +635,14 @@ macro_rules! impl_expression_has_type {
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let expression_ref = ExprRef::from(self);
                 expression_ref.inferred_type(model)
+            }
+        }
+
+        impl HasExpectedType for $ty {
+            #[inline]
+            fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+                let expression_ref = ExprRef::from(self);
+                expression_ref.expected_type(model)
             }
         }
     };
@@ -620,6 +718,46 @@ impl HasType for ast::Expr {
             Expr::Tuple(inner) => inner.inferred_type(model),
             Expr::Slice(inner) => inner.inferred_type(model),
             Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
+        }
+    }
+}
+
+impl HasExpectedType for ast::Expr {
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        match self {
+            Expr::BoolOp(inner) => inner.expected_type(model),
+            Expr::Named(inner) => inner.expected_type(model),
+            Expr::BinOp(inner) => inner.expected_type(model),
+            Expr::UnaryOp(inner) => inner.expected_type(model),
+            Expr::Lambda(inner) => inner.expected_type(model),
+            Expr::If(inner) => inner.expected_type(model),
+            Expr::Dict(inner) => inner.expected_type(model),
+            Expr::Set(inner) => inner.expected_type(model),
+            Expr::ListComp(inner) => inner.expected_type(model),
+            Expr::SetComp(inner) => inner.expected_type(model),
+            Expr::DictComp(inner) => inner.expected_type(model),
+            Expr::Generator(inner) => inner.expected_type(model),
+            Expr::Await(inner) => inner.expected_type(model),
+            Expr::Yield(inner) => inner.expected_type(model),
+            Expr::YieldFrom(inner) => inner.expected_type(model),
+            Expr::Compare(inner) => inner.expected_type(model),
+            Expr::Call(inner) => inner.expected_type(model),
+            Expr::FString(inner) => inner.expected_type(model),
+            Expr::TString(inner) => inner.expected_type(model),
+            Expr::StringLiteral(inner) => inner.expected_type(model),
+            Expr::BytesLiteral(inner) => inner.expected_type(model),
+            Expr::NumberLiteral(inner) => inner.expected_type(model),
+            Expr::BooleanLiteral(inner) => inner.expected_type(model),
+            Expr::NoneLiteral(inner) => inner.expected_type(model),
+            Expr::EllipsisLiteral(inner) => inner.expected_type(model),
+            Expr::Attribute(inner) => inner.expected_type(model),
+            Expr::Subscript(inner) => inner.expected_type(model),
+            Expr::Starred(inner) => inner.expected_type(model),
+            Expr::Name(inner) => inner.expected_type(model),
+            Expr::List(inner) => inner.expected_type(model),
+            Expr::Tuple(inner) => inner.expected_type(model),
+            Expr::Slice(inner) => inner.expected_type(model),
+            Expr::IpyEscapeCommand(inner) => inner.expected_type(model),
         }
     }
 }

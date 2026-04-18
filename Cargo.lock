@@ -4534,6 +4534,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_importer",
+ "ruff_python_literal",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
