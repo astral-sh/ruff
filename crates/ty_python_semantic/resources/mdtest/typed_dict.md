@@ -3010,6 +3010,16 @@ func(v1=1, v2="optional", v3="ok")
 
 # error: [unknown-argument]
 func(v1=1, v3="ok", v4=1)
+
+td2 = TD2(v1=1, v3="ok")
+func(**td2)
+
+untyped_dict: dict[str, str] = {}
+# error: [invalid-argument-type]
+func(**untyped_dict)
+
+# error: [parameter-already-assigned]
+func(v1=1, **td2)
 ```
 
 ### Callable signatures
@@ -3136,6 +3146,114 @@ def stringified(**kwargs: "Unpack[StringifiedTD]") -> None:
 stringified(a=1)
 ```
 
+### Non-string-keyed mappings are rejected
+
+Only string-keyed mappings can be unpacked into named keyword parameters.
+
+```py
+def takes_name(*, name: str) -> None: ...
+def _(int_key_dict: dict[int, str]) -> None:
+    # snapshot: invalid-argument-type
+    takes_name(**int_key_dict)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument expression after ** must be a mapping with `str` key type
+ --> src/mdtest_snippet.py:4:16
+  |
+4 |     takes_name(**int_key_dict)
+  |                ^^^^^^^^^^^^^^ Found `int`
+  |
+```
+
+### Explicit keywords still conflict with maybe-present unpacked keys
+
+If a partial `TypedDict` may provide a key, passing that key explicitly still counts as a duplicate.
+
+```py
+from typing_extensions import TypedDict
+
+class MaybeX(TypedDict, total=False):
+    x: int
+
+def takes_x(*, x: int) -> None: ...
+def _(maybe_x: MaybeX) -> None:
+    # error: [parameter-already-assigned]
+    takes_x(x=1, **maybe_x)
+```
+
+### Partial `TypedDict`s do not satisfy required unpacked keys
+
+When a `TypedDict` key is not required, unpacking it does not prove that the corresponding required
+parameter is present.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+class MaybeX(TypedDict, total=False):
+    x: int
+
+class HasX(TypedDict):
+    x: int
+
+def takes_required_x(**kwargs: Unpack[HasX]) -> None: ...
+def _(maybe_x: MaybeX, has_x: HasX) -> None:
+    # snapshot: missing-argument
+    takes_required_x(**maybe_x)
+
+    takes_required_x(**has_x)
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `x` of function `takes_required_x`
+  --> src/mdtest_snippet.py:12:5
+   |
+12 |     takes_required_x(**maybe_x)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/mdtest_snippet.py:9:22
+  |
+9 | def takes_required_x(**kwargs: Unpack[HasX]) -> None: ...
+  |                      ^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
+
+### Partial `TypedDict`s can still contribute unknown keys
+
+If a partial `TypedDict` only offers unrelated keys, the call can fail both because a required key
+is missing and because the provided key is unknown.
+
+```py
+from typing_extensions import TypedDict
+
+class MaybeExtra(TypedDict, total=False):
+    extra: int
+
+def takes_y(*, y: int) -> None: ...
+def _(maybe_extra: MaybeExtra) -> None:
+    # error: [missing-argument]
+    # error: [unknown-argument]
+    takes_y(**maybe_extra)
+```
+
+### Legacy dunder-style positional-only parameters still coexist with unpacked keys
+
+Legacy stub-style positional-only parameter names like `__x` should not conflict with unpacked
+`TypedDict` keys of the same name.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+LegacyPositionalOnlyKwargs = TypedDict("LegacyPositionalOnlyKwargs", {"__x": int})
+
+def legacy(__x: int, **kwargs: Unpack[LegacyPositionalOnlyKwargs]) -> None:
+    reveal_type(kwargs)  # revealed: LegacyPositionalOnlyKwargs
+
+def _(legacy_kwargs: LegacyPositionalOnlyKwargs) -> None:
+    legacy(1, **legacy_kwargs)
+```
+
 ## Bare `TypedDict` annotations in `**kwargs`
 
 A bare `TypedDict` annotation on `**kwargs` still means “arbitrary keyword names whose values have
@@ -3169,6 +3287,37 @@ explicit_a_bad: ExplicitAProtocol = plain
 
 def unrelated_named_parameter(x: int, **kwargs: BareKwargs) -> None:
     reveal_type(kwargs)  # revealed: dict[str, BareKwargs]
+```
+
+## `dict[str, T]` remains permissive
+
+When the unpacked mapping is a string-keyed mapping like `dict[str, T]`, ty should optimistically
+assume that the right keys may be present. It should still require the mapping's value type `T` to
+be assignable to each parameter exposed by the unpacked `TypedDict`.
+
+```py
+from typing_extensions import TypedDict, Unpack
+
+class NameKwargs(TypedDict, total=False):
+    name: int
+
+def accepts_name_kwargs(**kwargs: Unpack[NameKwargs]) -> None: ...
+
+class AcceptsNameKwargs:
+    def __init__(self, **kwargs: Unpack[NameKwargs]) -> None:
+        pass
+
+class ForwardingWrapper(AcceptsNameKwargs):
+    def __init__(self, **kwargs: int) -> None:
+        super().__init__(**kwargs)
+
+def _(good_kwargs: dict[str, int], bad_kwargs: dict[str, str]) -> None:
+    accepts_name_kwargs(**good_kwargs)
+    AcceptsNameKwargs(**good_kwargs)
+    ForwardingWrapper(**good_kwargs)
+
+    # error: [invalid-argument-type]
+    accepts_name_kwargs(**bad_kwargs)
 ```
 
 ## Recursive functional `TypedDict` (unstringified forward reference)

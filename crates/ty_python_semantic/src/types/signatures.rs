@@ -2499,6 +2499,14 @@ impl<'db> Unpacked<'db> {
         }
     }
 
+    pub(crate) fn display_name(&self) -> Name {
+        Name::new(format!("**{}", self.name))
+    }
+
+    pub(crate) fn annotated_type(&self) -> Type<'db> {
+        self.annotated_type
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -3047,11 +3055,25 @@ impl<'db> Parameters<'db> {
             .find(|(_, parameter)| parameter.callable_by_name(name))
     }
 
+    /// Return parameter (with index) for given keyword name, including fallback to an ordinary
+    /// `**kwargs` parameter that accepts arbitrary keyword names.
+    pub(crate) fn bindable_keyword_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.keyword_by_name(name)
+            .or_else(|| self.keyword_variadic())
+    }
+
     /// Return the keywords parameter (`**kwargs`), if any, and its index, or `None`.
     pub(crate) fn keyword_variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    /// Return the retained `**kwargs: Unpack[TypedDict]` metadata and its index, if any.
+    pub(crate) fn unpacked(&self) -> Option<(usize, &Unpacked<'db>)> {
+        self.unpacked
+            .as_ref()
+            .map(|parameter| (self.value.len(), parameter))
     }
 }
 
@@ -3727,15 +3749,14 @@ mod tests {
         );
         assert!(sig.parameters.keyword_variadic().is_none());
 
-        let parameter = sig
+        let (index, parameter) = sig
             .parameters
-            .unpacked
-            .as_ref()
+            .unpacked()
             .expect("expected retained unpacked **kwargs metadata");
         let unpacked_keys =
             extract_unpacked_typed_dict_keys_from_value_type(&db, parameter.annotated_type)
                 .expect("stored unpacked TypedDict metadata must remain unpackable");
-        assert_eq!(sig.parameters.value.len(), 2);
+        assert_eq!(index, sig.parameters.len());
         assert_eq!(parameter.name.as_str(), "kwargs");
         assert_eq!(
             unpacked_keys.keys().map(Name::as_str).collect::<Vec<_>>(),
