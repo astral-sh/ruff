@@ -1234,6 +1234,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        // Fast paths: reject incompatible arities before doing any per-parameter type comparisons.
+        if source.parameters.is_standard() && target.parameters.is_standard() {
+            let source_has_variadic = source.parameters.iter().any(Parameter::is_variadic);
+            let source_has_keyword_variadic =
+                source.parameters.iter().any(Parameter::is_keyword_variadic);
+            let target_has_variadic = target.parameters.iter().any(Parameter::is_variadic);
+            let target_has_keyword_variadic =
+                target.parameters.iter().any(Parameter::is_keyword_variadic);
+
+            // If target has `*args` but source doesn't, then target accepts unbounded positional
+            // arguments that source cannot absorb. Likewise for `**kwargs` and arbitrary keyword
+            // names.
+            if (target_has_variadic && !source_has_variadic)
+                || (target_has_keyword_variadic && !source_has_keyword_variadic)
+            {
+                return self.never();
+            }
+
+            // If target has more positional parameters than source and source has no `*args` to
+            // absorb them, then source cannot handle all argument combinations that target accepts.
+            if !source_has_variadic {
+                let source_positional = source.parameters.positional().count();
+                let target_positional = target.parameters.positional().count();
+                if target_positional > source_positional {
+                    return self.never();
+                }
+            }
+
+            // If source has more required positional-only parameters than target, then target
+            // accepts calls with fewer positional arguments than source requires. (Positional-only
+            // parameters must be passed positionally; other required parameters can be passed by
+            // keyword, so they don't raise target's minimum positional-argument count.)
+            let count_required_positional_only = |parameters: &Parameters<'db>| {
+                parameters
+                    .iter()
+                    .filter(|p| {
+                        matches!(
+                            p.kind(),
+                            ParameterKind::PositionalOnly {
+                                default_type: None,
+                                ..
+                            }
+                        )
+                    })
+                    .count()
+            };
+            if count_required_positional_only(&source.parameters)
+                > count_required_positional_only(&target.parameters)
+            {
+                return self.never();
+            }
+        }
+
         let mut result = self.always();
 
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
@@ -2590,6 +2643,12 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_top(&self) -> bool {
         matches!(self.kind, ParametersKind::Top)
+    }
+
+    /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
+    /// `ParamSpec`, or `Concatenate`).
+    pub(crate) const fn is_standard(&self) -> bool {
+        matches!(self.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.

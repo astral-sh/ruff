@@ -2196,6 +2196,101 @@ static_assert(is_subtype_of(RegularCallableTypeOf[overload_ab], RegularCallableT
 static_assert(is_subtype_of(RegularCallableTypeOf[overload_ba], RegularCallableTypeOf[overload_ab]))
 ```
 
+#### Overloaded callable with many arity-incompatible overloads
+
+When an overloaded source callable has many overloads with different arities, overloads whose
+positional parameter count is less than the target's should be quickly rejected without expensive
+per-parameter type comparisons.
+
+`many_overloads.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def many(a: int) -> int: ...
+@overload
+def many(a: int, b: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int) -> int: ...
+@overload
+def many(a: int, b: int, c: int, d: int, e: int) -> int: ...
+```
+
+```py
+from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from many_overloads import many
+
+def two_args(a: int, b: int) -> int:
+    return 0
+
+def five_args(a: int, b: int, c: int, d: int, e: int) -> int:
+    return 0
+
+def six_args(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+    return 0
+
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[two_args]))
+static_assert(is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[five_args]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[many], RegularCallableTypeOf[six_args]))
+```
+
+#### Variadic arity incompatibility
+
+If the target has `*args` or `**kwargs` but the source does not, the source cannot absorb the
+unbounded positional or keyword arguments that the target accepts.
+
+```py
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+def fixed_two(a: int, b: int, /) -> int:
+    return 0
+
+def star_args(a: int, /, *args: int) -> int:
+    return 0
+
+def star_kwargs(a: int, /, **kwargs: int) -> int:
+    return 0
+
+# Target has `*args`, source doesn't.
+static_assert(not is_subtype_of(CallableTypeOf[fixed_two], CallableTypeOf[star_args]))
+
+# Target has `**kwargs`, source doesn't.
+static_assert(not is_subtype_of(CallableTypeOf[fixed_two], CallableTypeOf[star_kwargs]))
+
+# Source has `*args`, target doesn't — not rejected by arity alone.
+def many_pos(a: int, /, *args: int) -> int:
+    return 0
+
+static_assert(is_subtype_of(CallableTypeOf[many_pos], CallableTypeOf[fixed_two]))
+```
+
+#### Source requires more positional-only parameters than target
+
+If the source has more required positional-only parameters than the target, then the target accepts
+calls with fewer positional arguments than the source requires.
+
+```py
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+def source_three(a: int, b: int, c: int, /) -> int:
+    return 0
+
+def target_three(a: int, b: int, c: int, /) -> int:
+    return 0
+
+def target_two_with_default(a: int, b: int, c: int = 0, /) -> int:
+    return 0
+
+# Target has a default, so it can be called with 2 positionals. Source requires 3.
+static_assert(not is_subtype_of(CallableTypeOf[source_three], CallableTypeOf[target_two_with_default]))
+
+# Equal required positional-only counts: not rejected by arity.
+static_assert(is_subtype_of(CallableTypeOf[source_three], CallableTypeOf[target_three]))
+```
+
 ### Generic callables
 
 A generic callable can be considered equivalent to an intersection of all of its possible
