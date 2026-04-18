@@ -106,6 +106,7 @@ impl ParsedModule {
             )))),
         }
     }
+
     /// Loads a reference to the parsed module.
     ///
     /// Note that holding on to the reference will prevent garbage collection

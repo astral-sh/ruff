@@ -1,4 +1,4 @@
-//! # Reachability evaluation
+//! # Reachability evaluationreacha
 //!
 //! During semantic index building, we record so-called reachability constraints that keep track
 //! of a set of conditions that need to apply in order for a certain statement or expression to
@@ -202,13 +202,11 @@ use crate::{
         UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
     },
 };
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    SemanticIndex, Truthiness, UseDefMap,
-    ast_ids::HasScopedUseId,
+    SemanticIndex, Statement, Truthiness, UseDefMap,
     definition::DefinitionState,
     place::ScopedPlaceId,
     place_table,
@@ -692,8 +690,6 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             is_await,
         }) => {
             let index = semantic_index(db, callable.file(db));
-            let module = parsed_module(db, callable.file(db)).load(db);
-            let use_def = index.use_def_map(callable.file_scope(db));
 
             // Short-circuit if this is a use of an unannotated collection literal.
             // Without this short-circuit, calling `infer_expression_type` below
@@ -702,19 +698,13 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // cycle participants, and the reachability analysis of a given use of
             // the collection may create dependencies on all previous uses, leading
             // to significant performance regressions.
-            if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) =
-                callable.node_ref(db).node(&module)
-                && let Some(use_id) = value.try_scoped_use_id(db, callable.scope(db))
-            {
-                for binding in use_def.bindings_at_use(use_id) {
-                    if let Some(definition) = binding.binding.definition()
-                        && definition
-                            .kind(db)
-                            .is_unannotated_collection_literal(&module)
-                    {
-                        return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
-                    }
-                }
+            //
+            // TODO: We could check this if this is a bound-method call on a collection
+            // via. the AST, which is more precisely what we want to short-circuit on, but
+            // adding a call to `parsed_module` here leads to >5x performance regressions
+            // on some ecosystem projects.
+            if index.is_collection_use(Statement::Expression(call_expr)) {
+                return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
             }
 
             // We first infer just the type of the callable. In the most likely case that the

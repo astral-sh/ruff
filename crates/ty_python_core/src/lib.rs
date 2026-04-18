@@ -450,6 +450,13 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
+    pub fn is_collection_use(&self, statement: Statement<'db>) -> bool {
+        self.uses_by_collection
+            .values()
+            .flatten()
+            .any(|(use_statement, _)| *use_statement == statement)
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
