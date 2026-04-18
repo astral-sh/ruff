@@ -73,15 +73,15 @@ def __getattr__(name: str) -> str:
 value = 42
 ```
 
-If you `import mod` (without importing the submodule directly), accessing `mod.sub` will call
-`mod.__getattr__('sub')`, so `reveal_type(mod.sub)` will show the return type of `__getattr__`.
+If you `import mod` (without importing the submodule directly), accessing `mod.sub` will prefer the
+actual submodule if it exists, matching the behavior of other type checkers and user expectations.
 
 `test_import_mod.py`:
 
 ```py
 import mod
 
-reveal_type(mod.sub)  # revealed: str
+reveal_type(mod.sub)  # revealed: <module 'mod.sub'>
 ```
 
 If you `import mod.sub` (importing the submodule directly), then `mod.sub` refers to the actual
@@ -133,4 +133,143 @@ from typing import Literal
 
 def __getattr__(name: Literal["known_attr"]) -> int:
     return 3
+```
+
+## Submodule wins over alias-only `__getattr__`
+
+When a package defines a module-level `__getattr__`, we should expect real submodules to take
+precedence over that result.
+
+```py
+import anyio_like
+
+# Submodule should be found as a real module, not via __getattr__
+reveal_type(anyio_like.to_thread.current_default_thread_limiter())  # revealed: int
+
+# The alias handled by __getattr__ should still work
+reveal_type(anyio_like.BrokenWorkerIntepreter)  # revealed: type[BrokenWorkerInterpreter]
+```
+
+`anyio_like/__init__.py`:
+
+```py
+from ._core import BrokenWorkerInterpreter
+
+def __getattr__(attr: str) -> type[BrokenWorkerInterpreter]:
+    if attr == "BrokenWorkerIntepreter":
+        return BrokenWorkerInterpreter
+
+    raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
+```
+
+`anyio_like/_core.py`:
+
+```py
+class BrokenWorkerInterpreter(Exception): ...
+```
+
+`anyio_like/to_thread.py`:
+
+```py
+def current_default_thread_limiter() -> int:
+    return 0
+```
+
+## `__getattr__` still handles non-submodules
+
+If there is no matching submodule on disk, module `__getattr__` should still fire; we should not
+invent submodules just because a package defines `__getattr__`.
+
+```py
+import alias_only
+
+reveal_type(alias_only.missing_attr)  # revealed: str
+```
+
+`alias_only/__init__.py`:
+
+```py
+def __getattr__(name: str) -> str:
+    return "from getattr"
+```
+
+## PySide-like package: submodules beat `__getattr__`
+
+Some packages (e.g., PySide) expose a module-level `__getattr__` that returns a list of names, but
+real submodules should still win for attribute access.
+
+```py
+from pyside_like import QtCore, QtWidgets
+
+reveal_type(QtCore)  # revealed: <module 'pyside_like.QtCore'>
+reveal_type(QtWidgets)  # revealed: <module 'pyside_like.QtWidgets'>
+reveal_type(QtCore.Qt.WindowType.FramelessWindowHint)  # revealed: int
+reveal_type(QtWidgets.QFileDialog)  # revealed: <class 'QFileDialog'>
+```
+
+`pyside_like/__init__.py`:
+
+```py
+def __getattr__(name: str) -> list[str]:
+    return []
+```
+
+`pyside_like/QtCore.py`:
+
+```py
+class Qt:
+    class WindowType:
+        FramelessWindowHint: int = 1
+```
+
+`pyside_like/QtWidgets.py`:
+
+```py
+class QFileDialog: ...
+```
+
+## Module `__getattr__` requires Python 3.7+
+
+```toml
+[environment]
+python-version = "3.6"
+```
+
+```py
+# error: [unresolved-import]
+from getattr_py36 import dynamic_value
+
+reveal_type(dynamic_value)  # revealed: Unknown
+```
+
+`getattr_py36.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    return 1
+```
+
+## Stub files allow `__getattr__` on older versions
+
+```toml
+[environment]
+python-version = "3.6"
+```
+
+```py
+import stubbed_pkg
+
+reveal_type(stubbed_pkg.via_stub)  # revealed: int
+```
+
+`stubbed_pkg/__init__.py`:
+
+```py
+pass
+```
+
+`stubbed_pkg/__init__.pyi`:
+
+```pyi
+def __getattr__(name: str) -> int: ...
 ```
