@@ -313,6 +313,10 @@ impl<'db> Type<'db> {
                     mode,
                 }),
                 CallDunderOutcome::MethodNotAvailable => Err(IterationError::UnboundAiterError),
+                CallDunderOutcome::Cycle => Err(IterationError::DunderCycle {
+                    method: "__aiter__",
+                    mode,
+                }),
             };
         }
 
@@ -415,6 +419,10 @@ impl<'db> Type<'db> {
                     dunder_getitem_error,
                 }),
             },
+            CallDunderOutcome::Cycle => Err(IterationError::DunderCycle {
+                method: "__iter__",
+                mode,
+            }),
         }
     }
 }
@@ -463,6 +471,12 @@ pub(super) enum IterationError<'db> {
 
     /// The asynchronous iterable has no `__aiter__` method.
     UnboundAiterError,
+
+    /// Determining whether a dunder method can be used for iteration leads to a semantic cycle.
+    DunderCycle {
+        method: &'static str,
+        mode: EvaluationMode,
+    },
 }
 
 impl<'db> IterationError<'db> {
@@ -542,6 +556,7 @@ impl<'db> IterationError<'db> {
                 CallDunderOutcome::ReturnType(dunder_getitem_return) => Some(
                     UnionType::from_two_elements(db, *dunder_next_return, *dunder_getitem_return),
                 ),
+                CallDunderOutcome::Cycle => Some(*dunder_next_return),
             },
 
             Self::UnboundIterAndGetitemError {
@@ -549,6 +564,8 @@ impl<'db> IterationError<'db> {
             } => dunder_getitem_error.return_type(),
 
             Self::UnboundAiterError => None,
+
+            Self::DunderCycle { .. } => None,
         }
     }
 
@@ -560,6 +577,7 @@ impl<'db> IterationError<'db> {
             Self::PossiblyUnboundIterAndGetitemError { .. }
             | Self::UnboundIterAndGetitemError { .. } => EvaluationMode::Sync,
             Self::UnboundAiterError => EvaluationMode::Async,
+            Self::DunderCycle { mode, .. } => *mode,
         }
     }
 
@@ -743,6 +761,13 @@ impl<'db> IterationError<'db> {
                             iterator_type = iterator.display(db),
                         ));
                     }
+                    CallDunderOutcome::Cycle => {
+                        reporter.may_not(format_args!(
+                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                             and resolving `{dunder_next_name}` on that object leads to a semantic cycle",
+                            iterator_type = iterator.display(db),
+                        ));
+                    }
                 }
             }
 
@@ -819,6 +844,12 @@ impl<'db> IterationError<'db> {
                          is inconsistent",
                     );
                 }
+                CallDunderOutcome::Cycle => {
+                    reporter.may_not(
+                        "It may not have an `__iter__` method and resolving its `__getitem__` \
+                         implementation leads to a semantic cycle",
+                    );
+                }
             },
 
             Self::UnboundIterAndGetitemError {
@@ -891,10 +922,22 @@ impl<'db> IterationError<'db> {
                         "It has no `__iter__` method and its `__getitem__` implementation is inconsistent",
                     );
                 }
+                CallDunderOutcome::Cycle => {
+                    reporter.may_not(
+                        "It has no `__iter__` method and resolving its `__getitem__` \
+                         implementation leads to a semantic cycle",
+                    );
+                }
             },
 
             IterationError::UnboundAiterError => {
                 reporter.is_not("It has no `__aiter__` method");
+            }
+
+            IterationError::DunderCycle { method, .. } => {
+                reporter.may_not(format_args!(
+                    "Resolving its `{method}` method leads to a semantic cycle"
+                ));
             }
         }
     }

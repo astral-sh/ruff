@@ -284,6 +284,38 @@ fn unbound_symbol_no_reachability_constraint_check() {
     assert_eq!(cycles, expected);
 }
 
+#[test]
+fn dunder_call_outcome_cycle_recovery_no_panic() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    // Regression test for a py-fuzzer seed that previously panicked while resolving cached
+    // dunder-call outcomes through class bases and membership/iteration checks.
+    db.write_dedented(
+        "src/a.py",
+        r#"
+            class name_0[name_3](lambda: name_4):
+                pass
+
+            {0 for unique_name_0 in name_0}
+
+            class name_0(0 not in name_0):
+                pass
+
+            match 0:
+                case name_0.name_3:
+                    try:
+                        pass
+                    except* 0 as name_4:
+                        pass
+            "#,
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").unwrap();
+    let _diagnostics = check_types(&db, file);
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {

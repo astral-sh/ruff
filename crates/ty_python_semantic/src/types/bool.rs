@@ -95,6 +95,8 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
+                CallDunderOutcome::Cycle => Ok(Truthiness::Ambiguous),
+
                 CallDunderOutcome::MethodNotAvailable => {
                     // We only consider `__len__` for tuples and `@final` types,
                     // since `__bool__` takes precedence
@@ -131,9 +133,8 @@ impl<'db> Type<'db> {
                                 // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
                                 // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
                                 CallDunderOutcome::CallError(..)
-                                | CallDunderOutcome::PossiblyUnbound(_) => {
-                                    Ok(Truthiness::Ambiguous)
-                                }
+                                | CallDunderOutcome::PossiblyUnbound(_)
+                                | CallDunderOutcome::Cycle => Ok(Truthiness::Ambiguous),
                             }
                         } else {
                             Ok(Truthiness::Ambiguous)

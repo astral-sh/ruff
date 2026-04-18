@@ -3,7 +3,7 @@ use super::{Signature, Type, TypeContext};
 use crate::Db;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 
 mod arguments;
 pub(crate) mod bind;
@@ -66,6 +66,7 @@ pub(crate) enum CallDunderOutcome<'db> {
     CallError(CallErrorKind, CallBindingSummary<'db>),
     PossiblyUnbound(CallBindingSummary<'db>),
     MethodNotAvailable,
+    Cycle,
 }
 
 impl<'db> CallDunderOutcome<'db> {
@@ -95,7 +96,10 @@ impl<'db> CallDunderOutcome<'db> {
     pub(crate) fn successful_return_type(self) -> Option<Type<'db>> {
         match self {
             Self::ReturnType(return_type) => Some(return_type),
-            Self::CallError(_, _) | Self::PossiblyUnbound(_) | Self::MethodNotAvailable => None,
+            Self::CallError(_, _)
+            | Self::PossiblyUnbound(_)
+            | Self::MethodNotAvailable
+            | Self::Cycle => None,
         }
     }
 
@@ -103,7 +107,7 @@ impl<'db> CallDunderOutcome<'db> {
         match self {
             Self::ReturnType(return_type) => Some(return_type),
             Self::CallError(_, summary) | Self::PossiblyUnbound(summary) => summary.return_type(),
-            Self::MethodNotAvailable => None,
+            Self::MethodNotAvailable | Self::Cycle => None,
         }
     }
 }
@@ -133,13 +137,48 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> CallDunderOutcome<'db> {
-        // Avoid memoizing full dunder-call outcomes: these queries can participate in semantic
-        // cycles while inferring class bases, decorators, and iterables.
-        let mut arguments = arguments.into_call_arguments();
-        CallDunderOutcome::from_result(
-            db,
-            self.try_call_dunder_with_policy(db, name, &mut arguments, tcx, policy),
-        )
+        fn dunder_call_outcome_cycle<'db>(
+            _db: &'db dyn Db,
+            _id: salsa::Id,
+            _receiver: Type<'db>,
+            _name: Name,
+            _arguments: SimpleCallArguments<'db>,
+            _tcx: TypeContext<'db>,
+            _policy: MemberLookupPolicy,
+        ) -> CallDunderOutcome<'db> {
+            CallDunderOutcome::Cycle
+        }
+
+        #[salsa::tracked(
+            cycle_result=dunder_call_outcome_cycle,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        #[allow(
+            clippy::needless_pass_by_value,
+            reason = "Salsa tracked query inputs must be owned"
+        )]
+        fn dunder_call_outcome_impl<'db>(
+            db: &'db dyn Db,
+            receiver: Type<'db>,
+            name: Name,
+            arguments: SimpleCallArguments<'db>,
+            tcx: TypeContext<'db>,
+            policy: MemberLookupPolicy,
+        ) -> CallDunderOutcome<'db> {
+            let mut arguments = arguments.into_call_arguments();
+            CallDunderOutcome::from_result(
+                db,
+                receiver.try_call_dunder_with_policy(
+                    db,
+                    name.as_str(),
+                    &mut arguments,
+                    tcx,
+                    policy,
+                ),
+            )
+        }
+
+        dunder_call_outcome_impl(db, self, Name::new_static(name), arguments, tcx, policy)
     }
 
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical

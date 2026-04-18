@@ -896,6 +896,7 @@ fn infer_membership_test_comparison<'db>(
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),
+        CallDunderOutcome::Cycle => None,
         // `__contains__` exists but can't be called with the given arguments.
         CallDunderOutcome::CallError(..) => None,
     };

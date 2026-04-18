@@ -158,6 +158,9 @@ impl<'db> ContextManagerError<'db> {
                 CallDunderOutcome::PossiblyUnbound(_) => {
                     format!("the method `{name}` may be missing")
                 }
+                CallDunderOutcome::Cycle => {
+                    format!("resolving `{name}` leads to a semantic cycle")
+                }
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
                 //  distinguish between a not callable `__enter__` attribute and a wrong signature.
@@ -180,6 +183,9 @@ impl<'db> ContextManagerError<'db> {
                 }
                 (CallDunderOutcome::MethodNotAvailable, CallDunderOutcome::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
+                }
+                (CallDunderOutcome::Cycle, CallDunderOutcome::Cycle) => {
+                    format!("resolving `{name_a}` and `{name_b}` leads to semantic cycles")
                 }
                 (CallDunderOutcome::CallError(_, _), CallDunderOutcome::CallError(_, _)) => {
                     format!("it does not correctly implement `{name_a}` or `{name_b}`")
