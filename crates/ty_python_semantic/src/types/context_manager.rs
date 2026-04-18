@@ -130,8 +130,8 @@ impl<'db> ContextManagerError<'db> {
                 CallDunderError::PossiblyUnbound(call_outcome) => {
                     Some(call_outcome.return_type(db))
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => None,
-                CallDunderError::CallError(_, bindings) => Some(bindings.return_type(db)),
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => None,
+                CallDunderError::CallError(_, bindings, _) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
             },
         }
@@ -168,7 +168,7 @@ impl<'db> ContextManagerError<'db> {
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
                 //  distinguish between a not callable `__enter__` attribute and a wrong signature.
-                CallDunderError::CallError(_, _) => {
+                CallDunderError::CallError(_, _, _) => {
                     format!("it does not correctly implement `{name}`")
                 }
             }
@@ -185,7 +185,7 @@ impl<'db> ContextManagerError<'db> {
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
                 }
-                (CallDunderError::CallError(_, _), CallDunderError::CallError(_, _)) => {
+                (CallDunderError::CallError(_, _, _), CallDunderError::CallError(_, _, _)) => {
                     format!("it does not correctly implement `{name_a}` or `{name_b}`")
                 }
                 (_, _) => format!(

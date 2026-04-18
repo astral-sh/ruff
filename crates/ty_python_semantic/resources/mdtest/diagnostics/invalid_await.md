@@ -67,6 +67,36 @@ async def main() -> None:
     await NonCallableAwait()  # error: [invalid-await]
 ```
 
+If `__await__` is inherited from a base class, the diagnostic follows the MRO and points at the base
+class's assignment — including through deeper inheritance chains.
+
+```py
+class BaseWithBadAwait:
+    __await__ = 42
+
+class IntermediateAwait(BaseWithBadAwait): ...
+class DeepInheritedNonCallableAwait(IntermediateAwait): ...
+
+async def main() -> None:
+    await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+```
+
+When the expression type is a union, the binding site cannot be attributed to a single definition,
+so the secondary annotation is omitted.
+
+```py
+class A:
+    __await__ = 42
+
+class B:
+    __await__ = "hello"
+
+x: A | B
+
+async def main() -> None:
+    await x  # error: [invalid-await]
+```
+
 ## `__await__` definition with explicit invalid return type
 
 `__await__` must return a valid iterator. This diagnostic also points to the method definition if

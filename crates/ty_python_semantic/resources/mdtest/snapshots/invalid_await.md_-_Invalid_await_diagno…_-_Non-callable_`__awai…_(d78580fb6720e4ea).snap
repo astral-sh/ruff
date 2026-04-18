@@ -13,27 +13,72 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 ## mdtest_snippet.py
 
 ```
-1 | class NonCallableAwait:
-2 |     __await__ = 42
-3 | 
-4 | async def main() -> None:
-5 |     await NonCallableAwait()  # error: [invalid-await]
+ 1 | class NonCallableAwait:
+ 2 |     __await__ = 42
+ 3 | 
+ 4 | async def main() -> None:
+ 5 |     await NonCallableAwait()  # error: [invalid-await]
+ 6 | class BaseWithBadAwait:
+ 7 |     __await__ = 42
+ 8 | 
+ 9 | class IntermediateAwait(BaseWithBadAwait): ...
+10 | class DeepInheritedNonCallableAwait(IntermediateAwait): ...
+11 | 
+12 | async def main() -> None:
+13 |     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+14 | class A:
+15 |     __await__ = 42
+16 | 
+17 | class B:
+18 |     __await__ = "hello"
+19 | 
+20 | x: A | B
+21 | 
+22 | async def main() -> None:
+23 |     await x  # error: [invalid-await]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-await]: `NonCallableAwait` is not awaitable
-   --> src/mdtest_snippet.py:5:11
-    |
-  5 |     await NonCallableAwait()  # error: [invalid-await]
-    |           ^^^^^^^^^^^^^^^^^^
-    |
-   ::: stdlib/builtins.pyi:348:7
-    |
-348 | class int:
-    |       --- attribute defined here
-    |
+ --> src/mdtest_snippet.py:5:11
+  |
+5 |     await NonCallableAwait()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/mdtest_snippet.py:2:5
+  |
+2 |     __await__ = 42
+  |     --------- attribute defined here
+  |
+info: `__await__` is not callable
+
+```
+
+```
+error[invalid-await]: `DeepInheritedNonCallableAwait` is not awaitable
+  --> src/mdtest_snippet.py:13:11
+   |
+13 |     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: src/mdtest_snippet.py:7:5
+   |
+ 7 |     __await__ = 42
+   |     --------- attribute defined here
+   |
+info: `__await__` is not callable
+
+```
+
+```
+error[invalid-await]: `A | B` is not awaitable
+  --> src/mdtest_snippet.py:23:11
+   |
+23 |     await x  # error: [invalid-await]
+   |           ^
+   |
 info: `__await__` is not callable
 
 ```
