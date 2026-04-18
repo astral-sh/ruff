@@ -90,6 +90,28 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
 ```
 
+Additionally, invariant collection literals are not promoted if they are in covariant position in
+the declared type:
+
+```py
+from typing import MutableSequence, Sequence, Iterable
+
+x1: MutableSequence[int] = [1, 2, 3]
+reveal_type(x1)  # revealed: list[int]
+
+x2: Sequence[int] = [1, 2, 3]
+reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
+
+x3: Iterable[int] = [1, 2, 3]
+reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
+
+x4 = frozenset([1, 2, 3])
+reveal_type(x4)  # revealed: frozenset[Literal[1, 2, 3]]
+
+for x5 in [1, 2, 3]:
+    reveal_type(x5)  # revealed: Literal[1, 2, 3]
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
@@ -151,6 +173,34 @@ reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Cova
 
 reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
+```
+
+However, non-covariant generic types are not promoted if they are in covariant position in the
+declared type:
+
+```py
+class CovariantSup[T]:
+    def pop(self) -> T:
+        raise NotImplementedError
+
+class InvariantSub[T](CovariantSup[T]):
+    x: T
+    def __init__(self, value: T): ...
+
+def f12[T](x: T) -> InvariantSub[T]:
+    raise NotImplementedError
+
+def f13[T](x: T) -> CovariantSup[T]:
+    raise NotImplementedError
+
+x1 = f12(1)
+reveal_type(x1)  # revealed: InvariantSub[int]
+
+x2 = f13(1)
+reveal_type(x2)  # revealed: CovariantSup[Literal[1]]
+
+x3: CovariantSup[int] = f12(1)
+reveal_type(x3)  # revealed: InvariantSub[Literal[1]]
 ```
 
 ## Promotion is recursive
