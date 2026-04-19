@@ -71,6 +71,7 @@ if sys.version_info < (3, 12):
         """
 
 if sys.version_info < (3, 10):
+    @deprecated("Unsupported by OpenSSL since 1.1.1; removed in Python 3.10.")
     def RAND_egd(path: str) -> None: ...
 
 def RAND_status() -> bool:
@@ -292,8 +293,8 @@ CERT_REQUIRED: Final = 2
 
 # verify flags
 VERIFY_DEFAULT: Final = 0
-VERIFY_CRL_CHECK_LEAF: Final = 0x4
-VERIFY_CRL_CHECK_CHAIN: Final = 0x8
+VERIFY_CRL_CHECK_LEAF: Final = 0x04
+VERIFY_CRL_CHECK_CHAIN: Final = 0x0C
 VERIFY_X509_STRICT: Final = 0x20
 VERIFY_X509_TRUSTED_FIRST: Final = 0x8000
 if sys.version_info >= (3, 10):
@@ -339,7 +340,7 @@ PROTOCOL_TLSv1_1: Final = 4
 PROTOCOL_TLSv1_2: Final = 5
 
 # protocol options
-OP_ALL: Final = 0x80000050
+OP_ALL: Final[int]
 OP_NO_SSLv2: Final = 0x0
 OP_NO_SSLv3: Final = 0x2000000
 OP_NO_TLSv1: Final = 0x4000000

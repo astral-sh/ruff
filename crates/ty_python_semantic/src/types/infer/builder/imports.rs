@@ -7,7 +7,6 @@ use ty_module_resolver::{
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
-    semantic_index::definition::Definition,
     types::{
         Type, TypeAndQualifiers,
         diagnostic::{
@@ -19,6 +18,7 @@ use crate::{
         infer_definition_types,
     },
 };
+use ty_python_core::definition::Definition;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_import_statement(&mut self, import: &ast::StmtImport) {
@@ -36,18 +36,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn report_unresolved_import(
         &self,
-        import_node: ast::AnyNodeRef<'_>,
         range: TextRange,
         level: u32,
         module: Option<&str>,
         module_name: Option<&ModuleName>,
     ) {
         let db = self.db();
-        let is_import_reachable = self.is_reachable(import_node);
-
-        if !is_import_reachable {
-            return;
-        }
 
         if let Some(module_name) = &module_name
             && (self
@@ -159,7 +153,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn infer_import_definition(
         &mut self,
-        node: &ast::StmtImport,
         alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
@@ -193,13 +186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(
-                node.into(),
-                alias.range(),
-                0,
-                Some(name),
-                Some(&full_module_name),
-            );
+            self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -295,13 +282,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.report_unresolved_import(
-                    import_from.into(),
-                    module_ref.range(),
-                    *level,
-                    module,
-                    None,
-                );
+                self.report_unresolved_import(module_ref.range(), *level, module, None);
                 return;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -311,25 +292,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                     self.file().path(db)
                 );
-                self.report_unresolved_import(
-                    import_from.into(),
-                    module_ref.range(),
-                    *level,
-                    module,
-                    None,
-                );
+                self.report_unresolved_import(module_ref.range(), *level, module, None);
                 return;
             }
         };
 
         if resolve_module(db, self.file(), &module_name).is_none() {
-            self.report_unresolved_import(
-                import_from.into(),
-                module_ref.range(),
-                *level,
-                module,
-                Some(&module_name),
-            );
+            self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
         }
     }
 
@@ -496,10 +465,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        if !self.is_reachable(import_from) {
-            return;
-        }
-
         if self
             .settings()
             .allowed_unresolved_imports
@@ -626,10 +591,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matches(&full_submodule_name)
             .is_include()
         {
-            return;
-        }
-
-        if !self.is_reachable(import_from) {
             return;
         }
 

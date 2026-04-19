@@ -32,12 +32,12 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
         with:
           enable-cache: true
-          version: "0.10.9"
+          version: "0.11.6"
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: "ruff"
           lookup-only: false
@@ -50,13 +50,13 @@ jobs:
         run: |
           cd ruff
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@3b27e0b28a5314240c218e939bde0c6c02a39652"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@c4499fe78814adc048fd3a3176e24ea4b5c01e13"
 
           ecosystem-analyzer \
             --verbose \

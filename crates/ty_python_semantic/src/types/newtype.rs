@@ -1,10 +1,11 @@
 use crate::Db;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
+use crate::types::constraints::ConstraintSet;
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::{Definition, DefinitionKind};
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to
@@ -107,51 +108,11 @@ impl<'db> NewType<'db> {
         Type::object()
     }
 
-    pub(crate) fn is_equivalent_to_impl(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         // Two instances of the "same" `NewType` won't compare == if one of them has an eagerly
         // evaluated base (or a normalized base, etc.) and the other doesn't, so we only check for
         // equality of the `definition`.
         self.definition(db) == other.definition(db)
-    }
-
-    // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
-    // subtype of another is to have the other in its chain of newtype bases. Once we reach the
-    // base class, we don't have to keep looking.
-    pub(crate) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        if self.is_equivalent_to_impl(db, other) {
-            return ConstraintSet::from_bool(constraints, true);
-        }
-        for base in self.iter_bases(db) {
-            if let NewTypeBase::NewType(base_newtype) = base {
-                if base_newtype.is_equivalent_to_impl(db, other) {
-                    return ConstraintSet::from_bool(constraints, true);
-                }
-            }
-        }
-        ConstraintSet::from_bool(constraints, false)
-    }
-
-    pub(crate) fn is_disjoint_from_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
-        // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
-        // it's not possible for some third type to multiply-inherit from both.
-        let mut self_not_subtype_of_other = self
-            .has_relation_to_impl(db, other, constraints)
-            .negate(db, constraints);
-        let other_not_subtype_of_self = other
-            .has_relation_to_impl(db, self, constraints)
-            .negate(db, constraints);
-        self_not_subtype_of_other.intersect(db, constraints, other_not_subtype_of_self)
     }
 
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any
@@ -213,6 +174,50 @@ impl<'db> NewType<'db> {
     ) -> Self {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_newtype_pair(
+        &self,
+        db: &'db dyn Db,
+        source: NewType<'db>,
+        target: NewType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
+        // subtype of another is to have the other in its chain of newtype bases. Once we reach the
+        // base class, we don't have to keep looking.
+        if source.is_equivalent_to(db, target) {
+            return self.always();
+        }
+        for base in source.iter_bases(db) {
+            if let NewTypeBase::NewType(base_newtype) = base
+                && base_newtype.is_equivalent_to(db, target)
+            {
+                return self.always();
+            }
+        }
+        self.never()
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn check_newtype_pair(
+        &self,
+        db: &'db dyn Db,
+        left: NewType<'db>,
+        right: NewType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
+        // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
+        // it's not possible for some third type to multiply-inherit from both.
+        let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
+        relation_checker
+            .check_newtype_pair(db, left, right)
+            .or(db, self.constraints, || {
+                relation_checker.check_newtype_pair(db, right, left)
+            })
+            .negate(db, self.constraints)
     }
 }
 

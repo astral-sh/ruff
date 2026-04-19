@@ -309,6 +309,57 @@ class E(enum.Enum):
                 reveal_type(super())
 ```
 
+### Metaclasses
+
+When the second argument to `super()` is a class object, the call can still be valid if that class
+object is an instance of the pivot metaclass. This includes both concrete class objects and
+`type[T]`-style annotations in metaclass methods:
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Any, TypeVar
+
+_TMeta = TypeVar("_TMeta", bound="BaseWithMeta")
+
+class MetaBase(type):
+    meta_base_value: int = 1
+
+    def plain(self: type[_TMeta]) -> type[_TMeta]:
+        return self
+
+class Meta(MetaBase):
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+        reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
+        reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
+        return super().__call__(*args, **kwargs)
+
+class BaseWithMeta(metaclass=Meta):
+    pass
+
+class SubWithMeta(BaseWithMeta):
+    def extra(self) -> int:
+        return 42
+
+reveal_type(SubWithMeta())  # revealed: SubWithMeta
+SubWithMeta().extra()
+reveal_type(super(Meta, BaseWithMeta).meta_base_value)  # revealed: int
+
+class OtherMeta(type):
+    pass
+
+class OtherBase(metaclass=OtherMeta):
+    pass
+
+super(Meta, OtherBase)  # error: [invalid-super-argument]
+
+T = TypeVar("T", bound=int)
+
+class BoundIntMeta(type):
+    def __call__(cls: type[T]) -> T:
+        return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
+```
+
 ### Unbound Super Object
 
 Calling `super(cls)` without a second argument returns an _unbound super object_. This is treated as
@@ -464,7 +515,7 @@ def f(x: C | D):
     s.b
 
 def f(flag: bool):
-    x = str() if flag else str("hello")
+    x = "" if flag else "hello"
     reveal_type(x)  # revealed: Literal["", "hello"]
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
@@ -497,7 +548,7 @@ def f(flag: bool):
 
     reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
 
-    reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
     # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
@@ -611,21 +662,45 @@ reveal_type(super(B, A))
 reveal_type(super(B, object))
 
 super(object, object()).__class__
+```
 
-# Not all objects valid in a class's bases list are valid as the first argument to `super()`.
-# For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
-#
+Not all objects valid in a class's bases list are valid as the first argument to `super()`. For
+example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to
+`super()`.
+
+```py
 # error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
 reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
+```
 
-# Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
-# but it *is* valid as the first argument to `super()`.
-#
+It's not valid to inherit from unsubscripted `typing.Generic` or `typing.Protocol`, but it _is_
+valid as the first argument to `super()`. Still required that it be in the second argument's MRO,
+though:
+
+```py
 # revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
 reveal_type(super(typing.Generic, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Generic, int)
 
-def _(x: type[typing.Any], y: typing.Any):
+# revealed: <super: <special-form 'typing.Protocol'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Protocol, typing.SupportsInt))
+# error: [invalid-super-argument]
+super(typing.Protocol, int)
+
+def _(x: type[typing.Any], y: typing.Any, z: int):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
+```
+
+`typing.TypedDict` never appears in the MRO of any class, so it's not valid as the first argument to
+`super()`.
+
+```py
+class TD(typing.TypedDict):
+    x: int
+
+# error: [invalid-super-argument]
+super(typing.TypedDict, TD)
 ```
 
 ### Diagnostic when the invalid type is rendered very verbosely
@@ -708,7 +783,7 @@ class Parent:
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
+        # error: [invalid-argument-type] "Argument to `Parent.__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
         super().__init__(children)
 
 # The fix is to use `Self` consistently in the subclass:

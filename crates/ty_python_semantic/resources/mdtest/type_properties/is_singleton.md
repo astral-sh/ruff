@@ -87,7 +87,6 @@ python-version = "3.9"
 from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(Ellipsis.__class__))
-static_assert(is_singleton((...).__class__))
 ```
 
 ### Python 3.10+

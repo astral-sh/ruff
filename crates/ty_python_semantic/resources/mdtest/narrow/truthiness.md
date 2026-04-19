@@ -3,47 +3,72 @@
 ## Value Literals
 
 ```py
-from typing import Literal
+from typing import Literal, TypeAlias
 
-def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]:
-    return 0
+X: TypeAlias = Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]
 
-x = foo()
+def _(x: X):
+    if x:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
+    else:
+        reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
 
-if x:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
-else:
-    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
+def _(x: X):
+    if not x:
+        reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
-if not x:
-    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
+def _(x: X):
+    if x and not x:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
-if x and not x:
-    reveal_type(x)  # revealed: Never
-else:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+def _(x: X):
+    if not (x and not x):
+        reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Never
 
-if not (x and not x):
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Never
+def _(x: X):
+    if x or not x:
+        reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Never
 
-if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Never
+def _(x: X):
+    if not (x or not x):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
 
-if not (x or not x):
-    reveal_type(x)  # revealed: Never
-else:
-    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
+def _(x: X):
+    if (isinstance(x, int) or isinstance(x, str)) and x:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo"]
+    else:
+        reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
+```
 
-if (isinstance(x, int) or isinstance(x, str)) and x:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo"]
-else:
-    reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
+## Walrus Member Access
+
+We can narrow on an attribute expression, even when its base is a named expression:
+
+```py
+class Foo:
+    val: int | None
+
+if (foo := Foo()).val:
+    reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
+```
+
+But we don't pick up stale narrowings from before the assignment in the named expression:
+
+```py
+foo1 = Foo()
+foo1.val = None
+if (foo1 := Foo()).val:
+    reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
 ## Function Literals
@@ -488,4 +513,25 @@ def test() -> None:
     reveal_type(p)  # revealed: Person & ~AlwaysFalsy
     # error: [invalid-key] "Unknown key "nonexistent" for TypedDict `Person`"
     print(p["nonexistent"])
+```
+
+## Truthiness narrowing of `NewType`s
+
+```py
+from typing import NewType
+
+FloatNewType = NewType("FloatNewType", float)
+ComplexNewType = NewType("ComplexNewType", complex)
+
+def expects_float(x: float): ...
+def expects_complex(x: complex): ...
+def f(floaty: FloatNewType, complexy: ComplexNewType):
+    if floaty:
+        reveal_type(floaty)  # revealed:FloatNewType & ~AlwaysFalsy
+        expects_float(floaty)  # fine
+
+    if complexy:
+        reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        expects_complex(complexy)  # fine
+        expects_float(complexy)  # error: [invalid-argument-type]
 ```

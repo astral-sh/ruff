@@ -5,12 +5,12 @@ use crate::{
     Db,
     types::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Truthiness, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
-        constraints::ConstraintSetBuilder, context::InferContext,
+        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
+        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
+use ty_python_core::Truthiness;
 
 impl<'db> Type<'db> {
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
@@ -207,6 +207,7 @@ impl<'db> Type<'db> {
 
         let truthiness = match self {
             Type::Dynamic(_)
+            | Type::Divergent(_)
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)

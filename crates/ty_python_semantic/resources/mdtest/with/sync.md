@@ -40,6 +40,46 @@ def _(flag: bool):
         reveal_type(f)  # revealed: str | int
 ```
 
+## Type aliases preserve context manager behavior
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self, TypeAlias
+from typing_extensions import TypeAliasType
+
+class A:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class B:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+UnionAB1: TypeAlias = A | B
+type UnionAB2 = A | B
+UnionAB3 = TypeAliasType("UnionAB3", A | B)
+
+def f1(x: UnionAB1) -> None:
+    with x as y:
+        reveal_type(y)  # revealed: A | B
+
+def f2(x: UnionAB2) -> None:
+    with x as y:
+        reveal_type(y)  # revealed: A | B
+
+def f3(x: UnionAB3) -> None:
+    with x as y:
+        reveal_type(y)  # revealed: A | B
+```
+
 ## Context manager without an `__enter__` or `__exit__` method
 
 ```py
@@ -152,8 +192,6 @@ with context_expr as f:
 
 ## Accidental use of non-async `with`
 
-<!-- snapshot-diagnostics -->
-
 If a synchronous `with` statement is used on a type with `__aenter__` and `__aexit__`, we show a
 diagnostic hint that the user might have intended to use `async with` instead.
 
@@ -162,9 +200,20 @@ class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, *args): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
+# snapshot: invalid-context-manager
 with Manager():
     pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`
+ --> src/mdtest_snippet.py:6:6
+  |
+6 | with Manager():
+  |      ^^^^^^^^^
+  |
+info: Objects of type `Manager` can be used as async context managers
+info: Consider using `async with` here
 ```
 
 ## Incorrect signatures

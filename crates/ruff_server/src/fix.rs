@@ -27,9 +27,13 @@ pub(crate) fn fix_all(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let source_kind = query.make_source_kind();
     let settings = query.settings();
     let document_path = query.virtual_file_path();
+
+    let SourceType::Python(source_type) = query.source_type_for_lint() else {
+        return Ok(Fixes::default());
+    };
+    let source_kind = query.make_python_source_kind(source_type);
 
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
@@ -52,10 +56,6 @@ pub(crate) fn fix_all(
         .map(PackageRoot::root)
     } else {
         None
-    };
-
-    let SourceType::Python(source_type) = query.source_type() else {
-        return Ok(Fixes::default());
     };
 
     // We need to iteratively apply all safe fixes onto a single file and then

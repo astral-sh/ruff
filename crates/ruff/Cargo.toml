@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.15.5"
+version = "0.15.11"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -39,7 +39,7 @@ ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-bitcode = { workspace = true, features = ["serde"] }
+bincode = { workspace = true, features = ["serde"] }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
@@ -93,3 +93,6 @@ test-case = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

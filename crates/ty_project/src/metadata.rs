@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::{MisconfigurationMode, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
@@ -16,6 +16,7 @@ use options::TyTomlError;
 mod configuration_file;
 pub mod options;
 pub mod pyproject;
+pub mod python_version;
 pub mod settings;
 pub mod value;
 
@@ -37,9 +38,6 @@ pub struct ProjectMetadata {
     /// The path ordering doesn't imply precedence.
     #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
     pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
-
-    #[cfg_attr(test, serde(skip))]
-    pub(super) misconfiguration_mode: MisconfigurationMode,
 }
 
 impl ProjectMetadata {
@@ -50,7 +48,6 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
-            misconfiguration_mode: MisconfigurationMode::Fail,
         }
     }
 
@@ -75,7 +72,6 @@ impl ProjectMetadata {
             root: root.to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
-            misconfiguration_mode: MisconfigurationMode::Fail,
         })
     }
 
@@ -88,17 +84,17 @@ impl ProjectMetadata {
             pyproject.tool.and_then(|tool| tool.ty).unwrap_or_default(),
             root,
             pyproject.project.as_ref(),
-            MisconfigurationMode::Fail,
+            &FallibleStrategy,
         )
     }
 
     /// Loads a project from a set of options with an optional pyproject-project table.
-    pub fn from_options(
+    pub fn from_options<Strategy: MisconfigurationStrategy>(
         mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<Self, ResolveRequiresPythonError> {
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<ResolveRequiresPythonError>> {
         let name = project
             .and_then(|project| project.name.as_deref())
             .map(|name| Name::new(&**name))
@@ -112,7 +108,13 @@ impl ProjectMetadata {
                 .as_ref()
                 .is_none_or(|env| env.python_version.is_none())
             {
-                if let Some(requires_python) = project.resolve_requires_python_lower_bound()? {
+                let requires_python = strategy.fallback_opt(
+                    project.resolve_requires_python_lower_bound(),
+                    |err| {
+                        tracing::debug!("skipping invalid requires_python lower bound: {err}");
+                    },
+                )?;
+                if let Some(requires_python) = requires_python.flatten() {
                     let mut environment = options.environment.unwrap_or_default();
                     environment.python_version = Some(requires_python);
                     options.environment = Some(environment);
@@ -125,7 +127,6 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
-            misconfiguration_mode,
         })
     }
 
@@ -203,7 +204,7 @@ impl ProjectMetadata {
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
-                    MisconfigurationMode::Fail,
+                    &FallibleStrategy,
                 )
                 .map_err(|err| {
                     ProjectMetadataError::InvalidRequiresPythonConstraint {
@@ -278,18 +279,14 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
-    pub fn to_program_settings(
+    pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> anyhow::Result<ProgramSettings> {
-        self.options.to_program_settings(
-            self.root(),
-            self.name(),
-            system,
-            vendored,
-            self.misconfiguration_mode,
-        )
+        strategy: &Strategy,
+    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+        self.options
+            .to_program_settings(self.root(), self.name(), system, vendored, strategy)
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {
@@ -659,7 +656,7 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
-                  r#python-version: Some("3.10"),
+                  r#python-version: Some(r#3.10),
                 )),
               ),
             )
@@ -711,7 +708,7 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
-                  r#python-version: Some("3.12"),
+                  r#python-version: Some(r#3.12),
                 )),
                 src: Some(SrcOptions(
                   root: Some("src"),
@@ -746,8 +743,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -776,8 +775,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::from((3, 0)))
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY37)
         );
 
         Ok(())
@@ -808,8 +809,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -838,8 +841,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY313)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY313)
         );
 
         Ok(())
@@ -870,8 +875,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY312)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY312)
         );
 
         Ok(())
@@ -904,8 +911,10 @@ unclosed table, expected `]`
                 .environment
                 .unwrap_or_default()
                 .python_version
-                .as_deref(),
-            Some(&PythonVersion::PY310)
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY310)
         );
 
         Ok(())
@@ -996,6 +1005,68 @@ unclosed table, expected `]`
         assert_error_eq(
             &error,
             "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_old_version_uses_lowest_supported_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==2.7"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref()
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY37)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_unsupported_future_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "==44.44"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!(
+                "Expected project discovery to fail because `requires-python` does not include a ty-supported version."
+            ));
+        };
+
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
         );
 
         Ok(())

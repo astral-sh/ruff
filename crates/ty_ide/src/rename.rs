@@ -2591,6 +2591,61 @@ result = func(10, y=20)
         "#);
     }
 
+    #[test]
+    fn rename_property_from_assignment_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property(self) -> int:
+                        return 42
+
+                    @my_property.setter
+                    def my_property(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                Foo().my_<CURSOR>property = 56
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             ^^^^^^^^^^^
+        5 | Foo().my_property = 56
+          |       -----------
+          |
+         ::: lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         -----------
+        5 |         return 42
+        6 |
+        7 |     @my_property.setter
+          |      -----------
+        8 |     def my_property(self, value: int) -> None:
+          |         -----------
+        9 |         pass
+          |
+        ");
+    }
+
     // TODO: This should rename all attribute usages
     // Note: Pylance only renames the assignment in `__init__`.
     #[test]

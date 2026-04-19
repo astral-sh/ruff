@@ -23,7 +23,7 @@ use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
 #[derive(Debug)]
-pub struct RuffSettings {
+pub(crate) struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,

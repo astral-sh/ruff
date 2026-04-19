@@ -28,12 +28,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 error[not-iterable]: Object of type `Bad` is not iterable
  --> src/mdtest_snippet.py:6:10
   |
-5 | # error: [not-iterable]
 6 | for x in Bad():
   |          ^^^^^
-7 |     reveal_type(x)  # revealed: Unknown
   |
 info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
-info: rule `not-iterable` is enabled by default
 
 ```

@@ -125,13 +125,7 @@ class Foo: ...
 X = list["int" | None]
 
 if TYPE_CHECKING:
-    # TODO: ideally we would not error here, since `if TYPE_CHECKING`
-    # blocks are not executed at runtime. Requires
-    # https://github.com/astral-sh/ty/issues/1553.
-    bar: "int" | "None"  # error: [unsupported-operator]
-
-    # TODO: same as above
-    # error: [unsupported-operator]
+    bar: "int" | "None"
     def foo(x: "int" | "None"): ...
 
     class Bar:
@@ -170,7 +164,12 @@ from __future__ import annotations
 def f(v: int | "Foo"):  # fine
     reveal_type(v)  # revealed: int | Foo
 
-class Foo: ...
+class Foo:
+    def __init__(self):
+        self.x: "int" | "str" = 42
+
+d = {}
+d[0]: "int" | "str" = 42
 
 # error: [unsupported-operator]
 X = list["int" | None]
@@ -212,32 +211,44 @@ class Foo: ...
 
 ```py
 def f1(
-    # error: [raw-string-type-annotation] "Type expressions cannot use raw string literal"
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in parameter annotations"
     a: r"int",
-    # error: [fstring-type-annotation] "Type expressions cannot use f-strings"
-    b: f"int",
-    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
-    c: b"int",
-    d: "int",
+    # error: [raw-string-type-annotation] "Raw string literals are not allowed in parameter annotations"
+    b: list[r"int"],
+    # error: [invalid-type-form] "F-strings are not allowed in parameter annotations"
+    c: f"int",
+    # error: [invalid-type-form] "F-strings are not allowed in parameter annotations"
+    d: list[f"int"],
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
+    e: b"int",
+    f: "int",
     # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
-    e: "in" "t",
-    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
-    f: "\N{LATIN SMALL LETTER I}nt",
-    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
-    g: "\x69nt",
-    h: """int""",
-    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
-    i: "b'int'",
+    g: "in" "t",
+    # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
+    h: list["in" "t"],
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in parameter annotations"
+    i: "\N{LATIN SMALL LETTER I}nt",
+    # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in parameter annotations"
+    j: "\x69nt",
+    k: """int""",
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
+    l: "b'int'",
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
+    m: list[b"int"],
 ):  # fmt:skip
     reveal_type(a)  # revealed: Unknown
-    reveal_type(b)  # revealed: Unknown
+    reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: Unknown
-    reveal_type(d)  # revealed: int
+    reveal_type(d)  # revealed: list[Unknown]
     reveal_type(e)  # revealed: Unknown
-    reveal_type(f)  # revealed: Unknown
+    reveal_type(f)  # revealed: int
     reveal_type(g)  # revealed: Unknown
-    reveal_type(h)  # revealed: int
+    reveal_type(h)  # revealed: list[Unknown]
     reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: Unknown
+    reveal_type(k)  # revealed: int
+    reveal_type(l)  # revealed: Unknown
+    reveal_type(m)  # revealed: list[Unknown]
 ```
 
 ## Various string kinds in `typing.Literal`
@@ -300,17 +311,17 @@ shouldn't panic.
 
 ```py
 # Regression test for https://github.com/astral-sh/ty/issues/1865
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_conditional: "f'{1 if 1 else 1}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_boolean_expression: "f'{1 or 2}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_generator_expression: "f'{(i for i in range(5))}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_list_comprehension: "f'{[i for i in range(5)]}'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_dict_comprehension: "f'{ {i: i for i in range(5)} }'"
-# error: [fstring-type-annotation]
+# error: [invalid-type-form]
 stringified_fstring_with_set_comprehension: "f'{ {i for i in range(5)} }'"
 
 # error: [invalid-type-form]
@@ -349,12 +360,8 @@ o: "1 < 2"
 # error: [invalid-type-form]
 p: "call()"
 # error: [invalid-type-form] "List literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
 r: "[1, 2]"
 # error: [invalid-type-form] "Tuple literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
-# error: [invalid-type-form] "Int literals are not allowed"
 s: "(1, 2)"
 ```
 

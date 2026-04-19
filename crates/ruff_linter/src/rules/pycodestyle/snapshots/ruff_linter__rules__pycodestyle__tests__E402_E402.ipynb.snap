@@ -12,18 +12,18 @@ E402 [*] Module level import not at top of cell
 11 | import a
    |
 help: Move module level imports to top of cell
-2  | 
+2  |
 3  | sys.path
-4  | 
+4  |
 5  + import pathlib
 6  | import os
-7  | 
+7  |
 8  | os.path
-9  | 
+9  |
    - import pathlib
-10 | 
+10 |
 11 | import a
-12 | 
+12 |
 note: This is an unsafe fix and may change runtime behavior
 
 E402 [*] Module level import not at top of cell
@@ -36,21 +36,21 @@ E402 [*] Module level import not at top of cell
 23 | import ok
    |
 help: Move module level imports to top of cell
-8  | 
+8  |
 9  | import pathlib
-10 | 
+10 |
 11 + import c
 12 | import a
-13 | 
+13 |
 14 | try:
 --------------------------------------------------------------------------------
-20 | 
+20 |
 21 | __some__magic = 1
-22 | 
+22 |
    - import c
 23 | import ok
-24 | 
-25 | 
+24 |
+25 |
 note: This is an unsafe fix and may change runtime behavior
 
 E402 [*] Module level import not at top of cell
@@ -63,18 +63,18 @@ E402 [*] Module level import not at top of cell
    |
 help: Move module level imports to top of cell
 20 | __some__magic = 1
-21 | 
+21 |
 22 | import c
 23 + import no_ok
 24 | import ok
-25 | 
-26 | 
+25 |
+26 |
 --------------------------------------------------------------------------------
 28 |     import e
-29 | 
-30 | 
+29 |
+30 |
    - import no_ok
-31 | 
+31 |
 32 | %%time
 33 | import pathlib
 note: This is an unsafe fix and may change runtime behavior

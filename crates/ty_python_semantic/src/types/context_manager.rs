@@ -1,11 +1,12 @@
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, EvaluationMode, Type, TypeContext, call::CallErrorKind,
+        CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
         context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
+use ty_python_core::EvaluationMode;
 
 impl<'db> Type<'db> {
     /// Returns the type bound from a context manager with type `self`.

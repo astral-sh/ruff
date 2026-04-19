@@ -6,14 +6,9 @@ use crate::{
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, UnionType,
-        callable::CallableTypeKind,
-        constraints::{ConstraintSet, ConstraintSetBuilder},
-        function::FunctionType,
-        generics::InferableTypeVars,
-        known_instance::InternedConstraintSet,
-        relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation},
-        signatures::CallableSignature,
-        visitor,
+        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
+        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
+        signatures::CallableSignature, visitor,
     },
 };
 
@@ -104,42 +99,22 @@ impl<'db> BoundMethodType<'db> {
                 .recursive_type_normalized_impl(db, div, true)?,
         ))
     }
+}
 
-    #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl<'c>(
-        self,
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_bound_method_pair(
+        &self,
         db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        source: BoundMethodType<'db>,
+        target: BoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
-        self.function(db)
-            .has_relation_to_impl(
-                db,
-                other.function(db),
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
-            .and(db, constraints, || {
-                other.self_instance(db).has_relation_to_impl(
-                    db,
-                    self.self_instance(db),
-                    constraints,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
+        self.check_function_pair(db, source.function(db), target.function(db))
+            .and(db, self.constraints, || {
+                self.check_type_pair(db, target.self_instance(db), source.self_instance(db))
             })
     }
 }
@@ -158,6 +133,8 @@ pub enum KnownBoundMethodType<'db> {
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`
     PropertyDunderSet(PropertyInstanceType<'db>),
+    /// Method wrapper for `some_property.__delete__`
+    PropertyDunderDelete(PropertyInstanceType<'db>),
     /// Method wrapper for `str.startswith`.
     /// We treat this method specially because we want to be able to infer precise Boolean
     /// literal return types if the instance and the prefix are both string literals, and
@@ -192,6 +169,9 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::PropertyDunderSet(property) => {
             visitor.visit_property_instance_type(db, property);
         }
+        KnownBoundMethodType::PropertyDunderDelete(property) => {
+            visitor.visit_property_instance_type(db, property);
+        }
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(
                 db,
@@ -208,115 +188,6 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> KnownBoundMethodType<'db> {
-    #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl<'c>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db, 'c>,
-        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        match (self, other) {
-            (
-                KnownBoundMethodType::FunctionTypeDunderGet(self_function),
-                KnownBoundMethodType::FunctionTypeDunderGet(other_function),
-            ) => self_function.has_relation_to_impl(
-                db,
-                other_function,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
-
-            (
-                KnownBoundMethodType::FunctionTypeDunderCall(self_function),
-                KnownBoundMethodType::FunctionTypeDunderCall(other_function),
-            ) => self_function.has_relation_to_impl(
-                db,
-                other_function,
-                constraints,
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
-
-            (
-                KnownBoundMethodType::PropertyDunderGet(self_property),
-                KnownBoundMethodType::PropertyDunderGet(other_property),
-            )
-            | (
-                KnownBoundMethodType::PropertyDunderSet(self_property),
-                KnownBoundMethodType::PropertyDunderSet(other_property),
-            ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
-                db,
-                Type::PropertyInstance(other_property),
-                constraints,
-                relation_visitor,
-                disjointness_visitor,
-            ),
-
-            (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(constraints, self == other)
-            }
-
-            (
-                KnownBoundMethodType::ConstraintSetRange,
-                KnownBoundMethodType::ConstraintSetRange,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetAlways,
-                KnownBoundMethodType::ConstraintSetAlways,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetNever,
-                KnownBoundMethodType::ConstraintSetNever,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
-                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetSatisfies(_),
-                KnownBoundMethodType::ConstraintSetSatisfies(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
-                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
-            ) => ConstraintSet::from_bool(constraints, true),
-
-            (
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::ConstraintSetRange
-                | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
-                | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::ConstraintSetRange
-                | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
-                | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
-            ) => ConstraintSet::from_bool(constraints, false),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -344,6 +215,11 @@ impl<'db> KnownBoundMethodType<'db> {
                     property.recursive_type_normalized_impl(db, div, nested)?,
                 ))
             }
+            KnownBoundMethodType::PropertyDunderDelete(property) => {
+                Some(KnownBoundMethodType::PropertyDunderDelete(
+                    property.recursive_type_normalized_impl(db, div, nested)?,
+                ))
+            }
             KnownBoundMethodType::StrStartswith(_)
             | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
@@ -360,7 +236,8 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::FunctionTypeDunderGet(_)
             | KnownBoundMethodType::FunctionTypeDunderCall(_)
             | KnownBoundMethodType::PropertyDunderGet(_)
-            | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
+            | KnownBoundMethodType::PropertyDunderSet(_)
+            | KnownBoundMethodType::PropertyDunderDelete(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
             KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
@@ -443,6 +320,18 @@ impl<'db> KnownBoundMethodType<'db> {
                             Parameter::positional_only(Some(Name::new_static("instance")))
                                 .with_annotated_type(Type::object()),
                             Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(Type::object()),
+                        ],
+                    ),
+                    Type::unknown(),
+                )))
+            }
+            KnownBoundMethodType::PropertyDunderDelete(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("instance")))
                                 .with_annotated_type(Type::object()),
                         ],
                     ),
@@ -556,6 +445,96 @@ impl<'db> KnownBoundMethodType<'db> {
     }
 }
 
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_known_bound_method_pair(
+        &self,
+        db: &'db dyn Db,
+        source: KnownBoundMethodType<'db>,
+        target: KnownBoundMethodType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (source, target) {
+            (
+                KnownBoundMethodType::FunctionTypeDunderGet(source_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(target_function),
+            ) => self.check_function_pair(db, source_function, target_function),
+
+            (
+                KnownBoundMethodType::FunctionTypeDunderCall(source_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(target_function),
+            ) => self.check_function_pair(db, source_function, target_function),
+
+            (
+                KnownBoundMethodType::PropertyDunderGet(source_property),
+                KnownBoundMethodType::PropertyDunderGet(target_property),
+            )
+            | (
+                KnownBoundMethodType::PropertyDunderSet(source_property),
+                KnownBoundMethodType::PropertyDunderSet(target_property),
+            )
+            | (
+                KnownBoundMethodType::PropertyDunderDelete(source_property),
+                KnownBoundMethodType::PropertyDunderDelete(target_property),
+            ) => self.check_property_instance_pair(db, source_property, target_property),
+
+            (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
+                ConstraintSet::from_bool(self.constraints, source == target)
+            }
+
+            (
+                KnownBoundMethodType::ConstraintSetRange,
+                KnownBoundMethodType::ConstraintSetRange,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetAlways,
+                KnownBoundMethodType::ConstraintSetAlways,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetNever,
+                KnownBoundMethodType::ConstraintSetNever,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetSatisfies(_),
+                KnownBoundMethodType::ConstraintSetSatisfies(_),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+            ) => self.always(),
+
+            (
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::PropertyDunderDelete(_)
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::PropertyDunderDelete(_)
+                | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+            ) => self.never(),
+        }
+    }
+}
+
 /// Represents a specific instance of `types.WrapperDescriptorType`
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum WrapperDescriptorKind {
@@ -565,6 +544,8 @@ pub enum WrapperDescriptorKind {
     PropertyDunderGet,
     /// `property.__set__`
     PropertyDunderSet,
+    /// `property.__delete__`
+    PropertyDunderDelete,
 }
 
 impl WrapperDescriptorKind {
@@ -637,6 +618,20 @@ impl WrapperDescriptorKind {
                                 .with_annotated_type(object),
                             Parameter::positional_only(Some(Name::new_static("value")))
                                 .with_annotated_type(object),
+                        ],
+                    ),
+                    Type::unknown(),
+                )))
+            }
+            WrapperDescriptorKind::PropertyDunderDelete => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(KnownClass::Property.to_instance(db)),
+                            Parameter::positional_only(Some(Name::new_static("instance")))
+                                .with_annotated_type(Type::object()),
                         ],
                     ),
                     Type::unknown(),

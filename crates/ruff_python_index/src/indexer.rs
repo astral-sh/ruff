@@ -68,13 +68,13 @@ impl Indexer {
                 TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     line_start = token.end();
                 }
-                TokenKind::String => {
-                    // If the previous token was a string, find the start of the line that contains
-                    // the closing delimiter, since the token itself can span multiple lines.
-                    line_start = source.line_start(token.end());
-                }
                 TokenKind::Comment => {
                     comment_ranges.push(token.range());
+                }
+                _ if token.string_flags().is_some() => {
+                    // String-like tokens, including f/t-string start, middle, and end tokens, can
+                    // span multiple lines.
+                    line_start = source.line_start(token.end());
                 }
                 _ => {}
             }
@@ -344,6 +344,24 @@ x = (
                 TextSize::new(24),
                 // row 7
                 TextSize::new(31),
+            ]
+        );
+
+        let contents = r#"
+x = [
+    "a" + \
+f"""
+b
+""" + \
+    "c"
+]
+"#
+        .trim();
+        assert_eq!(
+            new_indexer(contents).continuation_line_starts(),
+            [
+                TextSize::try_from(contents.find(r#"    "a" + \"#).unwrap()).unwrap(),
+                TextSize::try_from(contents.find("\"\"\" + \\").unwrap()).unwrap(),
             ]
         );
     }

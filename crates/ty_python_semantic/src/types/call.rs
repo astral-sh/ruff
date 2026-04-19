@@ -11,6 +11,29 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 
 impl<'db> Type<'db> {
+    /// Memoize the pure return-type part of binary dunder resolution so repeated identical
+    /// expressions don't re-run overload selection at every call site.
+    pub(crate) fn try_call_bin_op_return_type(
+        db: &'db dyn Db,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        #[salsa::tracked]
+        fn try_call_bin_op_return_type_impl<'db>(
+            db: &'db dyn Db,
+            left_ty: Type<'db>,
+            op: ast::Operator,
+            right_ty: Type<'db>,
+        ) -> Option<Type<'db>> {
+            Type::try_call_bin_op(db, left_ty, op, right_ty)
+                .ok()
+                .map(|bindings| bindings.return_type(db))
+        }
+
+        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+    }
+
     pub(crate) fn try_call_bin_op(
         db: &'db dyn Db,
         left_ty: Type<'db>,
@@ -104,6 +127,10 @@ impl<'db> Type<'db> {
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.1.return_type(db)
+    }
+
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
     /// that has no setter, and `None` otherwise.
     pub(crate) fn as_attempt_to_set_property_with_no_setter(
@@ -118,6 +145,24 @@ impl<'db> CallError<'db> {
             .flat_map(bind::Binding::errors)
             .find_map(|error| match error {
                 BindingError::PropertyHasNoSetter(property) => Some(*property),
+                _ => None,
+            })
+    }
+
+    /// Returns `Some(property)` if the call error was caused by an attempt to delete a property
+    /// that has no deleter, and `None` otherwise.
+    pub(crate) fn as_attempt_to_delete_property_with_no_deleter(
+        &self,
+    ) -> Option<PropertyInstanceType<'db>> {
+        if self.0 != CallErrorKind::BindingError {
+            return None;
+        }
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .find_map(|error| match error {
+                BindingError::PropertyHasNoDeleter(property) => Some(*property),
                 _ => None,
             })
     }

@@ -14,11 +14,11 @@ E402 [*] Module level import not at top of file
 help: Move module level imports to top of file
 1 | """module docstring"""
 2 + import os
-3 | 
+3 |
 4 | print("something")
-5 | 
+5 |
   - import os
-6 | 
+6 |
 7 | # Prevent F403
 8 | os.path
 note: This is an unsafe fix and may change runtime behavior

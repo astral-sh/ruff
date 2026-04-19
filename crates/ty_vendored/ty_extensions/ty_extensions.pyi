@@ -20,6 +20,26 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
+"""
+`CallableTypeOf[T]` extracts the callable type of `T` while preserving any function-like
+behavior.
+
+This means the result may behave differently from a plain `typing.Callable` in
+type-theoretic checks. In particular, method-like and descriptor-like callables remain
+distinct from regular callables.
+
+Use this when you want to preserve the full callable flavor of a function, method, or
+synthesized callable.
+"""
+
+RegularCallableTypeOf: _SpecialForm
+"""
+`RegularCallableTypeOf[T]` extracts a regular `typing.Callable`-style type from `T`.
+
+This keeps the callable signatures of `T` but discards function-like behavior such as
+descriptor-style method binding. Use this when you want to compare a callable against
+ordinary `Callable[...]` types in type-theoretic tests.
+"""
 
 Top: _SpecialForm
 """
@@ -194,6 +214,12 @@ def into_callable(ty: Any) -> Any:
     """Converts a value into a `Callable`, if possible.
 
     This is the value equivalent of `CallableTypeOf`, which operates on types.
+    """
+
+def into_regular_callable(ty: Any) -> Any:
+    """Converts a value into a regular `Callable`, if possible.
+
+    This is the value equivalent of `RegularCallableTypeOf`, which operates on types.
     """
 
 def dunder_all_names(module: Any) -> tuple[LiteralString, ...] | None:

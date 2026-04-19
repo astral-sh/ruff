@@ -1122,6 +1122,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, if_.into());
             }
+            if checker.is_rule_enabled(Rule::UnnecessaryIf) {
+                ruff::rules::unnecessary_if(checker, if_);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1316,6 +1319,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 handlers,
                 orelse,
                 finalbody,
+                is_star,
                 ..
             },
         ) => {
@@ -1355,7 +1359,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::SuppressibleException) {
                 flake8_simplify::rules::suppressible_exception(
-                    checker, stmt, body, handlers, orelse, finalbody,
+                    checker, stmt, *is_star, body, handlers, orelse, finalbody,
                 );
             }
             if checker.is_rule_enabled(Rule::ReturnInTryExceptFinally) {
@@ -1383,6 +1387,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, try_stmt.into());
+            }
+            if checker.is_rule_enabled(Rule::UselessFinally) {
+                ruff::rules::useless_finally(checker, try_stmt);
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {

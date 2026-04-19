@@ -552,15 +552,6 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
-                    BindingKind::ConditionalDeletion(binding_id) => {
-                        self.unresolved_references.push(
-                            name.range,
-                            self.exceptions(),
-                            UnresolvedReferenceFlags::empty(),
-                        );
-                        return ReadResult::UnboundLocal(binding_id);
-                    }
-
                     // If we hit an unbound exception that shadowed a bound name, resole to the
                     // bound name. For example, given:
                     //
@@ -712,7 +703,6 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -845,8 +835,7 @@ impl<'a> SemanticModel<'a> {
                         }
                         if let BindingKind::Annotation
                         | BindingKind::Deletion
-                        | BindingKind::UnboundException(..)
-                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        | BindingKind::UnboundException(..) = binding.kind
                         {
                             continue;
                         }
@@ -870,7 +859,6 @@ impl<'a> SemanticModel<'a> {
                     let candidate_id = match self.bindings[binding_id].kind {
                         BindingKind::Annotation => continue,
                         BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
                         BindingKind::UnboundException(Some(binding_id)) => binding_id,
                         _ => binding_id,
                     };
@@ -1142,22 +1130,22 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.segments() == module_path.as_slice() {
-                                if let Some(source) = binding.source {
-                                    // Verify that `sys` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::Import(Import { qualified_name })
+                            if qualified_name.segments() == module_path.as_slice() =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `sys` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -1193,22 +1181,22 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.segments().starts_with(&module_path) {
-                                if let Some(source) = binding.source {
-                                    // Verify that `os` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{module}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name })
+                            if qualified_name.segments().starts_with(&module_path) =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `os` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{module}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -2033,6 +2021,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
+    /// Return `true` if the model is in an exception handler.
+    pub const fn in_orelse(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ORELSE)
+    }
+
     /// Return `true` if the model is in an `assert` statement.
     pub const fn in_assert_statement(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
@@ -2699,6 +2692,19 @@ bitflags! {
         /// t'{x}'
         /// ```
         const T_STRING = 1 << 29;
+
+        /// The model is in the body of an `else` clause.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     ...
+        /// else:
+        ///     print(x)
+        /// ```
+        const ORELSE = 1 << 30;
 
 
         /// The context is in any type annotation.

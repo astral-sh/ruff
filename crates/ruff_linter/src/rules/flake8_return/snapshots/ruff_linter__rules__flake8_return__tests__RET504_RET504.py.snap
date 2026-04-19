@@ -16,8 +16,8 @@ help: Remove unnecessary assignment
   -     a = 1
   -     return a  # RET504
 5 +     return 1
-6 | 
-7 | 
+6 |
+7 |
 8 | # Can be refactored false positives
 note: This is an unsafe fix and may change runtime behavior
 
@@ -36,8 +36,8 @@ help: Remove unnecessary assignment
    -     formatted = formatted.replace("()", "").replace("  ", " ").strip()
    -     return formatted
 22 +     return formatted.replace("()", "").replace("  ", " ").strip()
-23 | 
-24 | 
+23 |
+24 |
 25 | # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,14 +50,14 @@ RET504 [*] Unnecessary assignment to `queryset` before `return` statement
     |            ^^^^^^^^
     |
 help: Remove unnecessary assignment
-242 | 
+242 |
 243 | def get_queryset():
 244 |     queryset = Model.filter(a=1)
     -     queryset = queryset.filter(c=3)
     -     return queryset
 245 +     return queryset.filter(c=3)
-246 | 
-247 | 
+246 |
+247 |
 248 | def get_queryset():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,14 +70,14 @@ RET504 [*] Unnecessary assignment to `queryset` before `return` statement
     |            ^^^^^^^^
     |
 help: Remove unnecessary assignment
-247 | 
-248 | 
+247 |
+248 |
 249 | def get_queryset():
     -     queryset = Model.filter(a=1)
     -     return queryset  # RET504
 250 +     return Model.filter(a=1)
-251 | 
-252 | 
+251 |
+252 |
 253 | # Function arguments
 note: This is an unsafe fix and may change runtime behavior
 
@@ -96,8 +96,8 @@ help: Remove unnecessary assignment
     -     val = 1
     -     return val  # RET504
 268 +     return 1
-269 | 
-270 | 
+269 |
+270 |
 271 | def str_to_bool(val):
 note: This is an unsafe fix and may change runtime behavior
 
@@ -116,8 +116,8 @@ help: Remove unnecessary assignment
     -         x = f.read()
     -     return x  # RET504
 320 +         return f.read()
-321 | 
-322 | 
+321 |
+322 |
 323 | def foo():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -136,8 +136,8 @@ help: Remove unnecessary assignment
     -     b=a
     -     return b  # RET504
 341 +     return a
-342 | 
-343 | 
+342 |
+343 |
 344 | def foo():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -150,14 +150,14 @@ RET504 [*] Unnecessary assignment to `b` before `return` statement
     |            ^
     |
 help: Remove unnecessary assignment
-344 | 
+344 |
 345 | def foo():
 346 |     a = 1
     -     b =a
     -     return b  # RET504
 347 +     return a
-348 | 
-349 | 
+348 |
+349 |
 350 | def foo():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -170,14 +170,14 @@ RET504 [*] Unnecessary assignment to `b` before `return` statement
     |            ^
     |
 help: Remove unnecessary assignment
-350 | 
+350 |
 351 | def foo():
 352 |     a = 1
     -     b= a
     -     return b  # RET504
 353 +     return a
-354 | 
-355 | 
+354 |
+355 |
 356 | def foo():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -190,14 +190,14 @@ RET504 [*] Unnecessary assignment to `a` before `return` statement
     |            ^
     |
 help: Remove unnecessary assignment
-355 | 
-356 | 
+355 |
+356 |
 357 | def foo():
     -     a = 1  # Comment
     -     return a
 358 +     return 1  # Comment
-359 | 
-360 | 
+359 |
+360 |
 361 | # Regression test for: https://github.com/astral-sh/ruff/issues/7098
 note: This is an unsafe fix and may change runtime behavior
 
@@ -210,14 +210,14 @@ RET504 [*] Unnecessary assignment to `D` before `return` statement
     |            ^
     |
 help: Remove unnecessary assignment
-361 | 
+361 |
 362 | # Regression test for: https://github.com/astral-sh/ruff/issues/7098
 363 | def mavko_debari(P_kbar):
     -     D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
     -     return D
 364 +     return 0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
-365 | 
-366 | 
+365 |
+366 |
 367 | # contextlib suppress in with statement
 note: This is an unsafe fix and may change runtime behavior
 
@@ -236,8 +236,8 @@ help: Remove unnecessary assignment
     -     y = y + 2
     -     return y  # RET504
 399 +     return y + 2
-400 | 
-401 | 
+400 |
+401 |
 402 | def foo():
 note: This is an unsafe fix and may change runtime behavior
 
@@ -256,8 +256,8 @@ help: Remove unnecessary assignment
     -         services = a["services"]
     -         return services
 422 +         return a["services"]
-423 | 
-424 | 
+423 |
+424 |
 425 | # See: https://github.com/astral-sh/ruff/issues/14052
 note: This is an unsafe fix and may change runtime behavior
 
@@ -272,14 +272,14 @@ RET504 [*] Unnecessary assignment to `x` before `return` statement
 460 | def f():
     |
 help: Remove unnecessary assignment
-453 | 
+453 |
 454 | # See: https://github.com/astral-sh/ruff/issues/18411
 455 | def f():
     -     (#=
     -     x) = 1
     -     return x
 456 +     return 1
-457 | 
+457 |
 458 | def f():
 459 |     x = (1
 note: This is an unsafe fix and may change runtime behavior
@@ -294,7 +294,7 @@ RET504 [*] Unnecessary assignment to `x` before `return` statement
     |
 help: Remove unnecessary assignment
 458 |     return x
-459 | 
+459 |
 460 | def f():
     -     x = (1
 461 +     return (1

@@ -5,10 +5,11 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 
+use crate::Project;
 use crate::db::Db;
-use crate::{IOErrorDiagnostic, Project};
 
 /// The indexed files of a project.
 ///
@@ -128,7 +129,7 @@ impl<'db> LazyFiles<'db> {
     pub(super) fn set(
         mut self,
         files: FxHashSet<File>,
-        diagnostics: Vec<IOErrorDiagnostic>,
+        diagnostics: Vec<Diagnostic>,
     ) -> Indexed<'db> {
         let files = Indexed {
             inner: Arc::new(IndexedInner { files, diagnostics }),
@@ -153,11 +154,11 @@ pub struct Indexed<'db> {
 #[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
     files: FxHashSet<File>,
-    diagnostics: Vec<IOErrorDiagnostic>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl Indexed<'_> {
-    pub(super) fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+    pub(super) fn diagnostics(&self) -> &[Diagnostic] {
         &self.inner.diagnostics
     }
 
@@ -188,7 +189,8 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 /// A Mutable view of a project's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
-/// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
+/// The changes are written back when the mutable view is dropped or by calling
+/// [`Self::set_diagnostics`] manually.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     project: Project,
@@ -215,7 +217,7 @@ impl IndexedMut<'_> {
         }
     }
 
-    pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<IOErrorDiagnostic>) {
+    pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>) {
         self.inner_mut().diagnostics = diagnostics;
     }
 

@@ -617,24 +617,21 @@ impl LocalReferencesFinder<'_> {
                         }
                     }
                 }
-                AnyNodeRef::StmtAnnAssign(ann_assign) => {
+                AnyNodeRef::StmtAnnAssign(ann_assign)
                     // Check if our node is the target (left side) of annotated assignment
-                    if Self::expr_contains_range(&ann_assign.target, covering_node.node().range()) {
+                    if Self::expr_contains_range(&ann_assign.target, covering_node.node().range()) => {
                         return ReferenceKind::Write;
                     }
-                }
-                AnyNodeRef::StmtAugAssign(aug_assign) => {
+                AnyNodeRef::StmtAugAssign(aug_assign)
                     // Check if our node is the target (left side) of augmented assignment
-                    if Self::expr_contains_range(&aug_assign.target, covering_node.node().range()) {
+                    if Self::expr_contains_range(&aug_assign.target, covering_node.node().range()) => {
                         return ReferenceKind::Write;
                     }
-                }
                 // For loop targets are writes
-                AnyNodeRef::StmtFor(for_stmt) => {
-                    if Self::expr_contains_range(&for_stmt.target, covering_node.node().range()) {
+                AnyNodeRef::StmtFor(for_stmt)
+                    if Self::expr_contains_range(&for_stmt.target, covering_node.node().range()) => {
                         return ReferenceKind::Write;
                     }
-                }
                 // With statement targets are writes
                 AnyNodeRef::WithItem(with_item) => {
                     if let Some(optional_vars) = &with_item.optional_vars {
@@ -654,30 +651,27 @@ impl LocalReferencesFinder<'_> {
                         }
                     }
                 }
-                AnyNodeRef::StmtFunctionDef(func) => {
+                AnyNodeRef::StmtFunctionDef(func)
                     if Self::node_contains_range(
                         AnyNodeRef::from(&func.name),
                         covering_node.node().range(),
-                    ) {
+                    ) => {
                         return ReferenceKind::Other;
                     }
-                }
-                AnyNodeRef::StmtClassDef(class) => {
+                AnyNodeRef::StmtClassDef(class)
                     if Self::node_contains_range(
                         AnyNodeRef::from(&class.name),
                         covering_node.node().range(),
-                    ) {
+                    ) => {
                         return ReferenceKind::Other;
                     }
-                }
-                AnyNodeRef::Parameter(param) => {
+                AnyNodeRef::Parameter(param)
                     if Self::node_contains_range(
                         AnyNodeRef::from(&param.name),
                         covering_node.node().range(),
-                    ) {
+                    ) => {
                         return ReferenceKind::Other;
                     }
-                }
                 AnyNodeRef::StmtGlobal(_) | AnyNodeRef::StmtNonlocal(_) => {
                     return ReferenceKind::Other;
                 }

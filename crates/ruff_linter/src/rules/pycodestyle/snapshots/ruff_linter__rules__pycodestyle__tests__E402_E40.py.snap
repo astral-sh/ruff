@@ -15,16 +15,16 @@ help: Move module level imports to top of file
 1  | #: E401
 2  + import foo
 3  | import os, sys
-4  | 
+4  |
 5  | #: Okay
 --------------------------------------------------------------------------------
 54 | #: E402
 55 | VERSION = '1.2.3'
-56 | 
+56 |
    - import foo
 57 | #: E402
 58 | import foo
-59 | 
+59 |
 note: This is an unsafe fix and may change runtime behavior
 
 E402 [*] Module level import not at top of file
@@ -41,16 +41,16 @@ help: Move module level imports to top of file
 1  | #: E401
 2  + import foo
 3  | import os, sys
-4  | 
+4  |
 5  | #: Okay
 --------------------------------------------------------------------------------
-56 | 
+56 |
 57 | import foo
 58 | #: E402
    - import foo
-59 | 
+59 |
 60 | a = 1
-61 | 
+61 |
 note: This is an unsafe fix and may change runtime behavior
 
 E402 [*] Module level import not at top of file
@@ -67,14 +67,14 @@ help: Move module level imports to top of file
 1  | #: E401
 2  + import bar
 3  | import os, sys
-4  | 
+4  |
 5  | #: Okay
 --------------------------------------------------------------------------------
-60 | 
+60 |
 61 | a = 1
-62 | 
+62 |
    - import bar
-63 | 
+63 |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
 note: This is an unsafe fix and may change runtime behavior
@@ -91,15 +91,15 @@ help: Move module level imports to top of file
 1  | #: E401
 2  + import re as regex, string  # also with a comment!
 3  | import os, sys
-4  | 
+4  |
 5  | #: Okay
 --------------------------------------------------------------------------------
 63 | import bar
-64 | 
+64 |
 65 | #: E401
    - import re as regex, string  # also with a comment!
 66 | import re as regex, string; x = 1
-67 | 
+67 |
 68 | x = 1; import re as regex, string
 note: This is an unsafe fix and may change runtime behavior
 

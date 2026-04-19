@@ -406,6 +406,10 @@ impl KnownModule {
     pub const fn is_functools(self) -> bool {
         matches!(self, Self::Functools)
     }
+
+    pub const fn is_dataclasses(self) -> bool {
+        matches!(self, Self::Dataclasses)
+    }
 }
 
 impl std::fmt::Display for KnownModule {

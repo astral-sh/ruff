@@ -3,10 +3,12 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::token::{self, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
     PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content, is_python_whitespace,
@@ -212,13 +214,13 @@ pub(crate) fn remove_argument<T: Ranged>(
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
-        .arguments_source_order()
+        .iter_source_order()
         .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
 
     let arg = arguments
-        .arguments_source_order()
+        .iter_source_order()
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
 
@@ -273,7 +275,7 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
     if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
         let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
         Edit::insertion(format!("{argument}, "), keyword.start())
-    } else if let Some(last) = arguments.arguments_source_order().last() {
+    } else if let Some(last) = arguments.iter_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
         let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
             .unwrap_or(last.range());
@@ -397,6 +399,23 @@ pub(crate) fn add_parameter(
     }
 }
 
+/// Return a fresh binding name derived from `base` that does not shadow an
+/// existing non-builtin symbol in the current semantic scope.
+pub(crate) fn fresh_binding_name(semantic: &SemanticModel<'_>, base: &str) -> Name {
+    if semantic.is_available(base) {
+        return Name::new(base);
+    }
+
+    let mut index = 0;
+    loop {
+        let candidate = format!("{base}_{index}");
+        if semantic.is_available(&candidate) {
+            return Name::new(candidate);
+        }
+        index += 1;
+    }
+}
+
 /// Safely adjust the indentation of the indented block at [`TextRange`].
 ///
 /// The [`TextRange`] is assumed to represent an entire indented block, including the leading
@@ -466,29 +485,27 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. }) => {
-            if is_only(body, child) {
-                return true;
-            }
+        | Stmt::With(ast::StmtWith { body, .. })
+            if is_only(body, child) =>
+        {
+            return true;
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            if is_only(body, child) || is_only(orelse, child) {
-                return true;
-            }
+        | Stmt::While(ast::StmtWhile { body, orelse, .. })
+            if (is_only(body, child) || is_only(orelse, child)) =>
+        {
+            return true;
         }
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
-        }) => {
-            if is_only(body, child)
-                || elif_else_clauses
-                    .iter()
-                    .any(|ast::ElifElseClause { body, .. }| is_only(body, child))
-            {
-                return true;
-            }
+        }) if (is_only(body, child)
+            || elif_else_clauses
+                .iter()
+                .any(|ast::ElifElseClause { body, .. }| is_only(body, child))) =>
+        {
+            return true;
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -496,23 +513,21 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
             orelse,
             finalbody,
             ..
-        }) => {
-            if is_only(body, child)
-                || is_only(orelse, child)
-                || is_only(finalbody, child)
-                || handlers.iter().any(|handler| match handler {
-                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) => is_only(body, child),
-                })
-            {
-                return true;
-            }
+        }) if (is_only(body, child)
+            || is_only(orelse, child)
+            || is_only(finalbody, child)
+            || handlers.iter().any(|handler| match handler {
+                ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
+                    is_only(body, child)
+                }
+            })) =>
+        {
+            return true;
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            if cases.iter().any(|case| is_only(&case.body, child)) {
-                return true;
-            }
+        Stmt::Match(ast::StmtMatch { cases, .. })
+            if cases.iter().any(|case| is_only(&case.body, child)) =>
+        {
+            return true;
         }
         _ => {}
     }

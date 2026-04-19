@@ -203,19 +203,19 @@ from ty_extensions import static_assert
 static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
 
-static_assert(None)  # error: "Static assertion error: argument of type `None` is statically known to be falsy"
+static_assert(None)  # error: "Static assertion error: argument of type `None` is always falsy"
 
 static_assert(1)
-static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is statically known to be falsy"
+static_assert(0)  # error: "Static assertion error: argument of type `Literal[0]` is always falsy"
 
 static_assert((0,))
-static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is statically known to be falsy"
+static_assert(())  # error: "Static assertion error: argument of type `tuple[()]` is always falsy"
 
 static_assert("a")
-static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is statically known to be falsy"
+static_assert("")  # error: "Static assertion error: argument of type `Literal[""]` is always falsy"
 
 static_assert(b"a")
-static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is statically known to be falsy"
+static_assert(b"")  # error: "Static assertion error: argument of type `Literal[b""]` is always falsy"
 ```
 
 ### Error messages
@@ -268,30 +268,84 @@ static_assert(False, shouted_message)
 
 ## Diagnostic snapshots
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from ty_extensions import static_assert
 import secrets
 
-# a passing assert
+# a passing assertion
 static_assert(1 < 2)
+```
 
-# evaluates to False
-# error: [static-assert-error]
+When the argument evalutes to `False`:
+
+```py
+# snapshot: static-assert-error
 static_assert(1 > 2)
+```
 
-# evaluates to False, with a message as the second argument
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: argument evaluates to `False`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | static_assert(1 > 2)
+  | ^^^^^^^^^^^^^^-----^
+  |               |
+  |               Inferred type of argument is `Literal[False]`
+  |
+```
+
+With a custom message:
+
+```py
+# snapshot: static-assert-error
 static_assert(1 > 2, "with a message")
+```
 
-# evaluates to something falsey
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: with a message
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | static_assert(1 > 2, "with a message")
+  | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
+  |               |
+  |               Inferred type of argument is `Literal[False]`
+  |
+```
+
+When it evaluates to something falsy:
+
+```py
+# snapshot: static-assert-error
 static_assert("")
+```
 
-# evaluates to something ambiguous
-# error: [static-assert-error]
+```snapshot
+error[static-assert-error]: Static assertion error: argument of type `Literal[""]` is always falsy
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | static_assert("")
+   | ^^^^^^^^^^^^^^--^
+   |               |
+   |               Inferred type of argument is `Literal[""]`
+   |
+```
+
+When it evaluates to something that is not statically known to be truthy or falsy:
+
+```py
+# snapshot: static-assert-error
 static_assert(secrets.randbelow(2))
+```
+
+```snapshot
+error[static-assert-error]: Static assertion error: argument of type `int` has an ambiguous static truthiness
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | static_assert(secrets.randbelow(2))
+   | ^^^^^^^^^^^^^^--------------------^
+   |               |
+   |               Inferred type of argument is `int`
+   |
 ```
 
 ## Type predicates
@@ -398,7 +452,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -422,7 +476,7 @@ def type_of_annotation() -> None:
 # error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
 
-# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -471,9 +525,13 @@ reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -
 
 ## `CallableTypeOf`
 
-The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
-a given callable object. This can be used to get the externally visibly signature of the object,
-which can then be used to test various type properties.
+The `CallableTypeOf` special form can be used to extract the callable type inhabited by a given
+callable object. This can be used to get the externally visible signature of the object, which can
+then be used to test various type properties.
+
+Unlike a plain `typing.Callable[...]`, `CallableTypeOf[...]` preserves function-like behavior. This
+means method-like and descriptor-like callables remain distinct from regular callables in some
+type-theoretic checks.
 
 It accepts a single type parameter which is expected to be a callable object.
 
@@ -498,7 +556,7 @@ c2: CallableTypeOf["foo"]
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c20: CallableTypeOf[("foo",)]
 
-# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 
@@ -545,4 +603,24 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+## `RegularCallableTypeOf`
+
+The `RegularCallableTypeOf` special form also extracts a callable type from a callable object, but
+it normalizes the result to a regular `typing.Callable`-style type.
+
+This keeps the callable signatures while discarding function-like behavior. Use it when you want to
+compare a callable against ordinary `Callable[...]` types without preserving descriptor semantics.
+
+It accepts a single type parameter which is expected to be a callable object.
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
+
+def f(x: int, /) -> None: ...
+
+static_assert(not is_assignable_to(Callable[[int], None], CallableTypeOf[f]))
+static_assert(is_assignable_to(Callable[[int], None], RegularCallableTypeOf[f]))
 ```

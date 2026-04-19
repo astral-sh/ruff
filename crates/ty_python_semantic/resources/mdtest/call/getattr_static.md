@@ -47,8 +47,9 @@ When a non-existent attribute is accessed without a default value, the runtime r
 `AttributeError`. We could emit a diagnostic for this case, but that is currently not supported:
 
 ```py
-# TODO: we could emit a diagnostic here
-reveal_type(inspect.getattr_static(C, "non_existent"))  # revealed: Never
+def _():
+    # TODO: we could emit a diagnostic here
+    reveal_type(inspect.getattr_static(C, "non_existent"))  # revealed: Never
 ```
 
 We can access attributes on objects of all kinds:

@@ -1,7 +1,14 @@
 import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Header, useTheme, setupMonaco } from "shared";
-import { persist, persistLocal, restore, stringify } from "./settings";
+import { Header, useTheme, setupMonaco, downloadZip } from "shared";
+import {
+  copyAsMarkdown,
+  copyAsMarkdownLink,
+  persist,
+  persistLocal,
+  restore,
+  stringify,
+} from "./settings";
 import { default as Editor, Source } from "./Editor";
 import { loader } from "@monaco-editor/react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
@@ -21,6 +28,38 @@ export default function Chrome() {
       return;
     }
     await persist(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdownLink(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleCopyMarkdown = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+    await copyAsMarkdown(settings, pythonSource);
+  }, [pythonSource, settings]);
+
+  const handleDownload = useCallback(async () => {
+    if (settings == null || pythonSource == null) {
+      return;
+    }
+
+    const toml = await import("smol-toml");
+
+    const files: { [name: string]: string } = { "main.py": pythonSource };
+
+    try {
+      files["ruff.toml"] = toml.stringify(JSON.parse(settings));
+    } catch {
+      files["ruff.json"] = settings;
+    }
+
+    await downloadZip(files, "ruff-playground");
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
@@ -81,12 +120,15 @@ export default function Chrome() {
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={revision}
         theme={theme}
         tool="ruff"
         version={`v${ruffVersion}`}
         onChangeTheme={setTheme}
+        edit={revision}
         onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
+        onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={handleResetClicked}
       />
 

@@ -12,11 +12,11 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_semantic::ResolvedDefinition;
-use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, call_type_simplified_by_overloads,
+    call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
     typed_dict_key_definition,
 };
@@ -321,6 +321,25 @@ impl<'db> Definitions<'db> {
     }
 }
 
+/// Resolve the docstring for a call-signature's resolved definition.
+///
+/// Tries the definition's own docstring first (stub-mapped when appropriate)
+/// and falls back to [`ResolvedDefinition::implementation_docstring`], which
+/// uses type-aware overload-chain matching to pick up the runtime
+/// implementation's docstring for overloaded functions whose stubs carry none.
+///
+/// Shared by hover and signature help so both surfaces render the same
+/// docstring for a given call site.
+pub(crate) fn docstring_for_call_definition<'db>(
+    db: &'db dyn crate::Db,
+    definition: Definition<'db>,
+) -> Option<Docstring> {
+    let resolved = ResolvedDefinition::Definition(definition);
+    Definitions(vec![resolved.clone()])
+        .docstring(db)
+        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
+}
+
 impl GotoTarget<'_> {
     pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
@@ -413,13 +432,11 @@ impl GotoTarget<'_> {
         }
     }
 
-    /// Try to get a simplified display of this callable type by resolving overloads
-    pub(crate) fn call_type_simplified_by_overloads(
-        &self,
-        model: &SemanticModel,
-    ) -> Option<String> {
+    /// Try to get a call signature for this target.
+    pub(crate) fn call_signature(&self, model: &SemanticModel) -> Option<String> {
         if let GotoTarget::Call { call, .. } = self {
-            call_type_simplified_by_overloads(model, call)
+            constructor_signature(model, call)
+                .or_else(|| call_type_simplified_by_overloads(model, call))
         } else {
             None
         }

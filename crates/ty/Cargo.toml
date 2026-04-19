@@ -13,9 +13,12 @@ license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+doctest = false
+
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
-ruff_python_ast = { workspace = true }
+ruff_diagnostics = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }
@@ -46,8 +49,10 @@ tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_module_resolver = { workspace = true }
+ty_python_core = { workspace = true }
 
 dunce = { workspace = true }
 filetime = { workspace = true }

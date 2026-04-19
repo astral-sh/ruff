@@ -157,19 +157,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_match
 error[invalid-argument-type]: Argument to function `foo` is incorrect
  --> src/mdtest_snippet.py:5:5
   |
-3 | from overloaded import foo
-4 |
 5 | foo("foo")  # error: [invalid-argument-type]
   |     ^^^^^ Expected `int`, found `Literal["foo"]`
   |
 info: Matching overload defined here
  --> src/overloaded.pyi:4:5
   |
-3 | @overload
 4 | def foo(a: int): ...
   |     ^^^ ------ Parameter declared here
-5 | @overload
-6 | def foo(a: int, b: int, c: int): ...
   |
 info: Non-matching overloads for function `foo`:
 info:   (a: int, b: int, c: int) -> Unknown
@@ -222,6 +217,5 @@ info:   (a: str, b: str, c: bool) -> Unknown
 info:   (a: bool, b: str, c: str) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
 info: ... omitted 12 overloads
-info: rule `invalid-argument-type` is enabled by default
 
 ```

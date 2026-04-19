@@ -17,12 +17,12 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
 1 | from __future__ import annotations
-  - 
+  -
 2 | from typing import Any
-  - 
+  -
 3 + from my_first_party import my_first_party_object
 4 | from requests import Session
-  - 
+  -
   - from my_first_party import my_first_party_object
-  - 
+  -
 5 | from . import my_local_folder_object

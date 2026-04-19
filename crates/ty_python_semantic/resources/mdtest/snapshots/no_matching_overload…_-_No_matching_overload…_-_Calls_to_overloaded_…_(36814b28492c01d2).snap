@@ -82,15 +82,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_
 error[no-matching-overload]: No overload of function `f` matches arguments
   --> src/mdtest_snippet.py:61:1
    |
-59 |     return 0
-60 |
 61 | f(b"foo")  # error: [no-matching-overload]
    | ^^^^^^^^^
    |
 info: First overload defined here
   --> src/mdtest_snippet.py:4:5
    |
- 3 |   @overload
  4 |   def f(
    |  _____^
  5 | |     lion: int,
@@ -111,8 +108,6 @@ info: First overload defined here
 20 | |     hyena: int,
 21 | | ) -> int: ...
    | |________^
-22 |   @overload
-23 |   def f(
    |
 info: Possible overloads for function `f`:
 info:   (lion: int, turtle: int, tortoise: int, goat: int, capybara: int, chicken: int, ostrich: int, gorilla: int, giraffe: int, condor: int, kangaroo: int, anaconda: int, tarantula: int, millipede: int, leopard: int, hyena: int) -> int
@@ -120,8 +115,6 @@ info:   (lion: str, turtle: str, tortoise: str, goat: str, capybara: str, chicke
 info: Overload implementation defined here
   --> src/mdtest_snippet.py:41:5
    |
-39 |       hyena: str,
-40 |   ) -> str: ...
 41 |   def f(
    |  _____^
 42 | |     lion: int | str,
@@ -142,8 +135,6 @@ info: Overload implementation defined here
 57 | |     hyena: int | str,
 58 | | ) -> int | str:
    | |______________^
-59 |       return 0
    |
-info: rule `no-matching-overload` is enabled by default
 
 ```

@@ -76,7 +76,7 @@ impl Violation for UnnecessaryFromFloat {
             method_name,
             constructor,
         } = self;
-        format!("Verbose method `{method_name}` in `{constructor}` construction",)
+        format!("Verbose method `{method_name}` in `{constructor}` construction")
     }
 
     fn fix_title(&self) -> Option<String> {

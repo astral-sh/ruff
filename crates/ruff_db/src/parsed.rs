@@ -241,7 +241,7 @@ mod indexed {
 
     impl IndexedModule {
         /// Create a new [`IndexedModule`] from the given AST.
-        #[allow(clippy::unnecessary_cast)]
+        #[expect(clippy::unnecessary_cast)]
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
             let mut visitor = Visitor {
                 nodes: Some(Vec::new()),

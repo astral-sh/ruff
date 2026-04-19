@@ -534,7 +534,7 @@ class Base: ...
 # error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[object, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
 # error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
@@ -545,11 +545,29 @@ type("Foo", (1, 2), {})
 type("Foo", (Base,), {b"attr": 1})
 ```
 
+Assigned calls still preserve list-literal base information after reporting the invalid `bases`
+argument:
+
+```py
+class Base:
+    attr: int = 1
+
+# error: [invalid-argument-type]
+FromList = type("FromList", [Base], {})
+reveal_type(FromList().attr)  # revealed: int
+
+bases = (Base,)
+
+# error: [invalid-argument-type]
+FromStarredList = type("FromStarredList", [*bases], {})
+reveal_type(FromStarredList().attr)  # revealed: int
+```
+
 ## `type[...]` as base class
 
-`type[...]` (SubclassOf) types cannot be used as base classes. When a `type[...]` is used in the
-bases tuple, we emit a diagnostic and insert `Unknown` into the MRO. This gives exactly one
-diagnostic about the unsupported base, rather than cascading errors:
+`type[...]` (SubclassOf) types are valid class bases, but the exact class is not known, so the MRO
+cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
+This gives exactly one diagnostic rather than cascading errors:
 
 ```py
 from ty_extensions import reveal_mro
@@ -569,6 +587,18 @@ def f(x: type[Base]):
 
     # Attributes from `Unknown` are accessible without further errors
     reveal_type(child.base_attr)  # revealed: Unknown
+```
+
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
+unknowable MRO is already inherent to `Any`/`Unknown`:
+
+```py
+from typing import Any
+
+def g(x: type[Any]):
+    # No diagnostic: `Any` base is fine as-is
+    Child = type("Child", (x,), {})
+    reveal_type(Child)  # revealed: <class 'Child'>
 ```
 
 ## MRO errors
@@ -624,44 +654,142 @@ CyclicChild = type("CyclicChild", (Cyclic,), {})
 A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
 `Generic[]` is not the last base class. We provide an autofix for this common error:
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import Generic, TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
 
-class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+```
 
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo1` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+ --> src/mdtest_snippet.py:6:7
+  |
+6 | class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Move `Generic[K, V]` to the end of the bases list
+3 | K = TypeVar("K")
+4 | V = TypeVar("V")
+5 |
+  - class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+6 + class Foo1(dict, Generic[K, V]): ...  # snapshot: inconsistent-mro
+7 | # fmt: off
+8 |
+9 | class Foo2(  # snapshot: inconsistent-mro
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
 # fmt: off
 
-class Foo2(  # error: [inconsistent-mro]
+class Foo2(  # snapshot: inconsistent-mro
     # comment1
     Generic[K, V],  # comment2
     # comment3
     dict  # comment4
     # comment5
 ): ...
+```
 
-class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo2` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:9:7
+   |
+ 9 |   class Foo2(  # snapshot: inconsistent-mro
+   |  _______^
+10 | |     # comment1
+11 | |     Generic[K, V],  # comment2
+12 | |     # comment3
+13 | |     dict  # comment4
+14 | |     # comment5
+15 | | ): ...
+   | |_^
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+8  |
+9  | class Foo2(  # snapshot: inconsistent-mro
+10 |     # comment1
+   -     Generic[K, V],  # comment2
+   -     # comment3
+   -     dict  # comment4
+11 +     dict, Generic[K, V]  # comment4
+12 |     # comment5
+13 | ): ...
+14 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+note: This is an unsafe fix and may change runtime behavior
+```
 
-class Foo4(  # error: [inconsistent-mro]
+```py
+class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+```
+
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo3` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:16:7
+   |
+16 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+13 |     dict  # comment4
+14 |     # comment5
+15 | ): ...
+   - class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+16 + class Foo3(dict, Generic[K, V], metaclass=type): ...  # snapshot: inconsistent-mro
+17 | class Foo4(  # snapshot: inconsistent-mro
+18 |     # comment1
+19 |     Generic[K, V],  # comment2
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
+class Foo4(  # snapshot: inconsistent-mro
     # comment1
     Generic[K, V],  # comment2
     # comment3
     dict,  # comment4
     # comment5
-    metaclass=type  # comment6
+    metaclass=type,  # comment6
     # comment7
 ): ...
 
 # fmt: on
 ```
 
-## MRO error highlighting (snapshot)
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo4` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:17:7
+   |
+17 |   class Foo4(  # snapshot: inconsistent-mro
+   |  _______^
+18 | |     # comment1
+19 | |     Generic[K, V],  # comment2
+20 | |     # comment3
+21 | |     dict,  # comment4
+22 | |     # comment5
+23 | |     metaclass=type,  # comment6
+24 | |     # comment7
+25 | | ): ...
+   | |_^
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+16 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+17 | class Foo4(  # snapshot: inconsistent-mro
+18 |     # comment1
+   -     Generic[K, V],  # comment2
+   -     # comment3
+   -     dict,  # comment4
+19 +     dict, Generic[K, V],  # comment4
+20 |     # comment5
+21 |     metaclass=type,  # comment6
+22 |     # comment7
+note: This is an unsafe fix and may change runtime behavior
+```
 
-<!-- snapshot-diagnostics -->
+## MRO error highlighting (snapshot)
 
 This snapshot test documents the diagnostic highlighting range for dynamic class literals.
 Currently, the entire `type()` call expression is highlighted:
@@ -669,7 +797,17 @@ Currently, the entire `type()` call expression is highlighted:
 ```py
 class A: ...
 
-Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+# snapshot: duplicate-base
+Dup = type("Dup", (A, A), {})
+```
+
+```snapshot
+error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | Dup = type("Dup", (A, A), {})
+  |       ^^^^^^^^^^^^^^^^^^^^^^^
+  |
 ```
 
 ## Metaclass conflicts
@@ -778,8 +916,6 @@ def f(ns: dict[str, Any]):
 
 ## `instance-layout-conflict` diagnostic snapshots
 
-<!-- snapshot-diagnostics -->
-
 When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
 
 ```py
@@ -789,8 +925,25 @@ class A:
 class B:
     __slots__ = ("y",)
 
-# error: [instance-layout-conflict]
+# snapshot: instance-layout-conflict
 X = type("X", (A, B), {})
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+ --> src/mdtest_snippet.py:8:5
+  |
+8 | X = type("X", (A, B), {})
+  |     ^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+  |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+ --> src/mdtest_snippet.py:8:16
+  |
+8 | X = type("X", (A, B), {})
+  |                -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+  |                |
+  |                `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+  |
 ```
 
 When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
@@ -1145,8 +1298,8 @@ class Base:
 class Child(Base, required_arg="value"):
     pass
 
-# The dynamically assigned attribute has Unknown in its type
-reveal_type(Child.config)  # revealed: Unknown | str
+# The dynamically assigned attribute has the inferred type
+reveal_type(Child.config)  # revealed: str
 
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
@@ -1241,5 +1394,5 @@ def f(flag: bool):
     # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
     # because the early-return guard only matches `ClassLiteral`, not union members.
     MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
-    reveal_type(MyClass)  # revealed: type | Unknown
+    reveal_type(MyClass)  # revealed: type | int
 ```

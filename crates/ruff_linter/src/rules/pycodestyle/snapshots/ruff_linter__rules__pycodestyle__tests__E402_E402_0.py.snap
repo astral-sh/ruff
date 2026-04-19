@@ -12,16 +12,16 @@ E402 [*] Module level import not at top of file
 help: Move module level imports to top of file
 1  | """Top-level docstring."""
 2  + import h
-3  | 
+3  |
 4  | __all__ = ["y"]
 5  | __version__: str = "0.1.0"
 --------------------------------------------------------------------------------
-33 | 
+33 |
 34 | __some__magic = 1
-35 | 
+35 |
    - import h
-36 | 
-37 | 
+36 |
+37 |
 38 | def foo() -> None:
 note: This is an unsafe fix and may change runtime behavior
 

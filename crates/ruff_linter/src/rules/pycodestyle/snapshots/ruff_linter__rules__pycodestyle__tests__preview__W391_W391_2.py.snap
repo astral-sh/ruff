@@ -16,7 +16,7 @@ help: Remove trailing newlines
 11 | if __name__ == '__main__':
 12 |     foo()
 13 |     bar()
-   - 
-   - 
-   - 
+   -
+   -
+   -
    -

@@ -278,6 +278,36 @@ def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
         reveal_type(item)  # revealed: Literal["f", "o"] | int
 ```
 
+## Attribute errors from iterated aliased unions
+
+We should still report missing attributes when a loop variable comes from an aliased union element:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A:
+    pass
+
+class B:
+    def do_b_thing(self) -> None:
+        pass
+
+type U = A | B
+
+class C:
+    def __init__(self, values: list[U]) -> None:
+        self.values = values
+
+    def f(self) -> None:
+        for item in self.values:
+            reveal_type(item)  # revealed: A | B
+            # error: [unresolved-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
+            item.do_b_thing()
+```
+
 ## Union type as iterable where one union element has no `__iter__` method
 
 <!-- snapshot-diagnostics -->

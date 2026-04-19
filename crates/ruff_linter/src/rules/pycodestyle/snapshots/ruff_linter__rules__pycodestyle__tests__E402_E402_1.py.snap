@@ -14,13 +14,13 @@ E402 [*] Module level import not at top of file
 help: Move module level imports to top of file
 1 + import b
 2 | import a
-3 | 
+3 |
 4 | """Some other docstring."""
-5 | 
+5 |
   - import b
-6 | 
+6 |
 7 | """Some other docstring."""
-8 | 
+8 |
 note: This is an unsafe fix and may change runtime behavior
 
 E402 [*] Module level import not at top of file
@@ -34,11 +34,11 @@ E402 [*] Module level import not at top of file
 help: Move module level imports to top of file
 1 + import c
 2 | import a
-3 | 
+3 |
 4 | """Some other docstring."""
 --------------------------------------------------------------------------------
-7 | 
+7 |
 8 | """Some other docstring."""
-9 | 
+9 |
   - import c
 note: This is an unsafe fix and may change runtime behavior
