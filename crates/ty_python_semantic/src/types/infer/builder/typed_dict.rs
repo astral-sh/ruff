@@ -11,6 +11,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
+use crate::types::infer::InferenceFlags;
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
@@ -61,6 +62,25 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Preserve string literal keys while inferring `TypedDict` fields, even when the enclosing
+    /// collection enables large-literal promotion.
+    fn infer_typed_dict_key_expression(&mut self, key: &ast::Expr) -> Type<'db> {
+        if let Some(key_ty) = self.try_expression_type(key) {
+            return key_ty.as_string_literal().map_or_else(
+                || {
+                    key.as_string_literal_expr().map_or(key_ty, |literal| {
+                        Type::string_literal(self.db(), literal.value.to_str())
+                    })
+                },
+                |_| key_ty,
+            );
+        }
+
+        self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
+            builder.infer_expression(key, TypeContext::default())
+        })
+    }
+
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
     /// This method *does not* call `infer_expression` on the object being called;
@@ -309,7 +329,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let typed_dict_items = typed_dict.items(self.db());
 
         for item in items {
-            let key_ty = self.infer_optional_expression(item.key.as_ref(), TypeContext::default());
+            let key_ty = item
+                .key
+                .as_ref()
+                .map(|key| self.infer_typed_dict_key_expression(key));
             if let Some((key, key_ty)) = item.key.as_ref().zip(key_ty) {
                 item_types.insert(key.node_index().load(), key_ty);
             }
@@ -436,7 +459,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let value_tcx = item
                 .key
                 .as_ref()
-                .map(|key| self.get_or_infer_expression(key, TypeContext::default()))
+                .map(|key| self.infer_typed_dict_key_expression(key))
                 .and_then(Type::as_string_literal)
                 .and_then(|key| items.get(key.value(self.db())))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
