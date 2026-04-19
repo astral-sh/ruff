@@ -2335,7 +2335,7 @@ for x in range(10):
         ");
     }
 
-    /// Go-to-definition on super() should not lookup on the super class itself
+    /// Go-to-definition on `super()` should not lookup on the super class itself
     #[test]
     fn goto_definition_does_not_lookup_on_bound_super() {
         let test = CursorTest::builder()
