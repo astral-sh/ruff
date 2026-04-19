@@ -37,7 +37,6 @@ bitflags::bitflags! {
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
-        const DID_CHANGE_CONFIGURATION = 1 << 19;
     }
 }
 
