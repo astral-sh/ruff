@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_import_float_to_top_enabled;
 
 /// ## What it does
 /// Checks for imports that are not at the top of the file.
@@ -78,6 +79,10 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
             },
             stmt.range(),
         );
+
+        if !is_import_float_to_top_enabled(checker.settings()) {
+            return;
+        }
 
         let indexer = checker.indexer();
         let locator = checker.locator();
