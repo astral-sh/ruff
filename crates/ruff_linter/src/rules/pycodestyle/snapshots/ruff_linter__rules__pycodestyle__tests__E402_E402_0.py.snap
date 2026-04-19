@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E402 Module level import not at top of file
+E402 [*] Module level import not at top of file
   --> E402_0.py:35:1
    |
 33 | __some__magic = 1
@@ -9,6 +9,21 @@ E402 Module level import not at top of file
 35 | import h
    | ^^^^^^^^
    |
+help: Move module level imports to top of file
+1  | """Top-level docstring."""
+2  + import h
+3  | 
+4  | __all__ = ["y"]
+5  | __version__: str = "0.1.0"
+--------------------------------------------------------------------------------
+33 | 
+34 | __some__magic = 1
+35 | 
+   - import h
+36 | 
+37 | 
+38 | def foo() -> None:
+note: This is an unsafe fix and may change runtime behavior
 
 E402 Module level import not at top of file
   --> E402_0.py:45:1
@@ -18,6 +33,7 @@ E402 Module level import not at top of file
 45 | import k; import l
    | ^^^^^^^^
    |
+help: Move module level imports to top of file
 
 E402 Module level import not at top of file
   --> E402_0.py:45:11
@@ -27,3 +43,4 @@ E402 Module level import not at top of file
 45 | import k; import l
    |           ^^^^^^^^
    |
+help: Move module level imports to top of file

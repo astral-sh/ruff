@@ -1,8 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::Violation;
+use crate::{Edit, Fix, FixAvailability, Violation};
+
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,6 +49,8 @@ pub(crate) struct ModuleImportNotAtTopOfFile {
 }
 
 impl Violation for ModuleImportNotAtTopOfFile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.source_type.is_ipynb() {
@@ -54,16 +59,59 @@ impl Violation for ModuleImportNotAtTopOfFile {
             "Module level import not at top of file".to_string()
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        if self.source_type.is_ipynb() {
+            Some("Move module level imports to top of cell".to_string())
+        } else {
+            Some("Move module level imports to top of file".to_string())
+        }
+    }
 }
 
 /// E402
 pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             ModuleImportNotAtTopOfFile {
                 source_type: checker.source_type,
             },
             stmt.range(),
         );
+
+        let indexer = checker.indexer();
+        let locator = checker.locator();
+
+        // Special-cases: there's leading or trailing content in the import block. These
+        // are too hard to get right, and relatively rare, so flag but don't fix.
+        if indexer.preceded_by_multi_statement_line(stmt, locator.contents())
+            || indexer.followed_by_multi_statement_line(stmt, locator.contents())
+        {
+            return;
+        }
+
+        let range = stmt.range();
+
+        // Include comments but not the trailing newline (so we don't insert an extra newline).
+        let text_range = TextRange::new(range.start(), locator.line_end(range.end()));
+
+        let edit = checker.importer().add_at_start(
+            checker.source()[text_range].trim_whitespace(),
+            // TODO(PR): this doesn't seem to fully work -- the imports end up
+            // in one of the cells above where they should, though no longer in
+            // the first cell in the file.
+            checker
+                .cell_offsets()
+                .and_then(|cell_offsets| cell_offsets.containing_range(text_range.start())),
+        );
+
+        // Include comments *and* the trailing newline, so that we do remove the whole line.
+        let removal_range =
+            TextRange::new(text_range.start(), locator.full_line_end(text_range.end()));
+
+        diagnostic.set_fix(Fix::unsafe_edits(
+            Edit::range_deletion(removal_range),
+            vec![edit],
+        ));
     }
 }
