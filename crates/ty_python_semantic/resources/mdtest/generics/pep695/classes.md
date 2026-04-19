@@ -171,10 +171,10 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[str]())  # revealed: Bounded[Unknown & int]
+reveal_type(Bounded[str]())  # revealed: Bounded[int & Unknown]
 
 # error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown & int]
+reveal_type(Bounded[int | str]())  # revealed: Bounded[int & Unknown]
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
 reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]

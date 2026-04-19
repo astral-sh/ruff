@@ -184,14 +184,14 @@ def f[T: int](x: T) -> T:
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
 # snapshot: invalid-argument-type
-reveal_type(f("string"))  # revealed: Unknown
+reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `f` is incorrect
  --> src/mdtest_snippet.py:9:15
   |
-9 | reveal_type(f("string"))  # revealed: Unknown
+9 | reveal_type(f("string"))  # revealed: int & Unknown
   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
   |
 info: Type variable defined here
@@ -214,14 +214,14 @@ reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
 # snapshot: invalid-argument-type
-reveal_type(f("string"))  # revealed: Unknown
+reveal_type(f("string"))  # revealed: (int & Unknown) | (None & Unknown)
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:10:15
    |
-10 | reveal_type(f("string"))  # revealed: Unknown
+10 | reveal_type(f("string"))  # revealed: (int & Unknown) | (None & Unknown)
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
    |
 info: Type variable defined here
@@ -368,26 +368,26 @@ def accepts_t_or_int[T_str: str](x: T_str | int) -> T_str:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
-reveal_type(accepts_t_or_int(1))  # revealed: Unknown
+reveal_type(accepts_t_or_int(1))  # revealed: str & Unknown
 
 class Unrelated: ...
 
 # error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
-reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
+reveal_type(accepts_t_or_int(Unrelated()))  # revealed: str & Unknown
 
 def accepts_t_or_list_of_t[T: str](x: T | list[T]) -> T:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
 # error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T`"
-reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+reveal_type(accepts_t_or_list_of_t(1))  # revealed: str & Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
     # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T`"
-    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: str & Unknown
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
@@ -511,15 +511,15 @@ class P[T]:
 def f[I: int, S: str](t: P[I] | P[S]) -> tuple[I, S]:
     raise NotImplementedError
 
-reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
-reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
+reveal_type(f(P[int]()))  # revealed: tuple[int, str & Unknown]
+reveal_type(f(P[str]()))  # revealed: tuple[int & Unknown, str]
 ```
 
 However, if we pass something that does not match _any_ union element, we do emit an error:
 
 ```py
 # error: [invalid-argument-type]
-reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+reveal_type(f(P[bytes]()))  # revealed: tuple[int & Unknown, str & Unknown]
 ```
 
 ## Inferring nested generic function calls
@@ -684,9 +684,9 @@ def f(
     reveal_type(close_and_return(e))  # revealed: ClosableNonFullyStaticNominal
 
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(f))  # revealed: Unknown
+    reveal_type(close_and_return(f))  # revealed: SupportsClose & Unknown
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(g))  # revealed: Unknown
+    reveal_type(close_and_return(g))  # revealed: SupportsClose & Unknown
 ```
 
 ## Opaque decorators don't affect typevar binding

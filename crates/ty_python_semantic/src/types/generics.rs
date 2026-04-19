@@ -975,15 +975,33 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
-            let typevar = typevar.typevar(db);
+        for (idx, (ty, bound_typevar)) in types.zip(variables).enumerate() {
+            let typevar = bound_typevar.typevar(db);
 
             if let Some(ty) = ty {
-                expanded[idx] = typevar.intersect_with_bound(db, ty.into());
+                let ty: Type<'db> = ty.into();
+                // Don't cap with the bound when:
+                // - the provided value is the same underlying typevar (regardless of binding
+                //   context). This covers the identity specialization `T -> T` (which would
+                //   otherwise become `T & Bound` and poison downstream uses like narrowing),
+                //   as well as passing a typevar across generic scopes — e.g. `TU` defined
+                //   once at module level, then used as both `def f(x: TU)` and `Foo[TU]`.
+                //   The two `BoundTypeVarInstance`s differ by binding context, but share the
+                //   same bound/constraints, so the intersection would be redundant. or
+                // - the typevar is `Self`: its bound is always the class's identity
+                //   specialization, which is redundant for any concrete self type and would
+                //   produce noisy intersections like `Iter[int] & Iter[T@Iter]`.
+                expanded[idx] = if typevar.is_self(db)
+                    || matches!(ty, Type::TypeVar(tv) if tv.typevar(db) == typevar)
+                {
+                    ty
+                } else {
+                    typevar.intersect_with_bound(db, ty)
+                };
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db) else {
+            let Some(default) = bound_typevar.default_type(db) else {
                 continue;
             };
 

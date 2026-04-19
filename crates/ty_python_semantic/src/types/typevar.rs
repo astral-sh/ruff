@@ -637,14 +637,17 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn intersect_with_bound(self, db: &'db dyn Db, other: Type<'db>) -> Type<'db> {
         match self.bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                IntersectionType::from_two_elements(db, other, bound)
+                IntersectionType::from_two_elements(db, bound.top_materialization(db), other)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => UnionType::from_elements(
                 db,
-                constraints
-                    .elements(db)
-                    .iter()
-                    .map(|&constraint| IntersectionType::from_two_elements(db, constraint, other)),
+                constraints.elements(db).iter().map(|&constraint| {
+                    IntersectionType::from_two_elements(
+                        db,
+                        constraint.top_materialization(db),
+                        other,
+                    )
+                }),
             ),
             None => other,
         }

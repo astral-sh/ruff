@@ -16,7 +16,7 @@ with open("foo.pickle", "rb") as f:
     x = pickle.load(f)  # fine
 
 def _(mode: str):
-    reveal_type(open("", mode))  # revealed: IO[Any]
+    reveal_type(open("", mode))  # revealed: IO[(str & Any) | (bytes & Any)]
 ```
 
 ## `os.fdopen`

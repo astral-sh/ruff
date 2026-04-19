@@ -37,10 +37,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 22 | reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 23 | 
 24 | # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-25 | reveal_type(Bounded[str]())  # revealed: Bounded[Unknown & int]
+25 | reveal_type(Bounded[str]())  # revealed: Bounded[int & Unknown]
 26 | 
 27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown & int]
+28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[int & Unknown]
 29 | 
 30 | reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
 31 | reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]
@@ -116,7 +116,7 @@ error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1,
 error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
   --> src/mdtest_snippet.py:25:21
    |
-25 | reveal_type(Bounded[str]())  # revealed: Bounded[Unknown & int]
+25 | reveal_type(Bounded[str]())  # revealed: Bounded[int & Unknown]
    |                     ^^^
    |
   ::: src/mdtest_snippet.py:14:1
@@ -131,7 +131,7 @@ error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int`
 error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
   --> src/mdtest_snippet.py:28:21
    |
-28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown & int]
+28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[int & Unknown]
    |                     ^^^^^^^^^
    |
   ::: src/mdtest_snippet.py:14:1

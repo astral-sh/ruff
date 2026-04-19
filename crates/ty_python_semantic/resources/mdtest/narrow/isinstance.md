@@ -697,7 +697,7 @@ class InvariantWithAny[T: int]:
 
 def _(x: object):
     if isinstance(x, InvariantWithAny):
-        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown & int]]
+        reveal_type(x)  # revealed: Top[InvariantWithAny[int & Unknown]]
         reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```

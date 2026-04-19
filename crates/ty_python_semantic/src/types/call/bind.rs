@@ -4535,6 +4535,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         error,
                         argument_index: adjusted_argument_index,
                     });
+                    self.constraint_set_errors[argument_index] = true;
                 }
             }
         }
