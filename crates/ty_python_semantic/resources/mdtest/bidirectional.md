@@ -126,6 +126,17 @@ d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 reveal_type(d4_invalid_literal)  # revealed: TD
 reveal_type(d4_invalid_dict)  # revealed: TD
 
+def takes_mapping(value: Mapping[str, object]) -> None:
+    pass
+
+def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
+    # The TypedDict-aware `dict(...)` fast path should not lose diagnostics from named keywords
+    # when unsupported `**kwargs` forces it to fall back to ordinary dict inference.
+    # error: [unresolved-reference] "Name `missing` used when not defined"
+    # error: [invalid-assignment]
+    maybe_td: TD = dict(x=missing, **kwargs)
+    takes_mapping(maybe_td)
+
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
 # in typeshed, which require the key type to be `str` when using keyword arguments. However, we
 # special-case this pattern to match the behavior of `d5_literal`.

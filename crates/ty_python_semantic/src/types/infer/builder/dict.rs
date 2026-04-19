@@ -3,7 +3,10 @@ use ruff_python_ast::{self as ast, HasNodeIndex};
 use rustc_hash::FxHashMap;
 
 use super::{ArgExpr, TypeInferenceBuilder};
-use crate::types::typed_dict::validate_typed_dict_constructor;
+use crate::types::typed_dict::{
+    extract_unpacked_typed_dict_keys_from_value_type, infer_unpacked_keyword_types,
+    validate_typed_dict_constructor,
+};
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -13,42 +16,59 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         arguments: &ast::Arguments,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        if !arguments.args.is_empty()
-            || arguments
-                .keywords
-                .iter()
-                .any(|keyword| keyword.arg.is_none())
-        {
+        if !arguments.args.is_empty() {
             return None;
         }
 
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
-        // then validate and return the TypedDict type.
+        // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
+        // is `TypedDict`-shaped.
         if let Some(tcx) = call_expression_tcx.annotation
             && let Some(typed_dict) = tcx
                 .filter_union(self.db(), Type::is_typed_dict)
                 .as_typed_dict()
         {
-            let items = typed_dict.items(self.db());
-            for keyword in &arguments.keywords {
-                if let Some(arg_name) = &keyword.arg {
-                    let value_tcx = items
-                        .get(arg_name.id.as_str())
-                        .map(|field| TypeContext::new(Some(field.declared_ty)))
-                        .unwrap_or_default();
-                    self.infer_expression(&keyword.value, value_tcx);
-                }
+            // Only speculate the `**kwargs` applicability check. Named keyword values are inferred
+            // on the real builder so their diagnostics are either committed with the fast path or
+            // left for ordinary `dict(...)` inference when we fall back.
+            let supports_typed_dict_context = {
+                let mut speculative_builder = self.speculate();
+                infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                    speculative_builder.infer_expression(expr, tcx)
+                })
+                .into_iter()
+                .flatten()
+                .all(|keyword_ty| {
+                    keyword_ty.is_dynamic()
+                        || keyword_ty.is_never()
+                        || extract_unpacked_typed_dict_keys_from_value_type(
+                            speculative_builder.db(),
+                            keyword_ty,
+                        )
+                        .is_some()
+                })
+            };
+
+            if supports_typed_dict_context {
+                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+                validate_typed_dict_constructor(
+                    &self.context,
+                    typed_dict,
+                    arguments,
+                    func.into(),
+                    |expr, _| self.expression_type(expr),
+                );
+
+                return Some(Type::TypedDict(typed_dict));
             }
+        }
 
-            validate_typed_dict_constructor(
-                &self.context,
-                typed_dict,
-                arguments,
-                func.into(),
-                |expr, _| self.expression_type(expr),
-            );
-
-            return Some(Type::TypedDict(typed_dict));
+        if arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
+        {
+            return None;
         }
 
         // Lower `dict(a=..., b=...)` to synthetic `(Literal["a"], value)` pairs so we can
