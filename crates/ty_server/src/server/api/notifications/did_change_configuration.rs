@@ -18,6 +18,7 @@ impl SyncNotificationHandler for DidChangeConfiguration {
         client: &Client,
         params: types::DidChangeConfigurationParams,
     ) -> Result<()> {
+        tracing::debug!("Recieved workspace/didChangeConfiguration");
         // workspace/didChangeConfiguration is a pull based, meaning the request should be empty, and
         // the server needs to pull the workspace configuration by requesting it from the
         // client.
@@ -39,8 +40,7 @@ impl SyncNotificationHandler for DidChangeConfiguration {
             })
             .collect();
 
-        tracing::debug!("{:?}", items);
-
+        tracing::debug!("Sending workspace/configuration requests to client");
         client.send_request::<lsp_types::request::WorkspaceConfiguration>(
             session,
             ConfigurationParams { items },

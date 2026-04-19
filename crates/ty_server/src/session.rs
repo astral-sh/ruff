@@ -788,6 +788,8 @@ impl Session {
         client: &Client,
         workspace_folders: Vec<(Url, ClientOptions)>,
     ) {
+        tracing::debug!("Updating workspace folders...");
+
         for (url, _) in &workspace_folders {
             self.reinitialize_workspace(url.clone());
         }
