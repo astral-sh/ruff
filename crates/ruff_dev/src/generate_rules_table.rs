@@ -26,7 +26,7 @@ const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
 const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message |    |");
+    table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | &#8203; { scope='col' aria-label='Fix/Status' } |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
@@ -34,27 +34,31 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         let status_token = match rule.group() {
             RuleGroup::Removed { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span>"
+                    "<span {SYMBOL_STYLE} title='Rule was removed in {since}' aria-label='Rule was removed in {since}'>{REMOVED_SYMBOL}</span>"
                 )
             }
             RuleGroup::Deprecated { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span>"
+                    "<span {SYMBOL_STYLE} title='Rule has been deprecated since {since}' aria-label='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span>"
                 )
             }
             RuleGroup::Preview { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span>"
+                    "<span {SYMBOL_STYLE} title='Rule has been in preview since {since}' aria-label='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span>"
                 )
             }
             RuleGroup::Stable { since } => {
-                format!("<span {SYMBOL_STYLE} title='Rule has been stable since {since}'></span>")
+                format!(
+                    "<span {SYMBOL_STYLE} title='Rule has been stable since {since}' aria-label='Rule has been stable since {since}'></span>"
+                )
             }
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span>")
+                format!(
+                    "<span {SYMBOL_STYLE} title='Automatic fix available' aria-label='Automatic fix available'>{FIX_SYMBOL}</span>"
+                )
             }
             FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
