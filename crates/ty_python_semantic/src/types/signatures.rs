@@ -2499,6 +2499,14 @@ impl<'db> Unpacked<'db> {
         }
     }
 
+    pub(crate) fn display_name(&self) -> Name {
+        Name::new(format!("**{}", self.name))
+    }
+
+    pub(crate) fn annotated_type(&self) -> Type<'db> {
+        self.annotated_type
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -3047,11 +3055,25 @@ impl<'db> Parameters<'db> {
             .find(|(_, parameter)| parameter.callable_by_name(name))
     }
 
+    /// Return parameter (with index) for given keyword name, including fallback to an ordinary
+    /// `**kwargs` parameter that accepts arbitrary keyword names.
+    pub(crate) fn bindable_keyword_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.keyword_by_name(name)
+            .or_else(|| self.keyword_variadic())
+    }
+
     /// Return the keywords parameter (`**kwargs`), if any, and its index, or `None`.
     pub(crate) fn keyword_variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    /// Return the retained `**kwargs: Unpack[TypedDict]` metadata and its index, if any.
+    pub(crate) fn unpacked(&self) -> Option<(usize, &Unpacked<'db>)> {
+        self.unpacked
+            .as_ref()
+            .map(|parameter| (self.value.len(), parameter))
     }
 }
 
