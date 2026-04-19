@@ -311,7 +311,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized();
 
     server.replace_workspace_configuration(
-        &workspace_root,
+        workspace_root,
         ClientOptions {
             workspace: WorkspaceOptions {
                 disable_language_services: Some(false),

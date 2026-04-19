@@ -751,7 +751,7 @@ impl TestServer {
                     Some("ty") => match serde_json::to_value(options) {
                         Ok(value) => value,
                         Err(err) => {
-                            panic!("Failed to deserialize workspace configuration options: {err}",)
+                            panic!("Failed to deserialize workspace configuration options: {err}")
                         }
                     },
                     Some(section) => {
@@ -860,7 +860,7 @@ impl TestServer {
         workspace_path: &SystemPath,
         new_configuration: ClientOptions,
     ) -> Result<()> {
-        let workspace_url: Url = Url::from_file_path(self.file_path(&workspace_path).as_std_path())
+        let workspace_url: Url = Url::from_file_path(self.file_path(workspace_path).as_std_path())
             .map_err(|()| anyhow!("Failed to convert workspace path to URL: {workspace_path}"))?;
 
         self.workspace_configurations

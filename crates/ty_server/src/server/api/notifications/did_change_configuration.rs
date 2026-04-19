@@ -1,11 +1,10 @@
+use crate::server::Action;
 use crate::server::Result;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
-use crate::session::{ClientOptions, Session, Workspaces};
+use crate::session::{ClientOptions, Session};
 use lsp_types::notification as notif;
 use lsp_types::{self as types, ConfigurationParams, Url};
-use serde_json::Value;
 
 pub(crate) struct DidChangeConfiguration;
 

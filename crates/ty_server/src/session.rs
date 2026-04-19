@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
-use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
+use lsp_types::notification::{DidChangeConfiguration, DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
     DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
@@ -790,7 +790,7 @@ impl Session {
             self.uninitialize_workspace(url.clone());
         }
 
-        self.initialize_workspace_folders(&client, workspace_folders);
+        self.initialize_workspace_folders(client, workspace_folders);
     }
 
     /// Removes a workspace folder at the given URL.
@@ -919,7 +919,7 @@ impl Session {
 
         // Refresh the workspace with the new options.
         self.workspaces.unregister(&root);
-        let _ = self.workspaces.register(url.clone());
+        let _ = self.workspaces.register(url);
     }
 
     /// Registers the dynamic capabilities with the client as per the resolved global settings.
@@ -936,9 +936,27 @@ impl Session {
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
+        static DID_CHANGE_CONFIGURATION_ID: &str = "ty/workspace/didChangeConfiguration";
 
         let mut registrations = vec![];
         let mut unregistrations = vec![];
+
+        if self
+            .resolved_client_capabilities
+            .supports_change_conf_notifications()
+        {
+            if self.registrations.contains(DidChangeConfiguration::METHOD) {
+                unregistrations.push(Unregistration {
+                    id: DID_CHANGE_CONFIGURATION_ID.into(),
+                    method: DidChangeConfiguration::METHOD.into(),
+                });
+            }
+            registrations.push(Registration {
+                id: DID_CHANGE_CONFIGURATION_ID.into(),
+                method: DidChangeConfiguration::METHOD.into(),
+                register_options: Some(serde_json::to_value(()).unwrap()),
+            });
+        }
 
         if self
             .resolved_client_capabilities
