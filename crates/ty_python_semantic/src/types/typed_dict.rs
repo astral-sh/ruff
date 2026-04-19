@@ -817,7 +817,7 @@ pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
 }
 
 #[derive(Debug, Clone, Copy)]
-struct UnpackedTypedDictKey<'db> {
+pub(super) struct UnpackedTypedDictKey<'db> {
     value_ty: Type<'db>,
     is_required: bool,
 }
@@ -831,7 +831,7 @@ struct UnpackedTypedDictKey<'db> {
 /// intersected, and the key is considered required if any constituent `TypedDict` requires it.
 /// For unions, returns all keys that may appear in any arm, unioning value types for shared keys,
 /// and a key is only considered required if every arm requires it.
-fn extract_unpacked_typed_dict_keys<'db>(
+pub(super) fn extract_unpacked_typed_dict_keys<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
