@@ -781,13 +781,15 @@ impl Session {
         );
     }
     // Updates workspace folders from a workspace/didChangeConfiguration request.
+    // Reinitializes the workspaces (unregistered), and then hands off to the main
+    // initialize_workspace_folders function.
     pub(crate) fn update_workspace_folders(
         &mut self,
         client: &Client,
         workspace_folders: Vec<(Url, ClientOptions)>,
     ) {
         for (url, _) in &workspace_folders {
-            self.uninitialize_workspace(url.clone());
+            self.reinitialize_workspace(url.clone());
         }
 
         self.initialize_workspace_folders(client, workspace_folders);
@@ -899,7 +901,8 @@ impl Session {
         }
     }
 
-    fn uninitialize_workspace(&mut self, url: Url) {
+    // Unregister and reregister a current initialized workspace
+    fn reinitialize_workspace(&mut self, url: Url) {
         let Ok(root) = url.to_file_path() else {
             tracing::debug!("Ignoring workspace with non-path root: {url}");
             return;
