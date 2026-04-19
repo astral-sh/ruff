@@ -709,7 +709,12 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(db, parameters);
+        let mut parameters = Parameters::new(
+            db,
+            parameters
+                .chain(self.parameters.unpacked.iter().map(Unpacked::to_parameter))
+                .collect::<Vec<_>>(),
+        );
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
@@ -2351,6 +2356,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        // `**kwargs: Unpack[TypedDict]` must stay distinct from an equivalent explicit keyword-only
+        // surface. A target callable with unpacked kwargs can still be invoked with additional
+        // keyword arguments supplied through a TypedDict subtype, so a source callable needs a real
+        // `**kwargs` parameter as well.
+        if target.parameters.unpacked.is_some()
+            && source_keyword_variadic.is_none()
+            && source.parameters.unpacked.is_none()
+        {
+            return self.never();
+        }
+
         for target_param in target_keywords.into_iter().chain(target_params) {
             match target_param.kind() {
                 ParameterKind::KeywordOnly {
@@ -2546,6 +2562,19 @@ impl<'db> Unpacked<'db> {
             ),
         }
     }
+
+    fn to_parameter(&self) -> Parameter<'db> {
+        Parameter {
+            annotated_type: self.annotated_type,
+            inferred_annotation: false,
+            has_starred_annotation: false,
+            has_unpacked_kwargs_annotation: true,
+            kind: ParameterKind::KeywordVariadic {
+                name: self.name.clone(),
+            },
+            form: ParameterForm::Value,
+        }
+    }
 }
 
 impl<'db> Parameters<'db> {
@@ -2554,22 +2583,42 @@ impl<'db> Parameters<'db> {
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
-    /// `ParamSpec`, or a `Concatenate` form.
-    ///
-    /// Callers that need to retain `**kwargs: Unpack[TypedDict]` metadata separately from the
-    /// signature surface should use [`Self::from_value_and_unpacked`].
+    /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
+    /// removing the original variadic keyword parameter from the signature surface, synthesizing
+    /// keyword-only parameters for the unpacked keys, and storing the original parameter
+    /// separately in [`Self::unpacked`].
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        Self::from_value_and_unpacked(db, parameters.into_iter().collect(), None)
-    }
+        let mut value: Vec<Parameter<'db>> = Vec::new();
+        let mut unpacked = None;
 
-    pub(crate) fn from_value_and_unpacked(
-        db: &'db dyn Db,
-        value: Vec<Parameter<'db>>,
-        unpacked: Option<Unpacked<'db>>,
-    ) -> Self {
+        for parameter in parameters {
+            if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
+                for (name, unpacked_key) in unpacked_keys {
+                    if value
+                        .iter()
+                        .any(|existing| existing.callable_by_name(name.as_str()))
+                    {
+                        continue;
+                    }
+
+                    value.push(
+                        Parameter::keyword_only(name)
+                            .with_annotated_type(unpacked_key.value_ty)
+                            .with_optional_default_type(
+                                (!unpacked_key.is_required).then_some(Type::unknown()),
+                            ),
+                    );
+                }
+
+                unpacked = Some(Unpacked::from_parameter(db, &parameter));
+            } else {
+                value.push(parameter);
+            }
+        }
+
         debug_assert!(value.iter().all(|parameter| !parameter.is_unpacked(db)));
 
         let mut kind = ParametersKind::Standard;
@@ -2944,48 +2993,26 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let mut value = positional_only
-            .into_iter()
-            .chain(positional_or_keyword)
-            .chain(variadic)
-            .chain(keyword_only)
-            .collect::<Vec<_>>();
-        let mut unpacked = None;
-
-        if let Some(arg) = kwarg.as_ref() {
-            let keywords = Parameter::from_node_and_kind(
+        let keywords = kwarg.as_ref().map(|arg| {
+            Parameter::from_node_and_kind(
                 db,
                 definition,
                 arg,
                 ParameterKind::KeywordVariadic {
                     name: arg.name.id.clone(),
                 },
-            );
+            )
+        });
 
-            if let Some(unpacked_keys) = keywords.unpacked_typed_dict_keys(db) {
-                for (name, unpacked_key) in unpacked_keys {
-                    if value
-                        .iter()
-                        .any(|parameter| parameter.callable_by_name(name.as_str()))
-                    {
-                        continue;
-                    }
-
-                    value.push(
-                        Parameter::keyword_only(name)
-                            .with_annotated_type(unpacked_key.value_ty)
-                            .with_optional_default_type(
-                                (!unpacked_key.is_required).then_some(Type::unknown()),
-                            ),
-                    );
-                }
-                unpacked = Some(Unpacked::from_parameter(db, &keywords));
-            } else {
-                value.push(keywords);
-            }
-        }
-
-        Self::from_value_and_unpacked(db, value, unpacked)
+        Self::new(
+            db,
+            positional_only
+                .into_iter()
+                .chain(positional_or_keyword)
+                .chain(variadic)
+                .chain(keyword_only)
+                .chain(keywords),
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
