@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Non-callable `__await__` on a re-exported class
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## other.py
+
+```
+1 | class HasBadAwait:
+2 |     __await__ = 42
+```
+
+## main.py
+
+```
+1 | from other import HasBadAwait
+2 | 
+3 | async def main() -> None:
+4 |     await HasBadAwait()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `HasBadAwait` is not awaitable
+ --> src/main.py:4:11
+  |
+4 |     await HasBadAwait()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^
+  |
+ ::: src/other.py:2:5
+  |
+2 |     __await__ = 42
+  |     --------- attribute defined here
+  |
+info: `__await__` is not callable
+
+```

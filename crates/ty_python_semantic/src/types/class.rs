@@ -2436,11 +2436,12 @@ impl<'db> CompletedMemberLookup<'db> {
 
             (
                 PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace { ty, .. }),
+                    place: Place::Defined(DefinedPlace { ty, definition, .. }),
                     qualifiers,
                 },
                 Some(dynamic),
             ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
+                .with_definition(definition)
                 .with_qualifiers(qualifiers),
 
             (
