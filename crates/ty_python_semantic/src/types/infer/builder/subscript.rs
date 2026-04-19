@@ -89,6 +89,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_subscript_slice(&mut self, slice: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+        self.with_inference_flag(InferenceFlags::PROMOTE_LITERALS, false, |builder| {
+            builder.infer_expression(slice, tcx)
+        })
+    }
+
     pub(super) fn infer_subscript_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -106,20 +112,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 self.store_typed_dict_key_expected_type(slice, value_ty);
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 self.store_typed_dict_key_expected_type(slice, value_ty);
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                 self.validate_subscript_deletion(subscript, value_ty, slice_ty);
                 Type::Never
             }
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
@@ -174,7 +180,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                     self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                     return ty;
                 }
@@ -217,7 +223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
                 _,
             ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
@@ -318,7 +324,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return union_type;
                     }
                     _ => {
-                        return self.infer_expression(slice, TypeContext::default());
+                        return self.infer_subscript_slice(slice, TypeContext::default());
                     }
                 },
                 SpecialFormType::Type => {
@@ -387,7 +393,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
             }
             Type::Dynamic(DynamicType::Unknown) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
@@ -400,7 +406,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
 
-        let slice_ty = self.infer_expression(slice, TypeContext::default());
+        let slice_ty = self.infer_subscript_slice(slice, TypeContext::default());
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
@@ -1232,7 +1238,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
+        let mut infer_slice_ty =
+            |builder: &mut Self, tcx| builder.infer_subscript_slice(slice, tcx);
 
         self.validate_subscript_assignment_impl(
             target,

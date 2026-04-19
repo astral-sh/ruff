@@ -71,6 +71,165 @@ takes_formatter({"format": "%(message)s"})
 takes_formatter({"factory": object(), "facility": "local0"})
 ```
 
+Large `dict[str, TypedDict]` literals should still preserve inner `TypedDict` keys after crossing
+the large-collection promotion threshold:
+
+```py
+from typing import TypedDict
+
+class Entry(TypedDict):
+    a: str
+    b: bool
+
+entries: dict[str, Entry] = {
+    "k0": {"a": "v", "b": False},
+    "k1": {"a": "v", "b": False},
+    "k2": {"a": "v", "b": False},
+    "k3": {"a": "v", "b": False},
+    "k4": {"a": "v", "b": False},
+    "k5": {"a": "v", "b": False},
+    "k6": {"a": "v", "b": False},
+    "k7": {"a": "v", "b": False},
+    "k8": {"a": "v", "b": False},
+    "k9": {"a": "v", "b": False},
+    "k10": {"a": "v", "b": False},
+    "k11": {"a": "v", "b": False},
+    "k12": {"a": "v", "b": False},
+    "k13": {"a": "v", "b": False},
+    "k14": {"a": "v", "b": False},
+    "k15": {"a": "v", "b": False},
+    "k16": {"a": "v", "b": False},
+    "k17": {"a": "v", "b": False},
+    "k18": {"a": "v", "b": False},
+    "k19": {"a": "v", "b": False},
+    "k20": {"a": "v", "b": False},
+    "k21": {"a": "v", "b": False},
+    "k22": {"a": "v", "b": False},
+    "k23": {"a": "v", "b": False},
+    "k24": {"a": "v", "b": False},
+    "k25": {"a": "v", "b": False},
+    "k26": {"a": "v", "b": False},
+    "k27": {"a": "v", "b": False},
+    "k28": {"a": "v", "b": False},
+    "k29": {"a": "v", "b": False},
+    "k30": {"a": "v", "b": False},
+    "k31": {"a": "v", "b": False},
+    "k32": {"a": "v", "b": False},
+    "k33": {"a": "v", "b": False},
+    "k34": {"a": "v", "b": False},
+    "k35": {"a": "v", "b": False},
+    "k36": {"a": "v", "b": False},
+    "k37": {"a": "v", "b": False},
+    "k38": {"a": "v", "b": False},
+    "k39": {"a": "v", "b": False},
+    "k40": {"a": "v", "b": False},
+    "k41": {"a": "v", "b": False},
+    "k42": {"a": "v", "b": False},
+    "k43": {"a": "v", "b": False},
+    "k44": {"a": "v", "b": False},
+    "k45": {"a": "v", "b": False},
+    "k46": {"a": "v", "b": False},
+    "k47": {"a": "v", "b": False},
+    "k48": {"a": "v", "b": False},
+    "k49": {"a": "v", "b": False},
+    "k50": {"a": "v", "b": False},
+    "k51": {"a": "v", "b": False},
+    "k52": {"a": "v", "b": False},
+    "k53": {"a": "v", "b": False},
+    "k54": {"a": "v", "b": False},
+    "k55": {"a": "v", "b": False},
+    "k56": {"a": "v", "b": False},
+    "k57": {"a": "v", "b": False},
+    "k58": {"a": "v", "b": False},
+    "k59": {"a": "v", "b": False},
+    "k60": {"a": "v", "b": False},
+    "k61": {"a": "v", "b": False},
+    "k62": {"a": "v", "b": False},
+    "k63": {"a": "v", "b": False},
+    "k64": {"a": "v", "b": False},
+}
+
+reveal_type(entries["k0"])  # revealed: Entry
+```
+
+Large dict literals should still preserve `TypedDict` subscript keys in nested value expressions:
+
+```py
+class BacktestContent(TypedDict):
+    final_balance: float
+    backtest_start_time: int
+
+def backtest_stats(content: BacktestContent) -> dict[str, object]:
+    return {
+        "k0": None,
+        "k1": None,
+        "k2": None,
+        "k3": None,
+        "k4": None,
+        "k5": None,
+        "k6": None,
+        "k7": None,
+        "k8": None,
+        "k9": None,
+        "k10": None,
+        "k11": None,
+        "k12": None,
+        "k13": None,
+        "k14": None,
+        "k15": None,
+        "k16": None,
+        "k17": None,
+        "k18": None,
+        "k19": None,
+        "k20": None,
+        "k21": None,
+        "k22": None,
+        "k23": None,
+        "k24": None,
+        "k25": None,
+        "k26": None,
+        "k27": None,
+        "k28": None,
+        "k29": None,
+        "k30": None,
+        "k31": None,
+        "k32": None,
+        "k33": None,
+        "k34": None,
+        "k35": None,
+        "k36": None,
+        "k37": None,
+        "k38": None,
+        "k39": None,
+        "k40": None,
+        "k41": None,
+        "k42": None,
+        "k43": None,
+        "k44": None,
+        "k45": None,
+        "k46": None,
+        "k47": None,
+        "k48": None,
+        "k49": None,
+        "k50": None,
+        "k51": None,
+        "k52": None,
+        "k53": None,
+        "k54": None,
+        "k55": None,
+        "k56": None,
+        "k57": None,
+        "k58": None,
+        "k59": None,
+        "k60": None,
+        "k61": None,
+        "k62": None,
+        "k63": None,
+        "final_balance": content["final_balance"],
+        "backtest_run_start_ts": content["backtest_start_time"],
+    }
+```
+
 Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
