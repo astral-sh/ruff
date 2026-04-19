@@ -913,27 +913,6 @@ impl<'db> BoundSuperType<'db> {
         };
 
         let class_literal = class.class_literal(db);
-        // TODO properly support super() with generic types
-        // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
-        // * also requires understanding how we should handle cases like this:
-        //  ```python
-        //  b_int: B[int]
-        //  b_unknown: B
-        //
-        //  super(B, b_int)
-        //  super(B[int], b_unknown)
-        //  ```
-
-        // NOTE: disable this because we are now handling generic classes
-        // match class_literal.generic_context(db) {
-        //     Some(_) => Place::bound(todo_type!("super in generic class")).into(),
-        //     None => class_literal.class_member_from_mro(
-        //         db,
-        //         name,
-        //         policy,
-        //         self.skip_until_after_pivot(db, owner.iter_mro(db)),
-        //     ),
-        // }
         class_literal.class_member_from_mro(
             db,
             name,
