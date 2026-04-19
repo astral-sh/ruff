@@ -866,8 +866,10 @@ impl<'db> BoundSuperType<'db> {
         Either::Right(mro_iter.skip_while(move |superclass| {
             if pivot_found {
                 false
-            } else if Some(pivot_class) == superclass.into_class() {
-                pivot_found = true;
+            } else if let Some(superclass_type) = superclass.into_class() {
+                if superclass_type.class_literal(db) == pivot_class.class_literal(db) {
+                    pivot_found = true;
+                };
                 true
             } else {
                 true
@@ -922,15 +924,23 @@ impl<'db> BoundSuperType<'db> {
         //  super(B, b_int)
         //  super(B[int], b_unknown)
         //  ```
-        match class_literal.generic_context(db) {
-            Some(_) => Place::bound(todo_type!("super in generic class")).into(),
-            None => class_literal.class_member_from_mro(
-                db,
-                name,
-                policy,
-                self.skip_until_after_pivot(db, owner.iter_mro(db)),
-            ),
-        }
+
+        // NOTE: disable this because we are now handling generic classes
+        // match class_literal.generic_context(db) {
+        //     Some(_) => Place::bound(todo_type!("super in generic class")).into(),
+        //     None => class_literal.class_member_from_mro(
+        //         db,
+        //         name,
+        //         policy,
+        //         self.skip_until_after_pivot(db, owner.iter_mro(db)),
+        //     ),
+        // }
+        class_literal.class_member_from_mro(
+            db,
+            name,
+            policy,
+            self.skip_until_after_pivot(db, owner.iter_mro(db)),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
