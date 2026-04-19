@@ -18,7 +18,7 @@ impl SyncNotificationHandler for DidChangeConfiguration {
         client: &Client,
         params: types::DidChangeConfigurationParams,
     ) -> Result<()> {
-        tracing::debug!("Recieved workspace/didChangeConfiguration");
+        tracing::debug!("Received workspace/didChangeConfiguration");
         // workspace/didChangeConfiguration is a pull based, meaning the request should be empty, and
         // the server needs to pull the workspace configuration by requesting it from the
         // client.
@@ -78,7 +78,7 @@ impl SyncNotificationHandler for DidChangeConfiguration {
                     .collect();
 
                 tracing::debug!(
-                    "Recieved new configuration options {:?}",
+                    "Received new configuration options {:?}",
                     workspaces_with_options,
                 );
 
