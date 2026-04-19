@@ -293,3 +293,35 @@ unresolved-reference="warn"
 
     Ok(())
 }
+
+#[test]
+fn configuration_notification() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return a
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, Some(ClientOptions::default()))?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.replace_workspace_configuration(
+        &workspace_root,
+        ClientOptions {
+            workspace: WorkspaceOptions {
+                disable_language_services: Some(false),
+                ..WorkspaceOptions::default()
+            },
+            ..ClientOptions::default()
+        },
+    )?;
+
+    server.did_change_configuration();
+
+    Ok(())
+}

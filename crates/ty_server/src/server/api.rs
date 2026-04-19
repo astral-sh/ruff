@@ -186,6 +186,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
             sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
         }
+        notifications::DidChangeConfiguration::METHOD => {
+            sync_notification_task::<notifications::DidChangeConfiguration>(notif)
+        }
         lsp_types::notification::Cancel::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }

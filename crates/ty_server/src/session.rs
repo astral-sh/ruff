@@ -780,6 +780,18 @@ impl Session {
             },
         );
     }
+    // Updates workspace folders from a workspace/didChangeConfiguration request.
+    pub(crate) fn update_workspace_folders(
+        &mut self,
+        client: &Client,
+        workspace_folders: Vec<(Url, ClientOptions)>,
+    ) {
+        for (url, _) in &workspace_folders {
+            self.uninitialize_workspace(url.clone());
+        }
+
+        self.initialize_workspace_folders(&client, workspace_folders);
+    }
 
     /// Removes a workspace folder at the given URL.
     ///
@@ -885,6 +897,29 @@ impl Session {
         } else {
             None
         }
+    }
+
+    fn uninitialize_workspace(&mut self, url: Url) {
+        let Ok(root) = url.to_file_path() else {
+            tracing::debug!("Ignoring workspace with non-path root: {url}");
+            return;
+        };
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let root = match SystemPathBuf::from_path_buf(root) {
+            Ok(root) => root,
+            Err(root) => {
+                tracing::debug!(
+                    "Ignoring workspace with non-UTF8 root: {root}",
+                    root = root.display()
+                );
+                return;
+            }
+        };
+
+        // Refresh the workspace with the new options.
+        self.workspaces.unregister(&root);
+        let _ = self.workspaces.register(url.clone());
     }
 
     /// Registers the dynamic capabilities with the client as per the resolved global settings.

@@ -55,8 +55,9 @@ use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidChangeWatchedFiles, DidChangeWorkspaceFolders, DidCloseTextDocument,
-    DidOpenTextDocument, Exit, Initialized, Notification,
+    DidChangeConfiguration, DidChangeTextDocument, DidChangeWatchedFiles,
+    DidChangeWorkspaceFolders, DidCloseTextDocument, DidOpenTextDocument, Exit, Initialized,
+    Notification,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest,
@@ -750,7 +751,7 @@ impl TestServer {
                     Some("ty") => match serde_json::to_value(options) {
                         Ok(value) => value,
                         Err(err) => {
-                            panic!("Failed to deserialize workspace configuration options: {err}")
+                            panic!("Failed to deserialize workspace configuration options: {err}",)
                         }
                     },
                     Some(section) => {
@@ -852,6 +853,33 @@ impl TestServer {
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFiles>(params);
+    }
+
+    pub(crate) fn replace_workspace_configuration(
+        &mut self,
+        workspace_path: &SystemPath,
+        new_configuration: ClientOptions,
+    ) -> Result<()> {
+        let workspace_url: Url = Url::from_file_path(self.file_path(&workspace_path).as_std_path())
+            .map_err(|()| anyhow!("Failed to convert workspace path to URL: {workspace_path}"))?;
+
+        self.workspace_configurations
+            .insert(workspace_url, new_configuration);
+
+        Ok(())
+    }
+
+    pub(crate) fn did_change_configuration(&mut self) {
+        let params = lsp_types::DidChangeConfigurationParams {
+            settings: serde_json::Value::Null,
+        };
+        self.send_notification::<DidChangeConfiguration>(params);
+
+        // Handle sending back the configuration
+        let (request_id, params) =
+            self.await_request::<lsp_types::request::WorkspaceConfiguration>();
+
+        self.handle_workspace_configuration_request(request_id, &params);
     }
 
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
