@@ -12,8 +12,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// Checks for operations that compare a name to itself.
 ///
 /// ## Why is this bad?
-/// Comparing a name to itself always results in the same value, and is likely
-/// a mistake.
+/// Comparing a name to itself is likely a mistake, as `__eq__` may be
+/// overridden to return a non-trivial value.
 ///
 /// ## Example
 /// ```python
