@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Non-callable `__await__` declared in class body, bound implicitly in `__init__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class ImplicitBadAwait:
+2 |     __await__: int
+3 | 
+4 |     def __init__(self) -> None:
+5 |         self.__await__ = 42
+6 | 
+7 | async def main() -> None:
+8 |     await ImplicitBadAwait()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `ImplicitBadAwait` is not awaitable
+ --> src/mdtest_snippet.py:8:11
+  |
+8 |     await ImplicitBadAwait()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/mdtest_snippet.py:2:5
+  |
+2 |     __await__: int
+  |     --------- attribute defined here
+  |
+info: `__await__` is not callable
+
+```

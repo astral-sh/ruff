@@ -5418,6 +5418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                definition,
                 ..
             }) => {
                 let mut bindings = self
@@ -5434,7 +5435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Err(CallDunderError::CallError(
                         call_error,
                         Box::new(bindings),
-                        None,
+                        definition,
                     ));
                 }
 
@@ -9110,7 +9111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    Place::bound(binding_type(db, definition)).with_definition(Some(definition))
                 } else {
                     Place::Undefined
                 };

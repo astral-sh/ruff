@@ -324,7 +324,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
-                place: Place::bound(member.ty()),
+                place: Place::bound(member.ty()).with_definition(member.definition()),
                 qualifiers: member.qualifiers(),
             })
             .unwrap_or_else(|| Type::object().member(db, name))

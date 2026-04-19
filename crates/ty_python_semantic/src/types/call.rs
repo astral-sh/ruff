@@ -231,12 +231,6 @@ impl<'db> CallDunderError<'db> {
     }
 }
 
-impl<'db> From<CallError<'db>> for CallDunderError<'db> {
-    fn from(CallError(kind, bindings): CallError<'db>) -> Self {
-        Self::CallError(kind, bindings, None)
-    }
-}
-
 #[derive(Debug)]
 pub(crate) enum CallBinOpError {
     /// The dunder attribute exists but it can't be called with the given arguments.
