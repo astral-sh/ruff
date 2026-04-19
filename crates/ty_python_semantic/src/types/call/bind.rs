@@ -4126,30 +4126,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             return;
         }
 
-        if let Some((parameter_index, parameter)) = self.parameters.unpacked() {
-            let permissive_string_mapping = argument_type.is_some_and(|argument_type| {
-                let Some((key_ty, _value_ty)) = argument_type.unpack_keys_and_items(db) else {
-                    return false;
-                };
-
-                key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
-            });
-
-            if !permissive_string_mapping {
-                self.errors.push(BindingError::InvalidArgumentType {
-                    parameter: ParameterContext {
-                        name: Some(parameter.display_name()),
-                        index: parameter_index,
-                        positional: false,
-                    },
-                    argument_index: self.get_argument_index(argument_index),
-                    expected_ty: parameter.annotated_type(),
-                    provided_ty: argument_type.unwrap_or_else(Type::unknown),
-                });
-                return;
-            }
-        }
-
+        // Fall back to ordinary `**kwargs` binding when the unpacked value is not TypedDict-shaped.
+        // This mirrors the non-`Unpack[TypedDict]` path: later validation still reports invalid
+        // `**` arguments, while binding here suppresses redundant missing-argument cascades and
+        // preserves per-parameter value checking for string-keyed mappings.
         for (parameter_index, parameter) in self.parameters.iter().enumerate() {
             if self.parameter_info[parameter_index]
                 .match_state
@@ -5004,6 +4984,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .iter()
             .any(Option::is_some)
         {
+            // The binding phase already matched this `**` argument against one or more parameters.
+            // For example, `dict[str, int]` can optimistically match
+            // `**kwargs: Unpack[TypedDict("Kwargs", {"name": int}, total=False)]`: the mapping may
+            // contain the right key, and the value type can be checked below against `name`.
+            //
+            // We still need to validate the unpacked mapping's key type here. A `dict[int, str]`
+            // may also have matched a parameter by value type, but it is not valid after `**`
+            // because keyword argument names must be strings.
             if extract_unpacked_typed_dict_keys_from_value_type(self.db, argument_type).is_none()
                 && argument_type.as_paramspec_typevar(self.db).is_none()
             {

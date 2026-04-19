@@ -2525,66 +2525,7 @@ pub(crate) enum ParametersKind<'db> {
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Vec<Parameter<'db>>,
-    unpacked: Option<Unpacked<'db>>,
     kind: ParametersKind<'db>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Unpacked<'db> {
-    name: Name,
-    annotated_type: Type<'db>,
-}
-
-impl<'db> Unpacked<'db> {
-    fn from_parameter(db: &'db dyn Db, parameter: &Parameter<'db>) -> Self {
-        debug_assert!(parameter.is_unpacked(db));
-        Self {
-            name: parameter
-                .name()
-                .expect("keyword variadic parameter always has a name")
-                .clone(),
-            annotated_type: parameter.annotated_type(),
-        }
-    }
-
-    pub(crate) fn display_name(&self) -> Name {
-        Name::new(format!("**{}", self.name))
-    }
-
-    pub(crate) fn annotated_type(&self) -> Type<'db> {
-        self.annotated_type
-    }
-
-    fn apply_type_mapping_impl<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        Self {
-            name: self.name.clone(),
-            annotated_type: self.annotated_type.apply_type_mapping_impl(
-                db,
-                type_mapping,
-                tcx,
-                visitor,
-            ),
-        }
-    }
-
-    fn to_parameter(&self) -> Parameter<'db> {
-        Parameter {
-            annotated_type: self.annotated_type,
-            inferred_annotation: false,
-            has_starred_annotation: false,
-            has_unpacked_kwargs_annotation: true,
-            kind: ParameterKind::KeywordVariadic {
-                name: self.name.clone(),
-            },
-            form: ParameterForm::Value,
-        }
-    }
 }
 
 impl<'db> Parameters<'db> {
@@ -2602,7 +2543,6 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         let parameters = parameters.into_iter();
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
-        let mut unpacked = None;
 
         for parameter in parameters {
             if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
@@ -2633,7 +2573,6 @@ impl<'db> Parameters<'db> {
                 value.push(
                     Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
                 );
-                unpacked = Some(Unpacked::from_parameter(db, &parameter));
             } else {
                 value.push(parameter);
             }
@@ -2714,18 +2653,13 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        Parameters {
-            value,
-            unpacked,
-            kind,
-        }
+        Parameters { value, kind }
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
         Self {
             value: Vec::new(),
-            unpacked: None,
             kind: ParametersKind::Standard,
         }
     }
@@ -2796,7 +2730,6 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2814,7 +2747,6 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2829,7 +2761,6 @@ impl<'db> Parameters<'db> {
                     Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
                 ),
             ],
-            unpacked: None,
             kind: ParametersKind::ParamSpec(typevar),
         }
     }
@@ -2859,7 +2790,6 @@ impl<'db> Parameters<'db> {
         ]);
         Self {
             value: prefix_params,
-            unpacked: None,
             kind: ParametersKind::Concatenate(concatenate_tail),
         }
     }
@@ -2878,7 +2808,6 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            unpacked: None,
             kind: ParametersKind::Gradual,
         }
     }
@@ -2892,7 +2821,6 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            unpacked: None,
             kind: ParametersKind::Standard,
         }
     }
@@ -2912,7 +2840,6 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            unpacked: None,
             kind: ParametersKind::Top,
         }
     }
@@ -3067,10 +2994,6 @@ impl<'db> Parameters<'db> {
                 .iter()
                 .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
                 .collect(),
-            unpacked: self
-                .unpacked
-                .as_ref()
-                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
             kind: self.kind,
         }
     }
@@ -3147,13 +3070,6 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
-    }
-
-    /// Return the retained `**kwargs: Unpack[TypedDict]` metadata and its index, if any.
-    pub(crate) fn unpacked(&self) -> Option<(usize, &Unpacked<'db>)> {
-        self.unpacked
-            .as_ref()
-            .map(|parameter| (self.value.len(), parameter))
     }
 }
 
