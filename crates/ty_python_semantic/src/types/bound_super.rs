@@ -6,7 +6,7 @@ use ruff_python_ast::AnyNodeRef;
 
 use crate::{
     Db, DisplaySettings,
-    place::{Place, PlaceAndQualifiers},
+    place::{PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
@@ -15,7 +15,6 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::EquivalenceChecker,
-        todo_type,
         typevar::{TypeVarConstraints, TypeVarInstance},
         visitor,
     },
