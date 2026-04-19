@@ -6,7 +6,7 @@ use ruff_python_ast::AnyNodeRef;
 
 use crate::{
     Db, DisplaySettings,
-    place::{PlaceAndQualifiers},
+    place::PlaceAndQualifiers,
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
@@ -868,7 +868,7 @@ impl<'db> BoundSuperType<'db> {
             } else if let Some(superclass_type) = superclass.into_class() {
                 if superclass_type.class_literal(db) == pivot_class.class_literal(db) {
                     pivot_found = true;
-                };
+                }
                 true
             } else {
                 true
