@@ -992,6 +992,9 @@ bitflags::bitflags! {
         /// (e.g., `*args: int` or `**kwargs: int` in a function definition).
         const IN_VARARG_ANNOTATION = 1 << 2;
 
+        /// Whether the visitor is currently visiting a `**kwargs` annotation.
+        const IN_KWARG_ANNOTATION = 1 << 7;
+
         /// Whether the visitor is currently visiting a return-type annotation
         const IN_RETURN_TYPE = 1 << 3;
 
