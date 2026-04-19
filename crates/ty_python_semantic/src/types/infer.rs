@@ -1300,6 +1300,13 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
+        /// Whether literal-heavy expressions should be widened during recursive inference.
+        ///
+        /// This is enabled for pathological cases such as huge collection literals or very
+        /// high-arity calls, where preserving every nested literal during inference can cause
+        /// severe performance issues.
+        const PROMOTE_LITERALS = 1 << 11;
+
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
 
