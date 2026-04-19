@@ -858,6 +858,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
+                definition: prev.definition.or(current.definition),
                 ..current
             }),
             // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
