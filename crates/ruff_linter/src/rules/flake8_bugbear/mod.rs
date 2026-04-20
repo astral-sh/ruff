@@ -97,6 +97,8 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
+    #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

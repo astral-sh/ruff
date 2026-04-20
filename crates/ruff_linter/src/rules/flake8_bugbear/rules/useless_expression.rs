@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_b018_subscript_enabled;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -35,9 +36,10 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// This rule ignores expression types that are commonly used for their side
 /// effects, such as function calls.
 ///
-/// However, if a seemingly useless expression (like an attribute access) is
-/// needed to trigger a side effect, consider assigning it to an anonymous
-/// variable, to indicate that the return value is intentionally ignored.
+/// However, if a seemingly useless expression (like an attribute access or a
+/// subscript) is needed to trigger a side effect, consider assigning it to an
+/// anonymous variable, to indicate that the return value is intentionally
+/// ignored.
 ///
 /// For example, given:
 /// ```python
@@ -65,6 +67,10 @@ impl Violation for UselessExpression {
             }
             Kind::Attribute => {
                 "Found useless attribute access. Either assign it to a variable or remove it."
+                    .to_string()
+            }
+            Kind::Subscript => {
+                "Found useless subscript access. Either assign it to a variable or remove it."
                     .to_string()
             }
         }
@@ -108,6 +114,16 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
                 value.range(),
             );
         }
+        // Flag subscripts as useless expressions, even if they're attached to calls or other
+        // expressions.
+        if is_b018_subscript_enabled(checker.settings()) && value.is_subscript_expr() {
+            checker.report_diagnostic(
+                UselessExpression {
+                    kind: Kind::Subscript,
+                },
+                value.range(),
+            );
+        }
         return;
     }
 
@@ -123,4 +139,5 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
 enum Kind {
     Expression,
     Attribute,
+    Subscript,
 }

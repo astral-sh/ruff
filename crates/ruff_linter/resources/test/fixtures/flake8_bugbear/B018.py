@@ -63,3 +63,11 @@ def foo5():
     foo.bar  # Attribute (raise)
     object().__class__  # Attribute (raise)
     "foo" + "bar"  # BinOp (raise)
+
+
+def foo6():
+    x["item"]  # Subscript (raise)
+    obj.attr["key"]  # Subscript (raise)
+    get_dict()["key"]  # Subscript on call result (raise)
+    x[0]  # Subscript with int key (raise)
+    _ = x["item"]  # OK: result intentionally ignored
