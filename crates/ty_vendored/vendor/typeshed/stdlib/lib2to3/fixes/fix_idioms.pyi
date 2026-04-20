@@ -25,6 +25,7 @@ into
     v = sorted(EXPR)
     foo(v)
 """
+
 from typing import ClassVar, Final, Literal
 
 from .. import fixer_base
