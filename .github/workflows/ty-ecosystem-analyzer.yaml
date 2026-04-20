@@ -102,7 +102,7 @@ jobs:
     needs: [build-ty]
     strategy:
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -144,7 +144,7 @@ jobs:
             --new "${GITHUB_SHA}" \
             --exclude-newer "${EXCLUDE_NEWER}" \
             --shard "${SHARD}" \
-            --num-shards 2 \
+            --num-shards 3 \
             --output-old "diagnostics-base-${SHARD}.json" \
             --output-new "diagnostics-PR-${SHARD}.json"
 
@@ -178,11 +178,16 @@ jobs:
         with:
           name: diagnostics-shard-1
 
+      - name: Download shard 2 diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: diagnostics-shard-2
+
       - name: Merge shard diagnostics
         shell: bash
         run: |
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json > diagnostics-base.json
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   > diagnostics-PR.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-0.json diagnostics-base-1.json diagnostics-base-2.json > diagnostics-base.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-0.json   diagnostics-PR-1.json   diagnostics-PR-2.json   > diagnostics-PR.json
 
       - name: Generate reports
         id: generate-reports
