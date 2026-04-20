@@ -506,9 +506,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                     .arguments
                     .iter_source_order()
                     .filter_map(|arg_or_keyword| match arg_or_keyword {
-                        ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => {
-                            Some(arg.range().start())
-                        }
+                        ArgOrKeyword::Arg(arg) => Some(arg.range().start()),
                         _ => None,
                     })
                     .last();
@@ -518,7 +516,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
-                        // Offer an edit only for the rightmost non-starred positional arg.
+                        // Offer an edit only for the last positional arg, and not for starred args.
                         let allow_edits = !argument.is_starred_expr()
                             && Some(argument.range().start()) == last_editable_arg_start;
 
@@ -3971,15 +3969,6 @@ Source with applied edits:
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        1 |
-        2 | def foo(a: str, b: int, c: int, d: str): ...
-        3 | t: tuple[int, int] = (23, 42)
-          - foo('foo', *t, d='bar')
-        4 + foo(a='foo', *t, d='bar')
         ");
     }
 
@@ -4089,15 +4078,6 @@ Source with applied edits:
         4 | foo([a=]1, [b=]*t)
           |             ^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-        1 |
-        2 | def foo(a: int, b: int): ...
-        3 | t: tuple[int] = (2,)
-          - foo(1, *t)
-        4 + foo(a=1, *t)
         ");
     }
 
