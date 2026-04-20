@@ -3,15 +3,16 @@ use std::fmt::{Display, Write};
 
 use camino::Utf8Path;
 use colored::Colorize;
+use parser::EmbeddedFileSourceMap;
 use ruff_db::Db;
 use ruff_db::files::File;
-use ruff_db::panic::{PanicError, catch_unwind};
+use ruff_db::source::line_index;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
-use ruff_db::source::line_index;
+use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_diagnostics::Applicability;
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::matcher::Failure;
@@ -34,6 +35,116 @@ mod assertion;
 mod diagnostic;
 pub mod matcher;
 pub mod parser;
+
+/// Run `path` as a markdown test suite with given `title`.
+///
+/// Panic on test failure, and print failure details.
+pub fn run<C>(
+    absolute_fixture_path: &Utf8Path,
+    relative_fixture_path: &Utf8Path,
+    source: &str,
+    test_name: &str,
+    crate_name: &str,
+    suite: &parser::MarkdownTestSuite<'_, C>,
+    mut run_test: impl FnMut(
+        &parser::MarkdownTest<'_, '_, C>,
+        &mut String,
+        OutputFormat,
+    ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures>,
+) -> anyhow::Result<()> {
+    let output_format = output_format();
+
+    let mut markdown_edits = vec![];
+
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
+    let mut any_failures = false;
+    let mut assertion = String::new();
+    for test in suite.tests() {
+        if filter
+            .as_ref()
+            .is_some_and(|f| !(test.uncontracted_name().contains(f) || test.name() == *f))
+        {
+            continue;
+        }
+
+        let result = run_test(&test, &mut assertion, output_format);
+
+        let this_test_failed = result.is_err();
+        any_failures = any_failures || this_test_failed;
+
+        if this_test_failed && output_format.is_cli() {
+            let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
+        }
+
+        match result {
+            Ok((_, edits)) => markdown_edits.extend(edits),
+            Err(failures) => {
+                let md_index = LineIndex::from_source_text(source);
+
+                for test_failures in failures {
+                    let source_map =
+                        EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
+
+                    for (relative_line_number, failures) in test_failures.by_line.iter() {
+                        let file = relative_fixture_path.as_str();
+
+                        let absolute_line_number =
+                            match source_map.to_absolute_line_number(relative_line_number) {
+                                Ok(line_number) => line_number,
+                                Err(last_line_number) => {
+                                    output_format.write_error(
+                                        &mut assertion,
+                                        file,
+                                        last_line_number,
+                                        &Failure::new(
+                                            "Found a trailing assertion comment \
+                                            (e.g., `# revealed:` or `# error:`) \
+                                            not followed by any statement.",
+                                        ),
+                                    );
+
+                                    continue;
+                                }
+                            };
+
+                        for failure in failures {
+                            output_format.write_error(
+                                &mut assertion,
+                                file,
+                                absolute_line_number,
+                                failure,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if this_test_failed && output_format.is_cli() {
+            let escaped_test_name = test.name().replace('\'', "\\'");
+            let _ = writeln!(
+                assertion,
+                "\nTo rerun this specific test, \
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+            );
+            let _ = writeln!(
+                assertion,
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p {crate_name} \
+                --test mdtest -- {test_name}",
+            );
+
+            let _ = writeln!(assertion, "\n{}", "-".repeat(50));
+        }
+    }
+
+    if !markdown_edits.is_empty() {
+        try_apply_markdown_edits(absolute_fixture_path, source, markdown_edits);
+    }
+
+    assert!(!any_failures, "{}", &assertion);
+
+    Ok(())
+}
 
 /// Determine the output format from the `MDTEST_GITHUB_ANNOTATIONS_FORMAT` environment variable.
 pub fn output_format() -> OutputFormat {
@@ -545,6 +656,12 @@ impl AttemptTestError<'_> {
             by_line,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestOutcome {
+    Success,
+    Skipped,
 }
 
 #[cfg(test)]
