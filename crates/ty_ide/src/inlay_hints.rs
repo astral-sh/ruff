@@ -169,7 +169,6 @@ impl InlayHint {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
-        allow_edits: bool,
     ) -> Self {
         let label_parts = vec![
             InlayHintLabelPart::new(name).with_target(navigation_target),
@@ -180,14 +179,7 @@ impl InlayHint {
             position,
             kind: InlayHintKind::CallArgumentName,
             label: InlayHintLabel { parts: label_parts },
-            text_edits: if allow_edits {
-                vec![InlayHintTextEdit {
-                    range: TextRange::empty(position),
-                    new_text: format!("{name}="),
-                }]
-            } else {
-                vec![]
-            },
+            text_edits: vec![],
         }
     }
 
@@ -410,20 +402,19 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         position: TextSize,
         name: &str,
         navigation_target: Option<NavigationTarget>,
-        allow_edits: bool,
-    ) {
+    ) -> bool {
         if !self.settings.call_argument_names {
-            return;
+            return false;
         }
 
         if name.starts_with('_') {
-            return;
+            return false;
         }
 
-        let inlay_hint =
-            InlayHint::call_argument_name(position, name, navigation_target, allow_edits);
+        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
 
         self.hints.push(inlay_hint);
+        true
     }
 }
 
@@ -502,40 +493,42 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                let last_editable_arg_start = call
-                    .arguments
-                    .iter_source_order()
-                    .filter_map(|arg_or_keyword| match arg_or_keyword {
-                        ArgOrKeyword::Arg(arg) => Some(arg.range().start()),
-                        ArgOrKeyword::Keyword(_) => None,
-                    })
-                    .last();
+                let mut last_editable_hint_index: Option<usize> = None;
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
-                        // Offer an edit only for the last positional arg, and not for starred args.
-                        let allow_edits = !argument.is_starred_expr()
-                            && Some(argument.range().start()) == last_editable_arg_start;
-
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
                         {
-                            self.add_call_argument_name(
+                            if self.add_call_argument_name(
                                 arg_or_keyword.range().start(),
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
-                                allow_edits,
-                            );
+                            ) {
+                                if !argument.is_starred_expr() {
+                                    last_editable_hint_index = Some(self.hints.len() - 1);
+                                }
+                            }
                         }
 
                         positional_index += 1;
                     }
 
                     self.visit_expr(arg_or_keyword.value());
+                }
+
+                // For the last positional argument, provide an edit to insert
+                // the inlay hint.
+                if let Some(index) = last_editable_hint_index {
+                    let hint: &mut InlayHint = &mut self.hints[index];
+                    hint.text_edits = vec![InlayHintTextEdit {
+                        range: TextRange::empty(hint.position),
+                        new_text: format!("{}=", hint.label.parts()[0].text()),
+                    }];
                 }
             }
             _ => {
@@ -3969,6 +3962,15 @@ Source with applied edits:
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+        3 | t: tuple[int, int] = (23, 42)
+          - foo('foo', *t, d='bar')
+        4 + foo(a='foo', *t, d='bar')
         ");
     }
 
@@ -4078,6 +4080,15 @@ Source with applied edits:
         4 | foo([a=]1, [b=]*t)
           |             ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        1 |
+        2 | def foo(a: int, b: int): ...
+        3 | t: tuple[int] = (2,)
+          - foo(1, *t)
+        4 + foo(a=1, *t)
         ");
     }
 
