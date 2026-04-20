@@ -343,19 +343,8 @@ The full inline comment specification is as follows:
 
 *The following is currently only available in [preview mode](`preview.md`).*
 
-To ignore one or more violations within a single "logical" line (a statement or
-block header), an "ignore" comment can be placed either above or at the end of
-the logical line, like so:
-
-```python
-import sys  # ruff: ignore[F401]  # Covers this line
-
-# ruff: ignore[E741, F841]  # Covers the next line
-i = 1
-```
-
-To cover an entire multi-line statement or header, the comment must either be
-placed above the first line, or as a trailing comment on the last line:
+To cover an entire "logical" line (a multi-line statement or suite header),
+an "ignore" comment may be placed above the first line:
 
 ```python
 # ruff: ignore[ARG001]  # Covers the entire function signature
@@ -365,15 +354,16 @@ def foo(
 ):
     pass
 
-def bar():
-    """
-    This function goes places.
-    """  # ruff: ignore[D404]  # Covers the entire docstring
-    pass
+# ruff: ignore[E501]  # Covers the entire list literal
+things = [
+    "really long string literal ...",
+    "really long string literal ...",
+]
 ```
 
-Otherwise, only a single "physical" line will be covered, leaving the rest of the
-multi-line statement or header uncovered:
+Alternately, placing the "ignore" comment inside of a multi-line statement, or
+at the end of a line, will cover only a single "physical" line, leaving the rest
+of the multi-line statement or header uncovered:
 
 ```python
 def foo(
@@ -398,6 +388,7 @@ still cover the next logical line:
 # I definitely know what I'm doing.
 i = 1
 ```
+
 The full line-level suppression comment specification is as follows:
 
 - An own-line or trailing comment starting with case sensitive `#ruff:`, with
