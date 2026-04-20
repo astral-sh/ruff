@@ -35,6 +35,7 @@ enum SuppressionAction {
     Enable,
     /// # ruff:ignore[...] ignore a single line or multi-line statement
     Ignore,
+    IgnoreAll,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -136,6 +137,9 @@ pub(crate) enum InvalidSuppressionKind {
 
     /// Suppression does not match surrounding indentation
     Indentation,
+
+    /// Suppression must be at global module scope
+    NotModuleScope,
 }
 
 #[allow(unused)]
@@ -555,6 +559,39 @@ impl<'a> SuppressionsBuilder<'a> {
                 }
                 suppressions.next();
                 continue;
+            } else if suppression.action == SuppressionAction::IgnoreAll {
+                if is_ruff_ignore_enabled(self.settings) {
+                    match indentation_at_offset(suppression.range.start(), self.source) {
+                        // Module scope
+                        Some("") => {
+                            let range = TextRange::up_to(self.source.text_len());
+                            for code in suppression.codes_as_str(self.source) {
+                                self.valid.push(Suppression {
+                                    code: code.into(),
+                                    range,
+                                    used: false.into(),
+                                    comments: SuppressionComments::Single(suppression.clone()),
+                                });
+                            }
+                        }
+                        // Indented/inside block
+                        Some(_) => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::NotModuleScope,
+                                comment: suppression.clone(),
+                            });
+                        }
+                        // Trailing
+                        None => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Trailing,
+                                comment: suppression.clone(),
+                            });
+                        }
+                    }
+                }
+                suppressions.next();
+                continue;
             }
 
             // Matched suppression comments
@@ -954,6 +991,9 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
+        } else if self.cursor.as_str().starts_with("ignore-all") {
+            self.cursor.skip_bytes("ignore-all".len());
+            Ok(SuppressionAction::IgnoreAll)
         } else if self.cursor.as_str().starts_with("ignore") {
             self.cursor.skip_bytes("ignore".len());
             Ok(SuppressionAction::Ignore)
@@ -2138,6 +2178,161 @@ bar = [
     }
 
     #[test]
+    fn ignore_all_suppression_single() {
+        let source = r#"
+print("start")
+# ruff:ignore-all[code]
+print("end")
+        "#;
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[code]\nprint(\"end\")\n        ",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore-all[code]",
+                        action: IgnoreAll,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_all_suppression_multiple() {
+        let source = r#"
+print("start")
+# ruff:ignore-all[alpha, beta]
+# ruff:ignore-all[gamma]
+print("end")
+        "#;
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    code: "alpha",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore-all[alpha, beta]",
+                        action: IgnoreAll,
+                        codes: [
+                            "alpha",
+                            "beta",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    code: "beta",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore-all[alpha, beta]",
+                        action: IgnoreAll,
+                        codes: [
+                            "alpha",
+                            "beta",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    code: "gamma",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore-all[gamma]",
+                        action: IgnoreAll,
+                        codes: [
+                            "gamma",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_all_suppression_trailing() {
+        let source = r#"
+print("hello")  # ruff:ignore-all[code]
+        "#;
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [],
+            invalid: [
+                InvalidSuppression {
+                    kind: Trailing,
+                    comment: SuppressionComment {
+                        text: "# ruff:ignore-all[code]",
+                        action: IgnoreAll,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_all_suppression_indented() {
+        let source = r#"
+def foo():
+    # ruff:ignore-all[code]
+    pass
+        "#;
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [],
+            invalid: [
+                InvalidSuppression {
+                    kind: NotModuleScope,
+                    comment: SuppressionComment {
+                        text: "# ruff:ignore-all[code]",
+                        action: IgnoreAll,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
     fn parse_unrelated_comment() {
         assert_debug_snapshot!(
             parse_suppression_comment("# hello world"),
@@ -2313,6 +2508,25 @@ bar = [
             SuppressionComment {
                 text: "# ruff: ignore[code]",
                 action: Ignore,
+                codes: [
+                    "code",
+                ],
+                reason: "",
+            },
+        )
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_all_single_code() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore-all[code]"),
+            @r##"
+        Ok(
+            SuppressionComment {
+                text: "# ruff: ignore-all[code]",
+                action: IgnoreAll,
                 codes: [
                     "code",
                 ],
