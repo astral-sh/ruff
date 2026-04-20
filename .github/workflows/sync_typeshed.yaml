@@ -226,6 +226,6 @@ jobs:
               owner: "astral-sh",
               repo: "ruff",
               title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
-              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              body: `Run listed here: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               labels: ["bug", "ty"],
             })
