@@ -29,7 +29,6 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 dunce = { workspace = true }
-insta = { workspace = true, features = ["filters"] }
 salsa = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true }

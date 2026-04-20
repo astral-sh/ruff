@@ -5,8 +5,10 @@ use std::{
 };
 
 use anyhow::{Context, bail};
+use camino::Utf8Path;
 use indexmap::{IndexMap, map::Entry};
 use ruff_db::{
+    diagnostic::{Diagnostic, FileResolver},
     panic::PanicError,
     system::{SystemPath, SystemPathBuf},
 };
@@ -204,6 +206,45 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
                     panic!("Test `{}` is expected to panic but it didn't.", self.name());
                 }
             }
+        }
+    }
+
+    pub fn snapshot_diagnostics(
+        &self,
+        resolver: &dyn FileResolver,
+        tool_name: &'static str,
+        relative_fixture_path: &Utf8Path,
+        snapshot_path: &Utf8Path,
+        diagnostics: &[Diagnostic],
+        mut snapshot_filter: impl FnMut(&Diagnostic) -> bool,
+    ) {
+        if self.should_snapshot_diagnostics() {
+            assert!(
+                !diagnostics.is_empty(),
+                "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+                self.name()
+            );
+
+            let snapshot = crate::create_diagnostic_snapshot(
+                resolver,
+                tool_name,
+                relative_fixture_path,
+                self,
+                diagnostics
+                    .iter()
+                    .filter(|diagnostic| snapshot_filter(diagnostic)),
+            );
+
+            let name = self.name().replace(' ', "_").replace(':', "__");
+            insta::with_settings!(
+                {
+                    snapshot_path => snapshot_path,
+                    input_file => name.clone(),
+                    filters => vec![(r"\\", "/")],
+                    prepend_module_to_snapshot => false,
+                },
+                { insta::assert_snapshot!(name, snapshot) }
+            );
         }
     }
 }
