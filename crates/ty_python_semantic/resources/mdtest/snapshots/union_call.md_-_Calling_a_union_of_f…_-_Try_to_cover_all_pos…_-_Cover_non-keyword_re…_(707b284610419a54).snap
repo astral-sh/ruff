@@ -123,10 +123,9 @@ error[no-matching-overload]: No overload of function `f6` matches arguments
 info: First overload defined here
   --> src/mdtest_snippet.py:23:1
    |
-23 | @overload
-   | ---------
-24 | def f6() -> None: ...
-   |     ^^^^^^^^^^^^
+23 | / @overload
+24 | | def f6() -> None: ...
+   | |_____________________^ First overload defined here
    |
 info: Possible overloads for function `f6`:
 info:   () -> None

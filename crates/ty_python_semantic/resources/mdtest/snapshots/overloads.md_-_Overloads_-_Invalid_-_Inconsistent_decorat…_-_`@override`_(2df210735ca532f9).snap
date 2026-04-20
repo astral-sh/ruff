@@ -122,16 +122,15 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 error[invalid-overload]: `@override` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:17:5
    |
-17 |     @overload
-   |     ---------
-18 |     def method(self, x: int) -> int: ...
-   |         ------ First overload defined here
-19 |     @overload
-20 |     @override
-   |     ---------
-21 |     # error: [invalid-overload]
-22 |     def method(self, x: str) -> str: ...
-   |         ^^^^^^
+17 | /     @overload
+18 | |     def method(self, x: int) -> int: ...
+   | |________________________________________- First overload defined here
+19 |       @overload
+20 |       @override
+   |       ---------
+21 |       # error: [invalid-overload]
+22 |       def method(self, x: str) -> str: ...
+   |           ^^^^^^
    |
 
 ```

@@ -37,10 +37,9 @@ error[no-matching-overload]: No overload of function `f` matches arguments
 info: First overload defined here
  --> src/mdtest_snippet.py:3:1
   |
-3 | @overload
-  | ---------
-4 | def f(x: int) -> int: ...
-  |     ^^^^^^^^^^^^^^^^
+3 | / @overload
+4 | | def f(x: int) -> int: ...
+  | |_________________________^ First overload defined here
   |
 info: Possible overloads for function `f`:
 info:   (x: int) -> int

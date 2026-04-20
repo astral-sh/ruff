@@ -114,16 +114,15 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:9:5
    |
- 9 |     @overload
-   |     ---------
-10 |     def method2(self, x: int) -> int: ...
-   |         ------- First overload defined here
-11 |     @final
-   |     ------
-12 |     @overload
-13 |     # error: [invalid-overload]
-14 |     def method2(self, x: str) -> str: ...
-   |         ^^^^^^^
+ 9 | /     @overload
+10 | |     def method2(self, x: int) -> int: ...
+   | |_________________________________________- First overload defined here
+11 |       @final
+   |       ------
+12 |       @overload
+13 |       # error: [invalid-overload]
+14 |       def method2(self, x: str) -> str: ...
+   |           ^^^^^^^
    |
 
 ```
@@ -132,15 +131,14 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:15:5
    |
-15 |     @overload
-   |     ---------
-16 |     def method3(self, x: int) -> int: ...
-   |         ------- First overload defined here
-17 |     @final
-   |     ------
-18 |     @overload
-19 |     def method3(self, x: str) -> int: ...  # error: [invalid-overload]
-   |         ^^^^^^^
+15 | /     @overload
+16 | |     def method3(self, x: int) -> int: ...
+   | |_________________________________________- First overload defined here
+17 |       @final
+   |       ------
+18 |       @overload
+19 |       def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+   |           ^^^^^^^
    |
 
 ```
@@ -149,18 +147,17 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:15:5
    |
-15 |     @overload
-   |     ---------
-16 |     def method3(self, x: int) -> int: ...
-   |         ------- First overload defined here
-17 |     @final
-18 |     @overload
-19 |     def method3(self, x: str) -> int: ...  # error: [invalid-overload]
-20 |     @overload
-21 |     @final
-   |     ------
-22 |     def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
-   |         ^^^^^^^
+15 | /     @overload
+16 | |     def method3(self, x: int) -> int: ...
+   | |_________________________________________- First overload defined here
+17 |       @final
+18 |       @overload
+19 |       def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+20 |       @overload
+21 |       @final
+   |       ------
+22 |       def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+   |           ^^^^^^^
    |
 
 ```

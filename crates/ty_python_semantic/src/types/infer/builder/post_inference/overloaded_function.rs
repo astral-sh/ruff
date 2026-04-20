@@ -1,5 +1,5 @@
-use ruff_db::diagnostic::Annotation;
-use ruff_text_size::Ranged;
+use ruff_db::{diagnostic::Annotation, parsed::parsed_module};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -202,7 +202,7 @@ pub(crate) fn check_overloaded_function<'db>(
         }
     }
 
-    for (function, decorator) in [
+    for (known_function, decorator) in [
         (KnownFunction::Final, FunctionDecorators::FINAL),
         (KnownFunction::Override, FunctionDecorators::OVERRIDE),
     ] {
@@ -219,10 +219,11 @@ pub(crate) fn check_overloaded_function<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`@{name}` decorator should be applied only to the \
                         overload implementation",
-                    name = function.name()
+                    name = known_function.name()
                 ));
-                for function in [function, KnownFunction::Overload] {
-                    if let Some(decorator) = overload.find_known_decorator_span(db, function) {
+                for known_function in [known_function, KnownFunction::Overload] {
+                    if let Some(decorator) = overload.find_known_decorator_span(db, known_function)
+                    {
                         diagnostic.annotate(Annotation::secondary(decorator));
                     }
                 }
@@ -249,21 +250,30 @@ pub(crate) fn check_overloaded_function<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`@{name}` decorator should be applied only to the \
                         first overload",
-                    name = function.name()
+                    name = known_function.name()
                 ));
-                if let Some(decorator) = overload.find_known_decorator_span(db, function) {
+                if let Some(decorator) = overload.find_known_decorator_span(db, known_function) {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
+                let file = function.file(db);
+                let module = parsed_module(db, file).load(db);
+                let node = first_overload.node(db, file, &module);
+                let range = if node.body.len() == 1 {
+                    node.range()
+                } else {
+                    TextRange::new(
+                        node.start(),
+                        node.returns
+                            .as_deref()
+                            .map(Ranged::end)
+                            .unwrap_or_else(|| node.parameters.end()),
+                    )
+                };
                 diagnostic.annotate(
                     context
-                        .secondary(first_overload.focus_range(db, context.module()))
+                        .secondary(range)
                         .message(format_args!("First overload defined here")),
                 );
-                if let Some(decorator) =
-                    first_overload.find_known_decorator_span(db, KnownFunction::Overload)
-                {
-                    diagnostic.annotate(Annotation::secondary(decorator));
-                }
             }
         }
     }

@@ -4835,64 +4835,61 @@ pub(crate) fn report_call_to_abstract_method(
     diag.set_primary_message(format_args!(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
-
-    let annotation = Annotation::secondary(abstract_method_span(
+    let span = abstract_method_span(
         db,
-        &mut diag,
         function,
-        AbstractMethodAnnotationPolicy::IncludeBody,
-    ))
-    .message(format_args!("Method `{name}` defined here"));
-
-    diag.annotate(annotation);
+        AbstractMethodAnnotationPolicy::AlwaysIncludeBody,
+    );
+    diag.annotate(
+        Annotation::secondary(span).message(format_args!("Method `{name}` defined here")),
+    );
 }
 
 pub(super) fn abstract_method_span<'db>(
     db: &'db dyn Db,
-    diagnostic: &mut Diagnostic,
     function: FunctionType<'db>,
     policy: AbstractMethodAnnotationPolicy,
 ) -> Span {
     let (_, implementation) = function.overloads_and_implementation(db);
 
-    if let Some(implementation) = implementation
-        && let Some(span) =
-            implementation.find_known_decorator_span(db, KnownFunction::AbstractMethod)
-    {
-        diagnostic.annotate(Annotation::secondary(span));
-    }
-
-    if policy == AbstractMethodAnnotationPolicy::ExcludeBody {
+    let Some(implementation) = implementation else {
         return function.spans(db).name;
-    }
+    };
 
     let file = function.file(db);
     let module = parsed_module(db, file).load(db);
-    let node = implementation.map(|implementation| implementation.node(db, file, &module));
+    let node = implementation.node(db, file, &module);
+    let source_text = source_text(db, file);
 
-    if let Some(node) = node
-        && let [single_stmt] = &*node.body
-        && let source_text = source_text(db, file)
-        && source_text.line_start(node.name.end()) == source_text.line_start(single_stmt.start())
+    let decorators_and_parameters = || {
+        Span::from(file).with_range(TextRange::new(
+            node.start(),
+            node.returns
+                .as_deref()
+                .map(Ranged::end)
+                .unwrap_or_else(|| node.parameters.end()),
+        ))
+    };
+
+    if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
+        && source_text.line_start(node.name.end()) != source_text.line_start(node.end())
     {
-        Span::from(file).with_range(TextRange::new(node.name.start(), single_stmt.end()))
-    } else {
-        if let Some(node) = node
-            && let [single_stmt] = &*node.body
-        {
-            diagnostic.annotate(Annotation::secondary(
-                Span::from(file).with_range(single_stmt.range()),
-            ));
-        }
+        return decorators_and_parameters();
+    }
 
-        function.spans(db).name
+    if let [single_stmt] = &*node.body
+        && source_text.line_start(single_stmt.start()) == source_text.line_start(single_stmt.end())
+    {
+        Span::from(file).with_range(node.range())
+    } else {
+        decorators_and_parameters()
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum AbstractMethodAnnotationPolicy {
-    IncludeBody,
-    ExcludeBody,
+    AlwaysIncludeBody,
+    ExcludeVerboseBody,
 }
 
 pub(crate) fn report_undeclared_protocol_member(

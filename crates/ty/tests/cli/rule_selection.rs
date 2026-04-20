@@ -1107,16 +1107,15 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
       --> test.py:6:5
        |
-     6 |     @abstractmethod
-       |     ---------------
-     7 |     def foo(self) -> int:
-       |         --- `foo` declared as abstract on superclass `Base`
-     8 |         raise NotImplementedError
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
      9 |
-    10 | @final
-       | ------
-    11 | class Derived(Base):
-       |       ^^^^^^^ `foo` is unimplemented
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
        |
     info: rule `abstract-method-in-final-class` was selected in the configuration file
 
@@ -1171,16 +1170,15 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
       --> src/test.py:6:5
        |
-     6 |     @abstractmethod
-       |     ---------------
-     7 |     def foo(self) -> int:
-       |         --- `foo` declared as abstract on superclass `Base`
-     8 |         raise NotImplementedError
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
      9 |
-    10 | @final
-       | ------
-    11 | class Derived(Base):
-       |       ^^^^^^^ `foo` is unimplemented
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
        |
     info: rule `abstract-method-in-final-class` was selected in the configuration file
 

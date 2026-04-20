@@ -1159,11 +1159,11 @@ fn check_final_class_abstract_methods<'db>(
 
     if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
         let policy = if kind.is_explicit() {
-            AbstractMethodAnnotationPolicy::ExcludeBody
+            AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         } else {
-            AbstractMethodAnnotationPolicy::IncludeBody
+            AbstractMethodAnnotationPolicy::AlwaysIncludeBody
         };
-        let secondary_span = abstract_method_span(db, &mut diagnostic, function, policy);
+        let secondary_span = abstract_method_span(db, function, policy);
         let mut secondary_annotation = Annotation::secondary(secondary_span);
         secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
             secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))

@@ -58,7 +58,7 @@ use crate::types::{
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
 use ty_python_core::scope::NodeWithScopeKind;
@@ -3518,12 +3518,25 @@ impl<'db> CallableBinding<'db> {
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
                         );
-                        sub.annotate(Annotation::primary(overload.spans(context.db()).signature));
-                        if let Some(decorator) = overload
-                            .find_known_decorator_span(context.db(), KnownFunction::Overload)
-                        {
-                            sub.annotate(Annotation::secondary(decorator));
-                        }
+                        let file = function.file(context.db());
+                        let module = parsed_module(context.db(), file).load(context.db());
+                        let node =
+                            overload.node(context.db(), function.file(context.db()), &module);
+                        let range = if node.body.len() == 1 {
+                            node.range()
+                        } else {
+                            TextRange::new(
+                                node.start(),
+                                node.returns
+                                    .as_deref()
+                                    .map(Ranged::end)
+                                    .unwrap_or_else(|| node.parameters.end()),
+                            )
+                        };
+                        sub.annotate(
+                            Annotation::primary(Span::from(file).with_range(range))
+                                .message("First overload defined here"),
+                        );
                         diag.sub(sub);
                     }
 

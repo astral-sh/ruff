@@ -198,16 +198,15 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/stub.pyi:26:5
    |
-26 |     @overload
-   |     ---------
-27 |     def bar(self, x: str) -> str: ...
-   |         --- First overload defined here
-28 |     @overload
-29 |     @final
-   |     ------
-30 |     # error: [invalid-overload]
-31 |     def bar(self, x: int) -> int: ...
-   |         ^^^
+26 | /     @overload
+27 | |     def bar(self, x: str) -> str: ...
+   | |_____________________________________- First overload defined here
+28 |       @overload
+29 |       @final
+   |       ------
+30 |       # error: [invalid-overload]
+31 |       def bar(self, x: int) -> int: ...
+   |           ^^^
    |
 
 ```
@@ -216,16 +215,15 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
   --> src/stub.pyi:32:5
    |
-32 |     @overload
-   |     ---------
-33 |     def baz(self, x: str) -> str: ...
-   |         --- First overload defined here
-34 |     @final
-   |     ------
-35 |     @overload
-36 |     # error: [invalid-overload]
-37 |     def baz(self, x: int) -> int: ...
-   |         ^^^
+32 | /     @overload
+33 | |     def baz(self, x: str) -> str: ...
+   | |_____________________________________- First overload defined here
+34 |       @final
+   |       ------
+35 |       @overload
+36 |       # error: [invalid-overload]
+37 |       def baz(self, x: int) -> int: ...
+   |           ^^^
    |
 
 ```
