@@ -1430,7 +1430,7 @@ def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
 
 def _(y: type[typing.NamedTuple]):
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(y)  # revealed: type[tuple[object, ...]] & type[NamedTupleLike]
 
 # error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
 def _(z: typing.NamedTuple[int]): ...

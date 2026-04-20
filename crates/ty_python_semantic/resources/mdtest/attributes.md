@@ -2301,6 +2301,7 @@ The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is alway
 
 ```py
 import typing_extensions
+from ty_extensions import Intersection
 
 reveal_type(typing_extensions.__class__)  # revealed: <class 'ModuleType'>
 reveal_type(type(typing_extensions))  # revealed: <class 'ModuleType'>
@@ -2321,7 +2322,10 @@ reveal_type(d.__class__)  # revealed: <class 'bool'>
 e = (42, 42)
 reveal_type(e.__class__)  # revealed: type[tuple[Literal[42], Literal[42]]]
 
-def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
+class A: ...
+class B: ...
+
+def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str], e: Intersection[A, B]):
     reveal_type(a.__class__)  # revealed: type[int]
     reveal_type(type(a))  # revealed: type[int]
 
@@ -2336,6 +2340,8 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     # as `c` could be some subclass of `str` with a custom metaclass.
     # All we know is that the metaclass must be a (non-strict) subclass of `type`.
     reveal_type(d.__class__)  # revealed: type[type]
+
+    reveal_type(e.__class__)  # revealed: type[A] & type[B]
 
 reveal_type(f.__class__)  # revealed: <class 'FunctionType'>
 
