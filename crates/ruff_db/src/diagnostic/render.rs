@@ -907,6 +907,12 @@ pub struct Input {
     pub(crate) line_index: LineIndex,
 }
 
+impl Input {
+    pub fn line_index(&self) -> &LineIndex {
+        &self.line_index
+    }
+}
+
 /// Returns the line number accounting for the given `len`
 /// number of preceding context lines.
 ///
