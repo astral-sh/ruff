@@ -979,25 +979,10 @@ impl<'db> GenericContext<'db> {
             let typevar = bound_typevar.typevar(db);
 
             if let Some(ty) = ty {
-                let ty: Type<'db> = ty.into();
-                // Don't cap with the bound when:
-                // - the provided value is the same underlying typevar (regardless of binding
-                //   context). This covers the identity specialization `T -> T` (which would
-                //   otherwise become `T & Bound` and poison downstream uses like narrowing),
-                //   as well as passing a typevar across generic scopes — e.g. `TU` defined
-                //   once at module level, then used as both `def f(x: TU)` and `Foo[TU]`.
-                //   The two `BoundTypeVarInstance`s differ by binding context, but share the
-                //   same bound/constraints, so the intersection would be redundant. or
-                // - the typevar is `Self`: its bound is always the class's identity
-                //   specialization, which is redundant for any concrete self type and would
-                //   produce noisy intersections like `Iter[int] & Iter[T@Iter]`.
-                expanded[idx] = if typevar.is_self(db)
-                    || matches!(ty, Type::TypeVar(tv) if tv.typevar(db) == typevar)
-                {
-                    ty
-                } else {
-                    typevar.intersect_with_bound(db, ty)
-                };
+                // `intersect_with_bound` short-circuits the cases where the intersection would
+                // be redundant (Self typevars; typevars whose bound/constraints are already
+                // subsumed by this typevar's), so we can unconditionally delegate.
+                expanded[idx] = typevar.intersect_with_bound(db, ty.into());
                 continue;
             }
 
@@ -1035,6 +1020,7 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, self.cap_by_upper_bound(db, types), None, None)
     }
 }
+
 
 /// An assignment of a specific type to each type variable in a generic scope.
 ///

@@ -635,11 +635,53 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     pub(crate) fn intersect_with_bound(self, db: &'db dyn Db, other: Type<'db>) -> Type<'db> {
-        match self.bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+        let Some(bound_or_constraints) = self.bound_or_constraints(db) else {
+            return other;
+        };
+
+        // If `self` is the synthetic `Self` typevar, `bound_or_constraints` is the class's
+        // identity specialization, which any concrete self value already satisfies — applying
+        // it produces noisy intersections like `Iter[int] & Iter[T@Iter]` without adding
+        // information.
+        //
+        // Similarly, if `other` is a typevar whose bound/constraints already ensure the value
+        // inhabits `self`'s bound/constraints, the intersection would be redundant. This
+        // covers the identity specialization `T -> T`, typevars reused across generic scopes
+        // (same underlying typevar, different binding context), and passing a caller's
+        // constrained typevar through to a callee with an equivalent/subset constraint set.
+        if self.is_self(db) {
+            return other;
+        }
+        if let Type::TypeVar(other_tv) = other {
+            let subsumed = match (&bound_or_constraints, other_tv.typevar(db).bound_or_constraints(db)) {
+                (_, None) => false,
+                (
+                    TypeVarBoundOrConstraints::UpperBound(self_bound),
+                    Some(TypeVarBoundOrConstraints::UpperBound(other_bound)),
+                ) => other_bound.is_assignable_to(db, *self_bound),
+                (
+                    TypeVarBoundOrConstraints::Constraints(self_constraints),
+                    Some(TypeVarBoundOrConstraints::Constraints(other_constraints)),
+                ) => other_constraints.elements(db).iter().all(|other_constraint| {
+                    self_constraints
+                        .elements(db)
+                        .iter()
+                        .any(|self_constraint| {
+                            other_constraint.is_equivalent_to(db, *self_constraint)
+                        })
+                }),
+                _ => false,
+            };
+            if subsumed {
+                return other;
+            }
+        }
+
+        match bound_or_constraints {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
                 IntersectionType::from_two_elements(db, bound.top_materialization(db), other)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => UnionType::from_elements(
+            TypeVarBoundOrConstraints::Constraints(constraints) => UnionType::from_elements(
                 db,
                 constraints.elements(db).iter().map(|&constraint| {
                     IntersectionType::from_two_elements(
@@ -649,7 +691,6 @@ impl<'db> TypeVarInstance<'db> {
                     )
                 }),
             ),
-            None => other,
         }
     }
 }

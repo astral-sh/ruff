@@ -3510,7 +3510,7 @@ class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
 # TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | @Todo(specialized non-generic class)
+reveal_type(T3.__bound__)  # revealed: B2[Top[B1[Any]] & Any] | @Todo(specialized non-generic class)
 
 # TODO error: [invalid-type-arguments]
 def f(x: B1[int]):
