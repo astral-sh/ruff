@@ -517,7 +517,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
-                    if let ArgOrKeyword::Arg(_) = arg_or_keyword {
+                    if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
                         // Offer an edit only for the rightmost non-starred positional arg.
                         let allow_edits = matches!(
                             arg_or_keyword,
@@ -528,7 +528,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
-                            && !arg_matches_name(&arg_or_keyword, name)
+                            && !arg_matches_name(argument, name)
                         {
                             self.add_call_argument_name(
                                 arg_or_keyword.range().start(),
@@ -556,18 +556,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 ///
 /// This allows us to filter out repetitive inlay hints like `x=x`, `x=y.x`, etc.,
 /// and suppresses hints for arguments that are already explicit keyword arguments.
-fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
-    // Explicit keyword argument already has a name, no hint needed.
-    if let ArgOrKeyword::Keyword(keyword) = arg_or_keyword {
-        return keyword.arg.is_some();
-    }
-
-    // Only care about positional args.
-    let ArgOrKeyword::Arg(arg) = arg_or_keyword else {
-        return false;
-    };
-
-    let mut expr = *arg;
+fn arg_matches_name(argument: &Expr, name: &str) -> bool {
+    let mut expr = argument;
     loop {
         match expr {
             // `x=x(1, 2)` counts as a match, recurse for it
