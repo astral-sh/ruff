@@ -118,9 +118,7 @@ function Logo({ name, className }: { name: "ruff" | "ty"; className: string }) {
             xmlns="http://www.w3.org/2000/svg"
             className={className}
           >
-            <path
-              d="M 64 10 H 37 V 0 H 5 V 10 H 0 V 35 H 5 V 54 C 5 59 10 64 16 64 H 64 V 40 H 37 V 35 H 54 C 59 35 64 30 64 24 V 10 Z M 99 10 H 104 V 0 H 133 V 54 C 133 59 128 64 122 64 h -53 V 40 H 101 V 35 H 79 C 74 35 69 30 69 24 V 0 H 99 Z"
-            />
+            <path d="M 64 10 H 37 V 0 H 5 V 10 H 0 V 35 H 5 V 54 C 5 59 10 64 16 64 H 64 V 40 H 37 V 35 H 54 C 59 35 64 30 64 24 V 10 Z M 99 10 H 104 V 0 H 133 V 54 C 133 59 128 64 122 64 h -53 V 40 H 101 V 35 H 79 C 74 35 69 30 69 24 V 0 H 99 Z" />
           </svg>
         </a>
       );
