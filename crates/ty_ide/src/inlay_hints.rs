@@ -507,7 +507,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                     .iter_source_order()
                     .filter_map(|arg_or_keyword| match arg_or_keyword {
                         ArgOrKeyword::Arg(arg) => Some(arg.range().start()),
-                        _ => None,
+                        ArgOrKeyword::Keyword(_) => None,
                     })
                     .last();
 
