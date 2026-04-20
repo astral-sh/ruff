@@ -168,31 +168,6 @@ pub struct SemanticTokens {
     tokens: Vec<SemanticToken>,
 }
 
-enum UnifiedTokenType {
-    None,
-    /// All types have the same semantic token type
-    Uniform(SemanticTokenType),
-    /// The elements have different semantic token types
-    Fallback,
-}
-
-impl UnifiedTokenType {
-    fn add(&mut self, ty: SemanticTokenType) {
-        *self = match self {
-            Self::None => Self::Uniform(ty),
-            Self::Uniform(current) if *current == ty => Self::Uniform(ty),
-            Self::Uniform(_) | Self::Fallback => Self::Fallback,
-        }
-    }
-
-    fn into_semantic_token_type(self) -> Option<SemanticTokenType> {
-        match self {
-            UnifiedTokenType::None | UnifiedTokenType::Fallback => None,
-            UnifiedTokenType::Uniform(ty) => Some(ty),
-        }
-    }
-}
-
 impl SemanticTokens {
     /// Create a new `SemanticTokens` instance.
     pub fn new(tokens: Vec<SemanticToken>) -> Self {
@@ -477,6 +452,31 @@ impl<'db> SemanticTokenVisitor<'db> {
         ty: Type,
         attr_name: &ast::Identifier,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
+        enum UnifiedTokenType {
+            None,
+            /// All types have the same semantic token type
+            Uniform(SemanticTokenType),
+            /// The elements have different semantic token types
+            Fallback,
+        }
+
+        impl UnifiedTokenType {
+            fn add(&mut self, ty: SemanticTokenType) {
+                *self = match self {
+                    Self::None => Self::Uniform(ty),
+                    Self::Uniform(current) if *current == ty => Self::Uniform(ty),
+                    Self::Uniform(_) | Self::Fallback => Self::Fallback,
+                }
+            }
+
+            fn into_semantic_token_type(self) -> Option<SemanticTokenType> {
+                match self {
+                    UnifiedTokenType::None | UnifiedTokenType::Fallback => None,
+                    UnifiedTokenType::Uniform(ty) => Some(ty),
+                }
+            }
+        }
+
         if ty.is_unknown() {
             return None;
         }
