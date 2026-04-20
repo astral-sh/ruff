@@ -5,7 +5,9 @@ use camino::Utf8Path;
 use colored::Colorize;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
-use mdtest::{Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, TestFile, output_format};
+use mdtest::{
+    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, output_format,
+};
 use ruff_db::Db as _;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
@@ -66,29 +68,17 @@ pub fn run(
             continue;
         }
 
-        let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
-            Log::Bool(enabled) => enabled.then(setup_logging),
-            Log::Filter(filter) => setup_logging_with_filter(filter),
-        });
-
         let result = run_test(
             &mut db,
             absolute_fixture_path,
             relative_fixture_path,
             snapshot_path,
             &test,
+            &mut assertion,
+            output_format,
         );
 
-        let inconsistencies = if result
-            .as_ref()
-            .is_ok_and(|(outcome, _)| outcome.has_been_skipped())
-        {
-            Ok(())
-        } else {
-            run_module_resolution_consistency_test(&db)
-        };
-
-        let this_test_failed = result.is_err() || inconsistencies.is_err();
+        let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
@@ -138,16 +128,6 @@ pub fn run(
                 }
             }
         }
-        if let Err(inconsistencies) = inconsistencies {
-            any_failures = true;
-            for inconsistency in inconsistencies {
-                output_format.write_inconsistency(
-                    &mut assertion,
-                    relative_fixture_path,
-                    &inconsistency,
-                );
-            }
-        }
 
         if this_test_failed && output_format.is_cli() {
             let escaped_test_name = test.name().replace('\'', "\\'");
@@ -181,19 +161,20 @@ enum TestOutcome {
     Skipped,
 }
 
-impl TestOutcome {
-    const fn has_been_skipped(self) -> bool {
-        matches!(self, TestOutcome::Skipped)
-    }
-}
-
 fn run_test(
     db: &mut db::Db,
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
+    assertion: &mut String,
+    output_format: OutputFormat,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
+    let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
+        Log::Bool(enabled) => enabled.then(setup_logging),
+        Log::Filter(filter) => setup_logging_with_filter(filter),
+    });
+
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -599,7 +580,15 @@ fn run_test(
         }
     }
 
-    if failures.is_empty() {
+    let inconsistencies = run_module_resolution_consistency_test(db);
+
+    if let Err(inconsistencies) = &inconsistencies {
+        for inconsistency in inconsistencies {
+            output_format.write_inconsistency(assertion, relative_fixture_path, &inconsistency);
+        }
+    }
+
+    if failures.is_empty() && inconsistencies.is_ok() {
         Ok((TestOutcome::Success, markdown_edits))
     } else {
         Err(failures)
