@@ -3185,9 +3185,11 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "bitflags 2.11.1",
+ "camino",
  "clap",
  "colored 3.1.1",
  "compact_str",
+ "datatest-stable",
  "fern",
  "glob",
  "globset",
@@ -3220,6 +3222,7 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_python_trivia",
  "ruff_source_file",
+ "ruff_test",
  "ruff_text_size",
  "rustc-hash",
  "schemars",
@@ -3541,6 +3544,21 @@ dependencies = [
  "memchr",
  "ruff_text_size",
  "serde",
+]
+
+[[package]]
+name = "ruff_test"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "mdtest",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_workspace",
+ "salsa",
 ]
 
 [[package]]
