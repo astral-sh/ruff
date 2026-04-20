@@ -155,6 +155,13 @@ def f(
     print("hello")
 
 
+def f(
+    foo,
+    bar,
+):  # ruff: ignore[ARG001]  should cover nothing and be marked as unused
+    pass
+
+
 # Ensure LAST suppression in file is reported.
 # https://github.com/astral-sh/ruff/issues/23235
 # ruff:disable[F401]

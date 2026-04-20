@@ -482,21 +482,40 @@ ARG001 Unused function argument: `bar`
 155 |     print("hello")
     |
 
-RUF100 [*] Unused suppression (non-enabled: `F401`)
-   --> suppressions.py:160:1
+RUF100 [*] Unused suppression (unused: `ARG001`)
+   --> suppressions.py:161:5
     |
-158 | # Ensure LAST suppression in file is reported.
-159 | # https://github.com/astral-sh/ruff/issues/23235
-160 | # ruff:disable[F401]
+159 |     foo,
+160 |     bar,
+161 | ):  # ruff: ignore[ARG001]  should cover nothing and be marked as unused
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+162 |     pass
+    |
+help: Remove unused suppression
+158 | def f(
+159 |     foo,
+160 |     bar,
+    - ):  # ruff: ignore[ARG001]  should cover nothing and be marked as unused
+161 + ):
+162 |     pass
+163 |
+164 |
+
+RUF100 [*] Unused suppression (non-enabled: `F401`)
+   --> suppressions.py:167:1
+    |
+165 | # Ensure LAST suppression in file is reported.
+166 | # https://github.com/astral-sh/ruff/issues/23235
+167 | # ruff:disable[F401]
     | ^^^^^^^^^^^^^^^^^^^^
-161 | print("goodbye")
-162 | # ruff:enable[F401]
+168 | print("goodbye")
+169 | # ruff:enable[F401]
     | -------------------
     |
 help: Remove unused suppression
-157 |
-158 | # Ensure LAST suppression in file is reported.
-159 | # https://github.com/astral-sh/ruff/issues/23235
+164 |
+165 | # Ensure LAST suppression in file is reported.
+166 | # https://github.com/astral-sh/ruff/issues/23235
     - # ruff:disable[F401]
-160 | print("goodbye")
+167 | print("goodbye")
     - # ruff:enable[F401]
