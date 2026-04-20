@@ -87,7 +87,7 @@ jobs:
           cp .github/ty-ecosystem.toml ../ty-ecosystem.toml
 
       - name: Upload ty binaries, project lists, and config
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ty-builds
           path: |
@@ -107,10 +107,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.6"
+          version: "0.11.7"
 
       - name: Download ty binaries, project lists, and config
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -148,7 +148,7 @@ jobs:
             --output-new "diagnostics-PR-${SHARD}.json"
 
       - name: Upload diagnostics
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: diagnostics-shard-${{ matrix.shard }}
           path: |
@@ -162,10 +162,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          version: "0.11.6"
+          version: "0.11.7"
 
       - name: Download shard 0 diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -230,7 +230,7 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-report
           path: dist/
@@ -238,19 +238,19 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: comment.md
           path: comment.md
 
       - name: Upload diagnostics diff
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: diff.html
           path: dist/diff.html
 
       - name: Upload timing diff
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: timing.html
           path: dist/timing.html

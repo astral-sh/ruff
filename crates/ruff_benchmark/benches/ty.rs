@@ -693,6 +693,49 @@ class E(Enum):
     });
 }
 
+/// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
+/// has one more member than the source protocol.
+///
+/// Without the member-count gate, repeated return-type checks spend time comparing every shared
+/// protocol member before eventually failing on the missing one.
+fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
+    const NUM_MEMBERS: usize = 800;
+    const NUM_FUNCTIONS: usize = 400;
+
+    setup_rayon();
+
+    let mut code = "from typing import Protocol\n\nclass Small(Protocol):\n".to_string();
+    for i in 0..NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push_str("\nclass Big(Protocol):\n");
+    for i in 0..=NUM_MEMBERS {
+        writeln!(&mut code, "    member_{i}: int").ok();
+    }
+
+    code.push('\n');
+    for i in 0..NUM_FUNCTIONS {
+        writeln!(
+            &mut code,
+            "def check_{i}(value: Small) -> Big:\n    return value\n"
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[many_protocol_members_mismatch]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), NUM_FUNCTIONS);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -1027,6 +1070,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_many_protocol_members_mismatch,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
