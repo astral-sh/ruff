@@ -477,37 +477,19 @@ fn run_test(
         failures.push(failure);
     }
 
-    if test.should_snapshot_diagnostics() {
-        assert!(
-            !all_diagnostics.is_empty(),
-            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
-            test.name()
-        );
-
-        // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
-        // since they make snapshots very noisy!
-        let snapshot = mdtest::create_diagnostic_snapshot(
-            db,
-            "ty",
-            relative_fixture_path,
-            test,
-            all_diagnostics.iter().filter(|diagnostic| {
-                diagnostic.id() != DiagnosticId::RevealedType
-                    && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
-            }),
-        );
-
-        let name = test.name().replace(' ', "_").replace(':', "__");
-        insta::with_settings!(
-            {
-                snapshot_path => snapshot_path,
-                input_file => name.clone(),
-                filters => vec![(r"\\", "/")],
-                prepend_module_to_snapshot => false,
-            },
-            { insta::assert_snapshot!(name, snapshot) }
-        );
-    }
+    // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+    // since they make snapshots very noisy!
+    test.snapshot_diagnostics(
+        db,
+        "ty",
+        relative_fixture_path,
+        snapshot_path,
+        &all_diagnostics,
+        |diagnostic| {
+            diagnostic.id() != DiagnosticId::RevealedType
+                && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+        },
+    );
 
     // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
     // But don't try to run fixes for tests that are expected to panic.
