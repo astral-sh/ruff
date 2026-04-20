@@ -1,7 +1,11 @@
+use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
 
 use camino::Utf8Path;
 use colored::Colorize;
+use ruff_db::Db;
+use ruff_db::files::File;
+use ruff_db::panic::{PanicError, catch_unwind};
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
@@ -460,6 +464,87 @@ pub fn create_diagnostic_snapshot<'d, C>(
 pub struct MarkdownEdit {
     pub(crate) range: TextRange,
     pub(crate) replacement: String,
+}
+
+/// Run a function over an embedded test file, catching any panics that occur in the process.
+///
+/// If no panic occurs, the result of the function is returned as an `Ok()` variant.
+///
+/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant to
+/// be formatted into a diagnostic message by callers.
+pub fn attempt_test<'a, T, F>(
+    test_fn: F,
+    test_file: &'a TestFile<'a>,
+) -> Result<T, AttemptTestError<'a>>
+where
+    F: FnOnce(File) -> T + std::panic::UnwindSafe,
+{
+    catch_unwind(|| test_fn(test_file.file)).map_err(|info| AttemptTestError { info, test_file })
+}
+
+pub struct AttemptTestError<'a> {
+    pub info: PanicError,
+    test_file: &'a TestFile<'a>,
+}
+
+impl AttemptTestError<'_> {
+    pub fn into_file_failures(
+        self,
+        db: &dyn Db,
+        action: &str,
+        clarification: Option<&str>,
+    ) -> FileFailures {
+        let info = self.info;
+
+        let mut by_line = matcher::FailuresByLine::default();
+        let mut messages = vec![];
+        match info.location {
+            Some(location) => messages.push(Failure::new(format_args!(
+                "Attempting to {action} caused a panic at {location}"
+            ))),
+            None => messages.push(Failure::new(format_args!(
+                "Attempting to {action} caused a panic at an unknown location",
+            ))),
+        }
+        if let Some(clarification) = clarification {
+            messages.push(Failure::new(clarification));
+        }
+        messages.push(Failure::new(""));
+        match info.payload.as_str() {
+            Some(message) => messages.push(Failure::new(message)),
+            // Mimic the default panic hook's rendering of the panic payload if it's
+            // not a string.
+            None => messages.push(Failure::new("Box<dyn Any>")),
+        }
+        messages.push(Failure::new(""));
+
+        if let Some(backtrace) = info.backtrace {
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    let msg = "run with `RUST_BACKTRACE=1` environment variable to \
+                         a backtrace";
+                    messages.push(Failure::new(msg));
+                }
+                BacktraceStatus::Captured => {
+                    messages.extend(backtrace.to_string().split('\n').map(Failure::new));
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(backtrace) = info.salsa_backtrace {
+            salsa::attach(db, || {
+                messages.extend(format!("{backtrace:#}").split('\n').map(Failure::new));
+            });
+        }
+
+        by_line.push(OneIndexed::from_zero_indexed(0), messages);
+
+        FileFailures {
+            backtick_offsets: self.test_file.to_code_block_backtick_offsets(),
+            by_line,
+        }
+    }
 }
 
 #[cfg(test)]
