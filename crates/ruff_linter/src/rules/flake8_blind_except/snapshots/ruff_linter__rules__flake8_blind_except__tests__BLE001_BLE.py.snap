@@ -313,3 +313,13 @@ BLE001 Do not catch blind exception: `Exception`
     |        ^^^^^^^^^
 293 |     logging.log(logging.INFO, "...", exc_info=e)  # ok
     |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:310:12
+    |
+308 |     try:
+309 |         pass
+310 |     except Exception:
+    |            ^^^^^^^^^
+311 |         await logger.aerror("...")  # BLE001
+    |

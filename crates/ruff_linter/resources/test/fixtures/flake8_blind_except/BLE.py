@@ -291,3 +291,26 @@ try:
     pass
 except Exception as e:
     logging.log(logging.INFO, "...", exc_info=e)  # ok
+
+
+# Test async logger methods (e.g. structlog)
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+
+async def test_async_logger():
+    try:
+        pass
+    except Exception:
+        await logger.aexception("...")  # ok
+
+    try:
+        pass
+    except Exception:
+        await logger.aerror("...")  # BLE001
+
+    try:
+        pass
+    except Exception:
+        logger.aexception("...")  # ok

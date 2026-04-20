@@ -245,9 +245,14 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
         }
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                // Unwrap `await` to handle async logger methods like `await logger.aexception(...)`.
+                let inner = match value.as_ref() {
+                    Expr::Await(ast::ExprAwait { value, .. }) => value.as_ref(),
+                    other => other,
+                };
                 if let Expr::Call(ast::ExprCall {
                     func, arguments, ..
-                }) = value.as_ref()
+                }) = inner
                 {
                     match func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. })
@@ -256,7 +261,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 self.semantic,
                                 self.logger_objects,
                             ) && match attr.as_str() {
-                                "exception" => true,
+                                "exception" | "aexception" => true,
                                 _ if is_logger_method_name(attr) => is_exc_info_enabled(
                                     attr,
                                     arguments,
