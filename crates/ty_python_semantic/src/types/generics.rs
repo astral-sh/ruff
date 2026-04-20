@@ -7,7 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -1852,11 +1852,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // least one of its overloads is. We collect type mappings from all satisfiable
                 // overloads, and only report an error if none of them are satisfiable.
                 let mut any_satisfiable = false;
+                let preserve_source_outer_typevars = matches!(
+                    actual_callable.kind(self.db),
+                    CallableTypeKind::FunctionLike
+                        | CallableTypeKind::StaticMethodLike
+                        | CallableTypeKind::ClassMethodLike
+                );
                 for actual_signature in &actual_callable.signatures(self.db).overloads {
-                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                    let when = formal_signature.overloads.iter().when_all(
                         self.db,
-                        formal_signature,
                         self.constraints,
+                        |formal_signature| {
+                            actual_signature
+                                .when_constraint_set_assignable_to_preserving_target_typevars(
+                                    self.db,
+                                    formal_signature,
+                                    self.constraints,
+                                    preserve_source_outer_typevars,
+                                )
+                        },
                     );
                     if self
                         .add_type_mappings_from_constraint_set(formal, when, &mut *f)

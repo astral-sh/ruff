@@ -177,6 +177,17 @@ class Foo:
         return "a"
 
 reveal_type(Foo().foo)  # revealed: str
+
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Container(Generic[T]):
+    @cached_property
+    def value(self) -> list[T] | None:
+        return None
+
+reveal_type(Container[int]().value)  # revealed: list[int] | None
 ```
 
 ## Lambdas as decorators

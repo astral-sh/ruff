@@ -758,61 +758,14 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
-        &self,
-        db: &'db dyn Db,
-        other: &CallableSignature<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        // If this signature is a paramspec, bind it to the entire overloaded other callable.
-        if let Some(self_bound_typevar) = self.parameters.as_paramspec()
-            && other.is_single_paramspec().is_none()
-        {
-            let upper = Type::Callable(CallableType::new(
-                db,
-                CallableSignature::from_overloads(other.overloads.iter().map(|signature| {
-                    Signature::new_generic(
-                        signature.generic_context,
-                        signature.parameters().clone(),
-                        Type::unknown(),
-                    )
-                })),
-                CallableTypeKind::ParamSpecValue,
-            ));
-            let param_spec_matches = ConstraintSet::constrain_typevar(
-                db,
-                constraints,
-                self_bound_typevar,
-                Type::Never,
-                upper,
-            );
-            let return_types_match = other
-                .overloads
-                .iter()
-                .map(|signature| signature.return_ty)
-                .when_any(db, constraints, |other_return_type| {
-                    self.return_ty.when_constraint_set_assignable_to(
-                        db,
-                        other_return_type,
-                        constraints,
-                    )
-                });
-            return param_spec_matches.and(db, constraints, || return_types_match);
-        }
-
-        other
-            .overloads
-            .iter()
-            .when_all(db, constraints, |other_signature| {
-                self.when_constraint_set_assignable_to(db, other_signature, constraints)
-            })
-    }
-
-    fn when_constraint_set_assignable_to<'c>(
+    /// Check assignability while preserving type variables from the target signature for
+    /// specialization inference.
+    pub(crate) fn when_constraint_set_assignable_to_preserving_target_typevars<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_outer_typevars: bool,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -823,7 +776,12 @@ impl<'db> Signature<'db> {
             &disjointness_visitor,
             &materialization_visitor,
         );
-        checker.check_signature_pair(db, self, other)
+        checker.check_signature_pair_preserving_target_typevars(
+            db,
+            self,
+            other,
+            preserve_source_outer_typevars,
+        )
     }
 
     /// Create a new signature with the given definition.
@@ -1165,6 +1123,47 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         )
+    }
+
+    /// Check a source signature against a target signature while leaving target type variables
+    /// available for callers to solve.
+    pub(super) fn check_signature_pair_preserving_target_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        preserve_source_outer_typevars: bool,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_inferable = source.inferable_typevars(db);
+        let target_inferable = target.inferable_typevars(db);
+        let inferable = source_inferable.merge(db, target_inferable);
+        let inferable = self.inferable.merge(db, inferable);
+
+        let checker = self.with_inferable_typevars(inferable);
+        let when = checker.check_signature_pair_inner(db, source, target);
+
+        // Function-like methods include containing-class type variables in their inferable set so
+        // method calls can infer the receiver specialization. For callable specialization
+        // inference, those outer variables are free context, not local variables of the actual
+        // callable. Other callable objects, like class constructors, own their class typevars, so
+        // those should still be reduced.
+        let source_typevars_to_reduce: Vec<_> = if preserve_source_outer_typevars
+            && let Some(source_definition) = source.definition()
+        {
+            source_inferable
+                .iter(db)
+                .filter(|identity| {
+                    identity
+                        .binding_context
+                        .definition()
+                        .is_none_or(|definition| definition == source_definition)
+                })
+                .collect()
+        } else {
+            source_inferable.iter(db).collect()
+        };
+
+        when.reduce_inferable(db, self.constraints, source_typevars_to_reduce)
     }
 
     fn check_signature_pair_inner(
