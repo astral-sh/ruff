@@ -30,9 +30,10 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
     binding_type, protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, UnionType};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
+use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -41,6 +42,7 @@ use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
@@ -4833,13 +4835,51 @@ pub(crate) fn report_call_to_abstract_method(
     diag.set_primary_message(format_args!(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
-    let spans = function.spans(db);
-    let mut sub = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!("Method `{name}` defined here"),
+    let span = abstract_method_span(
+        db,
+        function,
+        AbstractMethodAnnotationPolicy::AlwaysIncludeBody,
     );
-    sub.annotate(Annotation::primary(spans.name));
-    diag.sub(sub);
+    diag.annotate(
+        Annotation::secondary(span).message(format_args!("Method `{name}` defined here")),
+    );
+}
+
+pub(super) fn abstract_method_span<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    policy: AbstractMethodAnnotationPolicy,
+) -> Span {
+    let (_, implementation) = function.overloads_and_implementation(db);
+
+    let Some(implementation) = implementation else {
+        return function.spans(db).name;
+    };
+
+    let file = function.file(db);
+    let module = parsed_module(db, file).load(db);
+    let node = implementation.node(db, file, &module);
+    let source_text = source_text(db, file);
+
+    if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
+        && source_text.line_start(node.name.end()) != source_text.line_start(node.end())
+    {
+        return implementation.spans(db).decorators_and_header;
+    }
+
+    if let [single_stmt] = &*node.body
+        && source_text.line_start(single_stmt.start()) == source_text.line_start(single_stmt.end())
+    {
+        Span::from(file).with_range(node.range())
+    } else {
+        implementation.spans(db).decorators_and_header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum AbstractMethodAnnotationPolicy {
+    AlwaysIncludeBody,
+    ExcludeVerboseBody,
 }
 
 pub(crate) fn report_undeclared_protocol_member(
@@ -5344,7 +5384,7 @@ pub(crate) enum TypedDictDeleteErrorKind {
 pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
     key_node: AnyNodeRef,
-    typed_dict_ty: Type<'db>,
+    typed_dict_ty: TypedDictType<'db>,
     field_name: &str,
     field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
     error_kind: TypedDictDeleteErrorKind,
@@ -5354,7 +5394,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         return;
     };
 
-    let typed_dict_name = typed_dict_ty.display(db);
+    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db);
 
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
@@ -5373,14 +5413,27 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         let module = parsed_module(db, file).load(db);
 
         let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
-        sub.annotate(
-            Annotation::secondary(
-                Span::from(file).with_range(declaration.full_range(db, &module).range()),
-            )
-            .message(format_args!(
-                "`{field_name}` declared as required here; consider making it `NotRequired`"
-            )),
-        );
+        for message in [
+            format_args!("`{field_name}` declared as required here"),
+            format_args!("Consider making it `NotRequired`"),
+        ] {
+            sub.annotate(
+                Annotation::secondary(
+                    Span::from(file).with_range(declaration.full_range(db, &module).range()),
+                )
+                .message(message),
+            );
+        }
+
+        if let Some(class) = typed_dict_ty.defining_class() {
+            sub.annotate(
+                Annotation::secondary(
+                    Span::from(file).with_range(class.class_literal(db).header_range(db)),
+                )
+                .message(format_args!("`{}` defined here", class.name(db))),
+            );
+        }
+
         diagnostic.sub(sub);
     }
 
@@ -6329,6 +6382,7 @@ pub(super) fn report_invalid_total_ordering(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
         class.name(db)
     ));
+    diagnostic.annotate(context.secondary(class.header_range(db)));
     diagnostic.info("The decorator will raise `ValueError` at runtime");
 }
 

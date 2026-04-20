@@ -956,10 +956,11 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
- --> src/overloaded.pyi:8:5
+ --> src/overloaded.pyi:7:1
   |
-8 | def f() -> None: ...
-  |     ^^^^^^^^^^^
+7 | / @overload
+8 | | def f() -> None: ...
+  | |____________________^ First overload defined here
   |
 info: Possible overloads for function `f`:
 info:   () -> None
