@@ -519,12 +519,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
                         // Offer an edit only for the rightmost non-starred positional arg.
-                        let allow_edits = matches!(
-                            arg_or_keyword,
-                            ArgOrKeyword::Arg(arg)
-                                if !arg.is_starred_expr()
-                                    && Some(arg.range().start()) == last_editable_arg_start
-                        );
+                        let allow_edits = !argument.is_starred_expr()
+                            && Some(argument.range().start()) == last_editable_arg_start;
 
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
