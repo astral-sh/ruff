@@ -589,6 +589,10 @@ impl<'a> SuppressionsBuilder<'a> {
                             });
                         }
                     }
+                } else {
+                    warn_user_once!(
+                        "#ruff:ignore-all comment found but not active, enable preview mode"
+                    );
                 }
                 suppressions.next();
                 continue;
