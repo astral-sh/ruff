@@ -261,6 +261,10 @@ mod tests {
         Rule::UselessExceptionStatement,
         Path::new("useless_exception_statement.py")
     )]
+    #[test_case(
+        Rule::BooleanChainedComparison,
+        Path::new("boolean_chained_comparison.py")
+    )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
