@@ -51,7 +51,7 @@ mod text_helpers;
 pub mod upstream_categories;
 mod violation;
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, fuzzing, feature = "testing"))]
 pub mod test;
 
 pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
