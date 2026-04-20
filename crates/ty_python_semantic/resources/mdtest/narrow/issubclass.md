@@ -88,7 +88,7 @@ def _(t: type[object]):
     if issubclass(t, A):
         reveal_type(t)  # revealed: type[A]
         if issubclass(t, B):
-            reveal_type(t)  # revealed: type[A] & type[B]
+            reveal_type(t)  # revealed: type[A & B]
     else:
         reveal_type(t)  # revealed: type & ~type[A]
 ```
@@ -518,7 +518,7 @@ class Baz:
 
 def f(x: type[Foo], y: Intersection[type[Bar], type[Baz]], z: type[Any]):
     if issubclass(x, y):
-        reveal_type(x)  # revealed: type[Foo] & type[Bar] & type[Baz]
+        reveal_type(x)  # revealed: type[Foo & Bar & Baz]
 
     if issubclass(x, z):
         reveal_type(x)  # revealed: type[Foo] & Any
@@ -529,7 +529,7 @@ The same if a union type is used:
 ```py
 def g(x: type[Foo], y: type[Bar | Baz]):
     if issubclass(x, y):
-        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+        reveal_type(x)  # revealed: type[(Foo & Bar) | (Foo & Baz)]
 ```
 
 And even if a `TypeVar` is used, providing it has valid upper bounds/constraints:
@@ -541,14 +541,14 @@ T = TypeVar("T", bound=type[Bar])
 
 def h_old_syntax(x: type[Foo], y: T) -> T:
     if issubclass(x, y):
-        reveal_type(x)  # revealed: type[Foo] & type[Bar]
+        reveal_type(x)  # revealed: type[Foo & Bar]
         reveal_type(x.attribute)  # revealed: int
 
     return y
 
 def h[U: type[Bar | Baz]](x: type[Foo], y: U) -> U:
     if issubclass(x, y):
-        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+        reveal_type(x)  # revealed: type[(Foo & Bar) | (Foo & Baz)]
         reveal_type(x.attribute)  # revealed: int | str
 
     return y
@@ -566,7 +566,7 @@ class Mushrooms: ...
 
 def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: type[Foo], y: T, z: U) -> tuple[T, U]:
     if issubclass(x, (y, (z, Mushrooms))):
-        # revealed: (type[Foo] & type[Bar] & type[Baz]) | (type[Foo] & type[Bar] & type[Spam]) | (type[Foo] & type[Eggs]) | (type[Foo] & type[Ham]) | (type[Foo] & type[Mushrooms])
+        # revealed: type[(Foo & Bar & Baz) | (Foo & Bar & Spam) | (Foo & Eggs) | (Foo & Ham) | (Foo & Mushrooms)]
         reveal_type(x)
 
     return (y, z)

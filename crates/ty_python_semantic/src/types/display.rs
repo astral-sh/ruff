@@ -33,7 +33,7 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner,
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
@@ -2484,12 +2484,22 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
 
         let elements = self.ty.elements(self.db);
         let mut condensed_types = vec![];
-        let mut subclass_of_types = vec![];
+        // Pre-compute each element's subclass-of entry (if any), so we can both collect them into
+        // the grouped `type[…]` and detect them during iteration without rerunning the match.
+        let subclass_of_entries: Vec<Option<SubclassOfGroupEntry<'_>>> = elements
+            .iter()
+            .map(|element| as_subclass_of_entry(self.db, *element))
+            .collect();
+        let subclass_of_group: Vec<SubclassOfGroupEntry<'_>> = subclass_of_entries
+            .iter()
+            .filter_map(|entry| entry.clone())
+            .collect();
         let element_labels: Vec<_> = elements
             .iter()
             .copied()
-            .map(|element| {
-                (!is_condensable(element) && !element.is_subclass_of())
+            .zip(&subclass_of_entries)
+            .map(|(element, subclass_of_entry)| {
+                (!is_condensable(element) && subclass_of_entry.is_none())
                     .then(|| singleline_union_element_label(self.db, element, &self.settings))
             })
             .collect();
@@ -2498,14 +2508,12 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         for element in elements.iter().copied() {
             if is_condensable(element) {
                 condensed_types.push(element);
-            } else if let Type::SubclassOf(subclass_of) = element {
-                subclass_of_types.push(subclass_of);
             }
         }
 
-        let total_entries = elements.len() - condensed_types.len() - subclass_of_types.len()
+        let total_entries = elements.len() - condensed_types.len() - subclass_of_group.len()
             + usize::from(!condensed_types.is_empty())
-            + usize::from(!subclass_of_types.is_empty());
+            + usize::from(!subclass_of_group.is_empty());
 
         assert_ne!(total_entries, 0);
 
@@ -2516,10 +2524,12 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             UNION_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
 
         let mut condensed_types = Some(condensed_types);
-        let mut subclass_of_types = Some(subclass_of_types);
+        let mut subclass_of_group = Some(subclass_of_group);
         let mut displayed_entries = 0usize;
 
-        for (element, label) in elements.iter().zip(&element_labels) {
+        for ((element, label), subclass_of_entry) in
+            elements.iter().zip(&element_labels).zip(&subclass_of_entries)
+        {
             if displayed_entries >= display_limit {
                 break;
             }
@@ -2533,13 +2543,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         settings: self.settings.singleline(),
                     });
                 }
-            } else if element.is_subclass_of() {
-                if let Some(subclass_of_types) = subclass_of_types.take() {
+            } else if subclass_of_entry.is_some() {
+                if let Some(entries) = subclass_of_group.take() {
                     displayed_entries += 1;
                     join.entry(&DisplaySubclassOfGroup {
-                        types: subclass_of_types,
+                        entries,
                         db: self.db,
                         settings: self.settings.singleline(),
+                        separator: " | ",
                     });
                 }
             } else {
@@ -2586,21 +2597,101 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
     }
 }
 
+/// A single entry inside a `type[…]` group. Each entry is either a single `SubclassOfInner`
+/// (produced from a `Type::SubclassOf` element) or a non-empty list of `SubclassOfInner`s
+/// joined by `&` (produced from a `Type::Intersection` element whose positives are all
+/// `Type::SubclassOf`). The `&`-joined form lets us render e.g. `type[A] & type[B]` inside a
+/// larger union as `type[(A & B) | …]` rather than breaking the grouping.
+type SubclassOfGroupEntry<'db> = Vec<SubclassOfInner<'db>>;
+
+/// If `ty` can be rendered as `type[…]`, returns the inner content as a
+/// `SubclassOfGroupEntry`; otherwise returns `None`.
+///
+/// - `Type::SubclassOf(s)` → one-element entry `[s]`.
+/// - `Type::Intersection` with only positive `Type::SubclassOf` elements (and no negatives)
+///   → multi-element entry, one per positive.
+fn as_subclass_of_entry<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<SubclassOfGroupEntry<'db>> {
+    match ty {
+        Type::SubclassOf(subclass_of) => Some(vec![subclass_of.subclass_of()]),
+        Type::Intersection(intersection) => {
+            if intersection.negative(db).iter().next().is_some() {
+                return None;
+            }
+            let positives = intersection.positive(db);
+            let mut inners = Vec::with_capacity(positives.len());
+            for &p in positives {
+                let Type::SubclassOf(subclass_of) = p else {
+                    return None;
+                };
+                inners.push(subclass_of.subclass_of());
+            }
+            (!inners.is_empty()).then_some(inners)
+        }
+        _ => None,
+    }
+}
+
 struct DisplaySubclassOfGroup<'db> {
-    types: Vec<SubclassOfType<'db>>,
+    entries: Vec<SubclassOfGroupEntry<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
+    /// Separator between entries inside `type[…]`. `" | "` when grouping a union of
+    /// subclass-of-like elements, `" & "` when grouping an intersection of them.
+    separator: &'static str,
 }
 
 impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_str("type[")?;
-        let total_entries = self.types.len();
+        let total_entries = self.entries.len();
         let display_limit =
             UNION_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
-        let mut join = f.join(" | ");
-        for subclass_of in self.types.iter().take(display_limit) {
-            match subclass_of.subclass_of() {
+        let mut join = f.join(self.separator);
+        // Multi-inner entries are joined by `&` internally, so they only need parens when the
+        // outer separator is `|` and there's more than one entry (i.e., we're inside a union).
+        let parenthesize_multi_inner = self.separator == " | " && total_entries > 1;
+        for entry in self.entries.iter().take(display_limit) {
+            join.entry(&DisplaySubclassOfEntry {
+                inners: entry,
+                db: self.db,
+                settings: self.settings.singleline(),
+                parenthesize_multi_inner,
+            });
+        }
+        if !self.settings.preserve_full_unions {
+            let omitted_entries = total_entries.saturating_sub(display_limit);
+            if omitted_entries > 0 {
+                join.entry(&DisplayOmitted {
+                    count: omitted_entries,
+                    singular: "type",
+                    plural: "types",
+                });
+            }
+        }
+        join.finish()?;
+        f.write_str("]")
+    }
+}
+
+struct DisplaySubclassOfEntry<'a, 'db> {
+    inners: &'a [SubclassOfInner<'db>],
+    db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
+    parenthesize_multi_inner: bool,
+}
+
+impl<'db> FmtDetailed<'db> for DisplaySubclassOfEntry<'_, 'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let parenthesize = self.parenthesize_multi_inner && self.inners.len() > 1;
+        if parenthesize {
+            f.write_char('(')?;
+        }
+        let mut join = f.join(" & ");
+        for inner in self.inners {
+            match *inner {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
                     join.entry(&class.display_with(self.db, self.settings.singleline()));
                 }
@@ -2619,18 +2710,17 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                 }
             }
         }
-        if !self.settings.preserve_full_unions {
-            let omitted_entries = total_entries.saturating_sub(display_limit);
-            if omitted_entries > 0 {
-                join.entry(&DisplayOmitted {
-                    count: omitted_entries,
-                    singular: "type",
-                    plural: "types",
-                });
-            }
-        }
         join.finish()?;
-        f.write_str("]")
+        if parenthesize {
+            f.write_char(')')?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for DisplaySubclassOfEntry<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
@@ -2713,30 +2803,60 @@ struct DisplayIntersectionType<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let tys = self
-            .ty
-            .positive(self.db)
+        // Group positive `SubclassOf` elements so that `type[A] & type[B]` renders as
+        // `type[A & B]`, mirroring how the union display renders `type[A] | type[B]` as
+        // `type[A | B]`. Negative elements are not grouped: `~type[A] & ~type[B]` could
+        // in principle be rewritten as `~type[A | B]`, but keeping them separate matches
+        // the narrower identity of what the user wrote.
+        let positive = self.ty.positive(self.db);
+        let mut subclass_of_group: Vec<SubclassOfGroupEntry<'db>> = positive
             .iter()
-            .map(|&ty| DisplayMaybeNegatedType {
+            .filter_map(|ty| {
+                if let Type::SubclassOf(subclass_of) = ty {
+                    Some(vec![subclass_of.subclass_of()])
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut subclass_of_group = (!subclass_of_group.is_empty()).then(|| {
+            // `take()` the first time we encounter a subclass-of element; None thereafter.
+            std::mem::take(&mut subclass_of_group)
+        });
+
+        f.set_invalid_type_annotation();
+        let mut join = f.join(" & ");
+
+        for &ty in positive {
+            if let Type::SubclassOf(_) = ty {
+                if let Some(entries) = subclass_of_group.take() {
+                    join.entry(&DisplaySubclassOfGroup {
+                        entries,
+                        db: self.db,
+                        settings: self.settings.singleline(),
+                        separator: " & ",
+                    });
+                }
+            } else {
+                join.entry(&DisplayMaybeNegatedType {
+                    ty,
+                    db: self.db,
+                    settings: self.settings.singleline(),
+                    negated: false,
+                });
+            }
+        }
+
+        for &ty in self.ty.negative(self.db).iter() {
+            join.entry(&DisplayMaybeNegatedType {
                 ty,
                 db: self.db,
                 settings: self.settings.singleline(),
-                negated: false,
-            })
-            .chain(
-                self.ty
-                    .negative(self.db)
-                    .iter()
-                    .map(|&ty| DisplayMaybeNegatedType {
-                        ty,
-                        db: self.db,
-                        settings: self.settings.singleline(),
-                        negated: true,
-                    }),
-            );
+                negated: true,
+            });
+        }
 
-        f.set_invalid_type_annotation();
-        f.join(" & ").entries(tys).finish()
+        join.finish()
     }
 }
 
