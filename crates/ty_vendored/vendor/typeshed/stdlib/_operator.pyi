@@ -1,12 +1,3 @@
-"""Operator interface.
-
-This module exports a set of functions implemented in C corresponding
-to the intrinsic operators of Python.  For example, operator.add(x, y)
-is equivalent to the expression x+y.  The function names are those
-used for special methods; variants without leading and trailing
-'__' are also provided for convenience.
-"""
-
 import sys
 from _typeshed import (
     SupportsAdd,
@@ -67,212 +58,88 @@ class _SupportsPos(Protocol[_T_co]):
     def __pos__(self) -> _T_co: ...
 
 # All four comparison functions must have the same signature, or we get false-positive errors
-def lt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
-    """Same as a < b."""
-
-def le(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
-    """Same as a <= b."""
-
-def eq(a: object, b: object, /) -> Any:
-    """Same as a == b."""
-
-def ne(a: object, b: object, /) -> Any:
-    """Same as a != b."""
-
-def ge(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
-    """Same as a >= b."""
-
-def gt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
-    """Same as a > b."""
-
-def not_(a: object, /) -> bool:
-    """Same as not a."""
-
-def truth(a: object, /) -> bool:
-    """Return True if a is true, False otherwise."""
-
-def is_(a: object, b: object, /) -> bool:
-    """Same as a is b."""
-
-def is_not(a: object, b: object, /) -> bool:
-    """Same as a is not b."""
-
-def abs(a: SupportsAbs[_T], /) -> _T:
-    """Same as abs(a)."""
-
+def lt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any: ...
+def le(a: _SupportsComparison, b: _SupportsComparison, /) -> Any: ...
+def eq(a: object, b: object, /) -> Any: ...
+def ne(a: object, b: object, /) -> Any: ...
+def ge(a: _SupportsComparison, b: _SupportsComparison, /) -> Any: ...
+def gt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any: ...
+def not_(a: object, /) -> bool: ...
+def truth(a: object, /) -> bool: ...
+def is_(a: object, b: object, /) -> bool: ...
+def is_not(a: object, b: object, /) -> bool: ...
+def abs(a: SupportsAbs[_T], /) -> _T: ...
 @overload
-def add(a: SupportsAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
-    """Same as a + b."""
-
+def add(a: SupportsAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
 @overload
 def add(a: _T_contra, b: SupportsRAdd[_T_contra, _T_co], /) -> _T_co: ...
-def and_(a, b, /):
-    """Same as a & b."""
-
-def floordiv(a, b, /):
-    """Same as a // b."""
-
-def index(a: SupportsIndex, /) -> int:
-    """Same as a.__index__()"""
-
-def inv(a: _SupportsInversion[_T_co], /) -> _T_co:
-    """Same as ~a."""
-
-def invert(a: _SupportsInversion[_T_co], /) -> _T_co:
-    """Same as ~a."""
-
-def lshift(a, b, /):
-    """Same as a << b."""
-
+def and_(a, b, /): ...
+def floordiv(a, b, /): ...
+def index(a: SupportsIndex, /) -> int: ...
+def inv(a: _SupportsInversion[_T_co], /) -> _T_co: ...
+def invert(a: _SupportsInversion[_T_co], /) -> _T_co: ...
+def lshift(a, b, /): ...
 @overload
-def mod(a: SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
-    """Same as a % b."""
-
+def mod(a: SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
 @overload
 def mod(a: _T_contra, b: SupportsRMod[_T_contra, _T_co], /) -> _T_co: ...
 @overload
-def mul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
-    """Same as a * b."""
-
+def mul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
 @overload
 def mul(a: _T_contra, b: SupportsRMul[_T_contra, _T_co], /) -> _T_co: ...
-def matmul(a, b, /):
-    """Same as a @ b."""
-
-def neg(a: _SupportsNeg[_T_co], /) -> _T_co:
-    """Same as -a."""
-
-def or_(a, b, /):
-    """Same as a | b."""
-
-def pos(a: _SupportsPos[_T_co], /) -> _T_co:
-    """Same as +a."""
-
-def pow(a, b, /):
-    """Same as a ** b."""
-
-def rshift(a, b, /):
-    """Same as a >> b."""
-
+def matmul(a, b, /): ...
+def neg(a: _SupportsNeg[_T_co], /) -> _T_co: ...
+def or_(a, b, /): ...
+def pos(a: _SupportsPos[_T_co], /) -> _T_co: ...
+def pow(a, b, /): ...
+def rshift(a, b, /): ...
 @overload
-def sub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
-    """Same as a - b."""
-
+def sub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
 @overload
 def sub(a: _T_contra, b: SupportsRSub[_T_contra, _T_co], /) -> _T_co: ...
-def truediv(a, b, /):
-    """Same as a / b."""
-
-def xor(a, b, /):
-    """Same as a ^ b."""
-
-def concat(a: Sequence[_T], b: Sequence[_T], /) -> Sequence[_T]:
-    """Same as a + b, for a and b sequences."""
-
-def contains(a: Container[object], b: object, /) -> bool:
-    """Same as b in a (note reversed operands)."""
-
-def countOf(a: Iterable[object], b: object, /) -> int:
-    """Return the number of items in a which are, or which equal, b."""
-
+def truediv(a, b, /): ...
+def xor(a, b, /): ...
+def concat(a: Sequence[_T], b: Sequence[_T], /) -> Sequence[_T]: ...
+def contains(a: Container[object], b: object, /) -> bool: ...
+def countOf(a: Iterable[object], b: object, /) -> int: ...
 @overload
-def delitem(a: MutableSequence[Any], b: int, /) -> None:
-    """Same as del a[b]."""
-
+def delitem(a: MutableSequence[Any], b: int, /) -> None: ...
 @overload
 def delitem(a: MutableSequence[Any], b: slice[int | None], /) -> None: ...
 @overload
 def delitem(a: MutableMapping[_K, Any], b: _K, /) -> None: ...
 @overload
-def getitem(a: Sequence[_T], b: slice[int | None], /) -> Sequence[_T]:
-    """Same as a[b]."""
-
+def getitem(a: Sequence[_T], b: slice[int | None], /) -> Sequence[_T]: ...
 @overload
 def getitem(a: SupportsGetItem[_K, _V], b: _K, /) -> _V: ...
-def indexOf(a: Iterable[_T], b: _T, /) -> int:
-    """Return the first index of b in a."""
-
+def indexOf(a: Iterable[_T], b: _T, /) -> int: ...
 @overload
-def setitem(a: MutableSequence[_T], b: int, c: _T, /) -> None:
-    """Same as a[b] = c."""
-
+def setitem(a: MutableSequence[_T], b: int, c: _T, /) -> None: ...
 @overload
 def setitem(a: MutableSequence[_T], b: slice[int | None], c: Sequence[_T], /) -> None: ...
 @overload
 def setitem(a: MutableMapping[_K, _V], b: _K, c: _V, /) -> None: ...
-def length_hint(obj: object, default: int = 0, /) -> int:
-    """Return an estimate of the number of items in obj.
-
-    This is useful for presizing containers when building from an iterable.
-
-    If the object supports len(), the result will be exact.
-    Otherwise, it may over- or under-estimate by an arbitrary amount.
-    The result will be an integer >= 0.
-    """
-
-def iadd(a, b, /):
-    """Same as a += b."""
-
-def iand(a, b, /):
-    """Same as a &= b."""
-
-def iconcat(a, b, /):
-    """Same as a += b, for a and b sequences."""
-
-def ifloordiv(a, b, /):
-    """Same as a //= b."""
-
-def ilshift(a, b, /):
-    """Same as a <<= b."""
-
-def imod(a, b, /):
-    """Same as a %= b."""
-
-def imul(a, b, /):
-    """Same as a *= b."""
-
-def imatmul(a, b, /):
-    """Same as a @= b."""
-
-def ior(a, b, /):
-    """Same as a |= b."""
-
-def ipow(a, b, /):
-    """Same as a **= b."""
-
-def irshift(a, b, /):
-    """Same as a >>= b."""
-
-def isub(a, b, /):
-    """Same as a -= b."""
-
-def itruediv(a, b, /):
-    """Same as a /= b."""
-
-def ixor(a, b, /):
-    """Same as a ^= b."""
+def length_hint(obj: object, default: int = 0, /) -> int: ...
+def iadd(a, b, /): ...
+def iand(a, b, /): ...
+def iconcat(a, b, /): ...
+def ifloordiv(a, b, /): ...
+def ilshift(a, b, /): ...
+def imod(a, b, /): ...
+def imul(a, b, /): ...
+def imatmul(a, b, /): ...
+def ior(a, b, /): ...
+def ipow(a, b, /): ...
+def irshift(a, b, /): ...
+def isub(a, b, /): ...
+def itruediv(a, b, /): ...
+def ixor(a, b, /): ...
 
 if sys.version_info >= (3, 11):
-    def call(obj: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-        """Same as obj(*args, **kwargs)."""
+    def call(obj: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R: ...
 
-def _compare_digest(a: AnyStr, b: AnyStr, /) -> bool:
-    """Return 'a == b'.
-
-    This function uses an approach designed to prevent
-    timing analysis, making it appropriate for cryptography.
-
-    a and b must both be of the same type: either str (ASCII only),
-    or any bytes-like object.
-
-    Note: If a and b are of different lengths, or if an error occurs,
-    a timing attack could theoretically reveal information about the
-    types and lengths of a and b--but not their values.
-    """
+def _compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...
 
 if sys.version_info >= (3, 14):
-    def is_none(a: object, /) -> TypeIs[None]:
-        """Same as a is None."""
-
-    def is_not_none(a: _T | None, /) -> TypeIs[_T]:
-        """Same as a is not None."""
+    def is_none(a: object, /) -> TypeIs[None]: ...
+    def is_not_none(a: _T | None, /) -> TypeIs[_T]: ...
