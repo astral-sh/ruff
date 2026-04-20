@@ -1,5 +1,8 @@
-use ruff_db::{diagnostic::Annotation, parsed::parsed_module};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_db::{
+    diagnostic::{Annotation, Span},
+    parsed::parsed_module,
+};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -258,20 +261,13 @@ pub(crate) fn check_overloaded_function<'db>(
                 let file = function.file(db);
                 let module = parsed_module(db, file).load(db);
                 let node = first_overload.node(db, file, &module);
-                let range = if node.body.len() == 1 {
-                    node.range()
+                let span = if node.body.len() == 1 {
+                    Span::from(file).with_range(node.range())
                 } else {
-                    TextRange::new(
-                        node.start(),
-                        node.returns
-                            .as_deref()
-                            .map(Ranged::end)
-                            .unwrap_or_else(|| node.parameters.end()),
-                    )
+                    first_overload.spans(db).decorators_and_header
                 };
                 diagnostic.annotate(
-                    context
-                        .secondary(range)
+                    Annotation::secondary(span)
                         .message(format_args!("First overload defined here")),
                 );
             }

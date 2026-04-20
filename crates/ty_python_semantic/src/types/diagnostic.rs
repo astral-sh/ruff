@@ -4861,20 +4861,10 @@ pub(super) fn abstract_method_span<'db>(
     let node = implementation.node(db, file, &module);
     let source_text = source_text(db, file);
 
-    let decorators_and_parameters = || {
-        Span::from(file).with_range(TextRange::new(
-            node.start(),
-            node.returns
-                .as_deref()
-                .map(Ranged::end)
-                .unwrap_or_else(|| node.parameters.end()),
-        ))
-    };
-
     if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         && source_text.line_start(node.name.end()) != source_text.line_start(node.end())
     {
-        return decorators_and_parameters();
+        return implementation.spans(db).decorators_and_header;
     }
 
     if let [single_stmt] = &*node.body
@@ -4882,7 +4872,7 @@ pub(super) fn abstract_method_span<'db>(
     {
         Span::from(file).with_range(node.range())
     } else {
-        decorators_and_parameters()
+        implementation.spans(db).decorators_and_header
     }
 }
 
