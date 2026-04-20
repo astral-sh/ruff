@@ -80,7 +80,9 @@ impl<'db> Type<'db> {
                     Ok(type_to_truthiness(return_type))
                 }
 
-                Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                Err(CallDunderError::PossiblyUnbound {
+                    bindings: outcome, ..
+                }) => {
                     let return_type = outcome.return_type(db);
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
                         // The type has a `__bool__` method, but it doesn't return a

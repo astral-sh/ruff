@@ -351,6 +351,34 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int
 ```
 
+## Union type as iterable where one union element has a non-callable `__iter__`
+
+<!-- snapshot-diagnostics -->
+
+When one union element has a callable `__iter__` and another has a non-callable `__iter__`
+attribute, the error should be "may not be iterable" (hedged), not "is not iterable" (definitive) —
+because at runtime the value might be the iterable variant.
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class NotIter:
+    # `__iter__` is present but not callable
+    __iter__: int = 32
+
+def _(flag: bool):
+    iterable = Test() if flag else NotIter()
+    # error: [not-iterable]
+    for x in iterable:
+        reveal_type(x)  # revealed: int | Unknown
+```
+
 ## Union type as iterator where one union element has no `__next__` method
 
 ```py

@@ -894,7 +894,7 @@ fn infer_membership_test_comparison<'db>(
         Ok(bindings) => Some(bindings.return_type(db)),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
-        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+        Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right
             .try_iterate(db)
             .map(|_| KnownClass::Bool.to_instance(db))
             .ok(),
