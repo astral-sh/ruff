@@ -736,6 +736,80 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for large calls to a gradual variadic tail.
+///
+/// Without the gradual-call shortcut, every positional argument type is folded into the same
+/// `*args` parameter type, making the call checker repeatedly grow a large union.
+fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[gradual_vararg_call]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for many precise arguments flowing into one variadic parameter.
+///
+/// The declared type is intentionally non-gradual, so argument checks still run. The important
+/// part is that the call checker should not repeatedly rebuild a growing union for `*args`.
+fn benchmark_vararg_parameter_type_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def accepts_objects(first: int, *args: object) -> None: ...
+
+accepts_objects(
+    0,
+"
+    .to_string();
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[vararg_parameter_type_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -1071,6 +1145,8 @@ criterion_group!(
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_gradual_vararg_call,
+    benchmark_vararg_parameter_type_accumulation,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
