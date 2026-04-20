@@ -33,6 +33,7 @@ use crate::types::{
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
+use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -41,6 +42,7 @@ use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
@@ -4833,16 +4835,64 @@ pub(crate) fn report_call_to_abstract_method(
     diag.set_primary_message(format_args!(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
-    let spans = function.spans(db);
-    diag.annotate(
-        Annotation::secondary(spans.name).message(format_args!("Method `{name}` defined here")),
-    );
-    if let (_, Some(implementation)) = function.overloads_and_implementation(db)
+
+    let annotation = Annotation::secondary(abstract_method_span(
+        db,
+        &mut diag,
+        function,
+        AbstractMethodAnnotationPolicy::IncludeBody,
+    ))
+    .message(format_args!("Method `{name}` defined here"));
+
+    diag.annotate(annotation);
+}
+
+pub(super) fn abstract_method_span<'db>(
+    db: &'db dyn Db,
+    diagnostic: &mut Diagnostic,
+    function: FunctionType<'db>,
+    policy: AbstractMethodAnnotationPolicy,
+) -> Span {
+    let (_, implementation) = function.overloads_and_implementation(db);
+
+    if let Some(implementation) = implementation
         && let Some(span) =
             implementation.find_known_decorator_span(db, KnownFunction::AbstractMethod)
     {
-        diag.annotate(Annotation::secondary(span));
+        diagnostic.annotate(Annotation::secondary(span));
     }
+
+    if policy == AbstractMethodAnnotationPolicy::ExcludeBody {
+        return function.spans(db).name;
+    }
+
+    let file = function.file(db);
+    let module = parsed_module(db, file).load(db);
+    let node = implementation.map(|implementation| implementation.node(db, file, &module));
+
+    if let Some(node) = node
+        && let [single_stmt] = &*node.body
+        && let source_text = source_text(db, file)
+        && source_text.line_start(node.name.end()) == source_text.line_start(single_stmt.start())
+    {
+        Span::from(file).with_range(TextRange::new(node.name.start(), single_stmt.end()))
+    } else {
+        if let Some(node) = node
+            && let [single_stmt] = &*node.body
+        {
+            diagnostic.annotate(Annotation::secondary(
+                Span::from(file).with_range(single_stmt.range()),
+            ));
+        }
+
+        function.spans(db).name
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum AbstractMethodAnnotationPolicy {
+    IncludeBody,
+    ExcludeBody,
 }
 
 pub(crate) fn report_undeclared_protocol_member(

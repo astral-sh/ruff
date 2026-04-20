@@ -23,7 +23,7 @@ error[call-abstract-method]: Cannot call `method` on class object
 5 |     @abstractmethod
   |     ---------------
 6 |     def method(cls) -> int: ...
-  |         ------ Method `method` defined here
+  |         ----------------------- Method `method` defined here
 7 |
 8 | # snapshot: call-abstract-method
 9 | Foo.method()
