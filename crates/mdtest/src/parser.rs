@@ -6,7 +6,10 @@ use std::{
 
 use anyhow::{Context, bail};
 use indexmap::{IndexMap, map::Entry};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::{
+    panic::PanicError,
+    system::{SystemPath, SystemPathBuf},
+};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_index::{IndexVec, newtype_index};
@@ -167,6 +170,41 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         self.section
             .directives
             .has_directive_set(MdtestDirective::PullTypesSkip)
+    }
+
+    pub fn check_panic(&self, panic_info: Option<PanicError>) {
+        match panic_info {
+            Some(panic_info) => {
+                let expected_message = self
+                    .should_expect_panic()
+                    .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+                let message = panic_info
+                    .payload
+                    .as_str()
+                    .unwrap_or("Box<dyn Any>")
+                    .to_string();
+
+                if let Some(expected_message) = expected_message {
+                    assert!(
+                        message.contains(expected_message),
+                        "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                        self.name()
+                    );
+                }
+            }
+            None => {
+                if let Ok(message) = self.should_expect_panic() {
+                    if let Some(message) = message {
+                        panic!(
+                            "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                            self.name()
+                        );
+                    }
+                    panic!("Test `{}` is expected to panic but it didn't.", self.name());
+                }
+            }
+        }
     }
 }
 
