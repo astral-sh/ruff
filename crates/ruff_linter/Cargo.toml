@@ -83,6 +83,7 @@ default = []
 schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
+testing = []
 
 [lints]
 workspace = true
