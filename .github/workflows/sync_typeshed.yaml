@@ -31,6 +31,8 @@ defaults:
   run:
     shell: bash
 
+permissions: {}
+
 env:
   # Don't set this flag globally for the workflow: it does strange things
   # to the snapshots in the `cargo insta test --accept` step in the MacOS job.
@@ -59,7 +61,7 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     permissions:
-      contents: write
+      contents: write # to push back to the repository
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
@@ -125,7 +127,7 @@ jobs:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
 
     permissions:
-      contents: write
+      contents: write # to push back to the repository
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
@@ -165,8 +167,8 @@ jobs:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
 
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # to push back to the repository
+      pull-requests: write # to create a PR
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
@@ -216,7 +218,7 @@ jobs:
     needs: [sync, docstrings-windows, docstrings-macos-and-pr]
     if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result != 'success' || needs.docstrings-windows.result != 'success' || needs.docstrings-macos-and-pr.result != 'success') }}
     permissions:
-      issues: write
+      issues: write # to create an issue on failure
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -226,6 +228,6 @@ jobs:
               owner: "astral-sh",
               repo: "ruff",
               title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
-              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              body: `Run listed here: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               labels: ["bug", "ty"],
             })
