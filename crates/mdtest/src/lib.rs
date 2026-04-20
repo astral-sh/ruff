@@ -21,7 +21,7 @@ use crate::parser::BacktickOffsets;
 /// Filter which tests to run in mdtest.
 ///
 /// Only tests whose names contain this filter string will be executed.
-pub const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 
 /// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
@@ -147,7 +147,7 @@ pub fn run<C>(
 }
 
 /// Determine the output format from the `MDTEST_GITHUB_ANNOTATIONS_FORMAT` environment variable.
-pub fn output_format() -> OutputFormat {
+fn output_format() -> OutputFormat {
     if std::env::var(MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
         OutputFormat::GitHub
     } else {
@@ -497,7 +497,7 @@ fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std
     Ok(())
 }
 
-pub fn try_apply_markdown_edits(
+fn try_apply_markdown_edits(
     absolute_fixture_path: &Utf8Path,
     source: &str,
     mut edits: Vec<MarkdownEdit>,
