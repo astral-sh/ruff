@@ -459,33 +459,7 @@ fn run_test(
         })
         .collect();
 
-    match panic_info {
-        Some(panic_info) => {
-            let expected_message = test
-                .should_expect_panic()
-                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
-
-            if let Some(expected_message) = expected_message {
-                let message = panic_info.payload.to_string();
-                assert!(
-                    message.contains(expected_message),
-                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
-                    test.name(),
-                );
-            }
-        }
-        None => {
-            if let Ok(message) = test.should_expect_panic() {
-                if let Some(message) = message {
-                    panic!(
-                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
-                        test.name()
-                    );
-                }
-                panic!("Test `{}` is expected to panic but it didn't.", test.name());
-            }
-        }
-    }
+    test.check_panic(panic_info);
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
