@@ -797,7 +797,7 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_parser::parse_unchecked_source;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{TextLen, TextSize};
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_project::ProjectMetadata;
@@ -908,15 +908,13 @@ mod tests {
 
                 inlay_hint_buf.insert_str(end_position, &hint_str);
             }
-            let mut edit_offset = 0;
+            let mut edit_offset = TextSize::default();
 
             for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
-                let start = edit.range.start().to_usize() + edit_offset;
-                let end = edit.range.end().to_usize() + edit_offset;
+                let updated_range = edit.range.add_start(edit_offset);
+                text_edit_buf.replace_range(updated_range.to_std_range(), &edit.new_text);
 
-                text_edit_buf.replace_range(start..end, &edit.new_text);
-
-                edit_offset += edit.new_text.len() - edit.range.len().to_usize();
+                edit_offset += edit.new_text.text_len() - edit.range.len();
             }
 
             let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
