@@ -538,7 +538,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         Self::standalone_comment_range(suppression.range, before, after)
                     } else {
                         // trailing ignore
-                        self.trailing_comment_range(suppression.range, before, after)
+                        self.trailing_comment_range(suppression.range, before)
                     };
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {
@@ -803,8 +803,24 @@ impl<'a> SuppressionsBuilder<'a> {
 
     /// Find the relevant range to cover for trailing end-of-line suppression comments
     ///
-    /// When placed at the end of the last line of a multi-line statement or suite header,
-    /// this should return the entire range of the logical line, including any trailing comments:
+    /// When placed on a single line statement, or "inside" of a logical line, ie, at the end of
+    /// any line within a multi-line statement or suite header, this should return only the range
+    /// of that same line, including any trailing comments:
+    ///
+    /// ```py
+    /// # V-- from here
+    /// foo = 1  # ruff:ignore[code]
+    /// # to here -----------------^
+    ///
+    /// foo = [
+    ///     # V--- from here
+    ///     1,  # ruff:ignore[code]
+    ///     # to here ------------^
+    /// ]
+    /// ```
+    ///
+    /// When placed at the end of a multi-line string, this should return the entire range of the
+    /// logical line, including any trailing comments:
     ///
     /// ```py
     ///
@@ -816,57 +832,23 @@ impl<'a> SuppressionsBuilder<'a> {
     ///
     /// ```
     ///
-    /// When placed "inside" of a logical line, ie, at the end of any line within a multi-line
-    /// statement or suite header, this should return only the range of that same line, including
-    /// any trailing comments:
-    ///
-    /// ```py
-    ///
-    /// foo = [
-    ///     # V--- from here
-    ///     1,  # ruff:ignore[code]
-    ///     # to here ------------^
-    /// ]
-    /// ```
-    ///
-    fn trailing_comment_range(
-        &self,
-        range: TextRange,
-        before: &[Token],
-        after: &[Token],
-    ) -> TextRange {
+    fn trailing_comment_range(&self, range: TextRange, before: &[Token]) -> TextRange {
         let mut start = range.start();
-        let mut end = range.end();
 
-        // Look forward for the next newline. If there are any non-trivia tokens, then this comment
-        // is not on the last line of the statement or header.
-        for next_token in after {
-            match next_token.kind() {
-                TokenKind::Comment => {
-                    end = next_token.end();
-                }
-                TokenKind::NonLogicalNewline => {}
-                TokenKind::Newline => {
-                    break;
-                }
-                _ => {
-                    return self.source.line_range(range.start());
-                }
-            }
-        }
-
-        // The comment is on the last line. Look backward to find the previous newline.
+        // Look backward to find the previous newline.
         for prev_token in before.iter().rev() {
             match prev_token.kind() {
-                TokenKind::Newline => {
+                TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     break;
                 }
-                TokenKind::NonLogicalNewline => {}
                 _ => {
                     start = prev_token.start();
                 }
             }
         }
+
+        // Until the end of the line.
+        let end = self.source.line_end(range.end());
 
         TextRange::new(start, end)
     }
@@ -1855,7 +1837,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "    'hello'  # ruff:ignore[code]",
+                    covered_source: "'hello'  # ruff:ignore[code]",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -1888,7 +1870,7 @@ print(
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "print(\n    'hello'\n)  # ruff:ignore[code]",
+                    covered_source: ")  # ruff:ignore[code]",
                     code: "code",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[code]",
@@ -2135,7 +2117,7 @@ bar = [
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "bar = [\n    1,\n]  # ruff:ignore[epsilon]",
+                    covered_source: "]  # ruff:ignore[epsilon]",
                     code: "epsilon",
                     disable_comment: SuppressionComment {
                         text: "# ruff:ignore[epsilon]",

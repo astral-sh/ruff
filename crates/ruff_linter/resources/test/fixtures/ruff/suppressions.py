@@ -141,13 +141,6 @@ def f(
 
 
 def f(
-    foo,
-    bar,
-):  # ruff: ignore[ARG001]  should cover the entire def
-    print("hello")
-
-
-def f(
     # ruff: ignore[ARG001]  should only cover the first argument
     foo,
     bar,

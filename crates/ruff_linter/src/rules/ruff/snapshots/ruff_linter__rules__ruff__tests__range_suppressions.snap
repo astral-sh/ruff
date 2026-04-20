@@ -131,6 +131,16 @@ help: Remove unused suppression
 48 |
 49 | def f():
 
+E741 Ambiguous variable name: `I`
+  --> suppressions.py:47:5
+   |
+45 |     # An usued suppression diagnostic should also be logged.
+46 |     # ruff: disable[E501]
+47 |     I = 1
+   |     ^
+48 |     # ruff: enable[E501]
+   |
+
 F841 [*] Local variable `I` is assigned to but never used
   --> suppressions.py:47:5
    |
@@ -150,16 +160,6 @@ help: Remove assignment to unused variable `I`
 49 |
 50 |
 note: This is an unsafe fix and may change runtime behavior
-
-E741 Ambiguous variable name: `I`
-  --> suppressions.py:47:5
-   |
-45 |     # An usued suppression diagnostic should also be logged.
-46 |     # ruff: disable[E501]
-47 |     I = 1
-   |     ^
-48 |     # ruff: enable[E501]
-   |
 
 RUF100 [*] Unused `noqa` directive (unused: `E741`, `F841`)
   --> suppressions.py:55:12
@@ -461,42 +461,42 @@ help: Remove assignment to unused variable `bar`
 note: This is an unsafe fix and may change runtime behavior
 
 ARG001 Unused function argument: `bar`
+   --> suppressions.py:146:5
+    |
+144 |     # ruff: ignore[ARG001]  should only cover the first argument
+145 |     foo,
+146 |     bar,
+    |     ^^^
+147 | ):
+148 |     print("hello")
+    |
+
+ARG001 Unused function argument: `bar`
    --> suppressions.py:153:5
     |
-151 |     # ruff: ignore[ARG001]  should only cover the first argument
-152 |     foo,
+151 | def f(
+152 |     foo,  # ruff: ignore[ARG001]  should only cover the first argument
 153 |     bar,
     |     ^^^
 154 | ):
 155 |     print("hello")
     |
 
-ARG001 Unused function argument: `bar`
-   --> suppressions.py:160:5
-    |
-158 | def f(
-159 |     foo,  # ruff: ignore[ARG001]  should only cover the first argument
-160 |     bar,
-    |     ^^^
-161 | ):
-162 |     print("hello")
-    |
-
 RUF100 [*] Unused suppression (non-enabled: `F401`)
-   --> suppressions.py:167:1
+   --> suppressions.py:160:1
     |
-165 | # Ensure LAST suppression in file is reported.
-166 | # https://github.com/astral-sh/ruff/issues/23235
-167 | # ruff:disable[F401]
+158 | # Ensure LAST suppression in file is reported.
+159 | # https://github.com/astral-sh/ruff/issues/23235
+160 | # ruff:disable[F401]
     | ^^^^^^^^^^^^^^^^^^^^
-168 | print("goodbye")
-169 | # ruff:enable[F401]
+161 | print("goodbye")
+162 | # ruff:enable[F401]
     | -------------------
     |
 help: Remove unused suppression
-164 |
-165 | # Ensure LAST suppression in file is reported.
-166 | # https://github.com/astral-sh/ruff/issues/23235
+157 |
+158 | # Ensure LAST suppression in file is reported.
+159 | # https://github.com/astral-sh/ruff/issues/23235
     - # ruff:disable[F401]
-167 | print("goodbye")
+160 | print("goodbye")
     - # ruff:enable[F401]
