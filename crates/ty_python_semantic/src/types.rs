@@ -5668,15 +5668,11 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
-            // TODO intersections
-            Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
-                    alternatives.to_meta_type(db)
-                } else {
-                    SubclassOfType::try_from_type(db, todo_type!("Intersection meta-type"))
-                        .expect("Type::Todo should be a valid `SubclassOfInner`")
-                }
-            }
+            Type::Intersection(intersection) => intersection
+                .finite_alternative_union(db)
+                .map(|alternatives| alternatives.to_meta_type(db))
+                .or_else(|| SubclassOfType::try_from_instance(db, self))
+                .unwrap_or_else(SubclassOfType::subclass_of_unknown),
             Type::EnumComplement(complement) => {
                 complement.remaining_literal_union(db).to_meta_type(db)
             }

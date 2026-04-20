@@ -6,9 +6,9 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    TypedDictType, UnionType, todo_type,
+    FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
+    MemberLookupPolicy, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
@@ -88,6 +88,21 @@ impl<'db> SubclassOfType<'db> {
                     .iter()
                     .map(|element| Self::try_from_instance(db, *element)),
             ),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                let positive = intersection.positive(db);
+                if positive.is_empty() {
+                    builder = builder.add_positive(KnownClass::Type.to_instance(db));
+                } else {
+                    for &element in intersection.positive(db) {
+                        builder = builder.add_positive(Self::try_from_instance(db, element)?);
+                    }
+                }
+                for &element in intersection.negative(db) {
+                    builder = builder.add_negative(Self::try_from_instance(db, element)?);
+                }
+                Some(builder.build())
+            }
             Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
             _ => SubclassOfInner::try_from_instance(db, ty)
                 .map(|subclass_of| Self::from(db, subclass_of)),
