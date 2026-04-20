@@ -4780,7 +4780,6 @@ dependencies = [
  "camino",
  "colored 3.1.1",
  "dunce",
- "insta",
  "mdtest",
  "ruff_db",
  "ruff_diagnostics",
