@@ -4193,6 +4193,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
+    parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -4222,6 +4223,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
+        let parameter_count = parameter_tys.len();
+
         Self {
             db,
             signature_type,
@@ -4229,6 +4232,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
+            parameter_ty_builders: std::iter::repeat_with(|| None)
+                .take(parameter_count)
+                .collect(),
             call_expression_tcx,
             return_ty,
             errors,
@@ -4587,14 +4593,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 provided_ty: argument_type,
             });
         }
-        // We still update the actual type of the parameter in this binding to match the
-        // argument, even if the argument type is not assignable to the expected parameter
-        // type.
-        if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
-            // We already verified in `match_parameters` that we only match multiple arguments
-            // with variadic parameters.
-            let union = UnionType::from_two_elements(self.db, existing, argument_type);
-            self.parameter_tys[parameter_index] = Some(union);
+        // We still update the actual type of the parameter in this binding to match the argument,
+        // even if the argument type is not assignable to the expected parameter type.
+        if let Some(builder) = &mut self.parameter_ty_builders[parameter_index] {
+            builder.add_in_place(argument_type);
+        } else if let Some(existing) = self.parameter_tys[parameter_index] {
+            let mut builder = UnionBuilder::new(self.db);
+            builder.add_in_place(existing);
+            builder.add_in_place(argument_type);
+            self.parameter_ty_builders[parameter_index] = Some(builder);
+        } else {
+            self.parameter_tys[parameter_index] = Some(argument_type);
         }
     }
 
@@ -4953,6 +4962,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
+        for (parameter_ty, builder) in self
+            .parameter_tys
+            .iter_mut()
+            .zip(self.parameter_ty_builders)
+        {
+            if let Some(builder) = builder {
+                *parameter_ty = Some(builder.build());
+            }
+        }
+
         (self.inferable_typevars, self.specialization, self.return_ty)
     }
 }
