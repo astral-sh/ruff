@@ -1021,7 +1021,6 @@ impl<'db> GenericContext<'db> {
     }
 }
 
-
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of

@@ -33,8 +33,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeAliasType,
+    TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -2492,7 +2492,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             .collect();
         let subclass_of_group: Vec<SubclassOfGroupEntry<'_>> = subclass_of_entries
             .iter()
-            .filter_map(|entry| entry.clone())
+            .filter_map(Option::clone)
             .collect();
         let element_labels: Vec<_> = elements
             .iter()
@@ -2527,8 +2527,10 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         let mut subclass_of_group = Some(subclass_of_group);
         let mut displayed_entries = 0usize;
 
-        for ((element, label), subclass_of_entry) in
-            elements.iter().zip(&element_labels).zip(&subclass_of_entries)
+        for ((element, label), subclass_of_entry) in elements
+            .iter()
+            .zip(&element_labels)
+            .zip(&subclass_of_entries)
         {
             if displayed_entries >= display_limit {
                 break;
@@ -2610,10 +2612,7 @@ type SubclassOfGroupEntry<'db> = Vec<SubclassOfInner<'db>>;
 /// - `Type::SubclassOf(s)` → one-element entry `[s]`.
 /// - `Type::Intersection` with only positive `Type::SubclassOf` elements (and no negatives)
 ///   → multi-element entry, one per positive.
-fn as_subclass_of_entry<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<SubclassOfGroupEntry<'db>> {
+fn as_subclass_of_entry<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<SubclassOfGroupEntry<'db>> {
     match ty {
         Type::SubclassOf(subclass_of) => Some(vec![subclass_of.subclass_of()]),
         Type::Intersection(intersection) => {
@@ -2847,7 +2846,7 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
             }
         }
 
-        for &ty in self.ty.negative(self.db).iter() {
+        for &ty in self.ty.negative(self.db) {
             join.entry(&DisplayMaybeNegatedType {
                 ty,
                 db: self.db,

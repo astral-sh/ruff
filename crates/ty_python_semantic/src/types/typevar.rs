@@ -655,14 +655,14 @@ impl<'db> TypeVarInstance<'db> {
                 (
                     TypeVarBoundOrConstraints::Constraints(self_constraints),
                     Some(TypeVarBoundOrConstraints::Constraints(other_constraints)),
-                ) => other_constraints.elements(db).iter().all(|other_constraint| {
-                    self_constraints
-                        .elements(db)
-                        .iter()
-                        .any(|self_constraint| {
+                ) => other_constraints
+                    .elements(db)
+                    .iter()
+                    .all(|other_constraint| {
+                        self_constraints.elements(db).iter().any(|self_constraint| {
                             other_constraint.is_equivalent_to(db, *self_constraint)
                         })
-                }),
+                    }),
                 _ => false,
             };
             if subsumed {
