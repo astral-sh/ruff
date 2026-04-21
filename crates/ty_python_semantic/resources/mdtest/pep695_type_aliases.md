@@ -376,6 +376,11 @@ def f(x: OptNestedInt) -> None:
     reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+
+type RecursiveList = list[RecursiveList]
+
+def g(x: RecursiveList):
+    reveal_type(x[0])  # revealed: list[RecursiveList]
 ```
 
 ### Invalid self-referential
@@ -431,8 +436,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    # TODO: should be `int | list[int]`
-    reveal_type(x)  # revealed: int | list[int] | Any
+    reveal_type(x)  # revealed: int | list[int]
 ```
 
 ### With legacy generic
@@ -579,7 +583,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With new-style union
@@ -590,7 +594,7 @@ type A = list[A | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str] | str
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With Optional
@@ -603,7 +607,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[Any | str | None] | str | None
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
 ### Tuple comparison

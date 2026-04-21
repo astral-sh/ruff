@@ -264,6 +264,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 
     pub(crate) fn visit(
         &self,
+        db: &'db dyn Db,
         ty: Type<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
@@ -272,15 +273,15 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             TypeMapping::Materialize(MaterializationKind::Top) => self
                 .top_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
             _ => self
                 .default
                 .get_or_init(TypeTransformer::default)
-                .visit(ty, func),
+                .visit_type(db, ty, func),
         }
     }
 
@@ -5584,7 +5585,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(self, type_mapping, || {
+            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -5632,7 +5633,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, type_mapping, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -5718,7 +5719,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => visitor.visit(self, type_mapping, || {
+            Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
                     db,
                     type_is
@@ -5727,7 +5728,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(self, type_mapping, || {
+            Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
                 type_guard.with_type(
                     db,
                     type_guard
@@ -5737,42 +5738,49 @@ impl<'db> Type<'db> {
             }),
 
             Type::TypeAlias(alias) => {
-                // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                // detection rather than the visitor's cycle detection, because the visitor tracks
-                // Type values and `RecursiveList` is different from `RecursiveList[T]`.
-                if TypeMapping::EagerExpansion == *type_mapping {
-                    return alias.raw_value_type(db).expand_eagerly(db);
-                }
-
-                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
-                // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
-                // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                //
-                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(self, type_mapping, || {
-                    match type_mapping {
-                        TypeMapping::EagerExpansion => unreachable!("handled above"),
-
-                        _ => {
+                match type_mapping {
+                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
+                    // detection rather than the visitor's cycle detection, because the visitor tracks
+                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
+                    TypeMapping::EagerExpansion => {
+                        alias.raw_value_type(db).expand_eagerly(db)
+                    },
+                    // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
+                    // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
+                    TypeMapping::ApplySpecialization(specialization)
+                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if let Some(current_specialization) = specialization.as_specialization(db) => {
+                        Type::TypeAlias(alias.apply_specialization(
+                            db,
+                            |generic_context| {
+                                alias
+                                    .specialization(db)
+                                    .unwrap_or_else(|| generic_context.identity_specialization(db))
+                                    .apply_specialization(db, current_specialization)
+                            },
+                        ))
+                    }
+                    _ => {
+                        // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
+                        // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
+                        // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
+                        //
+                        // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
+                        // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
+                        // will detect the cycle and return the fallback value.
+                        let mapped = visitor.visit(db, self, type_mapping, || {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        });
+
+                        // If the type mapping does not result in any change to this type alias, keep the
+                        // alias node instead of eagerly expanding it.
+                        if alias.value_type(db) == mapped {
+                            self
+                        } else {
+                            mapped
                         }
                     }
-                });
-
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
-
-                // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
-                //
-                // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
-                // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
-                // incomplete.
-                if !is_recursive && alias.value_type(db) == mapped {
-                    self
-                } else {
-                    mapped
                 }
             }
 
@@ -6802,7 +6810,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization,
                 materialization_kind,
             } => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: specialization.clone(),
+                specialization: *specialization,
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
