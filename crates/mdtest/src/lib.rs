@@ -3,19 +3,18 @@ use std::fmt::{Display, Write};
 
 use camino::Utf8Path;
 use colored::Colorize;
-use parser::EmbeddedFileSourceMap;
-use ruff_db::Db;
-use ruff_db::files::File;
 use similar::{ChangeTag, TextDiff};
 
+use ruff_db::Db;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
+use ruff_db::files::File;
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::matcher::Failure;
-use crate::parser::BacktickOffsets;
+use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 
 /// Filter which tests to run in mdtest.
 ///
