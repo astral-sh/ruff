@@ -163,6 +163,7 @@ def f(
 
 
 class Foo:
+    # ruff: ignore[ARG002]  should be unused due to ignore-all below
     def bar(self, arg1, arg2):
         print("hello")
 
