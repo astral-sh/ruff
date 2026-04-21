@@ -96,11 +96,15 @@ mod tests {
 
     text = ""
     with (ROOT_DIR / "crates/ruff_linter/src/codes.rs").open("r") as fp:
-        while (line := next(fp)).strip() != "// ruff":
+        for line in fp:
+            if line.strip() == "// ruff":
+                text += " " * 8 + f"// {plugin}\n\n"
+                text += line
+                text += fp.read()
+                break
             text += line
-        text += " " * 8 + f"// {plugin}\n\n"
-        text += line
-        text += fp.read()
+        else:
+            raise RuntimeError("Marker '// ruff' not found in codes.rs")
 
     with (ROOT_DIR / "crates/ruff_linter/src/codes.rs").open("w") as fp:
         fp.write(text)
