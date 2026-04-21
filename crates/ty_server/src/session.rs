@@ -325,15 +325,6 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
-    /// any.
-    pub(crate) fn project_db_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectDatabase> {
-        self.project_state_for_path(path).map(|state| &state.db)
-    }
-
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
