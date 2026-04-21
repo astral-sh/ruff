@@ -3003,13 +3003,10 @@ impl<'db> CallableBinding<'db> {
                             move |(parameter_index, variadic_argument_type)| {
                                 // TODO: For an unannotated `self` / `cls` parameter, the type should be
                                 // `typing.Self` / `type[typing.Self]`
-                                let mut parameter_type = overload.signature.parameters()
+                                let parameter_type = overload.signature.parameters()
                                     [parameter_index]
-                                    .annotated_type();
-                                if let Some(specialization) = overload.specialization {
-                                    parameter_type =
-                                        parameter_type.apply_specialization(db, specialization);
-                                }
+                                    .annotated_type()
+                                    .apply_optional_specialization(db, overload.specialization);
                                 OverloadFilterSlot {
                                     parameter: parameter_type,
                                     argument: argument_types.get_for_declared_type(parameter_type),
@@ -3069,19 +3066,16 @@ impl<'db> CallableBinding<'db> {
                 .take(max_slot_count)
                 .collect::<Vec<_>>();
 
-            let current_slots = &matching_overload_slots[upto].1;
+            let (_, current_slots) = &matching_overload_slots[upto];
 
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
                     if participating_slot_indices.contains(&slot_index) {
-                        let argument_type =
-                            if let Some(variadic_argument_type) = slot.variadic_argument {
-                                variadic_argument_type
-                            } else {
-                                current_slots
-                                    .get(slot_index)
-                                    .map_or(Type::unknown(), |slot| slot.argument)
-                            };
+                        let argument_type = slot.variadic_argument.unwrap_or_else(|| {
+                            current_slots
+                                .get(slot_index)
+                                .map_or(Type::unknown(), |slot| slot.argument)
+                        });
                         union_argument_type_builders[slot_index]
                             .add_in_place(argument_type.top_materialization(db));
                     }
@@ -5039,7 +5033,6 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish();
-        tracing::debug!("argument_matches: {:#?}", self.argument_matches);
     }
 
     fn check_types(
