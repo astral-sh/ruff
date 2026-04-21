@@ -46,7 +46,7 @@ use crate::types::generics::{
 };
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
-    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
+    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -4189,6 +4189,48 @@ struct ArgumentTypeChecker<'a, 'db> {
     constraint_set_errors: Vec<bool>,
 }
 
+/// Result of checking only the key type of a keyword-unpack argument.
+enum KeywordUnpackKeyTypeCheck<'db> {
+    /// The argument type is handled by a more specific path, or does not expose mapping keys.
+    NotApplicable,
+    /// The argument exposes mapping keys, and they are assignable to `str`.
+    Valid,
+    /// The argument exposes mapping keys, but the key type is not assignable to `str`.
+    Invalid(Type<'db>),
+}
+
+/// Validate the key type of a keyword-unpack argument without checking its value type.
+fn validate_keyword_unpack_key_type<'db>(
+    db: &'db dyn Db,
+    constraints: &ConstraintSetBuilder<'db>,
+    argument_type: Type<'db>,
+    inferable_typevars: InferableTypeVars<'db>,
+) -> KeywordUnpackKeyTypeCheck<'db> {
+    if matches!(argument_type, Type::TypedDict(_))
+        || argument_type.as_paramspec_typevar(db).is_some()
+    {
+        return KeywordUnpackKeyTypeCheck::NotApplicable;
+    }
+
+    let Some((key_type, _)) = argument_type.unpack_keys_and_items(db) else {
+        return KeywordUnpackKeyTypeCheck::NotApplicable;
+    };
+
+    if key_type
+        .when_assignable_to(
+            db,
+            KnownClass::Str.to_instance(db),
+            constraints,
+            inferable_typevars,
+        )
+        .is_always_satisfied(db)
+    {
+        KeywordUnpackKeyTypeCheck::Valid
+    } else {
+        KeywordUnpackKeyTypeCheck::Invalid(key_type)
+    }
+}
+
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
@@ -4490,6 +4532,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
+                if self.is_gradual_variadic_parameter(parameter_index) {
+                    continue;
+                }
+
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
 
@@ -4538,6 +4584,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
+        if self.is_gradual_variadic_parameter(parameter_index) {
+            return;
+        }
+
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization {
             argument_type = argument_type.apply_specialization(self.db, specialization);
@@ -4584,6 +4634,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         } else {
             self.parameter_tys[parameter_index] = Some(argument_type);
         }
+    }
+
+    fn is_gradual_variadic_parameter(&self, parameter_index: usize) -> bool {
+        let parameters = self.signature.parameters();
+        let parameter = &parameters[parameter_index];
+
+        matches!(parameters.kind(), ParametersKind::Gradual)
+            && matches!(parameter.annotated_type(), Type::Dynamic(_))
+            && (parameter.is_variadic() || parameter.is_keyword_variadic())
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -4888,23 +4947,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
                 Some(paramspec)
             } else {
-                let Some((key_type, _)) = argument_type.unpack_keys_and_items(self.db) else {
-                    return;
-                };
-
-                if !key_type
-                    .when_assignable_to(
-                        self.db,
-                        KnownClass::Str.to_instance(self.db),
-                        constraints,
-                        self.inferable_typevars,
-                    )
-                    .is_always_satisfied(self.db)
-                {
-                    self.errors.push(BindingError::InvalidKeyType {
-                        argument_index: adjusted_argument_index,
-                        provided_ty: key_type,
-                    });
+                match validate_keyword_unpack_key_type(
+                    self.db,
+                    constraints,
+                    argument_type,
+                    self.inferable_typevars,
+                ) {
+                    KeywordUnpackKeyTypeCheck::NotApplicable => return,
+                    KeywordUnpackKeyTypeCheck::Valid => {}
+                    KeywordUnpackKeyTypeCheck::Invalid(provided_ty) => {
+                        self.errors.push(BindingError::InvalidKeyType {
+                            argument_index: adjusted_argument_index,
+                            provided_ty,
+                        });
+                    }
                 }
 
                 None
@@ -5118,6 +5174,24 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        let parameters = self.signature.parameters();
+
+        if parameters.is_top() {
+            self.errors
+                .push(BindingError::CalledTopCallable(self.signature_type));
+            return;
+        }
+
+        if matches!(parameters.kind(), ParametersKind::Gradual)
+            && parameters
+                .as_slice()
+                .iter()
+                .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
+        {
+            self.check_keyword_unpack_key_types(db, constraints, arguments);
+            return;
+        }
+
         let mut checker = ArgumentTypeChecker::new(
             db,
             self.signature_type,
@@ -5129,11 +5203,6 @@ impl<'db> Binding<'db> {
             self.return_ty,
             &mut self.errors,
         );
-        if self.signature.parameters().is_top() {
-            self.errors
-                .push(BindingError::CalledTopCallable(self.signature_type));
-            return;
-        }
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
@@ -5141,6 +5210,43 @@ impl<'db> Binding<'db> {
         checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+    }
+
+    fn check_keyword_unpack_key_types(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) {
+        let mut num_synthetic_args = 0;
+
+        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+            let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
+                num_synthetic_args += 1;
+                None
+            } else {
+                Some(argument_index - num_synthetic_args)
+            };
+
+            if !matches!(argument, Argument::Keywords) {
+                continue;
+            }
+
+            let argument_type = argument_types.get_default().unwrap_or(Type::unknown());
+            if let KeywordUnpackKeyTypeCheck::Invalid(provided_ty) =
+                validate_keyword_unpack_key_type(
+                    db,
+                    constraints,
+                    argument_type,
+                    InferableTypeVars::None,
+                )
+            {
+                self.errors.push(BindingError::InvalidKeyType {
+                    argument_index: adjusted_argument_index,
+                    provided_ty,
+                });
+            }
+        }
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
