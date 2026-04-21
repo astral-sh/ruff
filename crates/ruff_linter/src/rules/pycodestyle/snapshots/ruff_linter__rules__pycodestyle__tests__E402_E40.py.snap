@@ -1,0 +1,71 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+assertion_line: 82
+---
+E402 Module level import not at top of file
+  --> E40.py:56:1
+   |
+54 | VERSION = '1.2.3'
+55 |
+56 | import foo
+   | ^^^^^^^^^^
+57 | #: E402
+58 | import foo
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> E40.py:58:1
+   |
+56 | import foo
+57 | #: E402
+58 | import foo
+   | ^^^^^^^^^^
+59 |
+60 | a = 1
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> E40.py:62:1
+   |
+60 | a = 1
+61 |
+62 | import bar
+   | ^^^^^^^^^^
+63 |
+64 | #: E401
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> E40.py:65:1
+   |
+64 | #: E401
+65 | import re as regex, string  # also with a comment!
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+66 | import re as regex, string; x = 1
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> E40.py:66:1
+   |
+64 | #: E401
+65 | import re as regex, string  # also with a comment!
+66 | import re as regex, string; x = 1
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |
+68 | x = 1; import re as regex, string
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> E40.py:68:8
+   |
+66 | import re as regex, string; x = 1
+67 |
+68 | x = 1; import re as regex, string
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Move module level imports to top of file

@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+assertion_line: 82
+---
+E402 Module level import not at top of file
+  --> E402_shebang_docstring_and_future.py:9:1
+   |
+ 7 | print("something")
+ 8 |
+ 9 | import os
+   | ^^^^^^^^^
+10 |
+11 | # Prevent F403
+   |
+help: Move module level imports to top of file
