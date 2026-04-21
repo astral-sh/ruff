@@ -183,9 +183,9 @@ class DC7(DC6):
 
 ### Protocol implementations
 
-Regular class-body assignments can implement protocol instance attributes. They can also provide the
-value for protocol `ClassVar` attributes by inheriting the `ClassVar` declaration from the protocol
-member:
+Regular class-body assignments can implement protocol instance attributes. The `ClassVar` case below
+uses the same rule as normal classes: an unannotated class-body assignment over an inherited
+`ClassVar` provides a value while preserving the inherited declaration.
 
 ```py
 from typing import ClassVar, Protocol
@@ -208,26 +208,6 @@ class ProtocolWithClassVar(Protocol):
 class ProtocolWithClassVarImpl(ProtocolWithClassVar):
     y = 0
     z = 0
-```
-
-### Imported unannotated assignments
-
-Imported unannotated class attributes are not pure class variables either:
-
-`module.py`:
-
-```py
-class Base:
-    attr = 1
-```
-
-`main.py`:
-
-```py
-from module import Base
-
-class Subclass(Base):
-    attr: int
 ```
 
 ## Method return types

@@ -3,6 +3,8 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+use std::cell::OnceCell;
+
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
@@ -325,7 +327,7 @@ fn check_class_declaration<'db>(
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
-    let mut subclass_variable_kind = VariableKindCache::default();
+    let subclass_variable_kind: OnceCell<Option<VariableKind>> = OnceCell::new();
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
@@ -470,8 +472,6 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let superclass_definition =
-                superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
             let superclass_variable_kind = superclass_variable_kind(
                 db,
                 superclass.own_class_member(db, None, &member.name).inner,
@@ -485,7 +485,7 @@ fn check_class_declaration<'db>(
             }
 
             if let Some(superclass_variable_kind) = superclass_variable_kind {
-                let subclass_variable_kind = subclass_variable_kind.get_or_compute(|| {
+                let subclass_kind = *subclass_variable_kind.get_or_init(|| {
                     variable_kind(
                         db,
                         class.own_class_member(db, None, &member.name).inner,
@@ -493,14 +493,13 @@ fn check_class_declaration<'db>(
                     )
                 });
 
-                if let Some(invalid_override) = invalid_classvar_instance_override(
-                    subclass_variable_kind,
-                    Some(superclass_variable_kind),
-                ) {
+                if let Some(subclass_kind) = subclass_kind
+                    && subclass_kind != superclass_variable_kind
+                {
                     // An unannotated class-body assignment can inherit an overridden `ClassVar`
                     // declaration instead of introducing a conflicting instance variable.
-                    if invalid_override.subclass_kind == VariableKind::Instance
-                        && invalid_override.superclass_kind == VariableKind::Class
+                    if subclass_kind == VariableKind::Instance
+                        && superclass_variable_kind == VariableKind::Class
                         && first_reachable_definition
                             .kind(db)
                             .is_unannotated_assignment()
@@ -512,18 +511,21 @@ fn check_class_declaration<'db>(
                         immediate_parent_variable_kind
                         && immediate_parent != superclass
                         && immediate_parent.is_subclass_of(db, superclass)
-                        && immediate_parent_kind != invalid_override.superclass_kind
+                        && immediate_parent_kind != superclass_variable_kind
                     {
                         continue;
                     }
 
+                    let superclass_definition = superclass_symbol_id
+                        .and_then(|id| symbol_definition(db, superclass_scope, id));
                     report_invalid_attribute_override(
                         context,
                         &member.name,
                         *first_reachable_definition,
                         superclass,
                         superclass_definition,
-                        invalid_override,
+                        subclass_kind,
+                        superclass_variable_kind,
                     );
                     liskov_diagnostic_emitted = true;
                     continue;
@@ -652,42 +654,17 @@ fn check_class_declaration<'db>(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum VariableKindCache {
-    #[default]
-    Uncomputed,
-    NotVariable,
-    Variable(VariableKind),
-}
-
-impl VariableKindCache {
-    fn get_or_compute(
-        &mut self,
-        compute: impl FnOnce() -> Option<VariableKind>,
-    ) -> Option<VariableKind> {
-        match *self {
-            Self::NotVariable => None,
-            Self::Variable(variable_kind) => Some(variable_kind),
-            Self::Uncomputed => {
-                if let Some(variable_kind) = compute() {
-                    *self = Self::Variable(variable_kind);
-                    Some(variable_kind)
-                } else {
-                    *self = Self::NotVariable;
-                    None
-                }
-            }
-        }
-    }
-}
-
+/// Whether an attribute declaration is a class variable or an instance variable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VariableKind {
+    /// A variable annotated with `ClassVar`.
     Class,
+    /// An instance variable, including an unannotated class-body assignment.
     Instance,
 }
 
 impl VariableKind {
+    /// Returns the wording used for this variable kind in diagnostics.
     const fn description(self) -> &'static str {
         match self {
             VariableKind::Class => "class variable",
@@ -696,24 +673,7 @@ impl VariableKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct InvalidAttributeOverride {
-    subclass_kind: VariableKind,
-    superclass_kind: VariableKind,
-}
-
-fn invalid_classvar_instance_override(
-    subclass_kind: Option<VariableKind>,
-    superclass_kind: Option<VariableKind>,
-) -> Option<InvalidAttributeOverride> {
-    let subclass_kind = subclass_kind?;
-    let superclass_kind = superclass_kind?;
-    (subclass_kind != superclass_kind).then_some(InvalidAttributeOverride {
-        subclass_kind,
-        superclass_kind,
-    })
-}
-
+/// Returns the variable kind for a superclass member, excluding final attributes.
 fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
     class_member: PlaceAndQualifiers<'db>,
@@ -726,6 +686,7 @@ fn superclass_variable_kind<'db>(
     variable_kind(db, class_member, instance_member)
 }
 
+/// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
 fn variable_kind<'db>(
     db: &'db dyn Db,
     class_member: PlaceAndQualifiers<'db>,
@@ -739,11 +700,7 @@ fn variable_kind<'db>(
         return None;
     }
 
-    if class_member.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-        || instance_member
-            .qualifiers
-            .contains(TypeQualifiers::CLASS_VAR)
-    {
+    if class_member.is_class_var() || instance_member.is_class_var() {
         return Some(VariableKind::Class);
     }
 
@@ -760,6 +717,7 @@ fn variable_kind<'db>(
     Some(VariableKind::Instance)
 }
 
+/// Returns the definition to use as the secondary annotation for an overridden symbol.
 fn symbol_definition<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -775,6 +733,7 @@ fn symbol_definition<'db>(
         })
 }
 
+/// Returns `true` if a type represents a variable-like attribute.
 fn is_variable_like_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::FunctionLiteral(_)
@@ -794,13 +753,15 @@ fn is_variable_like_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
+/// Reports an invalid override between a class variable and an instance variable.
 fn report_invalid_attribute_override<'db>(
     context: &InferContext<'db, '_>,
     member: &Name,
     subclass_definition: Definition<'db>,
     superclass: ClassType<'db>,
     superclass_definition: Option<Definition<'db>>,
-    invalid_override: InvalidAttributeOverride,
+    subclass_kind: VariableKind,
+    superclass_kind: VariableKind,
 ) {
     let db = context.db();
 
@@ -813,8 +774,8 @@ fn report_invalid_attribute_override<'db>(
 
     let superclass_name = superclass.name(db);
     let superclass_member = format!("{superclass_name}.{member}");
-    let subclass_kind = invalid_override.subclass_kind.description();
-    let superclass_kind = invalid_override.superclass_kind.description();
+    let subclass_kind = subclass_kind.description();
+    let superclass_kind = superclass_kind.description();
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of attribute `{member}`"));
