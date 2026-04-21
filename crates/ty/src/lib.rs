@@ -7,7 +7,7 @@ mod version;
 
 use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use anyhow::{Context, anyhow};
@@ -24,10 +24,12 @@ use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
+use ty_project::dependency_metadata::parse_uv_workspace_metadata;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
@@ -133,6 +135,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .iter()
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
+    let dependency_metadata_path = args
+        .dependency_metadata
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
 
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
@@ -146,6 +152,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
+    let dependency_metadata = dependency_metadata_path
+        .as_deref()
+        .map(|path| load_dependency_metadata(&system, path))
+        .transpose()?;
     let config_file = args
         .config_file
         .as_ref()
@@ -179,6 +189,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
+    project.set_dependency_metadata(&mut db, dependency_metadata.clone());
 
     if !check_paths.is_empty() {
         project.set_included_paths(&mut db, check_paths);
@@ -201,7 +212,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(mode, dependency_metadata, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -243,6 +255,20 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         Ok(exit_status)
     }
+}
+
+fn load_dependency_metadata(
+    system: &dyn System,
+    path: &SystemPath,
+) -> Result<Arc<DependencyMetadata>> {
+    let source = system
+        .read_to_string(path)
+        .with_context(|| format!("Failed to read dependency metadata `{path}`"))?;
+
+    let metadata = parse_uv_workspace_metadata(&source)
+        .with_context(|| format!("Failed to load dependency metadata `{path}`"))?;
+
+    Ok(Arc::new(metadata))
 }
 
 #[derive(Copy, Clone)]
@@ -291,6 +317,8 @@ struct MainLoop {
     /// Interface for displaying information to the user.
     printer: Printer,
 
+    dependency_metadata: Option<Arc<DependencyMetadata>>,
+
     /// Cancellation token that gets set by Ctrl+C.
     /// Used for long-running operations on the main thread. Operations on background threads
     /// use Salsa's cancellation mechanism.
@@ -298,7 +326,11 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        dependency_metadata: Option<Arc<DependencyMetadata>>,
+        printer: Printer,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -310,6 +342,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
+                dependency_metadata,
                 printer,
                 cancellation_token,
             },
@@ -481,6 +514,8 @@ impl MainLoop {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(&changes);
+                    db.project()
+                        .set_dependency_metadata(db, self.dependency_metadata.clone());
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

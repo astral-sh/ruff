@@ -53,6 +53,7 @@ pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub(crate) use self::type_expansion::expand_type;
+use crate::dependency::check_dependency_lints;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
@@ -202,6 +203,8 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .iter()
             .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
+
+    diagnostics.extend(&check_dependency_lints(db, file));
 
     let diagnostics = check_suppressions(db, file, diagnostics);
 

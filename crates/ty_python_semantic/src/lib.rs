@@ -49,6 +49,7 @@ pub use types::ide_support::{
 pub use types::{DisplaySettings, TypeQualifiers};
 
 mod db;
+pub mod dependency;
 mod dunder_all;
 mod fixes;
 pub mod lint;
@@ -81,6 +82,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 
 /// Register all known semantic lints.
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
+    dependency::register_lints(registry);
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
@@ -106,6 +108,8 @@ pub struct AnalysisSettings {
     pub allowed_unresolved_imports: ModuleGlobSet,
 
     pub replace_imports_with_any: ModuleGlobSet,
+
+    pub dependency_metadata: Option<std::sync::Arc<dependency::DependencyMetadata>>,
 }
 
 impl Default for AnalysisSettings {
@@ -115,6 +119,7 @@ impl Default for AnalysisSettings {
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),
+            dependency_metadata: None,
         }
     }
 }
