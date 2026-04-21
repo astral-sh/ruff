@@ -3824,7 +3824,7 @@ pub(super) fn report_invalid_attribute_assignment(
     // silenced diagnostics during attribute resolution, and rely on the assignability
     // diagnostic being emitted here.
 
-    report_invalid_assignment_with_message(
+    let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         node,
         target_ty,
@@ -3833,7 +3833,12 @@ pub(super) fn report_invalid_attribute_assignment(
             source_ty.display(context.db()),
             target_ty.display(context.db()),
         ),
-    );
+    ) else {
+        return;
+    };
+
+    let error_context = source_ty.assignability_error_context(context.db(), target_ty);
+    error_context.attach_to(context.db(), &mut diag);
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(
@@ -4027,19 +4032,23 @@ pub(super) fn report_invalid_generator_yield_type(
 
     let settings =
         DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
-    let expected_ty = expected_ty.display_with(context.db(), settings.clone());
-    let actual_ty = actual_ty.display_with(context.db(), settings);
+    let expected_display = expected_ty.display_with(context.db(), settings.clone());
+    let actual_display = actual_ty.display_with(context.db(), settings);
 
     let (kind_name, title, concise) = match kind {
         GeneratorMismatchKind::YieldType => (
             "yield",
             "Yield expression type does not match annotation",
-            format!("Yield type `{actual_ty}` does not match annotated yield type `{expected_ty}`"),
+            format!(
+                "Yield type `{actual_display}` does not match annotated yield type `{expected_display}`"
+            ),
         ),
         GeneratorMismatchKind::SendType => (
             "send",
             "Send type does not match annotation",
-            format!("Send type `{actual_ty}` does not match annotated send type `{expected_ty}`"),
+            format!(
+                "Send type `{actual_display}` does not match annotated send type `{expected_display}`"
+            ),
         ),
     };
 
@@ -4047,19 +4056,22 @@ pub(super) fn report_invalid_generator_yield_type(
     diag.set_concise_message(concise);
     let primary = match kind {
         GeneratorMismatchKind::YieldType => {
-            format!("expression of type `{actual_ty}`, expected `{expected_ty}`")
+            format!("expression of type `{actual_display}`, expected `{expected_display}`")
         }
         GeneratorMismatchKind::SendType => {
-            format!("generator with send type `{actual_ty}`, expected `{expected_ty}`")
+            format!("generator with send type `{actual_display}`, expected `{expected_display}`")
         }
     };
     diag.set_primary_message(primary);
 
     if let Some(return_type_span) = return_type_span {
         diag.annotate(Annotation::secondary(return_type_span).message(format!(
-            "Function annotated with {kind_name} type `{expected_ty}` here"
+            "Function annotated with {kind_name} type `{expected_display}` here"
         )));
     }
+
+    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
+    error_context.attach_to(context.db(), &mut diag);
 }
 
 pub(super) fn report_implicit_return_type(
