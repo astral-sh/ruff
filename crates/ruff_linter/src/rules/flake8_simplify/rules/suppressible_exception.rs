@@ -157,16 +157,7 @@ pub(crate) fn suppressible_exception(
                 checker.semantic(),
             )?;
             let mut rest: Vec<Edit> = Vec::new();
-            let content: String;
-            if exception == "BaseException" && handler_names.is_empty() {
-                let (import_exception, binding_exception) = checker
-                    .importer()
-                    .get_or_import_builtin_symbol(&exception, stmt.start(), checker.semantic())?;
-                content = format!("with {binding}({binding_exception})");
-                rest.extend(import_exception);
-            } else {
-                content = format!("with {binding}({exception})");
-            }
+            let content = format!("with {binding}({exception})");
             rest.push(Edit::range_deletion(
                 checker.locator().full_lines_range(*range),
             ));

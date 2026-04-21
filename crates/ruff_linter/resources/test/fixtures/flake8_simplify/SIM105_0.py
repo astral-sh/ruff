@@ -141,3 +141,11 @@ try:
     int("a")
 except BaseException:
     pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/22334
+# Bare except when BaseException is shadowed should not import builtins
+BaseException = ValueError
+try:
+    int("a")
+except:
+    pass

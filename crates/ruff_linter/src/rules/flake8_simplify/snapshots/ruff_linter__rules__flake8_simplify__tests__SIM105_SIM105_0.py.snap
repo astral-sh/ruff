@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 59
 ---
 SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
  --> SIM105_0.py:6:1
@@ -326,6 +327,8 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
 142 | | except BaseException:
 143 | |     pass
     | |________^
+144 |
+145 |   # Regression test for: https://github.com/astral-sh/ruff/issues/22334
     |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
 1   + import contextlib
@@ -340,5 +343,35 @@ help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException
 141 + with contextlib.suppress(BaseException):
 142 |     int("a")
     - except BaseException:
+    -     pass
+143 |
+144 | # Regression test for: https://github.com/astral-sh/ruff/issues/22334
+145 | # Bare except when BaseException is shadowed should not import builtins
+note: This is an unsafe fix and may change runtime behavior
+
+SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
+   --> SIM105_0.py:148:1
+    |
+146 |   # Bare except when BaseException is shadowed should not import builtins
+147 |   BaseException = ValueError
+148 | / try:
+149 | |     int("a")
+150 | | except:
+151 | |     pass
+    | |________^
+    |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
+1   + import contextlib
+2   | def foo():
+3   |     pass
+4   |
+--------------------------------------------------------------------------------
+146 | # Regression test for: https://github.com/astral-sh/ruff/issues/22334
+147 | # Bare except when BaseException is shadowed should not import builtins
+148 | BaseException = ValueError
+    - try:
+149 + with contextlib.suppress(BaseException):
+150 |     int("a")
+    - except:
     -     pass
 note: This is an unsafe fix and may change runtime behavior
