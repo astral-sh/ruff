@@ -25,9 +25,11 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
+pub mod dependency_metadata;
 mod files;
 pub mod glob;
 pub mod metadata;
@@ -220,7 +222,22 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
+    pub fn set_dependency_metadata(
+        self,
+        db: &mut dyn Db,
+        dependency_metadata: Option<Arc<DependencyMetadata>>,
+    ) {
+        let settings = self
+            .settings(db)
+            .clone()
+            .with_dependency_metadata(dependency_metadata);
+
+        if self.settings(db) != &settings {
+            self.set_settings(db).to(Box::new(settings));
+        }
+    }
+
+    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.

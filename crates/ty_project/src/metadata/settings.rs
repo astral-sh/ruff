@@ -3,6 +3,7 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
@@ -59,6 +60,26 @@ impl Settings {
 
     pub fn analysis(&self) -> &AnalysisSettings {
         &self.analysis
+    }
+
+    pub(crate) fn with_dependency_metadata(
+        mut self,
+        dependency_metadata: Option<Arc<DependencyMetadata>>,
+    ) -> Self {
+        self.analysis.dependency_metadata = dependency_metadata.clone();
+
+        self.overrides = self
+            .overrides
+            .into_iter()
+            .map(|mut override_| {
+                let mut settings = (*override_.settings).clone();
+                settings.analysis.dependency_metadata = dependency_metadata.clone();
+                override_.settings = Arc::new(settings);
+                override_
+            })
+            .collect();
+
+        self
     }
 }
 
@@ -196,7 +217,13 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     // It's okay to ignore the errors here because the rules are eagerly validated
     // during `overrides.to_settings()`.
     let rules = rules.to_rule_selection(db, &mut Vec::new());
-    let analysis = analysis.to_settings(db, &mut Vec::new());
+    let mut analysis = analysis.to_settings(db, &mut Vec::new());
+    analysis.dependency_metadata = db
+        .project()
+        .settings(db)
+        .analysis()
+        .dependency_metadata
+        .clone();
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
