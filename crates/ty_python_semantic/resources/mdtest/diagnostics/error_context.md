@@ -1103,3 +1103,44 @@ error[invalid-return-type]: Return type does not match returned value
   |
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
+
+### In `invalid-assignment` for attribute assignments
+
+```py
+class C:
+    x: tuple[int, str]
+
+c = C()
+c.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is not assignable to attribute `x` of type `tuple[int, str]`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | c.x = (1, b"")  # snapshot
+  | ^^^
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
+
+### In `invalid-yield` diagnostics
+
+```py
+from typing import Generator
+
+def f() -> Generator[tuple[int, str], None, None]:
+    yield (1, b"")  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+ --> src/mdtest_snippet.py:3:12
+  |
+3 | def f() -> Generator[tuple[int, str], None, None]:
+  |            -------------------------------------- Function annotated with yield type `tuple[int, str]` here
+4 |     yield (1, b"")  # snapshot: invalid-yield
+  |           ^^^^^^^^ expression of type `tuple[Literal[1], Literal[b""]]`, expected `tuple[int, str]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
