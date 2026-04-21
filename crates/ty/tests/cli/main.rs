@@ -1,5 +1,6 @@
 mod analysis_options;
 mod config_option;
+mod dependency_metadata;
 mod exit_code;
 mod file_selection;
 mod fixes;
