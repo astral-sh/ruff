@@ -2,11 +2,11 @@
 
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, name::Name};
 
 use crate::{
     Db, DisplaySettings,
-    place::PlaceAndQualifiers,
+    place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
@@ -15,6 +15,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::EquivalenceChecker,
+        signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
         visitor,
     },
@@ -310,7 +311,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn iter_mro(&self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    fn iter_mro(&self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Either::Left(ClassBase::Dynamic(*dynamic).mro(db, None))
@@ -854,8 +855,8 @@ impl<'db> BoundSuperType<'db> {
     fn skip_until_after_pivot(
         self,
         db: &'db dyn Db,
-        mro_iter: impl Iterator<Item = ClassBase<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+        mro_iter: impl Iterator<Item = ClassBase<'db>> + Clone,
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
             return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
@@ -912,13 +913,28 @@ impl<'db> BoundSuperType<'db> {
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.lookup_anchor,
         };
 
+        let mut mro_after_pivot = self.skip_until_after_pivot(db, owner.iter_mro(db));
         let class_literal = class.class_literal(db);
-        class_literal.class_member_from_mro(
-            db,
-            name,
-            policy,
-            self.skip_until_after_pivot(db, owner.iter_mro(db)),
-        )
+        let result = class_literal.class_member_from_mro(db, name, policy, mro_after_pivot.clone());
+
+        // TODO: Here we are hard-coding that __class_getitem__ is the only member defined in
+        // typing._Generic in the typeshed, and we are hard-coding its signature. Ideally we would
+        // look that up from the typeshed class, but that would require threading through the
+        // static class literal through the SpecialForm and KnownInstance types that we create.
+        if result.place.is_undefined()
+            && name == "__class_getitem__"
+            && mro_after_pivot
+                .any(|superclass| matches!(superclass, ClassBase::Generic | ClassBase::Protocol))
+        {
+            let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
+                .with_annotated_type(Type::unknown());
+            let parameters = Parameters::new(db, [item_parameter]);
+            let return_type = self.owner(db).owner_type();
+            let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
+            return Place::bound(class_getitem).into();
+        }
+
+        result
     }
 
     pub(super) fn recursive_type_normalized_impl(
