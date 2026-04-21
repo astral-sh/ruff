@@ -502,20 +502,20 @@ help: Remove unused suppression
 164 |
 
 RUF100 [*] Unused suppression (non-enabled: `F401`)
-   --> suppressions.py:167:1
+   --> suppressions.py:174:1
     |
-165 | # Ensure LAST suppression in file is reported.
-166 | # https://github.com/astral-sh/ruff/issues/23235
-167 | # ruff:disable[F401]
+172 | # Ensure LAST suppression in file is reported.
+173 | # https://github.com/astral-sh/ruff/issues/23235
+174 | # ruff:disable[F401]
     | ^^^^^^^^^^^^^^^^^^^^
-168 | print("goodbye")
-169 | # ruff:enable[F401]
+175 | print("goodbye")
+176 | # ruff:enable[F401]
     | -------------------
     |
 help: Remove unused suppression
-164 |
-165 | # Ensure LAST suppression in file is reported.
-166 | # https://github.com/astral-sh/ruff/issues/23235
+171 |
+172 | # Ensure LAST suppression in file is reported.
+173 | # https://github.com/astral-sh/ruff/issues/23235
     - # ruff:disable[F401]
-167 | print("goodbye")
+174 | print("goodbye")
     - # ruff:enable[F401]

@@ -162,6 +162,13 @@ def f(
     pass
 
 
+class Foo:
+    def bar(self, arg1, arg2):
+        print("hello")
+
+# ruff: ignore-all[ARG002]  should cover the class method above!
+
+
 # Ensure LAST suppression in file is reported.
 # https://github.com/astral-sh/ruff/issues/23235
 # ruff:disable[F401]
