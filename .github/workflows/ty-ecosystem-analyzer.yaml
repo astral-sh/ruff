@@ -104,7 +104,7 @@ jobs:
     strategy:
       matrix:
         shard: [0, 1]
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-64' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Install the latest version of uv
