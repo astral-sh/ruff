@@ -58,10 +58,10 @@ class ValidSubclass(Base):
 
 ### Regular class-body assignments
 
-An unannotated class-body assignment is not treated as a pure class variable. This keeps common
-patterns valid: a subclass can replace a class-level default, and an explicit `ClassVar` can
-override an inherited unannotated class attribute because the base attribute was not declared as an
-instance variable:
+An unannotated class-body assignment is an instance variable with a class-level default. This means
+it can replace another inherited instance-variable default, but it cannot override an inherited
+`ClassVar`. An explicit `ClassVar` cannot override an inherited unannotated class-body assignment
+either, because code using the base class can still write that attribute through an instance:
 
 ```py
 from typing import ClassVar
@@ -71,12 +71,14 @@ class Base:
     class_attr: ClassVar[int] = 1
 
 class RegularClassAttributeOverride(Base):
+    # error: [invalid-method-override] "instance variable cannot override class variable `Base.class_attr`"
     class_attr = 1
 
 class RegularClassAttributeBase:
     attr = 1
 
 class ExplicitClassVarOverride(RegularClassAttributeBase):
+    # error: [invalid-method-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
     attr: ClassVar[int] = 1
 
 class ClassDefaultBase:
@@ -181,9 +183,9 @@ class DC7(DC6):
 
 ### Protocol implementations
 
-Regular class-body assignments are flexible enough to satisfy both protocol `ClassVar` attributes
-and protocol instance attributes. These assignments are accepted because they do not explicitly
-change an inherited pure class variable into an instance declaration, or vice versa:
+Regular class-body assignments can implement protocol instance attributes. They cannot implement a
+protocol `ClassVar` attribute, because the assignment still declares an instance variable with a
+class-level default:
 
 ```py
 from typing import ClassVar, Protocol
@@ -194,6 +196,7 @@ class ProtocolBase(Protocol):
     instance_attr_with_default: int = 1
 
 class ProtocolImpl(ProtocolBase):
+    # error: [invalid-method-override] "instance variable cannot override class variable `ProtocolBase.class_attr`"
     class_attr = 1
     instance_attr = 1
     instance_attr_with_default = 1

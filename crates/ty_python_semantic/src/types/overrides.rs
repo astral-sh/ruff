@@ -325,15 +325,7 @@ fn check_class_declaration<'db>(
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
-    let subclass_class_member = class.own_class_member(db, None, &member.name);
-    let subclass_own_instance_member = class.own_instance_member(db, &member.name);
-    let subclass_variable_kind = variable_kind(
-        db,
-        subclass_class_member.inner,
-        subclass_instance_member,
-        subclass_own_instance_member.inner,
-        Some(*first_reachable_definition),
-    );
+    let mut subclass_variable_kind = VariableKindCache::default();
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
@@ -478,46 +470,53 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let superclass_class_member = superclass.own_class_member(db, None, &member.name);
             let superclass_definition =
                 superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
-            let superclass_own_instance_member = superclass.own_instance_member(db, &member.name);
             let superclass_variable_kind = superclass_variable_kind(
                 db,
-                superclass_class_member.inner,
+                superclass.own_class_member(db, None, &member.name).inner,
                 superclass_instance_member,
-                superclass_own_instance_member.inner,
-                superclass_definition,
             );
 
-            if let Some(superclass_kind) = superclass_variable_kind
+            if let Some(superclass_variable_kind) = superclass_variable_kind
                 && immediate_parent_variable_kind.is_none()
             {
-                immediate_parent_variable_kind = Some((superclass, superclass_kind));
+                immediate_parent_variable_kind = Some((superclass, superclass_variable_kind));
             }
 
-            if let Some(invalid_override) =
-                invalid_classvar_instance_override(subclass_variable_kind, superclass_variable_kind)
-            {
-                if let Some((immediate_parent, immediate_parent_kind)) =
-                    immediate_parent_variable_kind
-                    && immediate_parent != superclass
-                    && immediate_parent.is_subclass_of(db, superclass)
-                    && immediate_parent_kind != invalid_override.superclass_kind
-                {
+            if let Some(superclass_variable_kind) = superclass_variable_kind {
+                let subclass_variable_kind = subclass_variable_kind.get_or_compute(|| {
+                    variable_kind(
+                        db,
+                        class.own_class_member(db, None, &member.name).inner,
+                        subclass_instance_member,
+                    )
+                });
+
+                if let Some(invalid_override) = invalid_classvar_instance_override(
+                    subclass_variable_kind,
+                    Some(superclass_variable_kind),
+                ) {
+                    if let Some((immediate_parent, immediate_parent_kind)) =
+                        immediate_parent_variable_kind
+                        && immediate_parent != superclass
+                        && immediate_parent.is_subclass_of(db, superclass)
+                        && immediate_parent_kind != invalid_override.superclass_kind
+                    {
+                        continue;
+                    }
+
+                    report_invalid_attribute_override(
+                        context,
+                        &member.name,
+                        *first_reachable_definition,
+                        superclass,
+                        superclass_definition,
+                        invalid_override,
+                    );
+                    liskov_diagnostic_emitted = true;
                     continue;
                 }
-
-                report_invalid_attribute_override(
-                    context,
-                    &member.name,
-                    *first_reachable_definition,
-                    superclass,
-                    superclass_definition,
-                    invalid_override,
-                );
-                liskov_diagnostic_emitted = true;
-                continue;
             }
 
             let Type::FunctionLiteral(subclass_function) = member.ty else {
@@ -642,6 +641,35 @@ fn check_class_declaration<'db>(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum VariableKindCache {
+    #[default]
+    Uncomputed,
+    NotVariable,
+    Variable(VariableKind),
+}
+
+impl VariableKindCache {
+    fn get_or_compute(
+        &mut self,
+        compute: impl FnOnce() -> Option<VariableKind>,
+    ) -> Option<VariableKind> {
+        match *self {
+            Self::NotVariable => None,
+            Self::Variable(variable_kind) => Some(variable_kind),
+            Self::Uncomputed => {
+                if let Some(variable_kind) = compute() {
+                    *self = Self::Variable(variable_kind);
+                    Some(variable_kind)
+                } else {
+                    *self = Self::NotVariable;
+                    None
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VariableKind {
     Class,
@@ -679,28 +707,18 @@ fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
-    own_instance_member: PlaceAndQualifiers<'db>,
-    definition: Option<Definition<'db>>,
 ) -> Option<VariableKind> {
     if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
         return None;
     }
 
-    variable_kind(
-        db,
-        class_member,
-        instance_member,
-        own_instance_member,
-        definition,
-    )
+    variable_kind(db, class_member, instance_member)
 }
 
 fn variable_kind<'db>(
     db: &'db dyn Db,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
-    own_instance_member: PlaceAndQualifiers<'db>,
-    definition: Option<Definition<'db>>,
 ) -> Option<VariableKind> {
     let class_member_ty = class_member.ignore_possibly_undefined()?;
     let instance_member_ty = instance_member.ignore_possibly_undefined()?;
@@ -728,25 +746,7 @@ fn variable_kind<'db>(
         return None;
     }
 
-    if definition.is_some_and(|definition| is_unannotated_assignment_definition(db, definition))
-        && own_instance_member
-            .place
-            .ignore_possibly_undefined()
-            .is_none()
-    {
-        return None;
-    }
-
     Some(VariableKind::Instance)
-}
-
-/// Returns whether `definition` is an unannotated assignment.
-///
-/// This is a Salsa-tracked query because `definition` can come from a superclass in another
-/// Python module, and `Definition::kind` should not be read across files outside tracked queries.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn is_unannotated_assignment_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    definition.kind(db).is_unannotated_assignment()
 }
 
 fn symbol_definition<'db>(
