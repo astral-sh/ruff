@@ -497,6 +497,17 @@ fn check_class_declaration<'db>(
                     subclass_variable_kind,
                     Some(superclass_variable_kind),
                 ) {
+                    // An unannotated class-body assignment can inherit an overridden `ClassVar`
+                    // declaration instead of introducing a conflicting instance variable.
+                    if invalid_override.subclass_kind == VariableKind::Instance
+                        && invalid_override.superclass_kind == VariableKind::Class
+                        && first_reachable_definition
+                            .kind(db)
+                            .is_unannotated_assignment()
+                    {
+                        continue;
+                    }
+
                     if let Some((immediate_parent, immediate_parent_kind)) =
                         immediate_parent_variable_kind
                         && immediate_parent != superclass

@@ -59,9 +59,10 @@ class ValidSubclass(Base):
 ### Regular class-body assignments
 
 An unannotated class-body assignment is an instance variable with a class-level default. This means
-it can replace another inherited instance-variable default, but it cannot override an inherited
-`ClassVar`. An explicit `ClassVar` cannot override an inherited unannotated class-body assignment
-either, because code using the base class can still write that attribute through an instance:
+it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
+it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
+override an inherited unannotated class-body assignment, because code using the base class can still
+write that attribute through an instance:
 
 ```py
 from typing import ClassVar
@@ -71,7 +72,6 @@ class Base:
     class_attr: ClassVar[int] = 1
 
 class RegularClassAttributeOverride(Base):
-    # error: [invalid-method-override] "instance variable cannot override class variable `Base.class_attr`"
     class_attr = 1
 
 class RegularClassAttributeBase:
@@ -183,9 +183,9 @@ class DC7(DC6):
 
 ### Protocol implementations
 
-Regular class-body assignments can implement protocol instance attributes. They cannot implement a
-protocol `ClassVar` attribute, because the assignment still declares an instance variable with a
-class-level default:
+Regular class-body assignments can implement protocol instance attributes. They can also provide the
+value for protocol `ClassVar` attributes by inheriting the `ClassVar` declaration from the protocol
+member:
 
 ```py
 from typing import ClassVar, Protocol
@@ -196,10 +196,18 @@ class ProtocolBase(Protocol):
     instance_attr_with_default: int = 1
 
 class ProtocolImpl(ProtocolBase):
-    # error: [invalid-method-override] "instance variable cannot override class variable `ProtocolBase.class_attr`"
     class_attr = 1
     instance_attr = 1
     instance_attr_with_default = 1
+
+class ProtocolWithClassVar(Protocol):
+    x: int = 1
+    y: int
+    z: ClassVar[int]
+
+class ProtocolWithClassVarImpl(ProtocolWithClassVar):
+    y = 0
+    z = 0
 ```
 
 ### Imported unannotated assignments
