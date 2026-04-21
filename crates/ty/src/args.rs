@@ -76,6 +76,10 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
+    /// Path to a `uv workspace metadata` JSON snapshot used for dependency lints.
+    #[arg(long, value_name = "PATH", hide = true)]
+    pub(crate) dependency_metadata: Option<SystemPathBuf>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,

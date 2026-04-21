@@ -92,6 +92,10 @@ pub(crate) mod tests {
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
+
+        pub(crate) fn set_analysis_settings(&mut self, settings: AnalysisSettings) {
+            self.analysis_settings = Arc::new(settings);
+        }
     }
 
     impl DbWithTestSystem for TestDb {
