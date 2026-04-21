@@ -499,12 +499,16 @@ fn check_class_declaration<'db>(
                         && subclass_kind != superclass_variable_kind
                     {
                         // An unannotated class-body assignment can inherit an overridden `ClassVar`
-                        // declaration instead of introducing a conflicting instance variable.
+                        // declaration instead of introducing a conflicting instance variable. This
+                        // also applies to augmented assignments after the initial class-body
+                        // assignment, e.g. `epilog = "..."; epilog += "..."`.
                         if subclass_kind == VariableKind::Instance
                             && superclass_variable_kind == VariableKind::Class
-                            && first_reachable_definition
-                                .kind(db)
-                                .is_unannotated_assignment()
+                            && matches!(
+                                first_reachable_definition.kind(db),
+                                DefinitionKind::Assignment(_)
+                                    | DefinitionKind::AugmentedAssignment(_)
+                            )
                         {
                             continue;
                         }

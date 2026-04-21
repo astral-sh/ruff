@@ -74,6 +74,10 @@ class Base:
 class RegularClassAttributeOverride(Base):
     class_attr = 1
 
+class AugmentedClassAttributeOverride(Base):
+    class_attr = 1
+    class_attr += 1
+
 class RegularClassAttributeBase:
     attr = 1
 
