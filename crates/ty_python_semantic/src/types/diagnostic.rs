@@ -3800,9 +3800,7 @@ pub(super) fn report_invalid_assignment<'db>(
         ));
 
         let error_context = value_ty.assignability_error_context(context.db(), target_ty);
-        for message in error_context.info_messages(context.db()) {
-            diag.info(message);
-        }
+        error_context.attach_to(context.db(), &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.primary_message().to_string();
@@ -5693,9 +5691,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    for message in error_context().info_messages(context.db()) {
-        diagnostic.info(message);
-    }
+    error_context().attach_to(context.db(), &mut diagnostic);
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 

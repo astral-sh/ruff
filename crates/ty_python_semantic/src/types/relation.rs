@@ -1436,7 +1436,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
-            (Type::TypedDict(_), _) => self.with_recursion_guard(source, target, || {
+            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
                 let spec = &[KnownClass::Str.to_instance(db), Type::object()];
                 let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
                 let result = self.check_type_pair(db, str_object_map, target);
@@ -1444,7 +1444,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     if let Type::NominalInstance(instance) = target
                         && instance.class(db).is_known(db, KnownClass::Dict)
                     {
-                        self.provide_context(|| ErrorContext::TypedDictNotAssignableToDict);
+                        self.provide_context(|| {
+                            ErrorContext::TypedDictNotAssignableToDict(typed_dict)
+                        });
                     }
                 }
                 result
