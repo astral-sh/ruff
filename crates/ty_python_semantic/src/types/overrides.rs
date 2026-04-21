@@ -502,6 +502,7 @@ fn check_class_declaration<'db>(
                 if let Some((immediate_parent, immediate_parent_kind)) =
                     immediate_parent_variable_kind
                     && immediate_parent != superclass
+                    && immediate_parent.is_subclass_of(db, superclass)
                     && immediate_parent_kind != invalid_override.superclass_kind
                 {
                     continue;
@@ -717,21 +718,21 @@ fn variable_kind<'db>(
         return Some(VariableKind::Class);
     }
 
-    if definition.is_some_and(|definition| is_unannotated_assignment_definition(db, definition))
-        && own_instance_member
-            .place
-            .ignore_possibly_undefined()
-            .is_none()
-    {
-        return None;
-    }
-
     if class_member.qualifiers.contains(TypeQualifiers::FINAL)
         || class_member_ty
             .class_member(db, "__get__".into())
             .place
             .ignore_possibly_undefined()
             .is_some()
+    {
+        return None;
+    }
+
+    if definition.is_some_and(|definition| is_unannotated_assignment_definition(db, definition))
+        && own_instance_member
+            .place
+            .ignore_possibly_undefined()
+            .is_none()
     {
         return None;
     }

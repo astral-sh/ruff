@@ -23,11 +23,17 @@ several checks for a type checker to perform when it checks a subclass `B` of a 
 ## `ClassVar` and instance variables
 
 A pure class variable cannot override an inherited instance variable, and an instance variable
-cannot override an inherited pure class variable:
+cannot override an inherited pure class variable.
+
+### Direct overrides
+
+An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
+class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
+one with the other changes the places where the attribute is valid, so it violates Liskov
+substitution:
 
 ```py
-from dataclasses import dataclass
-from typing import ClassVar, Protocol
+from typing import ClassVar
 
 class Base:
     instance_attr: int
@@ -48,6 +54,21 @@ class ValidSubclass(Base):
     instance_attr: int
     instance_attr_with_default: int = 1
     class_attr: ClassVar[int] = 1
+```
+
+### Regular class-body assignments
+
+An unannotated class-body assignment is not treated as a pure class variable. This keeps common
+patterns valid: a subclass can replace a class-level default, and an explicit `ClassVar` can
+override an inherited unannotated class attribute because the base attribute was not declared as an
+instance variable:
+
+```py
+from typing import ClassVar
+
+class Base:
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
 
 class RegularClassAttributeOverride(Base):
     class_attr = 1
@@ -65,6 +86,16 @@ class ClassDefaultBase:
 class ClassDefaultSubclass(ClassDefaultBase):
     class_default = 2
     declared_instance = True
+```
+
+### Repeated inherited conflicts
+
+If a parent class already made an invalid change from class variable to instance variable, a child
+that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
+other direction:
+
+```py
+from typing import ClassVar
 
 class GrandparentClassVar:
     attr: ClassVar[int]
@@ -85,6 +116,54 @@ class ParentClassVar(GrandparentInstance):
 
 class ChildClassVar(ParentClassVar):
     attr: ClassVar[int]
+```
+
+### Descriptors
+
+A descriptor can define different behavior when accessed on an instance. Because descriptor lookup
+is neither a pure class variable nor a normal instance variable, overriding it with an instance
+attribute is accepted:
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object]) -> int:
+        return 1
+
+class DescriptorBase:
+    descriptor_attr = Descriptor()
+
+class DescriptorOverride(DescriptorBase):
+    descriptor_attr: int
+```
+
+### Multiple inheritance
+
+The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
+with the subclass: an unrelated base that declares the same member as a pure class variable still
+makes an instance-variable override invalid.
+
+```py
+from typing import ClassVar
+
+class ClassVarBase:
+    attr: ClassVar[int]
+
+class InstanceBase:
+    attr: int
+
+class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
+    # error: [invalid-method-override] "instance variable cannot override class variable `ClassVarBase.attr`"
+    attr: int
+```
+
+### Dataclasses
+
+Dataclass fields are instance variables, even though they are usually declared in the class body.
+`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
 
 @dataclass
 class DC6:
@@ -98,6 +177,16 @@ class DC7(DC6):
 
     # error: [invalid-method-override] "instance variable cannot override class variable `DC6.y`"
     y: int
+```
+
+### Protocol implementations
+
+Regular class-body assignments are flexible enough to satisfy both protocol `ClassVar` attributes
+and protocol instance attributes. These assignments are accepted because they do not explicitly
+change an inherited pure class variable into an instance declaration, or vice versa:
+
+```py
+from typing import ClassVar, Protocol
 
 class ProtocolBase(Protocol):
     class_attr: ClassVar[int]
@@ -109,6 +198,8 @@ class ProtocolImpl(ProtocolBase):
     instance_attr = 1
     instance_attr_with_default = 1
 ```
+
+### Imported unannotated assignments
 
 Imported unannotated class attributes are not pure class variables either:
 
