@@ -162,7 +162,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         let Case { db, .. } = case;
 
         db.apply_changes(
-            vec![ChangeEvent::Changed {
+            &[ChangeEvent::Changed {
                 path: case.file_path.clone(),
                 kind: ChangedKind::FileContent,
             }],

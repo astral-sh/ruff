@@ -80,7 +80,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
 
-            session.apply_changes(&AnySystemPath::System(root.clone()), changes);
+            session.apply_changes(&AnySystemPath::System(root.clone()), &changes);
             publish_settings_diagnostics(session, client, root);
         }
 
