@@ -94,60 +94,89 @@ Assigning an intersection to a non-intersection:
 
 ```py
 from ty_extensions import Intersection
+from typing import Protocol
 
-class P: ...
-class Q: ...
-class R: ...
+class SupportsFoo(Protocol):
+    def foo(self) -> None: ...
 
-def _(source: Intersection[P, Q]):
-    target: int = source  # snapshot
+class SupportsBar(Protocol):
+    def bar(self) -> None: ...
+
+class SupportsFooAndBar(Protocol):
+    def foo(self) -> None: ...
+    def bar(self) -> None: ...
+
+class HasFoo:
+    def foo(self) -> None: ...
+
+class HasBar:
+    def bar(self) -> None: ...
+
+class HasNeither: ...
+
+def _(source: Intersection[HasBar, HasNeither]):
+    target: SupportsFooAndBar = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P & Q` is not assignable to `int`
- --> src/mdtest_snippet.py:8:13
-  |
-8 |     target: int = source  # snapshot
-  |             ---   ^^^^^^ Incompatible value of type `P & Q`
-  |             |
-  |             Declared type
-  |
+error[invalid-assignment]: Object of type `HasBar & HasNeither` is not assignable to `SupportsFooAndBar`
+  --> src/mdtest_snippet.py:23:13
+   |
+23 |     target: SupportsFooAndBar = source  # snapshot
+   |             -----------------   ^^^^^^ Incompatible value of type `HasBar & HasNeither`
+   |             |
+   |             Declared type
+   |
+info: no element of intersection `HasBar & HasNeither` is assignable to `SupportsFooAndBar`
+info: ├── type `HasBar` is not assignable to protocol `SupportsFooAndBar`
+info: │   └── protocol member `foo` is not defined on type `HasBar`
+info: └── type `HasNeither` is not assignable to protocol `SupportsFooAndBar`
+info:     └── protocol member `bar` is not defined on type `HasNeither`
 ```
 
 Assigning a non-intersection to an intersection:
 
 ```py
-def _(source: P):
-    target: Intersection[P, Q] = source  # snapshot
+def _(source: HasFoo):
+    target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P` is not assignable to `P & Q`
-  --> src/mdtest_snippet.py:10:13
+error[invalid-assignment]: Object of type `HasFoo` is not assignable to `SupportsFoo & SupportsBar`
+  --> src/mdtest_snippet.py:25:13
    |
-10 |     target: Intersection[P, Q] = source  # snapshot
-   |             ------------------   ^^^^^^ Incompatible value of type `P`
+25 |     target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
+   |             --------------------------------------   ^^^^^^ Incompatible value of type `HasFoo`
    |             |
    |             Declared type
    |
+info: type `HasFoo` is not assignable to element `SupportsBar` of intersection `SupportsFoo & SupportsBar`
+info: └── type `HasFoo` is not assignable to protocol `SupportsBar`
+info:     └── protocol member `bar` is not defined on type `HasFoo`
 ```
 
 Assigning an intersection to an intersection:
 
 ```py
-def _(source: Intersection[P, R]):
-    target: Intersection[P, Q] = source  # snapshot
+def _(source: Intersection[HasFoo, HasNeither]):
+    target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `P & R` is not assignable to `P & Q`
-  --> src/mdtest_snippet.py:12:13
+error[invalid-assignment]: Object of type `HasFoo & HasNeither` is not assignable to `SupportsFoo & SupportsBar`
+  --> src/mdtest_snippet.py:27:13
    |
-12 |     target: Intersection[P, Q] = source  # snapshot
-   |             ------------------   ^^^^^^ Incompatible value of type `P & R`
+27 |     target: Intersection[SupportsFoo, SupportsBar] = source  # snapshot
+   |             --------------------------------------   ^^^^^^ Incompatible value of type `HasFoo & HasNeither`
    |             |
    |             Declared type
    |
+info: type `HasFoo & HasNeither` is not assignable to element `SupportsBar` of intersection `SupportsFoo & SupportsBar`
+info: └── no element of intersection `HasFoo & HasNeither` is assignable to `SupportsBar`
+info:     ├── type `HasFoo` is not assignable to protocol `SupportsBar`
+info:     │   └── protocol member `bar` is not defined on type `HasFoo`
+info:     └── type `HasNeither` is not assignable to protocol `SupportsBar`
+info:         └── protocol member `bar` is not defined on type `HasNeither`
 ```
 
 ## Tuples
@@ -789,6 +818,11 @@ error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFo
    |             |
    |             Declared type
    |
+info: no element of intersection `DoesNotSupportFoo1 & DoesNotSupportFoo2` is assignable to `SupportsFoo`
+info: ├── type `DoesNotSupportFoo1` is not assignable to protocol `SupportsFoo`
+info: │   └── protocol member `foo` is not defined on type `DoesNotSupportFoo1`
+info: └── type `DoesNotSupportFoo2` is not assignable to protocol `SupportsFoo`
+info:     └── protocol member `foo` is not defined on type `DoesNotSupportFoo2`
 ```
 
 ## Assigning an overload set

@@ -55,6 +55,15 @@ pub(crate) enum ErrorContext<'db> {
     NotAssignableToNOtherUnionElements {
         n: usize,
     },
+    NotAssignableToIntersectionElement {
+        source: Type<'db>,
+        element: Type<'db>,
+        intersection: Type<'db>,
+    },
+    NoIntersectionElementAssignableToTarget {
+        intersection: Type<'db>,
+        target: Type<'db>,
+    },
     TypedDictFieldMissing {
         field_name: Name,
         source: TypedDictType<'db>,
@@ -158,6 +167,24 @@ impl<'db> ErrorContext<'db> {
             Self::NotAssignableToNOtherUnionElements { n } => format!(
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
+            ),
+            Self::NotAssignableToIntersectionElement {
+                source,
+                element,
+                intersection,
+            } => format!(
+                "type `{}` is not assignable to element `{}` of intersection `{}`",
+                source.display(db),
+                element.display(db),
+                intersection.display(db),
+            ),
+            Self::NoIntersectionElementAssignableToTarget {
+                intersection,
+                target,
+            } => format!(
+                "no element of intersection `{}` is assignable to `{}`",
+                intersection.display(db),
+                target.display(db),
             ),
             Self::TypedDictFieldMissing { field_name, source } => {
                 format!(
