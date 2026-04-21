@@ -1003,6 +1003,12 @@ bitflags::bitflags! {
 
         /// Whether we are currently in a context where `Concatenate` can be legal
         const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
+
+        /// Whether we're in the first pass of inferring a PEP-613 type alias.
+        ///
+        /// During this pass, `invalid-type-form` diagnostics are suppressed;
+        /// these are emitted during the second, post-inference, pass.
+        const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
     }
 }
 

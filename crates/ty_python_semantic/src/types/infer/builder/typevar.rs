@@ -582,10 +582,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         paramspec_name: Option<&str>,
     ) {
         let previously_allowed_paramspec = self
+            .context
             .inference_flags
             .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
         self.infer_paramspec_default_impl(default_expr, paramspec_name);
-        self.inference_flags.set(
+        self.context.inference_flags.set(
             InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
             previously_allowed_paramspec,
         );
@@ -606,13 +607,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let previously_allowed_paramspec = self
+                    .context
                     .inference_flags
                     .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
                 let types = elts
                     .iter()
                     .map(|elt| self.infer_type_expression(elt))
                     .collect::<Vec<_>>();
-                self.inference_flags.set(
+                self.context.inference_flags.set(
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );

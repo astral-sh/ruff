@@ -477,9 +477,7 @@ BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
 # type expression in post-inference)
 #
 # error:[invalid-type-form]
-# error:[invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
-# error: [invalid-type-form]
 # error: [invalid-type-form]
 BadTypeAlias15: TypeAlias = Literal[-3.14]
 ```
