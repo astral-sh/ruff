@@ -141,9 +141,7 @@ info: Function defined here
   |
 1 | def foo(
   |     ^^^
-  |
- ::: src/mdtest_snippet.py:3:5
-  |
+2 |     x: int,
 3 |     y: int,
   |     ------ Parameter declared here
   |
@@ -412,7 +410,7 @@ c("wrong")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+error[invalid-argument-type]: Argument to bound method `C.__call__` is incorrect
  --> src/mdtest_snippet.py:6:3
   |
 6 | c("wrong")  # snapshot: invalid-argument-type
@@ -440,7 +438,7 @@ c.square("hello")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to bound method `square` is incorrect
+error[invalid-argument-type]: Argument to bound method `C.square` is incorrect
  --> src/mdtest_snippet.py:6:10
   |
 6 | c.square("hello")  # snapshot: invalid-argument-type
@@ -569,6 +567,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 8 |     f(x)  # snapshot: invalid-argument-type
   |       ^ Expected `Number`, found `int | float`
   |
+info: element `int` of union `int | float` is not assignable to `Number`
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |

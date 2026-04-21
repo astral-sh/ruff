@@ -497,12 +497,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {
         if let Some(returns) = returns {
-            self.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
+            self.context.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
             self.infer_type_expression_with_state(
                 returns,
                 DeferredExpressionState::from(self.defer_annotations()),
             );
-            self.inference_flags.remove(InferenceFlags::IN_RETURN_TYPE);
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_RETURN_TYPE);
         }
     }
 
@@ -532,20 +534,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kwarg,
         } = parameters;
 
-        self.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
+        self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
         for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
-            self.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
+            self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
-            self.inference_flags
+            self.context
+                .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
         }
-        self.inference_flags
+        self.context
+            .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
     }
 

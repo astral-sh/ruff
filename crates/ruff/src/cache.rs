@@ -200,7 +200,7 @@ impl Cache {
     #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
-        const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+        const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
         let changes = std::mem::take(self.changes.get_mut().unwrap());
         if changes.is_empty() {

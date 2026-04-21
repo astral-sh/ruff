@@ -67,30 +67,26 @@ info: See https://docs.python.org/3/glossary.html#term-generator for more detail
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:24:12
-   |
-24 |     return ""  # error: [invalid-return-type]
-   |            ^^ expected `None`, found `Literal[""]`
-   |
-  ::: src/mdtest_snippet.py:22:30
+  --> src/mdtest_snippet.py:22:30
    |
 22 | def invalid_return_type() -> typing.Generator[None, None, None]:
    |                              ---------------------------------- Expected `None` because of return type
+23 |     yield
+24 |     return ""  # error: [invalid-return-type]
+   |            ^^ expected `None`, found `Literal[""]`
    |
 
 ```
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:27:12
-   |
-27 |     return ""  # error: [invalid-return-type]
-   |            ^^ expected `int`, found `Literal[""]`
-   |
-  ::: src/mdtest_snippet.py:25:23
+  --> src/mdtest_snippet.py:25:23
    |
 25 | def wrong_return() -> typing.Generator[int, int, int]:
    |                       ------------------------------- Expected `int` because of return type
+26 |     yield 1
+27 |     return ""  # error: [invalid-return-type]
+   |            ^^ expected `int`, found `Literal[""]`
    |
 
 ```
@@ -108,15 +104,14 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:36:12
-   |
-36 |     return "foo"
-   |            ^^^^^ expected `None`, found `Literal["foo"]`
-   |
-  ::: src/mdtest_snippet.py:33:35
+  --> src/mdtest_snippet.py:33:35
    |
 33 | def iterator_must_not_return() -> typing.Iterator[int]:
    |                                   -------------------- Expected `None` because of return type
+34 |     yield 2
+35 |     # error: [invalid-return-type]
+36 |     return "foo"
+   |            ^^^^^ expected `None`, found `Literal["foo"]`
    |
 
 ```

@@ -102,6 +102,8 @@ async def main():
 
 ## Context expression with possibly-unbound union variants
 
+<!-- snapshot-diagnostics -->
+
 ```py
 async def _(flag: bool):
     class Manager1:
@@ -153,8 +155,6 @@ async def main():
 
 ## Accidental use of async `async with`
 
-<!-- snapshot-diagnostics -->
-
 If a asynchronous `async with` statement is used on a type with `__enter__` and `__exit__`, we show
 a diagnostic hint that the user might have intended to use `with` instead.
 
@@ -164,9 +164,20 @@ class Manager:
     def __exit__(self, *args): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
+    # snapshot: invalid-context-manager
     async with Manager():
         pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`
+ --> src/mdtest_snippet.py:7:16
+  |
+7 |     async with Manager():
+  |                ^^^^^^^^^
+  |
+info: Objects of type `Manager` can be used as sync context managers
+info: Consider using `with` here
 ```
 
 ## Incorrect signatures

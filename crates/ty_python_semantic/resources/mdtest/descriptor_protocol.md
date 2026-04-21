@@ -582,15 +582,14 @@ DontAssignToMe().immutable = "the properties, they are a-changing"
 
 ```snapshot
 error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
- --> src/mdtest_snippet.py:6:1
-  |
-6 | DontAssignToMe().immutable = "the properties, they are a-changing"
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
-  |
- ::: src/mdtest_snippet.py:3:9
+ --> src/mdtest_snippet.py:3:9
   |
 3 |     def immutable(self): ...
   |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # snapshot: invalid-assignment
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
   |
 ```
 
@@ -908,6 +907,33 @@ class C:
     d: Descriptor1 = Descriptor1()
 
 reveal_type(C.d)  # revealed: int
+```
+
+### Descriptors with `Concatenate` self-types on `__get__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+P2 = ParamSpec("P2")
+T = TypeVar("T")
+
+class FunctionWrapper(Generic[P]):
+    def __get__(
+        self: "FunctionWrapper[Concatenate[T, P2]]",
+        instance: T,
+    ) -> None:
+        raise NotImplementedError
+
+def wrapper(fn: Callable[P, Any]) -> FunctionWrapper[P]:
+    raise NotImplementedError
+
+class Example:
+    @wrapper
+    def __call__(self) -> None:
+        pass
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

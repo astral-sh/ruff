@@ -443,7 +443,7 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to constructor `A.__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
 A(f([]))
 ```
 
@@ -505,6 +505,16 @@ reveal_type(f7)  # revealed: (int, /) -> None
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
 f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
 reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+
+def _(x: bool):
+    signatures = {
+        "upper": str.upper,
+        "lower": str.lower,
+        "title": str.title,
+    }
+
+    # revealed: (x) -> Unknown
+    f = signatures.get("", reveal_type(lambda x: x))
 ```
 
 We do not currently account for type annotations present later in the scope:

@@ -560,6 +560,7 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
 /// Salsa-tracked [`StaticClassLiteral::try_mro`] method unless it's absolutely necessary.
+#[derive(Clone)]
 pub(crate) struct MroIterator<'db> {
     db: &'db dyn Db,
 

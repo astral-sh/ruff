@@ -46,7 +46,7 @@ use crate::{
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -444,45 +444,10 @@ impl<'db> StaticClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        match self.known(db) {
-            Some(KnownClass::VersionInfo) => {
-                let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-                    .expect("sys.version_info tuple spec should always be a valid tuple");
-
-                Box::new([
-                    definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                    Type::from(tuple_type.to_class_type(db)),
-                ])
-            }
-            // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
-            // but this causes more problems than it fixes.
-            Some(KnownClass::NotImplementedType) => Box::new([]),
-            _ => class_stmt
-                .bases()
-                .iter()
-                .flat_map(|base_node| {
-                    if let ast::Expr::Starred(starred) = base_node {
-                        let starred_ty =
-                            definition_expression_type(db, class_definition, &starred.value);
-                        // If the starred expression is a fixed-length tuple, unpack it.
-                        if let Some(Tuple::Fixed(tuple)) = starred_ty
-                            .tuple_instance_spec(db)
-                            .map(std::borrow::Cow::into_owned)
-                        {
-                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
-                        }
-                        // Otherwise, we can't statically determine the bases.
-                        Either::Right(std::iter::once(Type::unknown()))
-                    } else {
-                        Either::Right(std::iter::once(definition_expression_type(
-                            db,
-                            class_definition,
-                            base_node,
-                        )))
-                    }
-                })
-                .collect(),
-        }
+        expanded_class_base_entries(db, self.known(db), class_stmt, class_definition)
+            .into_iter()
+            .map(ExpandedClassBaseEntry::ty)
+            .collect()
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
@@ -490,6 +455,8 @@ impl<'db> StaticClassLiteral<'db> {
         if self
             .known_function_decorators(db)
             .contains(&KnownFunction::DisjointBase)
+            && !self.is_typed_dict(db)
+            && !self.is_protocol(db)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
@@ -2596,6 +2563,128 @@ impl<'db> StaticClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+}
+
+/// A single semantic class-base entry after expanding starred tuple bases and synthetic bases.
+#[derive(Clone, Copy)]
+pub(crate) enum ExpandedClassBaseEntry<'a, 'db> {
+    /// A base that comes from a concrete expression in the class header.
+    SourceBacked { node: &'a ast::Expr, ty: Type<'db> },
+    /// A base introduced by semantic expansion with no corresponding source expression.
+    Synthetic(Type<'db>),
+}
+
+impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
+    /// Returns the source expression for this base entry, if it has one.
+    pub(crate) const fn source_node(self) -> Option<&'a ast::Expr> {
+        match self {
+            Self::SourceBacked { node, .. } => Some(node),
+            Self::Synthetic(_) => None,
+        }
+    }
+
+    /// Returns the semantic type of this base entry.
+    pub(crate) const fn ty(self) -> Type<'db> {
+        match self {
+            Self::SourceBacked { ty, .. } | Self::Synthetic(ty) => ty,
+        }
+    }
+}
+
+/// Expands a class's bases into the semantic entries used by [`StaticClassLiteral::explicit_bases`].
+///
+/// Entries are source-backed when they originate from a concrete base expression in the class
+/// header, and synthetic when semantic expansion adds a base with no corresponding source span.
+pub(crate) fn expanded_class_base_entries<'a, 'db>(
+    db: &'db dyn Db,
+    known_class: Option<KnownClass>,
+    class_stmt: &'a ast::StmtClassDef,
+    class_definition: Definition<'db>,
+) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
+    match known_class {
+        Some(KnownClass::VersionInfo) => {
+            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
+                .expect("sys.version_info tuple spec should always be a valid tuple");
+
+            vec![
+                ExpandedClassBaseEntry::SourceBacked {
+                    node: &class_stmt.bases()[0],
+                    ty: definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
+                },
+                ExpandedClassBaseEntry::Synthetic(Type::from(tuple_type.to_class_type(db))),
+            ]
+        }
+        // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
+        // but this causes more problems than it fixes.
+        Some(KnownClass::NotImplementedType) => vec![],
+        _ => {
+            let mut expanded_bases = Vec::with_capacity(class_stmt.bases().len());
+
+            for base_node in class_stmt.bases() {
+                if let Some(tuple) =
+                    expanded_fixed_length_starred_class_base_tuple(db, class_definition, base_node)
+                {
+                    if let ast::Expr::Starred(starred) = base_node
+                        && let Some(tuple_literal) = starred.value.as_tuple_expr()
+                        && tuple_literal.len() == tuple.len()
+                        && tuple_literal
+                            .iter()
+                            .all(|element| !element.is_starred_expr())
+                    {
+                        expanded_bases.extend(
+                            tuple_literal
+                                .iter()
+                                .zip(tuple.owned_elements().into_vec())
+                                .map(|(node, ty)| ExpandedClassBaseEntry::SourceBacked {
+                                    node,
+                                    ty,
+                                }),
+                        );
+                        continue;
+                    }
+
+                    expanded_bases.extend(tuple.owned_elements().into_vec().into_iter().map(
+                        |ty| ExpandedClassBaseEntry::SourceBacked {
+                            node: base_node,
+                            ty,
+                        },
+                    ));
+                    continue;
+                }
+
+                let ty = if matches!(base_node, ast::Expr::Starred(_)) {
+                    Type::unknown()
+                } else {
+                    definition_expression_type(db, class_definition, base_node)
+                };
+                expanded_bases.push(ExpandedClassBaseEntry::SourceBacked {
+                    node: base_node,
+                    ty,
+                });
+            }
+
+            expanded_bases
+        }
+    }
+}
+
+/// If `base_node` is a starred class base whose value is inferred as a fixed-length tuple,
+/// returns the unpacked tuple in source order.
+fn expanded_fixed_length_starred_class_base_tuple<'db>(
+    db: &'db dyn Db,
+    class_definition: Definition<'db>,
+    base_node: &ast::Expr,
+) -> Option<FixedLengthTuple<Type<'db>>> {
+    let ast::Expr::Starred(starred) = base_node else {
+        return None;
+    };
+
+    let starred_ty = definition_expression_type(db, class_definition, &starred.value);
+    let tuple_spec = starred_ty.tuple_instance_spec(db)?;
+    let Tuple::Fixed(tuple) = tuple_spec.into_owned() else {
+        return None;
+    };
+    Some(tuple)
 }
 
 #[salsa::tracked]

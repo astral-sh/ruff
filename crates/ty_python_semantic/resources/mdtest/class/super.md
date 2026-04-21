@@ -783,7 +783,7 @@ class Parent:
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
+        # error: [invalid-argument-type] "Argument to `Parent.__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
         super().__init__(children)
 
 # The fix is to use `Self` consistently in the subclass:
@@ -812,6 +812,6 @@ class MyProtocol(Protocol, Generic[_T_co]):
         # Accessing parent's __class_getitem__ through super()
         reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
         parent_method = super().__class_getitem__
-        reveal_type(parent_method)  # revealed: @Todo(super in generic class)
+        reveal_type(parent_method)  # revealed: (item: Unknown, /) -> type[Self@__class_getitem__]
         return parent_method(item)
 ```

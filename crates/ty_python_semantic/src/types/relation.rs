@@ -18,7 +18,10 @@ use crate::types::{
 };
 use crate::{
     Db,
-    types::{Type, constraints::ConstraintSet, generics::InferableTypeVars},
+    types::{
+        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
+        generics::InferableTypeVars,
+    },
 };
 
 /// A non-exhaustive enumeration of relations that can exist between types.
@@ -330,6 +333,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
+            context_tree: ErrorContextTree::disabled(),
             given: assuming,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -345,6 +349,33 @@ impl<'db> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.when_assignable_to(db, target, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
+    }
+
+    /// Re-run the assignability check with error context collection enabled.
+    ///
+    /// This should normally be called when `is_assignable_to` has returned `false` and we
+    /// are now about to emit a diagnostic where additional context could be useful.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    pub(crate) fn assignability_error_context(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        let builder = ConstraintSetBuilder::new();
+        let checker = TypeRelationChecker {
+            constraints: &builder,
+            inferable: InferableTypeVars::None,
+            relation: TypeRelation::Assignability,
+            context_tree: ErrorContextTree::enabled(),
+            given: ConstraintSet::from_bool(&builder, false),
+            relation_visitor: &HasRelationToVisitor::default(&builder),
+            disjointness_visitor: &IsDisjointVisitor::default(&builder),
+            materialization_visitor: &ApplyTypeMappingVisitor::default(),
+        };
+        checker.check_type_pair(db, self, target);
+        checker.context_tree
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set assignability.
@@ -432,6 +463,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             relation,
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -576,6 +608,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
+    context_tree: ErrorContextTree<'db>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -601,6 +634,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -618,6 +652,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints,
             inferable: InferableTypeVars::None,
             relation: TypeRelation::ConstraintSetAssignability,
+            context_tree: ErrorContextTree::disabled(),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
             disjointness_visitor,
@@ -638,6 +673,37 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn never(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, false)
+    }
+
+    /// Provide context about a failing (assignability) relation between two types.
+    pub(super) fn provide_context(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
+        self.context_tree.push(get_context);
+    }
+
+    /// Overwrite the error context tree with a new root context and child nodes.
+    pub(super) fn set_context(
+        &self,
+        root: ErrorContext<'db>,
+        children: impl IntoIterator<Item = ErrorContextTree<'db>>,
+    ) {
+        self.context_tree.set(root, children);
+    }
+
+    /// Return true if error context collection is currently enabled.
+    pub(super) fn is_context_collection_enabled(&self) -> bool {
+        self.context_tree.is_enabled()
+    }
+
+    /// Temporarily suppress error context collection for the duration of `f`.
+    ///
+    /// Note: we may eventually not need this method once we properly retain error
+    /// context everywhere.
+    pub(super) fn without_context_collection<R>(&self, f: impl FnOnce() -> R) -> R {
+        let was_enabled = self.context_tree.is_enabled();
+        self.context_tree.set_enabled(false);
+        let result = f();
+        self.context_tree.set_enabled(was_enabled);
+        result
     }
 
     fn with_recursion_guard(
@@ -1054,17 +1120,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .elements(db)
                     .iter()
                     .when_all(db, self.constraints, |&elem_ty| {
-                        self.check_type_pair(db, elem_ty, target)
+                        let constraint_set = self.check_type_pair(db, elem_ty, target);
+                        if constraint_set.is_never_satisfied(db) {
+                            self.provide_context(|| ErrorContext::NotAllUnionElementsAssignable {
+                                element: elem_ty,
+                                union: source,
+                                target,
+                            });
+                        }
+                        constraint_set
                     })
             }
 
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .when_any(db, self.constraints, |&elem_ty| {
-                    self.check_type_pair(db, source, elem_ty)
-                })
-                .or(db, self.constraints, || {
+            (_, Type::Union(union)) => {
+                let is_new_type_of_union = || {
                     // Normally non-unions cannot directly contain unions in our model due to the fact that we
                     // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
                     // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
@@ -1090,7 +1159,50 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         }
                         _ => self.never(),
                     }
-                }),
+                };
+
+                let mut elements_context = vec![];
+                let context_collection_enabled = self.is_context_collection_enabled();
+
+                let elements = union.elements(db);
+                let result = elements
+                    .iter()
+                    .when_any(db, self.constraints, |&elem_ty| {
+                        let result = self.check_type_pair(db, source, elem_ty);
+                        if context_collection_enabled {
+                            let ctx = self.context_tree.take();
+                            if !ctx.is_empty() {
+                                elements_context.push(ctx);
+                            }
+                        }
+                        result
+                    })
+                    .or(db, self.constraints, is_new_type_of_union);
+
+                if context_collection_enabled
+                    && !elements_context.is_empty()
+                    && result.is_never_satisfied(db)
+                {
+                    let elements_without_context = elements.len() - elements_context.len();
+                    if elements_without_context > 0 && elements_without_context < elements.len() {
+                        elements_context.push(
+                            ErrorContext::NotAssignableToNOtherUnionElements {
+                                n: elements_without_context,
+                            }
+                            .into(),
+                        );
+                    }
+                    self.set_context(
+                        ErrorContext::NotAssignableToAnyUnionElement {
+                            source,
+                            union: target,
+                        },
+                        elements_context,
+                    );
+                }
+
+                result
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1146,22 +1258,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // positive elements is a subtype of that type. If there are no positive elements,
                 // we treat `object` as the implicit positive element (e.g., `~str` is semantically
                 // `object & ~str`).
-                intersection
-                    .positive_elements_or_object(db)
-                    .when_any(db, self.constraints, |elem_ty| {
-                        self.check_type_pair(db, elem_ty, target)
-                    })
-                    .or(db, self.constraints, || {
-                        if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
-                                target,
-                            )
-                        } else {
-                            self.never()
-                        }
-                    })
+                // TODO: Similar to how we do this for unions, we should collect error
+                // context for all elements and report it if *all* checks fail.
+
+                self.without_context_collection(|| {
+                    intersection
+                        .positive_elements_or_object(db)
+                        .when_any(db, self.constraints, |elem_ty| {
+                            self.check_type_pair(db, elem_ty, target)
+                        })
+                        .or(db, self.constraints, || {
+                            if should_expand_intersection(intersection) {
+                                self.check_type_pair(
+                                    db,
+                                    intersection.with_expanded_typevars_and_newtypes(db),
+                                    target,
+                                )
+                            } else {
+                                self.never()
+                            }
+                        })
+                })
             }
 
             // `Never` is the bottom type, the empty set.
@@ -1319,10 +1436,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
-            (Type::TypedDict(_), _) => self.with_recursion_guard(source, target, || {
+            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
                 let spec = &[KnownClass::Str.to_instance(db), Type::object()];
                 let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
-                self.check_type_pair(db, str_object_map, target)
+                let result = self.check_type_pair(db, str_object_map, target);
+                if result.is_never_satisfied(db) {
+                    if let Type::NominalInstance(instance) = target
+                        && instance.class(db).is_known(db, KnownClass::Dict)
+                    {
+                        self.provide_context(|| {
+                            ErrorContext::TypedDictNotAssignableToDict(typed_dict)
+                        });
+                    }
+                }
+                result
             }),
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
@@ -1709,6 +1836,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             constraints: self.constraints,
+            context_tree: ErrorContextTree::disabled(),
             given: self.given,
             inferable: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
@@ -1789,6 +1917,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             constraints: self.constraints,
             inferable: self.inferable,
+            context_tree: ErrorContextTree::disabled(),
             given: self.given,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,

@@ -771,24 +771,20 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     ])?;
 
     // Without --force-exclude, explicitly passed file overrides exclude.
-    assert_cmd_snapshot!(case.command().arg("out/amd64/install/_setup_util.py"), @r#"
+    assert_cmd_snapshot!(case.command().arg("out/amd64/install/_setup_util.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
      --> out/amd64/install/_setup_util.py:3:21
       |
-    2 | base_path: str = "/path"
     3 | if base_path not in CMAKE_PREFIX_PATH:
       |                     ^^^^^^^^^^^^^^^^^
-    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
       |
 
     error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
      --> out/amd64/install/_setup_util.py:4:5
       |
-    2 | base_path: str = "/path"
-    3 | if base_path not in CMAKE_PREFIX_PATH:
     4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
       |     ^^^^^^^^^^^^^^^^^
       |
@@ -796,7 +792,7 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    ");
 
     // With --force-exclude, the exclude pattern is enforced even for explicit paths.
     assert_cmd_snapshot!(case.command().arg("--force-exclude").arg("out/amd64/install/_setup_util.py"), @"
@@ -1056,7 +1052,6 @@ print(other_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> library.py:3:12
       |
-    2 | def process_data():
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |
@@ -1064,7 +1059,6 @@ print(other_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> main.py:5:7
       |
-    4 | result = library.process_data()
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
       |
@@ -1082,7 +1076,6 @@ print(other_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> main.py:5:7
       |
-    4 | result = library.process_data()
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
       |
@@ -1143,7 +1136,6 @@ print(regular_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/module.py:3:12
       |
-    2 | def process():
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |
@@ -1151,7 +1143,6 @@ print(regular_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> src/utils.py:3:12
       |
-    2 | def helper():
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |
@@ -1169,7 +1160,6 @@ print(regular_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> generated_module.py:3:12
       |
-    2 | def process():
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |
@@ -1177,7 +1167,6 @@ print(regular_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> generated_utils.py:3:12
       |
-    2 | def helper():
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |
@@ -1202,7 +1191,6 @@ print(regular_undefined)  # error: unresolved-reference
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> generated_module.py:3:12
       |
-    2 | def process():
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
       |

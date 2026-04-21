@@ -169,9 +169,7 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
    |
  8 |     @final
    |     ------
-   |
-  ::: src/mdtest_snippet.pyi:10:9
-   |
+ 9 |     @property
 10 |     def my_property1(self) -> int: ...
    |         ------------ `Parent.my_property1` defined here
    |
@@ -229,9 +227,7 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
    |
 17 |     @final
    |     ------
-   |
-  ::: src/mdtest_snippet.pyi:19:9
-   |
+18 |     @classmethod
 19 |     def class_method1(cls) -> int: ...
    |         ------------- `Parent.class_method1` defined here
    |
@@ -261,9 +257,7 @@ info: `Parent.static_method1` is decorated with `@final`, forbidding overrides
    |
 23 |     @final
    |     ------
-   |
-  ::: src/mdtest_snippet.pyi:25:9
-   |
+24 |     @staticmethod
 25 |     def static_method1() -> int: ...
    |         -------------- `Parent.static_method1` defined here
    |
@@ -399,9 +393,7 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
    |
  8 |     @final
    |     ------
-   |
-  ::: src/mdtest_snippet.pyi:10:9
-   |
+ 9 |     @property
 10 |     def my_property1(self) -> int: ...
    |         ------------ `Parent.my_property1` defined here
    |
@@ -421,9 +413,7 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
    |
 17 |     @final
    |     ------
-   |
-  ::: src/mdtest_snippet.pyi:19:9
-   |
+18 |     @classmethod
 19 |     def class_method1(cls) -> int: ...
    |         ------------- `Parent.class_method1` defined here
    |

@@ -41,7 +41,9 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 14 |     f(a)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `str | Foo`
    |
-info: Element `Foo` of this union is not assignable to `Sized`
+info: element `Foo` of union `str | Foo` is not assignable to `Sized`
+info: └── type `Foo` is not assignable to protocol `Sized`
+info:     └── protocol member `__len__` is not defined on type `Foo`
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -58,7 +60,9 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 15 |     f(b)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 5 union elements`
    |
-info: Element `Foo` of this union is not assignable to `Sized`
+info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 5 union elements` is not assignable to `Sized`
+info: └── type `Foo` is not assignable to protocol `Sized`
+info:     └── protocol member `__len__` is not defined on type `Foo`
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -75,7 +79,9 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 16 |     f(c)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 6 union elements`
    |
-info: Union elements `Foo` and `Bar` are not assignable to `Sized`
+info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 6 union elements` is not assignable to `Sized`
+info: └── type `Foo` is not assignable to protocol `Sized`
+info:     └── protocol member `__len__` is not defined on type `Foo`
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -92,7 +98,9 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 17 |     f(d)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 7 union elements`
    |
-info: Union element `Foo`, and 2 more union elements, are not assignable to `Sized`
+info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 7 union elements` is not assignable to `Sized`
+info: └── type `Foo` is not assignable to protocol `Sized`
+info:     └── protocol member `__len__` is not defined on type `Foo`
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |

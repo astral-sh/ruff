@@ -206,12 +206,20 @@ reveal_type(not PossiblyUnboundBool())
 
 ## Object that implements `__bool__` incorrectly
 
-<!-- snapshot-diagnostics -->
-
 ```py
 class NotBoolable:
     __bool__: int = 3
 
-# error: [unsupported-bool-conversion]
+# snapshot: unsupported-bool-conversion
 not NotBoolable()
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | not NotBoolable()
+  | ^^^^^^^^^^^^^^^^^
+  |
+info: `__bool__` on `NotBoolable` must be callable
 ```

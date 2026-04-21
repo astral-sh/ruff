@@ -2568,30 +2568,30 @@ impl NodeId {
                     )?;
                     // Calling display_graph recursively here causes rustc to claim that the
                     // expect(unused) up above is unfulfilled!
-                    write!(f, "\n{prefix}┡━₁ ",)?;
+                    write!(f, "\n{prefix}┡━₁ ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_true,
-                        &format_args!("{prefix}│   ",),
+                        &format_args!("{prefix}│   "),
                         seen,
                         f,
                     )?;
-                    write!(f, "\n{prefix}├─? ",)?;
+                    write!(f, "\n{prefix}├─? ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_uncertain,
-                        &format_args!("{prefix}│   ",),
+                        &format_args!("{prefix}│   "),
                         seen,
                         f,
                     )?;
-                    write!(f, "\n{prefix}└─₀ ",)?;
+                    write!(f, "\n{prefix}└─₀ ")?;
                     format_node(
                         db,
                         builder,
                         interior.if_false,
-                        &format_args!("{prefix}    ",),
+                        &format_args!("{prefix}    "),
                         seen,
                         f,
                     )?;

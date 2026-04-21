@@ -32,6 +32,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
+pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::set_theoretic::{
@@ -127,6 +128,7 @@ mod newtype;
 mod overrides;
 mod protocol_class;
 pub(crate) mod relation;
+mod relation_error;
 mod set_theoretic;
 mod signatures;
 mod special_form;
@@ -2718,7 +2720,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
@@ -3652,7 +3654,7 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         ) {
             Ok(bindings) => bindings.return_type(db),
-            Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => bindings.return_type(db),
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
@@ -4772,36 +4774,12 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        // For intersection types, call the dunder on each element separately and combine
-        // the results. This avoids intersecting bound methods (which often collapses to Never)
-        // and instead intersects the return types.
-        //
-        // TODO: we might be able to remove this after fixing
-        // https://github.com/astral-sh/ty/issues/2428.
         if let Type::Intersection(intersection) = self {
-            // Using `positive()` rather than `positive_elements_or_object()` is safe
-            // here because `object` does not define any of the dunders that are called
-            // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
-            // `__iter__`, `__enter__`, `__bool__`).
-            let positive = intersection.positive(db);
+            return intersection.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+        }
 
-            let mut successful_bindings = Vec::with_capacity(positive.len());
-            let mut last_error = None;
-
-            for element in positive {
-                match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
-                    Ok(bindings) => successful_bindings.push(bindings),
-                    Err(err) => last_error = Some(err),
-                }
-            }
-
-            if successful_bindings.is_empty() {
-                // TODO we are only showing one of the errors here; should we aggregate them
-                // somehow or show all of them?
-                return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
-            }
-
-            return Ok(Bindings::from_intersection(self, successful_bindings));
+        if let Type::Union(union) = self {
+            return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -4826,7 +4804,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        unbound_on: None,
+                    });
                 }
                 Ok(bindings)
             }
@@ -4861,7 +4842,10 @@ impl<'db> Type<'db> {
                     .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
-                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                    return Err(CallDunderError::PossiblyUnbound {
+                        bindings: Box::new(bindings),
+                        unbound_on: None,
+                    });
                 }
                 Ok(bindings)
             }
@@ -6378,6 +6362,121 @@ impl<'db> Type<'db> {
     }
 }
 
+impl<'db> IntersectionType<'db> {
+    // Calls the dunder on each element separately and combines the results.
+    // This avoids intersecting bound methods (which often collapses to Never)
+    // and instead intersects the return types.
+    //
+    // TODO: we might be able to remove this after fixing
+    // https://github.com/astral-sh/ty/issues/2428.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Using `positive()` rather than `positive_elements_or_object()` is safe
+        // here because `object` does not define any of the dunders that are called
+        // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
+        // `__iter__`, `__enter__`, `__bool__`).
+        let positive = self.positive(db);
+        let mut successful_bindings = Vec::with_capacity(positive.len());
+        let mut last_error = None;
+
+        for element in positive {
+            match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
+                Ok(bindings) => successful_bindings.push(bindings),
+                Err(err) => last_error = Some(err),
+            }
+        }
+
+        if successful_bindings.is_empty() {
+            // TODO we are only showing one of the errors here; should we aggregate
+            // them somehow or show all of them?
+            return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
+        }
+
+        Ok(Bindings::from_intersection(
+            Type::Intersection(self),
+            successful_bindings,
+        ))
+    }
+}
+
+impl<'db> UnionType<'db> {
+    // Performs a lookup for the dunder on each union member separately, then
+    // aggregates the results.
+    //
+    // This alternative to aggregating the dunder lookups with
+    // `UnionType.map_with_boundness_and_qualifiers` preserves the information
+    // necessary to emit more precise diagnostics for "possibly unbound" errors.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let elements = self.elements(db);
+        let mut builder = UnionBuilder::new(db);
+        let mut unbound_on: Vec<Type<'db>> = Vec::new();
+        let mut any_defined = false;
+        let mut possibly_undefined = false;
+
+        for element in elements {
+            match element
+                .member_lookup_with_policy(
+                    db,
+                    name.into(),
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                    possibly_undefined = true;
+                }
+                Place::Defined(DefinedPlace { ty, .. }) => {
+                    builder = builder.add(ty);
+                    any_defined = true;
+                }
+                Place::Undefined => {
+                    unbound_on.push(*element);
+                    possibly_undefined = true;
+                }
+            }
+        }
+
+        if !any_defined {
+            return Err(CallDunderError::MethodNotAvailable);
+        }
+
+        let dunder_callable = builder.build();
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = dunder_callable
+            .bindings(db)
+            .match_parameters(db, argument_types)
+            .check_types(db, &constraints, argument_types, tcx, &[])?;
+
+        if possibly_undefined {
+            return Err(CallDunderError::PossiblyUnbound {
+                bindings: Box::new(bindings),
+                unbound_on: (!unbound_on.is_empty()).then(|| unbound_on.into_boxed_slice()),
+            });
+        }
+
+        Ok(bindings)
+    }
+}
+
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
@@ -7303,7 +7402,7 @@ impl<'db> AwaitError<'db> {
                     );
                 }
             }
-            Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
+            Self::Call(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                 diag.info("`__await__` may be missing");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(

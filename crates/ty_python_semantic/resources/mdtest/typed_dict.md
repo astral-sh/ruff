@@ -4335,6 +4335,50 @@ class Baz(Bar):
         pass
 ```
 
+## Conditional fields in class body
+
+Conditional branches in a `TypedDict` body can declare fields. Static reachability determines
+whether those fields are part of the schema.
+
+### Python 3.12 or later
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+import sys
+from typing import TypedDict
+
+class ConditionalField(TypedDict):
+    x: int
+    if sys.version_info >= (3, 12):
+        y: str
+
+ConditionalField(x=1, y="hello")
+```
+
+### Python before 3.12
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import sys
+from typing import TypedDict
+
+class ConditionalField(TypedDict):
+    x: int
+    if sys.version_info >= (3, 12):
+        y: str
+
+# error: [invalid-key] "Unknown key "y" for TypedDict `ConditionalField`"
+ConditionalField(x=1, y="hello")
+```
+
 ## `TypedDict` with `@dataclass` decorator
 
 Applying `@dataclass` to a `TypedDict` class is conceptually incoherent: `TypedDict` defines

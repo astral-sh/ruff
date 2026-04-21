@@ -109,6 +109,10 @@ pub(crate) struct FunctionSpans {
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
+    /// A span that starts at the beginning of the first decorator (if any),
+    /// and ends at the end of the function signature (either the last parameter,
+    /// or the return type if present).
+    pub(crate) decorators_and_header: Span,
 }
 
 bitflags! {
@@ -642,6 +646,7 @@ impl<'db> OverloadLiteral<'db> {
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
+            decorators_and_header: span.with_range(signature.cover_offset(func_def.start())),
         }
     }
 }
@@ -1932,7 +1937,7 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
                     );
 
                     if actual_ty.is_subtype_of(db, *asserted_ty) {

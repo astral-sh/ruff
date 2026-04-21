@@ -9,7 +9,9 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-pub(crate) use self::static_literal::StaticClassLiteral;
+pub(crate) use self::static_literal::{
+    ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
+};
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
@@ -102,18 +104,34 @@ impl<'db> CodeGeneratorKind<'db> {
             class: StaticClassLiteral<'db>,
             specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
+            // If a class is directly decorated as a dataclass, it's a dataclass.
+            // If a class' metaclass is a dataclass transformer, it's a dataclass.
+            // If a class inherits from a base class that is a dataclass
+            // transformer, it's a dataclass (unless it is a subclass of `type`,
+            // in which case we assume the subclass is itself also meant for use
+            // as a metaclass dataclass transformer, not itself supposed to be a
+            // dataclass.)
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
                 Some(CodeGeneratorKind::DataclassLike(Some(info.params)))
-            } else if let Some(transformer_params) =
-                class.iter_mro(db, specialization).skip(1).find_map(|base| {
-                    base.into_class().and_then(|class| {
-                        class
-                            .static_class_literal(db)
-                            .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
-                    })
+            } else if KnownClass::Type
+                .try_to_class_literal(db)
+                .is_none_or(|type_class| {
+                    !class.is_subclass_of(
+                        db,
+                        None,
+                        ClassType::NonGeneric(ClassLiteral::Static(type_class)),
+                    )
                 })
+                && let Some(transformer_params) =
+                    class.iter_mro(db, specialization).skip(1).find_map(|base| {
+                        base.into_class().and_then(|class| {
+                            class
+                                .static_class_literal(db)
+                                .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+                        })
+                    })
             {
                 Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
             } else if class

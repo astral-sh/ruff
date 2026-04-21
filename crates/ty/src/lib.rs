@@ -505,7 +505,8 @@ impl MainLoop {
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .show_fix_diff(true);
+                        .show_fix_diff(true)
+                        .context(0);
 
                     write!(
                         stdout,

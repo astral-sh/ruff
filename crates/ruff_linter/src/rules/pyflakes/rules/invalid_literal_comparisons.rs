@@ -156,11 +156,7 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     // Track the nesting level.
     let mut nesting = 0u32;
 
-    loop {
-        let Some(token) = tok_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = tok_iter.next() {
         match token.kind() {
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
                 nesting = nesting.saturating_add(1);

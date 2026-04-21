@@ -11,6 +11,29 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 
 impl<'db> Type<'db> {
+    /// Memoize the pure return-type part of binary dunder resolution so repeated identical
+    /// expressions don't re-run overload selection at every call site.
+    pub(crate) fn try_call_bin_op_return_type(
+        db: &'db dyn Db,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        #[salsa::tracked]
+        fn try_call_bin_op_return_type_impl<'db>(
+            db: &'db dyn Db,
+            left_ty: Type<'db>,
+            op: ast::Operator,
+            right_ty: Type<'db>,
+        ) -> Option<Type<'db>> {
+            Type::try_call_bin_op(db, left_ty, op, right_ty)
+                .ok()
+                .map(|bindings| bindings.return_type(db))
+        }
+
+        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+    }
+
     pub(crate) fn try_call_bin_op(
         db: &'db dyn Db,
         left_ty: Type<'db>,
@@ -104,6 +127,10 @@ impl<'db> Type<'db> {
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.1.return_type(db)
+    }
+
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
     /// that has no setter, and `None` otherwise.
     pub(crate) fn as_attempt_to_set_property_with_no_setter(
@@ -169,7 +196,15 @@ pub(super) enum CallDunderError<'db> {
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Box<Bindings<'db>>),
+    PossiblyUnbound {
+        // Describes the places where the dunder was indeed defined.
+        bindings: Box<Bindings<'db>>,
+
+        // Lists the types on which the dunder was undefined (e.g., the specific
+        // members of a union on which the dunder was missing). `None` means
+        // that the call path does not track where the dunder may be unbound.
+        unbound_on: Option<Box<[Type<'db>]>>,
+    },
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
@@ -180,7 +215,7 @@ impl<'db> CallDunderError<'db> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
             Self::CallError(_, bindings) => Some(bindings.return_type(db)),
-            Self::PossiblyUnbound(bindings) => Some(bindings.return_type(db)),
+            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
         }
     }
 
@@ -209,7 +244,7 @@ impl From<CallDunderError<'_>> for CallBinOpError {
     fn from(value: CallDunderError<'_>) -> Self {
         match value {
             CallDunderError::CallError(_, _) => Self::CallError,
-            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_) => {
+            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
                 CallBinOpError::NotSupported
             }
         }

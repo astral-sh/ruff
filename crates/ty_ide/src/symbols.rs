@@ -2921,7 +2921,7 @@ class C: ...
                 .iter()
                 .map(|(_, symbol)| {
                     let mut snapshot =
-                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind,);
+                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind);
                     if let Some(ref imported_from) = symbol.imported_from {
                         snapshot = format!(
                             "{snapshot} :: Re-exported from `{module_name}`",

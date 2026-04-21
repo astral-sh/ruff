@@ -212,7 +212,7 @@ supports_delete = SupportsDelete()
 del supports_delete.x
 
 rejects_descriptor_delete = RejectsDescriptorDelete()
-# TODO: this should be an error once properties with `Never`/`NoReturn` deleters are rejected
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `RejectsDescriptorDelete` whose `__delete__` method returns `Never`/`NoReturn`"
 del rejects_descriptor_delete.x
 
 explicit_none_deleter = ExplicitNoneDeleter()
@@ -415,8 +415,6 @@ Deleting a required key from a TypedDict is a type error because it would make t
 a valid instance of that TypedDict type. However, deleting `NotRequired` keys (or keys in
 `total=False` TypedDicts) is allowed.
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import TypedDict, NotRequired
 
@@ -435,22 +433,88 @@ class MixedMovie(TypedDict):
 m: Movie = {"name": "Blade Runner", "year": 1982}
 p: PartialMovie = {"name": "Test"}
 mixed: MixedMovie = {"name": "Test"}
+```
 
-# Required keys cannot be deleted.
-# error: [invalid-argument-type]
+Required keys cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del m["name"]
+```
 
-# In a partial TypedDict (`total=False`), all keys can be deleted.
+```snapshot
+error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `Movie`
+  --> src/mdtest_snippet.py:19:7
+   |
+19 | del m["name"]
+   |       ^^^^^^
+   |
+info: Field defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | class Movie(TypedDict):
+  |       ---------------- `Movie` defined here
+4 |     name: str
+  |     ---------
+  |     |
+  |     `name` declared as required here
+  |     Consider making it `NotRequired`
+  |
+info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
+```
+
+In a partial TypedDict (`total=False`), all keys can be deleted.
+
+```py
 del p["name"]
+```
 
-# `NotRequired` keys can always be deleted.
+`NotRequired` keys can always be deleted.
+
+```py
 del mixed["year"]
+```
 
-# But required keys in mixed `TypedDict` still cannot be deleted.
-# error: [invalid-argument-type]
+But required keys in mixed `TypedDict` still cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del mixed["name"]
+```
 
-# And keys that don't exist cannot be deleted.
-# error: [invalid-argument-type]
+```snapshot
+error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `MixedMovie`
+  --> src/mdtest_snippet.py:23:11
+   |
+23 | del mixed["name"]
+   |           ^^^^^^
+   |
+info: Field defined here
+  --> src/mdtest_snippet.py:11:7
+   |
+11 | class MixedMovie(TypedDict):
+   |       --------------------- `MixedMovie` defined here
+12 |     name: str
+   |     ---------
+   |     |
+   |     `name` declared as required here
+   |     Consider making it `NotRequired`
+   |
+info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
+```
+
+And keys that don't exist cannot be deleted.
+
+```py
+# snapshot: invalid-argument-type
 del mixed["non_existent"]
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete unknown key "non_existent" from TypedDict `MixedMovie`
+  --> src/mdtest_snippet.py:25:11
+   |
+25 | del mixed["non_existent"]
+   |           ^^^^^^^^^^^^^^
+   |
 ```

@@ -283,7 +283,10 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-                Err(CallDunderError::PossiblyUnbound(dunder_aiter_bindings)) => {
+                Err(CallDunderError::PossiblyUnbound {
+                    bindings: dunder_aiter_bindings,
+                    ..
+                }) => {
                     let iterator = dunder_aiter_bindings.return_type(db);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(_) => Err(IterationError::IterCallError {
@@ -361,7 +364,10 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is possibly unbound...
-            Err(CallDunderError::PossiblyUnbound(dunder_iter_outcome)) => {
+            Err(CallDunderError::PossiblyUnbound {
+                bindings: dunder_iter_outcome,
+                ..
+            }) => {
                 let iterator = dunder_iter_outcome.return_type(db);
 
                 match try_call_dunder_next_on_iterator(iterator) {
@@ -514,13 +520,14 @@ impl<'db> IterationError<'db> {
                 dunder_getitem_error,
             } => match dunder_getitem_error {
                 CallDunderError::MethodNotAvailable => Some(*dunder_next_return),
-                CallDunderError::PossiblyUnbound(dunder_getitem_outcome) => {
-                    Some(UnionType::from_two_elements(
-                        db,
-                        *dunder_next_return,
-                        dunder_getitem_outcome.return_type(db),
-                    ))
-                }
+                CallDunderError::PossiblyUnbound {
+                    bindings: dunder_getitem_outcome,
+                    ..
+                } => Some(UnionType::from_two_elements(
+                    db,
+                    *dunder_next_return,
+                    dunder_getitem_outcome.return_type(db),
+                )),
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     Some(*dunder_next_return)
                 }
@@ -685,7 +692,7 @@ impl<'db> IterationError<'db> {
                         iterator_type = iterator.display(db),
                     ));
                     }
-                    CallDunderError::PossiblyUnbound(_) => {
+                    CallDunderError::PossiblyUnbound { .. } => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which may not have a `{dunder_next_name}` method",
@@ -739,7 +746,7 @@ impl<'db> IterationError<'db> {
                          and it doesn't have a `__getitem__` method",
                     );
                 }
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     reporter
                         .may_not("It may not have an `__iter__` method or a `__getitem__` method");
                 }
@@ -805,7 +812,7 @@ impl<'db> IterationError<'db> {
                     reporter
                         .is_not("It doesn't have an `__iter__` method or a `__getitem__` method");
                 }
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     reporter.is_not(
                         "It has no `__iter__` method and it may not have a `__getitem__` method",
                     );

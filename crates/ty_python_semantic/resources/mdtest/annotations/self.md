@@ -181,7 +181,7 @@ Calling an instance method explicitly verifies the first argument:
 ```py
 A.implicit_self(a)
 
-# error: [invalid-argument-type] "Argument to function `implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `A.implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
 A.implicit_self(1)
 ```
 
@@ -193,7 +193,7 @@ from typing import Never, Callable
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
 
-# error: [invalid-argument-type] "Argument to bound method `can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
+# error: [invalid-argument-type] "Argument to bound method `Strange.can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
 Strange().can_not_be_called()
 ```
 
@@ -1065,7 +1065,7 @@ class Explicit:
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
-# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `Disjoint`, found `Explicit`"
+# error: [invalid-argument-type] "Argument to bound method `Explicit.bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()

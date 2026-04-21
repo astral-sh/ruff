@@ -54,6 +54,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
    |
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -76,6 +77,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self) -> int: ...
    |         ------------------- `Super.method` defined here
    |
+info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -187,6 +189,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
+info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -209,6 +212,7 @@ error[invalid-method-override]: Invalid override of method `method`
  2 |     def method(self, x: int, /): ...
    |         ----------------------- `Super.method` defined here
    |
+info: parameter `x` has an incompatible type: `int` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -224,16 +228,16 @@ class Sub16(Super2):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method2`
-  --> src/mdtest_snippet.pyi:46:9
-   |
-46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
-   |
-  ::: src/mdtest_snippet.pyi:43:9
+  --> src/mdtest_snippet.pyi:43:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
+44 |
+45 | class Sub16(Super2):
+46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
    |
+info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -246,16 +250,18 @@ class Sub17(Super2):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method2`
-  --> src/mdtest_snippet.pyi:48:9
-   |
-48 |     def method2(self, *, x): ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
-   |
-  ::: src/mdtest_snippet.pyi:43:9
+  --> src/mdtest_snippet.pyi:43:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
+44 |
+45 | class Sub16(Super2):
+46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
+47 | class Sub17(Super2):
+48 |     def method2(self, *, x): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
    |
+info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -278,15 +284,16 @@ class Sub19(Super3):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method3`
-  --> src/mdtest_snippet.pyi:55:9
-   |
-55 |     def method3(self, x, /): ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super3.method3`
-   |
-  ::: src/mdtest_snippet.pyi:50:9
+  --> src/mdtest_snippet.pyi:50:9
    |
 50 |     def method3(self, *, x): ...
    |         ------------------- `Super3.method3` defined here
+51 |
+52 | class Sub18(Super3):
+53 |     def method3(self, x): ...  # fine: `x` can still be used as a keyword argument
+54 | class Sub19(Super3):
+55 |     def method3(self, x, /): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super3.method3`
    |
 info: This violates the Liskov Substitution Principle
 ```
@@ -310,15 +317,16 @@ class Sub21(Super4):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/mdtest_snippet.pyi:62:9
-   |
-62 |     def method(self, *args): ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
-   |
-  ::: src/mdtest_snippet.pyi:57:9
+  --> src/mdtest_snippet.pyi:57:9
    |
 57 |     def method(self, *args: int, **kwargs: str): ...
    |         --------------------------------------- `Super4.method` defined here
+58 |
+59 | class Sub20(Super4):
+60 |     def method(self, *args: object, **kwargs: object): ...  # fine
+61 | class Sub21(Super4):
+62 |     def method(self, *args): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
    |
 info: This violates the Liskov Substitution Principle
 ```
@@ -415,16 +423,16 @@ class ThirdChild(GradualParent):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
- --> src/stub.pyi:7:9
-  |
-7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
-  |
- ::: src/stub.pyi:4:9
+ --> src/stub.pyi:4:9
   |
 4 |     def method(self, x: int) -> None: ...
   |         ---------------------------- `Grandparent.method` defined here
+5 |
+6 | class Parent(Grandparent):
+7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
   |
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
@@ -439,6 +447,7 @@ error[invalid-method-override]: Invalid override of method `method`
  7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
    |         ---------------------------- `Parent.method` defined here
    |
+info: parameter `x` has an incompatible type: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
@@ -453,6 +462,21 @@ error[invalid-method-override]: Invalid override of method `method`
  7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
    |         ---------------------------- `Parent.method` defined here
    |
+info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:25:9
+   |
+25 |     def method(self) -> int: ...
+   |         ------------------- `GrandparentWithReturnType.method` defined here
+26 |
+27 | class ParentWithReturnType(GrandparentWithReturnType):
+28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `GrandparentWithReturnType.method`
+   |
+info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
@@ -460,27 +484,15 @@ error[invalid-method-override]: Invalid override of method `method`
   --> src/stub.pyi:28:9
    |
 28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `GrandparentWithReturnType.method`
-   |
-  ::: src/stub.pyi:25:9
-   |
-25 |     def method(self) -> int: ...
-   |         ------------------- `GrandparentWithReturnType.method` defined here
-   |
-info: This violates the Liskov Substitution Principle
-
-
-error[invalid-method-override]: Invalid override of method `method`
-  --> src/stub.pyi:33:9
-   |
+   |         ------------------- `ParentWithReturnType.method` defined here
+29 |
+30 | class ChildWithReturnType(ParentWithReturnType):
+31 |     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
+32 |     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
 33 |     def method(self) -> int: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentWithReturnType.method`
    |
-  ::: src/stub.pyi:28:9
-   |
-28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
-   |         ------------------- `ParentWithReturnType.method` defined here
-   |
+info: incompatible return types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
@@ -495,6 +507,7 @@ error[invalid-method-override]: Invalid override of method `method`
  4 |     def method(self, x: int) -> None: ...
    |         ---------------------------- `Grandparent.method` defined here
    |
+info: parameter `x` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -522,16 +535,16 @@ class D(C):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `get`
- --> src/other_stub.pyi:5:9
-  |
-5 |     def get(self, default, /): ...  # snapshot: invalid-method-override
-  |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
-  |
- ::: src/other_stub.pyi:2:9
+ --> src/other_stub.pyi:2:9
   |
 2 |     def get(self, default): ...
   |         ------------------ `A.get` defined here
+3 |
+4 | class B(A):
+5 |     def get(self, default, /): ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
   |
+info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -733,6 +746,7 @@ error[invalid-method-override]: Invalid override of method `foo`
 2 |     def foo(self, x): ...
   |         ------------ `one.A.foo` defined here
   |
+info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -806,40 +820,40 @@ class D(C):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `x`
- --> src/bar.pyi:7:5
-  |
-7 |     x = foo.x  # snapshot: invalid-method-override
-  |     ^^^^^^^^^ Definition is incompatible with `A.x`
-  |
- ::: src/bar.pyi:4:9
+ --> src/bar.pyi:4:9
   |
 4 |     def x(self, y: int): ...
   |         --------------- `A.x` defined here
+5 |
+6 | class B(A):
+7 |     x = foo.x  # snapshot: invalid-method-override
+  |     ^^^^^^^^^ Definition is incompatible with `A.x`
   |
  ::: src/foo.pyi:1:5
   |
 1 | def x(self, y: str): ...
   |     --------------- Signature of `B.x`
   |
+info: parameter `y` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
 error[invalid-method-override]: Invalid override of method `x`
-  --> src/bar.pyi:13:9
-   |
-13 |     def x(self, y: int): ...  # snapshot: invalid-method-override
-   |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
-   |
-  ::: src/bar.pyi:10:5
+  --> src/bar.pyi:10:5
    |
 10 |     x = foo.x
    |     --------- `C.x` defined here
+11 |
+12 | class D(C):
+13 |     def x(self, y: int): ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
    |
   ::: src/foo.pyi:1:5
    |
  1 | def x(self, y: str): ...
    |     --------------- Signature of `C.x`
    |
+info: parameter `y` has an incompatible type: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -864,6 +878,7 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 142 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
     |
+info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:
 help
@@ -960,6 +975,7 @@ error[invalid-method-override]: Invalid override of method `__lt__`
 9 |     def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
   |
+info: parameter `other` has an incompatible type: `Foo` is not assignable to `Bar`
 info: This violates the Liskov Substitution Principle
 info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
  --> src/mdtest_snippet.pyi:5:7
@@ -975,6 +991,7 @@ error[invalid-method-override]: Invalid override of method `_asdict`
 54 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
    |
+info: incompatible return types: `tuple[int, ...]` is not assignable to `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
 info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
   --> src/mdtest_snippet.pyi:50:7
@@ -1030,6 +1047,7 @@ error[invalid-method-override]: Invalid override of method `class_method`
  4 |     def class_method(cls, x: int) -> int: ...
    |         -------------------------------- `Parent.class_method` defined here
    |
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -1051,6 +1069,7 @@ error[invalid-method-override]: Invalid override of method `static_method`
  6 |     def static_method(x: int) -> int: ...
    |         ---------------------------- `Parent.static_method` defined here
    |
+info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 

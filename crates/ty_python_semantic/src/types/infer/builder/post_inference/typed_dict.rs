@@ -36,7 +36,14 @@ fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &a
     //     may also contain a docstring or pass statements (primarily to allow the creation
     //     of an empty `TypedDict`). No other statements are allowed, and type checkers
     //     should report an error if any are present.
-    for stmt in &class_node.body {
+    validate_typed_dict_class_body_statements(context, &class_node.body);
+}
+
+fn validate_typed_dict_class_body_statements(
+    context: &InferContext<'_, '_>,
+    statements: &[ast::Stmt],
+) {
+    for stmt in statements {
         match stmt {
             // Annotated assignments are allowed (that's the whole point), but they're
             // not allowed to have a value.
@@ -52,6 +59,14 @@ fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &a
             }
             // Pass statements are allowed.
             ast::Stmt::Pass(_) => continue,
+            // If statements are allowed; the body statements must validate.
+            ast::Stmt::If(if_stmt) => {
+                validate_typed_dict_class_body_statements(context, &if_stmt.body);
+                for elif_else_clause in &if_stmt.elif_else_clauses {
+                    validate_typed_dict_class_body_statements(context, &elif_else_clause.body);
+                }
+                continue;
+            }
             ast::Stmt::Expr(expr) => {
                 // Docstrings are allowed.
                 if matches!(*expr.value, ast::Expr::StringLiteral(_)) {

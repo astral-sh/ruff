@@ -866,10 +866,10 @@ impl<'m> ContextCursor<'m> {
                         return Some(cause_ty);
                     }
                 }
-                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                    if handler.type_.as_deref().is_some_and(contains) {
-                        return Some(except_ty);
-                    }
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler)
+                    if handler.type_.as_deref().is_some_and(contains) =>
+                {
+                    return Some(except_ty);
                 }
                 _ => {}
             }
@@ -1411,6 +1411,13 @@ fn add_argument_completions<'db>(
     let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
         match node {
+            // Do not suggest argument completions in value positions for
+            // keyword arguments
+            ast::AnyNodeRef::Keyword(kw) => {
+                if kw.value.range().contains_range(cursor.range) {
+                    return;
+                }
+            }
             ast::AnyNodeRef::Arguments(_) => {
                 in_arguments = true;
             }
@@ -8730,6 +8737,28 @@ re.match('', '', fla<CURSOR>
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
             @"flags=",
+        );
+    }
+
+    #[test]
+    fn call_keyword_argument_at_value() {
+        let builder = completion_test_builder(
+            "\
+def bar(y_true,y_pred): ...
+
+y_true = 1
+y_pred = 2
+
+bar(y_true=y<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r###"
+        y_pred
+        y_true
+        "###
         );
     }
 

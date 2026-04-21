@@ -18,12 +18,24 @@ x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` i
 
 ## Numbers special case
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from numbers import Number
 
-a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+# snapshot: invalid-assignment
+a: Number = 1
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Number`
+ --> src/mdtest_snippet.py:4:4
+  |
+4 | a: Number = 1
+  |    ------   ^ Incompatible value of type `Literal[1]`
+  |    |
+  |    Declared type
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ```
 
 ## Violates previous annotation
@@ -326,16 +338,28 @@ IntOrStr = int | str
 
 ### Earlier versions
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.9"
 ```
 
 ```py
-# error: [unsupported-operator]
+# snapshot: unsupported-operator
 IntOrStr = int | str
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/mdtest_snippet.py:2:12
+  |
+2 | IntOrStr = int | str
+  |            ---^^^---
+  |            |     |
+  |            |     Has type `<class 'str'>`
+  |            Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 ```
 
 ## Attribute expressions in type annotations are understood

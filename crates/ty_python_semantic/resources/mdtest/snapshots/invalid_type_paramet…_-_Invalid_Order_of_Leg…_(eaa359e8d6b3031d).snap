@@ -65,9 +65,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -88,9 +86,8 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:6:1
-   |
+ 4 |
+ 5 | T2 = TypeVar("T2")
  6 | T3 = TypeVar("T3")
    | ------------------ `T3` defined here
    |
@@ -111,9 +108,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -134,9 +129,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |
@@ -176,9 +169,7 @@ error[invalid-generic-class]: Type parameters without defaults cannot follow typ
    |
  3 | T1 = TypeVar("T1", default=int)
    | ------------------------------- `T1` defined here
-   |
-  ::: src/mdtest_snippet.py:5:1
-   |
+ 4 |
  5 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
    |

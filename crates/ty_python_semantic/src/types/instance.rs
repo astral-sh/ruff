@@ -26,8 +26,8 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -495,7 +495,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        if !has_all_protocol_members_defined(db, ty, protocol) {
+        // Fast path: skip expensive per-member type comparisons when members are plainly
+        // missing. When collecting error context, we continue and let the structural check
+        // below report per-member errors instead.
+        if !self.is_context_collection_enabled()
+            && !has_all_protocol_members_defined(db, ty, protocol)
+        {
             return result;
         }
 
@@ -514,6 +519,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
+        if structurally_satisfied.is_never_satisfied(db) {
+            self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
+                ty,
+                protocol: Type::ProtocolInstance(protocol),
+            });
+        }
         result.or(db, self.constraints, || structurally_satisfied)
     }
 

@@ -60,30 +60,26 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 
 ```
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:7:12
-  |
-7 |     return 1
-  |            ^ expected `str`, found `Literal[1]`
-  |
- ::: src/mdtest_snippet.py:5:12
+ --> src/mdtest_snippet.py:5:12
   |
 5 | def f() -> str:
   |            --- Expected `str` because of return type
+6 |     # error: [invalid-return-type]
+7 |     return 1
+  |            ^ expected `str`, found `Literal[1]`
   |
 
 ```
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:11:5
-   |
-11 |     return
-   |     ^^^^^^ expected `int`, found `None`
-   |
-  ::: src/mdtest_snippet.py:9:12
+  --> src/mdtest_snippet.py:9:12
    |
  9 | def f() -> int:
    |            --- Expected `int` because of return type
+10 |     # error: [invalid-return-type]
+11 |     return
+   |     ^^^^^^ expected `int`, found `None`
    |
 
 ```
@@ -106,30 +102,26 @@ info:  - or as `@abstractmethod`-decorated methods on abstract classes
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:24:12
-   |
-24 |     return A[int]()  # error: [invalid-return-type]
-   |            ^^^^^^^^ expected `mdtest_snippet.A[int]`, found `mdtest_snippet.<locals of function 'f'>.A[int]`
-   |
-  ::: src/mdtest_snippet.py:22:12
+  --> src/mdtest_snippet.py:22:12
    |
 22 | def f() -> A[int]:
    |            ------ Expected `mdtest_snippet.A[int]` because of return type
+23 |     class A[T]: ...
+24 |     return A[int]()  # error: [invalid-return-type]
+   |            ^^^^^^^^ expected `mdtest_snippet.A[int]`, found `mdtest_snippet.<locals of function 'f'>.A[int]`
    |
 
 ```
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:30:12
-   |
-30 |     return B()  # error: [invalid-return-type]
-   |            ^^^ expected `mdtest_snippet.B`, found `mdtest_snippet.<locals of function 'g'>.B`
-   |
-  ::: src/mdtest_snippet.py:28:12
+  --> src/mdtest_snippet.py:28:12
    |
 28 | def g() -> B:
    |            - Expected `mdtest_snippet.B` because of return type
+29 |     class B: ...
+30 |     return B()  # error: [invalid-return-type]
+   |            ^^^ expected `mdtest_snippet.B`, found `mdtest_snippet.<locals of function 'g'>.B`
    |
 
 ```

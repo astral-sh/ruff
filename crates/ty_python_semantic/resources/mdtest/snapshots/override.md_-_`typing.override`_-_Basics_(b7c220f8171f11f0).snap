@@ -206,15 +206,13 @@ info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `foo` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:101:9
-    |
-101 |     def foo(self): ...  # error: [invalid-explicit-override]
-    |         ^^^
-    |
-   ::: src/mdtest_snippet.pyi:99:5
+   --> src/mdtest_snippet.pyi:99:5
     |
  99 |     @override
     |     ---------
+100 |     @classmethod
+101 |     def foo(self): ...  # error: [invalid-explicit-override]
+    |         ^^^
     |
 info: No `foo` definitions were found on any superclasses of `Invalid`
 
@@ -248,15 +246,13 @@ info: No `baz` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:110:9
-    |
-110 |     def eggs(): ...  # error: [invalid-explicit-override]
-    |         ^^^^
-    |
-   ::: src/mdtest_snippet.pyi:108:5
+   --> src/mdtest_snippet.pyi:108:5
     |
 108 |     @override
     |     ---------
+109 |     @staticmethod
+110 |     def eggs(): ...  # error: [invalid-explicit-override]
+    |         ^^^^
     |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
 
@@ -277,15 +273,13 @@ info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_property2` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:116:9
-    |
-116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
-    |         ^^^^^^^^^^^^^
-    |
-   ::: src/mdtest_snippet.pyi:114:5
+   --> src/mdtest_snippet.pyi:114:5
     |
 114 |     @override
     |     ---------
+115 |     @property
+116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
+    |         ^^^^^^^^^^^^^
     |
 info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 

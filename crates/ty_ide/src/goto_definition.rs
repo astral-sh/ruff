@@ -2335,6 +2335,84 @@ for x in range(10):
         ");
     }
 
+    /// Go-to-definition on `super()` should not lookup on the super class itself
+    #[test]
+    fn goto_definition_does_not_lookup_on_bound_super() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Foo:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class Bar(Foo):
+    def __init__(self):
+        super().__init<CURSOR>__(x)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        6 | class Bar(Foo):
+        7 |     def __init__(self):
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class Foo:
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        4 |         self.x = x
+          |
+        ");
+    }
+
+    /// Go-to-definition should resolve to the parent class
+    #[test]
+    fn goto_definition_resolves_super_for_generic_class() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Base:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class GenericFoo[T](Base):
+    def __init__(self, x: int, y: T):
+        super().__init<CURSOR>__(x)
+        self.y = y
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        6 | class GenericFoo[T](Base):
+        7 |     def __init__(self, x: int, y: T):
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+        9 |         self.y = y
+          |
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        2 | class Base:
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        4 |         self.x = x
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {

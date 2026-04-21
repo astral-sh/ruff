@@ -46,7 +46,7 @@ use crate::types::generics::{
 };
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
-    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
+    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -58,10 +58,11 @@ use crate::types::{
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
-use ty_python_core::EvaluationMode;
+use ty_python_core::scope::NodeWithScopeKind;
+use ty_python_core::{EvaluationMode, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -1251,12 +1252,22 @@ impl<'db> Bindings<'db> {
                         ] = overload.parameter_types()
                         {
                             if let Some(setter) = property.setter(db) {
-                                if let Err(_call_error) = setter
+                                if let Ok(return_ty) = setter
                                     .try_call(db, &CallArguments::positional([*instance, *value]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__set__` returns `None` for ordinary setters, but
+                                    // preserving `Never` keeps non-returning setters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1271,12 +1282,22 @@ impl<'db> Bindings<'db> {
                             overload.parameter_types()
                         {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__delete__` returns `None` for ordinary deleters,
+                                    // but preserving `Never` keeps non-returning deleters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1289,12 +1310,22 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
-                                if let Err(_call_error) = setter
+                                if let Ok(return_ty) = setter
                                     .try_call(db, &CallArguments::positional([*instance, *value]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__set__` returns `None` for ordinary setters, but
+                                    // preserving `Never` keeps non-returning setters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -1309,12 +1340,22 @@ impl<'db> Bindings<'db> {
                     )) => {
                         if let [Some(instance), ..] = overload.parameter_types() {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Err(_call_error) =
-                                    deleter.try_call(db, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = deleter
+                                    .try_call(db, &CallArguments::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
                                 {
+                                    // `property.__delete__` returns `None` for ordinary deleters,
+                                    // but preserving `Never` keeps non-returning deleters divergent.
+                                    overload.set_return_type(if return_ty.is_never() {
+                                        return_ty
+                                    } else {
+                                        Type::none(db)
+                                    });
+                                } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
                                     ));
+                                    overload.set_return_type(Type::unknown());
                                 }
                             } else {
                                 overload
@@ -2090,7 +2131,7 @@ impl<'db> Bindings<'db> {
                             };
 
                             let return_type = parse_struct_format(db, format_literal.value(db))
-                                .map(|elements| Type::heterogeneous_tuple(db, elements.into_iter()))
+                                .map(|elements| Type::heterogeneous_tuple(db, elements))
                                 .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
 
                             overload.set_return_type(return_type);
@@ -2984,44 +3025,70 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        // The maximum number of parameters across all the overloads that are being considered
-        // for filtering.
-        let max_parameter_count = matching_overload_indexes
+        struct OverloadFilterSlot<'db> {
+            parameter: Type<'db>,
+            argument: Type<'db>,
+            variadic_argument: Option<Type<'db>>,
+        }
+
+        let matching_overload_slots = matching_overload_indexes
             .iter()
-            .map(|&index| self.overloads[index].signature.parameters().len())
+            .map(|&index| {
+                let overload = &self.overloads[index];
+                let slots = overload
+                    .argument_matches
+                    .iter()
+                    .zip(arguments.types())
+                    .flat_map(move |(matched_argument, argument_types)| {
+                        matched_argument.iter().map(
+                            move |(parameter_index, variadic_argument_type)| {
+                                // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                                // `typing.Self` / `type[typing.Self]`
+                                let parameter_type = overload.signature.parameters()
+                                    [parameter_index]
+                                    .annotated_type()
+                                    .apply_optional_specialization(db, overload.specialization);
+                                OverloadFilterSlot {
+                                    parameter: parameter_type,
+                                    argument: argument_types.get_for_declared_type(parameter_type),
+                                    variadic_argument: variadic_argument_type,
+                                }
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                (index, slots)
+            })
+            .collect::<Vec<_>>();
+
+        let max_slot_count = matching_overload_slots
+            .iter()
+            .map(|(_, slots)| slots.len())
             .max()
             .unwrap_or(0);
 
-        // These are the parameter indexes that matches the arguments that participate in the
-        // filtering process.
-        //
-        // The parameter types at these indexes have at least one overload where the type isn't
-        // gradual equivalent to the parameter types at the same index for other overloads.
-        let mut participating_parameter_indexes = HashSet::new();
-
-        // The parameter types at each index for the first overload containing a parameter at
-        // that index.
-        let mut first_parameter_types: Vec<Option<Type<'db>>> = vec![None; max_parameter_count];
-
-        for argument_index in 0..arguments.len() {
-            for overload_index in matching_overload_indexes {
-                let overload = &self.overloads[*overload_index];
-                for &parameter_index in &overload.argument_matches[argument_index].parameters {
-                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                    // `typing.Self` / `type[typing.Self]`
-                    let current_parameter_type =
-                        overload.signature.parameters()[parameter_index].annotated_type();
-                    let first_parameter_type = &mut first_parameter_types[parameter_index];
-                    if let Some(first_parameter_type) = first_parameter_type {
+        let mut participating_slot_indices = HashSet::new();
+        for slot_index in 0..max_slot_count {
+            let mut first_parameter_type: Option<Type<'db>> = None;
+            for (_, overload_slots) in &matching_overload_slots {
+                let current_parameter_type =
+                    overload_slots.get(slot_index).map(|slot| slot.parameter);
+                match (first_parameter_type, current_parameter_type) {
+                    (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, current_parameter_type, constraints)
                             .is_always_satisfied(db)
                         {
-                            participating_parameter_indexes.insert(parameter_index);
+                            participating_slot_indices.insert(slot_index);
                         }
-                    } else {
-                        *first_parameter_type = Some(current_parameter_type);
                     }
+                    (Some(_), None) => {
+                        participating_slot_indices.insert(slot_index);
+                    }
+                    (None, Some(current_parameter_type)) => {
+                        first_parameter_type = Some(current_parameter_type);
+                    }
+                    (None, None) => {}
                 }
             }
         }
@@ -3037,70 +3104,25 @@ impl<'db> CallableBinding<'db> {
             }
 
             let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameter_count)
+                .take(max_slot_count)
                 .collect::<Vec<_>>();
 
-            // The following loop is trying to construct a tuple of argument types that correspond to
-            // the participating parameter indexes. Considering the following example:
-            //
-            // ```python
-            // @overload
-            // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
-            // @overload
-            // def f(*args: Any) -> tuple[Any, ...]: ...
-            //
-            // f(1, 2)
-            // ```
-            //
-            // Here, only the first parameter participates in the filtering process because only one
-            // overload has the second parameter. So, while going through the argument types, the
-            // second argument needs to be skipped but for the second overload both arguments map to
-            // the first parameter and that parameter is considered for the filtering process. This
-            // flag is to handle that special case of many-to-one mapping from arguments to parameters.
-            let mut variadic_parameter_handled = false;
+            let (_, current_slots) = &matching_overload_slots[upto];
 
-            for (argument_index, argument_types) in arguments.types().iter().enumerate() {
-                if variadic_parameter_handled {
-                    continue;
-                }
-
-                // Get the argument type as inferred against the target overload.
-                let current_overload = &self.overloads[*current_index];
-                let argument_type =
-                    match *current_overload.argument_matches[argument_index].parameters {
-                        [parameter_index] => {
-                            let declared_type = current_overload.signature.parameters()
-                                [parameter_index]
-                                .annotated_type();
-                            argument_types.get_for_declared_type(declared_type)
-                        }
-                        // Splatted arguments are inferred without type context.
-                        _ => argument_types.get_default().unwrap_or(Type::unknown()),
-                    };
-
-                for overload_index in matching_overload_indexes {
-                    let overload = &self.overloads[*overload_index];
-                    for (parameter_index, variadic_argument_type) in
-                        overload.argument_matches[argument_index].iter()
-                    {
-                        let parameter = &overload.signature.parameters()[parameter_index];
-                        if parameter.is_variadic() {
-                            variadic_parameter_handled = true;
-                        }
-                        if !participating_parameter_indexes.contains(&parameter_index) {
-                            continue;
-                        }
-                        union_argument_type_builders[parameter_index].add_in_place(
-                            variadic_argument_type
-                                .unwrap_or(argument_type)
-                                .top_materialization(db),
-                        );
+            for (_, slots) in &matching_overload_slots {
+                for (slot_index, slot) in slots.iter().enumerate() {
+                    if participating_slot_indices.contains(&slot_index) {
+                        let argument_type = slot.variadic_argument.unwrap_or_else(|| {
+                            current_slots
+                                .get(slot_index)
+                                .map_or(Type::unknown(), |slot| slot.argument)
+                        });
+                        union_argument_type_builders[slot_index]
+                            .add_in_place(argument_type.top_materialization(db));
                     }
                 }
             }
 
-            // These only contain the top materialized argument types for the corresponding
-            // participating parameter indexes.
             let top_materialized_argument_type = Type::heterogeneous_tuple(
                 db,
                 union_argument_type_builders
@@ -3115,32 +3137,12 @@ impl<'db> CallableBinding<'db> {
             );
 
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameter_count)
+                .take(max_slot_count)
                 .collect::<Vec<_>>();
-
-            // The number of parameters that have been skipped because they don't participate in
-            // the filtering process. This is used to make sure the types are added to the
-            // corresponding parameter index in `union_parameter_types`.
-            let mut skipped_parameters = 0;
-
-            for argument_index in 0..arguments.len() {
-                for overload_index in &matching_overload_indexes[..=upto] {
-                    let overload = &self.overloads[*overload_index];
-                    for parameter_index in &overload.argument_matches[argument_index].parameters {
-                        if !participating_parameter_indexes.contains(parameter_index) {
-                            skipped_parameters += 1;
-                            continue;
-                        }
-                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                        // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type =
-                            overload.signature.parameters()[*parameter_index].annotated_type();
-                        if let Some(specialization) = overload.specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, specialization);
-                        }
-                        union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
-                            .add_in_place(parameter_type);
+            for (_, slots) in &matching_overload_slots[..=upto] {
+                for (slot_index, slot) in slots.iter().enumerate() {
+                    if participating_slot_indices.contains(&slot_index) {
+                        union_parameter_types[slot_index].add_in_place(slot.parameter);
                     }
                 }
             }
@@ -3447,11 +3449,9 @@ impl<'db> CallableBinding<'db> {
                     CallableDescription::new(context.db(), self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" of {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" of {description}"))
+                        .unwrap_or_default()
                 ));
 
                 if let Some(index) =
@@ -3479,7 +3479,25 @@ impl<'db> CallableBinding<'db> {
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
                         );
-                        sub.annotate(Annotation::primary(overload.spans(context.db()).signature));
+                        let file = function.file(context.db());
+                        let module = parsed_module(context.db(), file).load(context.db());
+                        let node =
+                            overload.node(context.db(), function.file(context.db()), &module);
+                        let range = if node.body.len() == 1 {
+                            node.range()
+                        } else {
+                            TextRange::new(
+                                node.start(),
+                                node.returns
+                                    .as_deref()
+                                    .map(Ranged::end)
+                                    .unwrap_or_else(|| node.parameters.end()),
+                            )
+                        };
+                        sub.annotate(
+                            Annotation::primary(Span::from(file).with_range(range))
+                                .message("First overload defined here"),
+                        );
                         diag.sub(sub);
                     }
 
@@ -4154,6 +4172,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
+    parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -4170,6 +4189,48 @@ struct ArgumentTypeChecker<'a, 'db> {
     constraint_set_errors: Vec<bool>,
 }
 
+/// Result of checking only the key type of a keyword-unpack argument.
+enum KeywordUnpackKeyTypeCheck<'db> {
+    /// The argument type is handled by a more specific path, or does not expose mapping keys.
+    NotApplicable,
+    /// The argument exposes mapping keys, and they are assignable to `str`.
+    Valid,
+    /// The argument exposes mapping keys, but the key type is not assignable to `str`.
+    Invalid(Type<'db>),
+}
+
+/// Validate the key type of a keyword-unpack argument without checking its value type.
+fn validate_keyword_unpack_key_type<'db>(
+    db: &'db dyn Db,
+    constraints: &ConstraintSetBuilder<'db>,
+    argument_type: Type<'db>,
+    inferable_typevars: InferableTypeVars<'db>,
+) -> KeywordUnpackKeyTypeCheck<'db> {
+    if matches!(argument_type, Type::TypedDict(_))
+        || argument_type.as_paramspec_typevar(db).is_some()
+    {
+        return KeywordUnpackKeyTypeCheck::NotApplicable;
+    }
+
+    let Some((key_type, _)) = argument_type.unpack_keys_and_items(db) else {
+        return KeywordUnpackKeyTypeCheck::NotApplicable;
+    };
+
+    if key_type
+        .when_assignable_to(
+            db,
+            KnownClass::Str.to_instance(db),
+            constraints,
+            inferable_typevars,
+        )
+        .is_always_satisfied(db)
+    {
+        KeywordUnpackKeyTypeCheck::Valid
+    } else {
+        KeywordUnpackKeyTypeCheck::Invalid(key_type)
+    }
+}
+
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
@@ -4183,6 +4244,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
+        let parameter_count = parameter_tys.len();
+
         Self {
             db,
             signature_type,
@@ -4190,6 +4253,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
+            parameter_ty_builders: std::iter::repeat_with(|| None)
+                .take(parameter_count)
+                .collect(),
             call_expression_tcx,
             return_ty,
             errors,
@@ -4460,6 +4526,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
+                if self.is_gradual_variadic_parameter(parameter_index) {
+                    continue;
+                }
+
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
 
@@ -4508,6 +4578,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
+        if self.is_gradual_variadic_parameter(parameter_index) {
+            return;
+        }
+
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization {
             argument_type = argument_type.apply_specialization(self.db, specialization);
@@ -4542,15 +4616,27 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 provided_ty: argument_type,
             });
         }
-        // We still update the actual type of the parameter in this binding to match the
-        // argument, even if the argument type is not assignable to the expected parameter
-        // type.
-        if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
-            // We already verified in `match_parameters` that we only match multiple arguments
-            // with variadic parameters.
-            let union = UnionType::from_two_elements(self.db, existing, argument_type);
-            self.parameter_tys[parameter_index] = Some(union);
+        // We still update the actual type of the parameter in this binding to match the argument,
+        // even if the argument type is not assignable to the expected parameter type.
+        if let Some(builder) = &mut self.parameter_ty_builders[parameter_index] {
+            builder.add_in_place(argument_type);
+        } else if let Some(existing) = self.parameter_tys[parameter_index] {
+            let mut builder = UnionBuilder::new(self.db);
+            builder.add_in_place(existing);
+            builder.add_in_place(argument_type);
+            self.parameter_ty_builders[parameter_index] = Some(builder);
+        } else {
+            self.parameter_tys[parameter_index] = Some(argument_type);
         }
+    }
+
+    fn is_gradual_variadic_parameter(&self, parameter_index: usize) -> bool {
+        let parameters = self.signature.parameters();
+        let parameter = &parameters[parameter_index];
+
+        matches!(parameters.kind(), ParametersKind::Gradual)
+            && matches!(parameter.annotated_type(), Type::Dynamic(_))
+            && (parameter.is_variadic() || parameter.is_keyword_variadic())
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -4855,23 +4941,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
                 Some(paramspec)
             } else {
-                let Some((key_type, _)) = argument_type.unpack_keys_and_items(self.db) else {
-                    return;
-                };
-
-                if !key_type
-                    .when_assignable_to(
-                        self.db,
-                        KnownClass::Str.to_instance(self.db),
-                        constraints,
-                        self.inferable_typevars,
-                    )
-                    .is_always_satisfied(self.db)
-                {
-                    self.errors.push(BindingError::InvalidKeyType {
-                        argument_index: adjusted_argument_index,
-                        provided_ty: key_type,
-                    });
+                match validate_keyword_unpack_key_type(
+                    self.db,
+                    constraints,
+                    argument_type,
+                    self.inferable_typevars,
+                ) {
+                    KeywordUnpackKeyTypeCheck::NotApplicable => return,
+                    KeywordUnpackKeyTypeCheck::Valid => {}
+                    KeywordUnpackKeyTypeCheck::Invalid(provided_ty) => {
+                        self.errors.push(BindingError::InvalidKeyType {
+                            argument_index: adjusted_argument_index,
+                            provided_ty,
+                        });
+                    }
                 }
 
                 None
@@ -4908,6 +4991,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
+        for (parameter_ty, builder) in self
+            .parameter_tys
+            .iter_mut()
+            .zip(self.parameter_ty_builders)
+        {
+            if let Some(builder) = builder {
+                *parameter_ty = Some(builder.build());
+            }
+        }
+
         (self.inferable_typevars, self.specialization, self.return_ty)
     }
 }
@@ -5075,6 +5168,24 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        let parameters = self.signature.parameters();
+
+        if parameters.is_top() {
+            self.errors
+                .push(BindingError::CalledTopCallable(self.signature_type));
+            return;
+        }
+
+        if matches!(parameters.kind(), ParametersKind::Gradual)
+            && parameters
+                .as_slice()
+                .iter()
+                .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
+        {
+            self.check_keyword_unpack_key_types(db, constraints, arguments);
+            return;
+        }
+
         let mut checker = ArgumentTypeChecker::new(
             db,
             self.signature_type,
@@ -5086,11 +5197,6 @@ impl<'db> Binding<'db> {
             self.return_ty,
             &mut self.errors,
         );
-        if self.signature.parameters().is_top() {
-            self.errors
-                .push(BindingError::CalledTopCallable(self.signature_type));
-            return;
-        }
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
@@ -5098,6 +5204,43 @@ impl<'db> Binding<'db> {
         checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+    }
+
+    fn check_keyword_unpack_key_types(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) {
+        let mut num_synthetic_args = 0;
+
+        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+            let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
+                num_synthetic_args += 1;
+                None
+            } else {
+                Some(argument_index - num_synthetic_args)
+            };
+
+            if !matches!(argument, Argument::Keywords) {
+                continue;
+            }
+
+            let argument_type = argument_types.get_default().unwrap_or(Type::unknown());
+            if let KeywordUnpackKeyTypeCheck::Invalid(provided_ty) =
+                validate_keyword_unpack_key_type(
+                    db,
+                    constraints,
+                    argument_type,
+                    InferableTypeVars::None,
+                )
+            {
+                self.errors.push(BindingError::InvalidKeyType {
+                    argument_index: adjusted_argument_index,
+                    provided_ty,
+                });
+            }
+        }
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -5356,8 +5499,8 @@ impl CallableBindingSnapshotter {
 /// Describes a callable for the purposes of diagnostics.
 #[derive(Debug)]
 pub(crate) struct CallableDescription<'a> {
-    pub(crate) name: &'a str,
-    pub(crate) kind: &'a str,
+    pub(crate) name: Cow<'a, str>,
+    pub(crate) kind: Option<&'static str>,
 }
 
 impl<'db> CallableDescription<'db> {
@@ -5365,47 +5508,86 @@ impl<'db> CallableDescription<'db> {
         db: &'db dyn Db,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
+        fn qualified_function_name<'db>(
+            db: &'db dyn Db,
+            function: FunctionType<'db>,
+        ) -> Cow<'db, str> {
+            let file = function.file(db);
+            let semantic_index = semantic_index(db, file);
+            let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
+            match enclosing_scope.node() {
+                NodeWithScopeKind::Class(class) => Cow::Owned(format!(
+                    "{}.{}",
+                    class.node(&parsed_module(db, file).load(db)).name,
+                    function.name(db)
+                )),
+                _ => Cow::Borrowed(function.name(db)),
+            }
+        }
+
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
-                kind: "function",
-                name: function.name(db),
+                kind: Some(if function.name(db) == "__new__" {
+                    "constructor"
+                } else {
+                    "function"
+                }),
+                name: qualified_function_name(db, function),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
-                kind: "class",
-                name: class_type.name(db),
+                kind: Some("class"),
+                name: Cow::Borrowed(class_type.name(db)),
             }),
-            Type::BoundMethod(bound_method) => Some(CallableDescription {
-                kind: "bound method",
-                name: bound_method.function(db).name(db),
+            Type::BoundMethod(bound_method) => Some({
+                let function = bound_method.function(db);
+                let kind = if function.name(db) == "__init__" {
+                    None
+                } else {
+                    Some("bound method")
+                };
+                CallableDescription {
+                    kind,
+                    name: qualified_function_name(db, function),
+                }
             }),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
+                    kind: Some("method wrapper `__get__` of function"),
+                    name: Cow::Borrowed(function.name(db)),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper",
-                    name: "`__get__` of property",
+                    kind: Some("method wrapper"),
+                    name: Cow::Borrowed("`__get__` of property"),
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
                 Some(CallableDescription {
-                    kind: "method wrapper",
-                    name: "`__delete__` of property",
+                    kind: Some("method wrapper"),
+                    name: Cow::Borrowed("`__delete__` of property"),
                 })
             }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
-                kind: "wrapper descriptor",
-                name: match kind {
+                kind: Some("wrapper descriptor"),
+                name: Cow::Borrowed(match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
                     WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
                     WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
-                },
+                }),
             }),
             _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for CallableDescription<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(kind) = self.kind {
+            write!(f, "{kind} `{}`", self.name)
+        } else {
+            write!(f, "`{}`", self.name)
         }
     }
 }
@@ -5703,45 +5885,17 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" to {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" to {description}"))
+                        .unwrap_or_default()
                 ));
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
 
-                if let Type::Union(union) = provided_ty {
-                    let union_elements = union.elements(context.db());
-                    let invalid_elements: Vec<Type<'db>> = union
-                        .elements(context.db())
-                        .iter()
-                        .filter(|element| !element.is_assignable_to(context.db(), *expected_ty))
-                        .copied()
-                        .collect();
-                    let first_invalid_element = invalid_elements[0].display(context.db());
-                    if invalid_elements.len() < union_elements.len() {
-                        match &invalid_elements[1..] {
-                            [] => diag.info(format_args!(
-                                "Element `{first_invalid_element}` of this union \
-                                is not assignable to `{expected_ty_display}`",
-                            )),
-                            [single] => diag.info(format_args!(
-                                "Union elements `{first_invalid_element}` and `{}` \
-                                are not assignable to `{expected_ty_display}`",
-                                single.display(context.db()),
-                            )),
-                            rest => diag.info(format_args!(
-                                "Union element `{first_invalid_element}`, \
-                                and {} more union elements, \
-                                are not assignable to `{expected_ty_display}`",
-                                rest.len(),
-                            )),
-                        }
-                    }
-                }
+                let error_context =
+                    provided_ty.assignability_error_context(context.db(), *expected_ty);
+                error_context.attach_to(context.db(), &mut diag);
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some(overload_literal) = matching_overload.get(context.db()) {
@@ -5849,11 +6003,9 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" to {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" to {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5877,11 +6029,9 @@ impl<'db> BindingError<'db> {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5920,11 +6070,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5949,11 +6097,9 @@ impl<'db> BindingError<'db> {
                 {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Positional-only parameter {parameter} passed as keyword argument{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -5976,11 +6122,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);
@@ -6002,11 +6146,9 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    if let Some(CallableDescription { kind, name }) = callable_description {
-                        format!(" to {kind} `{name}`")
-                    } else {
-                        String::new()
-                    }
+                    callable_description
+                        .map(|description| format!(" to {description}"))
+                        .unwrap_or_default()
                 ));
 
                 match error {
@@ -6092,11 +6234,9 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
+                        callable_description
+                            .map(|description| format!(" of {description}"))
+                            .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(context.db(), &mut diag);

@@ -14,7 +14,9 @@ use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
+use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
+use crate::types::infer::InferenceFlags;
 use crate::{
     Db,
     lint::{LintId, LintMetadata},
@@ -42,6 +44,8 @@ pub(crate) struct InferContext<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     no_type_check: InNoTypeCheck,
+    /// This field tracks various flags that control how type inference should behave in the current context.
+    pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
 }
 
@@ -54,6 +58,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             no_type_check: InNoTypeCheck::default(),
+            inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
             ),
@@ -448,6 +453,18 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
+
+        // Suppress all `invalid-type-form` errors during the first pass of
+        // inferring a PEP-613 type alias. These errors are emitted during the
+        // second pass, post-inference.
+        if (lint_id == LintId::of(&INVALID_TYPE_FORM)
+            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
+            && ctx
+                .inference_flags
+                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+        {
+            return None;
+        }
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
