@@ -284,10 +284,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
-    /// Type-inference is context-dependent, especially in type expressions.
-    /// This field tracks various flags that control how type inference should behave in the current context.
-    inference_flags: InferenceFlags,
-
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -344,7 +340,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
-            inference_flags: InferenceFlags::empty(),
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -1279,12 +1274,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
         let previous_check_unbound_typevars = self
+            .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        self.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let value_ty = self.infer_type_expression(&type_alias.value);
-        self.inference_flags.remove(InferenceFlags::IN_TYPE_ALIAS);
-        self.inference_flags.set(
+        self.context
+            .inference_flags
+            .remove(InferenceFlags::IN_TYPE_ALIAS);
+        self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
         );
@@ -3995,8 +3993,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;
 
-            if is_pep_613_type_alias && self.in_stub() {
-                self.deferred_state = DeferredExpressionState::Deferred;
+            if is_pep_613_type_alias {
+                self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
+                if self.in_stub() {
+                    self.deferred_state = DeferredExpressionState::Deferred;
+                }
             }
 
             // This might be a PEP-613 type alias (`OptionalList: TypeAlias = list[T] | None`). Use
@@ -4010,10 +4011,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             self.typevar_binding_context = previous_typevar_binding_context;
-
             self.deferred_state = previous_deferred_state;
-
             self.dataclass_field_specifiers.clear();
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
 
             let inferred_ty = if target
                 .as_name_expr()
@@ -8235,7 +8237,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 self.scope(),
                                 self.typevar_binding_context,
-                                self.inference_flags
+                                self.inference_flags()
                             ) && !defined_type.member(db, attr_name).place.is_undefined()
                             {
                                 diag.help(format_args!(
@@ -8841,7 +8843,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             typevar_binding_context: _,
-            inference_flags: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -8925,7 +8926,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             undecorated_type: _,
             typevar_binding_context: _,
-            inference_flags: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -8966,7 +8966,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
-            inference_flags: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -9050,7 +9049,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
-            inference_flags: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9076,6 +9074,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ScopeInference { expressions, extra }
     }
 
+    const fn inference_flags(&self) -> InferenceFlags {
+        self.context.inference_flags
+    }
+
     /// Returns a fresh [`TypeInferenceBuilder`] for the current scope that can be used
     /// to speculatively infer expressions during multi-inference.
     ///
@@ -9087,7 +9089,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index,
             cycle_recovery,
             deferred_state,
-            inference_flags,
             typevar_binding_context,
             ref expression_cache,
             ref return_types_and_ranges,
@@ -9116,7 +9117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
-        builder.inference_flags = inference_flags;
+        builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
         builder
             .return_types_and_ranges
@@ -9147,7 +9148,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // builder only state
             expression_cache: _,
             typevar_binding_context: _,
-            inference_flags: _,
             deferred_state: _,
             called_functions: _,
             index: _,
