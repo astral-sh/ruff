@@ -23,10 +23,11 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
-            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE,
-            OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
+            INVALID_NAMED_TUPLE_OVERRIDE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
@@ -468,68 +469,74 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if !configuration.check_method_liskov_violations() {
+            if !configuration.check_liskov_violations() {
                 continue;
             }
 
-            let superclass_variable_kind = superclass_variable_kind(
-                db,
-                superclass.own_class_member(db, None, &member.name).inner,
-                superclass_instance_member,
-            );
+            if configuration.check_attribute_liskov_violations() {
+                let superclass_variable_kind = superclass_variable_kind(
+                    db,
+                    superclass.own_class_member(db, None, &member.name).inner,
+                    superclass_instance_member,
+                );
 
-            if let Some(superclass_variable_kind) = superclass_variable_kind
-                && immediate_parent_variable_kind.is_none()
-            {
-                immediate_parent_variable_kind = Some((superclass, superclass_variable_kind));
+                if let Some(superclass_variable_kind) = superclass_variable_kind
+                    && immediate_parent_variable_kind.is_none()
+                {
+                    immediate_parent_variable_kind = Some((superclass, superclass_variable_kind));
+                }
+
+                if let Some(superclass_variable_kind) = superclass_variable_kind {
+                    let subclass_kind = *subclass_variable_kind.get_or_init(|| {
+                        variable_kind(
+                            db,
+                            class.own_class_member(db, None, &member.name).inner,
+                            subclass_instance_member,
+                        )
+                    });
+
+                    if let Some(subclass_kind) = subclass_kind
+                        && subclass_kind != superclass_variable_kind
+                    {
+                        // An unannotated class-body assignment can inherit an overridden `ClassVar`
+                        // declaration instead of introducing a conflicting instance variable.
+                        if subclass_kind == VariableKind::Instance
+                            && superclass_variable_kind == VariableKind::Class
+                            && first_reachable_definition
+                                .kind(db)
+                                .is_unannotated_assignment()
+                        {
+                            continue;
+                        }
+
+                        if let Some((immediate_parent, immediate_parent_kind)) =
+                            immediate_parent_variable_kind
+                            && immediate_parent != superclass
+                            && immediate_parent.is_subclass_of(db, superclass)
+                            && immediate_parent_kind != superclass_variable_kind
+                        {
+                            continue;
+                        }
+
+                        let superclass_definition = superclass_symbol_id
+                            .and_then(|id| symbol_definition(db, superclass_scope, id));
+                        report_invalid_attribute_override(
+                            context,
+                            &member.name,
+                            *first_reachable_definition,
+                            superclass,
+                            superclass_definition,
+                            subclass_kind,
+                            superclass_variable_kind,
+                        );
+                        liskov_diagnostic_emitted = true;
+                        continue;
+                    }
+                }
             }
 
-            if let Some(superclass_variable_kind) = superclass_variable_kind {
-                let subclass_kind = *subclass_variable_kind.get_or_init(|| {
-                    variable_kind(
-                        db,
-                        class.own_class_member(db, None, &member.name).inner,
-                        subclass_instance_member,
-                    )
-                });
-
-                if let Some(subclass_kind) = subclass_kind
-                    && subclass_kind != superclass_variable_kind
-                {
-                    // An unannotated class-body assignment can inherit an overridden `ClassVar`
-                    // declaration instead of introducing a conflicting instance variable.
-                    if subclass_kind == VariableKind::Instance
-                        && superclass_variable_kind == VariableKind::Class
-                        && first_reachable_definition
-                            .kind(db)
-                            .is_unannotated_assignment()
-                    {
-                        continue;
-                    }
-
-                    if let Some((immediate_parent, immediate_parent_kind)) =
-                        immediate_parent_variable_kind
-                        && immediate_parent != superclass
-                        && immediate_parent.is_subclass_of(db, superclass)
-                        && immediate_parent_kind != superclass_variable_kind
-                    {
-                        continue;
-                    }
-
-                    let superclass_definition = superclass_symbol_id
-                        .and_then(|id| symbol_definition(db, superclass_scope, id));
-                    report_invalid_attribute_override(
-                        context,
-                        &member.name,
-                        *first_reachable_definition,
-                        superclass,
-                        superclass_definition,
-                        subclass_kind,
-                        superclass_variable_kind,
-                    );
-                    liskov_diagnostic_emitted = true;
-                    continue;
-                }
+            if !configuration.check_method_liskov_violations() {
+                continue;
             }
 
             let Type::FunctionLiteral(subclass_function) = member.ty else {
@@ -766,7 +773,7 @@ fn report_invalid_attribute_override<'db>(
     let db = context.db();
 
     let Some(builder) = context.report_lint(
-        &INVALID_METHOD_OVERRIDE,
+        &INVALID_ATTRIBUTE_OVERRIDE,
         subclass_definition.focus_range(db, context.module()),
     ) else {
         return;
@@ -808,15 +815,16 @@ pub(super) enum MethodKind<'db> {
 bitflags! {
     /// Bitflags representing which override-related rules have been enabled.
     #[derive(Default, Debug, Copy, Clone)]
-    struct OverrideRulesConfig: u8 {
+    struct OverrideRulesConfig: u16 {
         const LISKOV_METHODS = 1 << 0;
-        const EXPLICIT_OVERRIDE = 1 << 1;
-        const FINAL_METHOD_OVERRIDDEN = 1 << 2;
-        const INVALID_NAMED_TUPLE = 1 << 3;
-        const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 4;
-        const INVALID_DATACLASS = 1 << 5;
-        const FINAL_VARIABLE_OVERRIDDEN = 1 << 6;
-        const INVALID_ENUM_VALUE = 1 << 7;
+        const LISKOV_ATTRIBUTES = 1 << 1;
+        const EXPLICIT_OVERRIDE = 1 << 2;
+        const FINAL_METHOD_OVERRIDDEN = 1 << 3;
+        const INVALID_NAMED_TUPLE = 1 << 4;
+        const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 5;
+        const INVALID_DATACLASS = 1 << 6;
+        const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
+        const INVALID_ENUM_VALUE = 1 << 8;
     }
 }
 
@@ -829,6 +837,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
 
         if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_METHODS;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_ATTRIBUTES;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
@@ -863,6 +874,15 @@ impl OverrideRulesConfig {
 
     const fn check_method_liskov_violations(self) -> bool {
         self.contains(OverrideRulesConfig::LISKOV_METHODS)
+    }
+
+    const fn check_attribute_liskov_violations(self) -> bool {
+        self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
+    }
+
+    const fn check_liskov_violations(self) -> bool {
+        self.contains(OverrideRulesConfig::LISKOV_METHODS)
+            || self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
     }
 
     const fn check_final_method_overridden(self) -> bool {

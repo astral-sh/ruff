@@ -41,13 +41,13 @@ class Base:
     class_attr: ClassVar[int] = 1
 
 class Subclass(Base):
-    # error: [invalid-method-override] "class variable cannot override instance variable `Base.instance_attr`"
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
     instance_attr: ClassVar[int]
 
-    # error: [invalid-method-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
     instance_attr_with_default: ClassVar[int] = 1
 
-    # error: [invalid-method-override] "instance variable cannot override class variable `Base.class_attr`"
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
     class_attr: int
 
 class ValidSubclass(Base):
@@ -78,7 +78,7 @@ class RegularClassAttributeBase:
     attr = 1
 
 class ExplicitClassVarOverride(RegularClassAttributeBase):
-    # error: [invalid-method-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
     attr: ClassVar[int] = 1
 
 class ClassDefaultBase:
@@ -103,7 +103,7 @@ class GrandparentClassVar:
     attr: ClassVar[int]
 
 class ParentInstance(GrandparentClassVar):
-    # error: [invalid-method-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
     attr: int
 
 class ChildInstance(ParentInstance):
@@ -113,7 +113,7 @@ class GrandparentInstance:
     attr: int
 
 class ParentClassVar(GrandparentInstance):
-    # error: [invalid-method-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
     attr: ClassVar[int]
 
 class ChildClassVar(ParentClassVar):
@@ -154,7 +154,7 @@ class InstanceBase:
     attr: int
 
 class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-method-override] "instance variable cannot override class variable `ClassVarBase.attr`"
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
     attr: int
 ```
 
@@ -174,10 +174,10 @@ class DC6:
 
 @dataclass
 class DC7(DC6):
-    # error: [invalid-method-override] "class variable cannot override instance variable `DC6.x`"
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `DC6.x`"
     x: ClassVar[int]
 
-    # error: [invalid-method-override] "instance variable cannot override class variable `DC6.y`"
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
     y: int
 ```
 
