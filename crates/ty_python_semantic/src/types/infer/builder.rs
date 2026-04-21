@@ -9117,6 +9117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
+        builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
         builder
             .return_types_and_ranges
