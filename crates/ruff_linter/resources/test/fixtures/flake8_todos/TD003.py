@@ -11,6 +11,12 @@
 # TODO: the issue code can be arbitrarily long
 # ABCDEFGHIJKLMNOPQRSTUVWXYZ-001
 
+# TODO: fix this (PROJ-123)
+
+# TODO(PROJ-123): fix this
+
+# TODO: Jira-style issue ID on the same line PROJ-123
+
 # TDO003 - errors
 # TODO: this comment has no
 # link after it

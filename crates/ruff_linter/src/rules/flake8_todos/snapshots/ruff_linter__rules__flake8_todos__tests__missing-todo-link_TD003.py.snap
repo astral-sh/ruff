@@ -1,64 +1,65 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+assertion_line: 27
 ---
 TD003 Missing issue link for this TODO
-  --> TD003.py:15:3
+  --> TD003.py:21:3
    |
-14 | # TDO003 - errors
-15 | # TODO: this comment has no
+20 | # TDO003 - errors
+21 | # TODO: this comment has no
    |   ^^^^
-16 | # link after it
+22 | # link after it
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:18:3
+  --> TD003.py:24:3
    |
-16 | # link after it
-17 |
-18 | # TODO: here's a TODO with no link after it
+22 | # link after it
+23 |
+24 | # TODO: here's a TODO with no link after it
    |   ^^^^
-19 | def foo(x):
-20 |     return x
+25 | def foo(x):
+26 |     return x
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:31:3
+  --> TD003.py:37:3
    |
-29 | # TDO-3870
-30 |
-31 | # TODO: here's a TODO without an issue link
-   |   ^^^^
-32 | # TODO: followed by a new TODO with an issue link
-33 | # TDO-3870
-   |
-
-TD003 Missing issue link for this TODO
-  --> TD003.py:35:9
-   |
-33 | # TDO-3870
-34 |
-35 | # foo # TODO: no link!
-   |         ^^^^
+35 | # TDO-3870
 36 |
-37 | # TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
-   |
-
-TD003 Missing issue link for this TODO
-  --> TD003.py:41:3
-   |
-39 | # TODO: #9627 A todo with a number on the same line
-40 |
-41 | # TODO: A todo with a random number, 5431
+37 | # TODO: here's a TODO without an issue link
    |   ^^^^
-42 |
-43 | # TODO: here's a TODO on the last line with no link
+38 | # TODO: followed by a new TODO with an issue link
+39 | # TDO-3870
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:43:3
+  --> TD003.py:41:9
    |
-41 | # TODO: A todo with a random number, 5431
+39 | # TDO-3870
+40 |
+41 | # foo # TODO: no link!
+   |         ^^^^
 42 |
-43 | # TODO: here's a TODO on the last line with no link
+43 | # TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:47:3
+   |
+45 | # TODO: #9627 A todo with a number on the same line
+46 |
+47 | # TODO: A todo with a random number, 5431
+   |   ^^^^
+48 |
+49 | # TODO: here's a TODO on the last line with no link
+   |
+
+TD003 Missing issue link for this TODO
+  --> TD003.py:49:3
+   |
+47 | # TODO: A todo with a random number, 5431
+48 |
+49 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
    |
