@@ -5815,9 +5815,7 @@ impl<'db> BindingError<'db> {
 
                 let error_context =
                     provided_ty.assignability_error_context(context.db(), *expected_ty);
-                for message in error_context.info_messages(context.db()) {
-                    diag.info(message);
-                }
+                error_context.attach_to(context.db(), &mut diag);
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some(overload_literal) = matching_overload.get(context.db()) {

@@ -5,9 +5,10 @@ use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
 
-use crate::Db;
-use crate::types::Type;
+use crate::types::context::LintDiagnosticGuard;
 use crate::types::tuple::TupleLength;
+use crate::types::{Type, TypedDictType};
+use crate::{Db, FxOrderSet};
 
 /// Identifies a parameter, either by name or by position.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,7 +55,7 @@ pub(crate) enum ErrorContext<'db> {
     NotAssignableToNOtherUnionElements {
         n: usize,
     },
-    TypedDictNotAssignableToDict,
+    TypedDictNotAssignableToDict(TypedDictType<'db>),
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
@@ -123,9 +124,12 @@ impl<'db> ErrorContext<'db> {
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
             ),
-            Self::TypedDictNotAssignableToDict => {
-                "`TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)"
-                    .to_string()
+            Self::TypedDictNotAssignableToDict(typed_dict) => {
+                let name = match typed_dict {
+                    TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
+                    TypedDictType::Synthesized(_) => "TypedDict".to_string(),
+                };
+                format!("{name} is not assignable to `dict`")
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
@@ -215,6 +219,32 @@ impl<'db> ErrorContext<'db> {
             }
         })
     }
+
+    fn help_message(&self) -> Option<HelpMessages> {
+        match self {
+            Self::TypedDictNotAssignableToDict(_) => {
+                Some(HelpMessages::TypedDictNotAssignableToDict)
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum HelpMessages {
+    TypedDictNotAssignableToDict,
+}
+
+impl std::fmt::Display for HelpMessages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HelpMessages::TypedDictNotAssignableToDict => {
+                f.write_str("Generally, TypedDict types are not assignable to any specialization of `dict[..]`, \
+                             since dictionary types allow destructive operations like `clear()`. \
+                             Consider using `Mapping[..]` instead of `dict[..]`.")
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -238,15 +268,19 @@ impl<'db> ErrorContextNode<'db> {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
-    fn render_messages(
+    fn render_tree(
         &self,
         db: &'db dyn Db,
-        messages: &mut Vec<String>,
+        output_lines: &mut Vec<String>,
+        help_messages: &mut FxOrderSet<HelpMessages>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(message) = self.context.render(db) {
-            messages.push(format!("{prefix}{message}"));
+        if let Some(line) = self.context.render(db) {
+            output_lines.push(format!("{prefix}{line}"));
+        }
+        if let Some(help_message) = self.context.help_message() {
+            help_messages.insert(help_message);
         }
 
         let num_children = self.children.len();
@@ -257,7 +291,13 @@ impl<'db> ErrorContextNode<'db> {
             } else {
                 (format!("{continuation}├── "), format!("{continuation}│   "))
             };
-            child.render_messages(db, messages, &child_prefix, &child_continuation);
+            child.render_tree(
+                db,
+                output_lines,
+                help_messages,
+                &child_prefix,
+                &child_continuation,
+            );
         }
     }
 }
@@ -356,12 +396,22 @@ impl<'db> ErrorContextTree<'db> {
         }
     }
 
-    /// Render the tree as a list of messages, with child nodes rendered as indented sub-messages.
-    pub(crate) fn info_messages(&self, db: &'db dyn Db) -> impl Iterator<Item = String> {
-        let mut messages = Vec::new();
+    /// Render the error context tree as info sub-diagnostics on `diag`.
+    pub(in crate::types) fn attach_to(
+        &self,
+        db: &'db dyn Db,
+        diag: &mut LintDiagnosticGuard<'_, '_>,
+    ) {
+        let mut output_lines = Vec::new();
+        let mut help_messages = FxOrderSet::default();
         self.root
             .borrow()
-            .render_messages(db, &mut messages, "", "");
-        messages.into_iter()
+            .render_tree(db, &mut output_lines, &mut help_messages, "", "");
+        for line in output_lines {
+            diag.info(line);
+        }
+        for help_message in help_messages {
+            diag.help(help_message.to_string());
+        }
     }
 }
