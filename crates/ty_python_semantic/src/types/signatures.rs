@@ -31,6 +31,7 @@ use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,
 };
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind,
@@ -767,14 +768,24 @@ impl<'db> Signature<'db> {
             return true;
         };
 
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
         if !first_parameter.is_positional() {
             return true;
         }
 
-        let expected_self_ty = first_parameter
-            .annotated_type()
-            .bind_self_typevars(db, self_type)
-            .apply_optional_specialization(db, self_type.class_specialization(db));
+        let mut expected_self_ty = first_parameter.annotated_type();
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if expected_self_ty.is_dynamic()
+            || expected_self_ty.is_object()
+            || expected_self_ty == self_type
+        {
+            return true;
+        }
+
+        // `Self`-like typevars in the receiver annotation are bound using the concrete receiver.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
 
         if expected_self_ty.is_dynamic()
             || expected_self_ty.is_object()
@@ -783,14 +794,32 @@ impl<'db> Signature<'db> {
             return true;
         }
 
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some(self_specialization) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            if expected_self_ty.is_dynamic()
+                || expected_self_ty.is_object()
+                || expected_self_ty == self_type
+            {
+                return true;
+            }
+        }
+
+        let inferable = self.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
+        if any_over_type(db, self_type, false, Type::is_union) {
+            // A union receiver can bind an overload that accepts any possible receiver
+            // alternative; whole-type assignability would only keep overloads that accept all of
+            // them.
+            return !self_type
+                .when_disjoint_from(db, expected_self_ty, &constraints, inferable)
+                .is_always_satisfied(db);
+        }
+
         self_type
-            .when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
+            .when_assignable_to(db, expected_self_ty, &constraints, inferable)
             .is_always_satisfied(db)
     }
 

@@ -159,7 +159,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import overload
+from typing import Generic, TypeVar, overload
 
 class Box[T]:
     # Use the class type parameter so specializations remain meaningful.
@@ -174,6 +174,19 @@ class Box[T]:
 
 reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specialized(x: int) -> int
 reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Generic[T_co]):
+    @overload
+    def get(self: "Reader[int]", default: int) -> int: ...
+    @overload
+    def get(self: "Reader[str]", default: str) -> str: ...
+    def get(self, default: object) -> object:
+        return default
+
+def union_receiver(reader: Reader[int | str]):
+    reveal_type(reader.get)  # revealed: Overload[(default: int) -> int, (default: str) -> str]
 ```
 
 ## Constructor
