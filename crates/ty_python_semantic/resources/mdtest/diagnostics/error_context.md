@@ -1082,3 +1082,24 @@ def _(source: frozenset[bool]):
 def _(source: tuple[bool, bool]):
     target: tuple[int, int] = source
 ```
+
+## Error context in other scenarios
+
+### In `invalid-return-type` diagnostics
+
+```py
+def f() -> tuple[int, str]:
+    return 1, b""  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:1:12
+  |
+1 | def f() -> tuple[int, str]:
+  |            --------------- Expected `tuple[int, str]` because of return type
+2 |     return 1, b""  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
