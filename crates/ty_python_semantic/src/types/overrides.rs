@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place},
+    place::{DefinedPlace, Place, PlaceAndQualifiers},
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
         Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -176,10 +176,11 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, class);
 
+    let subclass_instance_member = instance_of_class.member(db, &member.name);
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
-    }) = instance_of_class.member(db, &member.name).place
+    }) = subclass_instance_member.place
     else {
         return;
     };
@@ -324,11 +325,21 @@ fn check_class_declaration<'db>(
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
+    let subclass_class_member = class.own_class_member(db, None, &member.name);
+    let subclass_own_instance_member = class.own_instance_member(db, &member.name);
+    let subclass_variable_kind = variable_kind(
+        db,
+        subclass_class_member.inner,
+        subclass_instance_member,
+        subclass_own_instance_member.inner,
+        Some(*first_reachable_definition),
+    );
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
     // If so, we shouldn't report the same violation for the child class.
     let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
+    let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
         for class_base in class.iter_mro(db).skip(1) {
@@ -382,12 +393,12 @@ fn check_class_declaration<'db>(
                 .unwrap_or_default();
             }
 
+            let superclass_instance_member =
+                Type::instance(db, superclass).member(db, &member.name);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
-            }) = Type::instance(db, superclass)
-                .member(db, &member.name)
-                .place
+            }) = superclass_instance_member.place
             else {
                 // If not defined on any superclass, no point in continuing to walk up the MRO
                 break;
@@ -467,7 +478,47 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // TODO: Check Liskov on non-methods too
+            let superclass_class_member = superclass.own_class_member(db, None, &member.name);
+            let superclass_definition =
+                superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+            let superclass_own_instance_member = superclass.own_instance_member(db, &member.name);
+            let superclass_variable_kind = superclass_variable_kind(
+                db,
+                superclass_class_member.inner,
+                superclass_instance_member,
+                superclass_own_instance_member.inner,
+                superclass_definition,
+            );
+
+            if let Some(superclass_kind) = superclass_variable_kind
+                && immediate_parent_variable_kind.is_none()
+            {
+                immediate_parent_variable_kind = Some((superclass, superclass_kind));
+            }
+
+            if let Some(invalid_override) =
+                invalid_classvar_instance_override(subclass_variable_kind, superclass_variable_kind)
+            {
+                if let Some((immediate_parent, immediate_parent_kind)) =
+                    immediate_parent_variable_kind
+                    && immediate_parent != superclass
+                    && immediate_parent_kind != invalid_override.superclass_kind
+                {
+                    continue;
+                }
+
+                report_invalid_attribute_override(
+                    context,
+                    &member.name,
+                    *first_reachable_definition,
+                    superclass,
+                    superclass_definition,
+                    invalid_override,
+                );
+                liskov_diagnostic_emitted = true;
+                continue;
+            }
+
             let Type::FunctionLiteral(subclass_function) = member.ty else {
                 continue;
             };
@@ -586,6 +637,190 @@ fn check_class_declaration<'db>(
             superclass,
             class,
             superclass_definition,
+        );
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VariableKind {
+    Class,
+    Instance,
+}
+
+impl VariableKind {
+    const fn description(self) -> &'static str {
+        match self {
+            VariableKind::Class => "class variable",
+            VariableKind::Instance => "instance variable",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InvalidAttributeOverride {
+    subclass_kind: VariableKind,
+    superclass_kind: VariableKind,
+}
+
+fn invalid_classvar_instance_override(
+    subclass_kind: Option<VariableKind>,
+    superclass_kind: Option<VariableKind>,
+) -> Option<InvalidAttributeOverride> {
+    let subclass_kind = subclass_kind?;
+    let superclass_kind = superclass_kind?;
+    (subclass_kind != superclass_kind).then_some(InvalidAttributeOverride {
+        subclass_kind,
+        superclass_kind,
+    })
+}
+
+fn superclass_variable_kind<'db>(
+    db: &'db dyn Db,
+    class_member: PlaceAndQualifiers<'db>,
+    instance_member: PlaceAndQualifiers<'db>,
+    own_instance_member: PlaceAndQualifiers<'db>,
+    definition: Option<Definition<'db>>,
+) -> Option<VariableKind> {
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+        return None;
+    }
+
+    variable_kind(
+        db,
+        class_member,
+        instance_member,
+        own_instance_member,
+        definition,
+    )
+}
+
+fn variable_kind<'db>(
+    db: &'db dyn Db,
+    class_member: PlaceAndQualifiers<'db>,
+    instance_member: PlaceAndQualifiers<'db>,
+    own_instance_member: PlaceAndQualifiers<'db>,
+    definition: Option<Definition<'db>>,
+) -> Option<VariableKind> {
+    let class_member_ty = class_member.ignore_possibly_undefined()?;
+    let instance_member_ty = instance_member.ignore_possibly_undefined()?;
+
+    if !is_variable_like_type(db, class_member_ty) || !is_variable_like_type(db, instance_member_ty)
+    {
+        return None;
+    }
+
+    if class_member.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+        || instance_member
+            .qualifiers
+            .contains(TypeQualifiers::CLASS_VAR)
+    {
+        return Some(VariableKind::Class);
+    }
+
+    if definition.is_some_and(|definition| is_unannotated_assignment_definition(db, definition))
+        && own_instance_member
+            .place
+            .ignore_possibly_undefined()
+            .is_none()
+    {
+        return Some(VariableKind::Class);
+    }
+
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL)
+        || class_member_ty
+            .class_member(db, "__get__".into())
+            .place
+            .ignore_possibly_undefined()
+            .is_some()
+    {
+        return None;
+    }
+
+    Some(VariableKind::Instance)
+}
+
+/// Returns whether `definition` is an unannotated assignment.
+///
+/// This is a Salsa-tracked query because `definition` can come from a superclass in another
+/// Python module, and `Definition::kind` should not be read across files outside tracked queries.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn is_unannotated_assignment_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    definition.kind(db).is_unannotated_assignment()
+}
+
+fn symbol_definition<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+) -> Option<Definition<'db>> {
+    use_def_map(db, scope)
+        .end_of_scope_symbol_declarations(symbol)
+        .find_map(|declaration| declaration.declaration.definition())
+        .or_else(|| {
+            use_def_map(db, scope)
+                .end_of_scope_symbol_bindings(symbol)
+                .find_map(|binding| binding.binding.definition())
+        })
+}
+
+fn is_variable_like_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::FunctionLiteral(_)
+        | Type::BoundMethod(_)
+        | Type::KnownBoundMethod(_)
+        | Type::WrapperDescriptor(_)
+        | Type::PropertyInstance(_) => false,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_variable_like_type(db, *element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .all(|element| is_variable_like_type(db, *element)),
+        _ => true,
+    }
+}
+
+fn report_invalid_attribute_override<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Name,
+    subclass_definition: Definition<'db>,
+    superclass: ClassType<'db>,
+    superclass_definition: Option<Definition<'db>>,
+    invalid_override: InvalidAttributeOverride,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &INVALID_METHOD_OVERRIDE,
+        subclass_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let superclass_name = superclass.name(db);
+    let superclass_member = format!("{superclass_name}.{member}");
+    let subclass_kind = invalid_override.subclass_kind.description();
+    let superclass_kind = invalid_override.superclass_kind.description();
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid override of attribute `{member}`"));
+    diagnostic.set_primary_message(format_args!(
+        "{subclass_kind} cannot override {superclass_kind} `{superclass_member}`"
+    ));
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    if let Some(superclass_definition) = superclass_definition
+        && superclass_definition.file(db) == context.file()
+    {
+        diagnostic.annotate(
+            Annotation::secondary(
+                context.span(superclass_definition.focus_range(db, context.module())),
+            )
+            .message(format_args!(
+                "{superclass_kind} `{superclass_member}` declared here"
+            )),
         );
     }
 }

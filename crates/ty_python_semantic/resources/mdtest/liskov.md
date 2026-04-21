@@ -20,6 +20,97 @@ several checks for a type checker to perform when it checks a subclass `B` of a 
 1. Mutable attributes should only ever be overridden invariantly: if a mutable attribute `A.attr`
     resolves to type `str`, it can only be overridden on a subclass with exactly the same type.
 
+## `ClassVar` and instance variables
+
+A pure class variable cannot override an inherited instance variable, and an instance variable
+cannot override an inherited pure class variable:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+class Base:
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class Subclass(Base):
+    # error: [invalid-method-override] "class variable cannot override instance variable `Base.instance_attr`"
+    instance_attr: ClassVar[int]
+
+    # error: [invalid-method-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    instance_attr_with_default: ClassVar[int] = 1
+
+    # error: [invalid-method-override] "instance variable cannot override class variable `Base.class_attr`"
+    class_attr: int
+
+class ValidSubclass(Base):
+    instance_attr: int
+    instance_attr_with_default: int = 1
+    class_attr: ClassVar[int] = 1
+
+class RegularClassAttributeOverride(Base):
+    class_attr = 1
+
+class RegularClassAttributeBase:
+    attr = 1
+
+class ExplicitClassVarOverride(RegularClassAttributeBase):
+    attr: ClassVar[int] = 1
+
+class GrandparentClassVar:
+    attr: ClassVar[int]
+
+class ParentInstance(GrandparentClassVar):
+    # error: [invalid-method-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
+    attr: int
+
+class ChildInstance(ParentInstance):
+    attr: int
+
+class GrandparentInstance:
+    attr: int
+
+class ParentClassVar(GrandparentInstance):
+    # error: [invalid-method-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
+    attr: ClassVar[int]
+
+class ChildClassVar(ParentClassVar):
+    attr: ClassVar[int]
+
+@dataclass
+class DC6:
+    x: int
+    y: ClassVar[int] = 1
+
+@dataclass
+class DC7(DC6):
+    # error: [invalid-method-override] "class variable cannot override instance variable `DC6.x`"
+    x: ClassVar[int]
+
+    # error: [invalid-method-override] "instance variable cannot override class variable `DC6.y`"
+    y: int
+```
+
+Imported unannotated class attributes are treated as class variables too:
+
+`module.py`:
+
+```py
+class Base:
+    attr = 1
+```
+
+`main.py`:
+
+```py
+from module import Base
+
+class Subclass(Base):
+    # error: [invalid-method-override] "instance variable cannot override class variable `Base.attr`"
+    attr: int
+```
+
 ## Method return types
 
 It is fine for a subclass method to return a subtype of the return type of the method it overrides:
