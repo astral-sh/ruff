@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+assertion_line: 27
 ---
 ARG001 Unused function argument: `self`
   --> ARG.py:9:7
@@ -36,3 +37,14 @@ ARG001 Unused function argument: `x`
    |            ^
 14 |     print("Hello, world!")
    |
+
+ARG001 Unused function argument: `default`
+   --> ARG.py:275:5
+    |
+273 | # When only **kwargs is forwarded (no *args), keyword-only params are still flagged.
+274 | def f(
+275 |     default: object = None,  # ARG001
+    |     ^^^^^^^
+276 |     **kwargs: object,
+277 | ) -> None:
+    |

@@ -1,5 +1,7 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
+use ruff_python_ast::{
+    Parameter, ParameterWithDefault, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise,
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
@@ -289,14 +291,46 @@ impl Argumentable {
     }
 }
 
+/// Returns `true` if both `*args` and `**kwargs` are present and referenced,
+/// indicating a forwarding pattern where keyword-only parameters serve as
+/// the documented interface for the underlying call.
+fn is_variadic_forwarding(parameters: &Parameters, scope: &Scope, checker: &Checker) -> bool {
+    let semantic = checker.semantic();
+    let is_used = |param: &Parameter| {
+        scope
+            .get(param.name())
+            .is_some_and(|id| !semantic.binding(id).is_unused())
+    };
+    parameters
+        .vararg
+        .as_deref()
+        .is_some_and(|vararg| is_used(vararg))
+        && parameters
+            .kwarg
+            .as_deref()
+            .is_some_and(|kwarg| is_used(kwarg))
+}
+
 /// Check a plain function for unused arguments.
 fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
         .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
+    // When both *args and **kwargs are forwarded to a call, keyword-only
+    // parameters between them serve as the documented interface and should
+    // not be flagged as unused.
+    let kwonlyargs: &[ParameterWithDefault] = if is_variadic_forwarding(parameters, scope, checker)
+    {
+        &[]
+    } else {
+        &parameters.kwonlyargs
+    };
     let args = parameters
-        .iter_non_variadic_params()
+        .posonlyargs
+        .iter()
+        .chain(&parameters.args)
+        .chain(kwonlyargs)
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
             parameters
@@ -321,8 +355,20 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
         .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
+    // When both *args and **kwargs are forwarded to a call, keyword-only
+    // parameters between them serve as the documented interface and should
+    // not be flagged as unused.
+    let kwonlyargs: &[ParameterWithDefault] = if is_variadic_forwarding(parameters, scope, checker)
+    {
+        &[]
+    } else {
+        &parameters.kwonlyargs
+    };
     let args = parameters
-        .iter_non_variadic_params()
+        .posonlyargs
+        .iter()
+        .chain(&parameters.args)
+        .chain(kwonlyargs)
         .skip(1)
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(

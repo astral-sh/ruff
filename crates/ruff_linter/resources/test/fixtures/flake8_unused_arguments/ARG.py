@@ -259,11 +259,20 @@ class C:
     
 
 ###
-# Unused arguments with `**kwargs`.
+# Unused arguments with `**kwargs` forwarding.
 ###
 
+# When both *args and **kwargs are forwarded, keyword-only params are OK.
 def f(
-    default: object = None,  # noqa: ARG001
+    *args: object,
+    default: object = None,
+    **kwargs: object,
+) -> None:
+    TypeVar(*args, **kwargs)
+
+# When only **kwargs is forwarded (no *args), keyword-only params are still flagged.
+def f(
+    default: object = None,  # ARG001
     **kwargs: object,
 ) -> None:
     TypeVar(**kwargs)
