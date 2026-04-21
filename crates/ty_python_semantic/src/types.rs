@@ -5749,7 +5749,8 @@ impl<'db> Type<'db> {
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
                     TypeMapping::ApplySpecialization(specialization)
                     | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                    if let Some(current_specialization) = specialization.as_specialization(db) => {
+                    if matches!(specialization, ApplySpecialization::Specialization(_) | ApplySpecialization::Partial { .. }) => {
+                        let current_specialization = specialization.as_specialization(db).unwrap();
                         Type::TypeAlias(alias.apply_specialization(
                             db,
                             |generic_context| {
