@@ -474,7 +474,8 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             Declared type
    |
 info: TypedDict `Person` is not assignable to `dict`
-help: Generally, TypedDict types are not assignable to any specialization of `dict[..]`, since dictionary types allow destructive operations like `clear()`. Consider using `Mapping[..]` instead of `dict[..]`.
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
+help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
 ## Protocols

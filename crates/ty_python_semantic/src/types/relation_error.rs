@@ -100,7 +100,11 @@ pub(crate) enum ErrorContext<'db> {
 }
 
 impl<'db> ErrorContext<'db> {
-    fn render(&self, db: &'db dyn Db) -> Option<String> {
+    fn render(
+        &self,
+        db: &'db dyn Db,
+        help_messages: &mut FxOrderSet<HelpMessages>,
+    ) -> Option<String> {
         Some(match self {
             Self::Empty => {
                 return None;
@@ -125,6 +129,9 @@ impl<'db> ErrorContext<'db> {
                 if *n == 1 { "" } else { "s" }
             ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
+                help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
+                help_messages.insert(HelpMessages::ConsiderUsingMappingInsteadOfDict);
+
                 let name = match typed_dict {
                     TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
                     TypedDictType::Synthesized(_) => "TypedDict".to_string(),
@@ -219,29 +226,22 @@ impl<'db> ErrorContext<'db> {
             }
         })
     }
-
-    fn help_message(&self) -> Option<HelpMessages> {
-        match self {
-            Self::TypedDictNotAssignableToDict(_) => {
-                Some(HelpMessages::TypedDictNotAssignableToDict)
-            }
-            _ => None,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages {
     TypedDictNotAssignableToDict,
+    ConsiderUsingMappingInsteadOfDict,
 }
 
 impl std::fmt::Display for HelpMessages {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HelpMessages::TypedDictNotAssignableToDict => {
-                f.write_str("Generally, TypedDict types are not assignable to any specialization of `dict[..]`, \
-                             since dictionary types allow destructive operations like `clear()`. \
-                             Consider using `Mapping[..]` instead of `dict[..]`.")
+                f.write_str("A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.")
+            }
+            HelpMessages::ConsiderUsingMappingInsteadOfDict => {
+                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
             }
         }
     }
@@ -276,11 +276,8 @@ impl<'db> ErrorContextNode<'db> {
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db) {
+        if let Some(line) = self.context.render(db, help_messages) {
             output_lines.push(format!("{prefix}{line}"));
-        }
-        if let Some(help_message) = self.context.help_message() {
-            help_messages.insert(help_message);
         }
 
         let num_children = self.children.len();
