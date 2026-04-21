@@ -3967,6 +3967,9 @@ pub(super) fn report_invalid_return_type(
             expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
+
+    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
+    error_context.attach_to(context.db(), &mut diag);
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
