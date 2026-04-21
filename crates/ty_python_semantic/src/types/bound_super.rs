@@ -865,15 +865,15 @@ impl<'db> BoundSuperType<'db> {
 
         Either::Right(mro_iter.skip_while(move |superclass| {
             if pivot_found {
-                false
-            } else if let Some(superclass_type) = superclass.into_class() {
-                if superclass_type.class_literal(db) == pivot_class.class_literal(db) {
-                    pivot_found = true;
-                }
-                true
-            } else {
-                true
+                return false;
             }
+
+            if let Some(superclass_type) = superclass.into_class()
+                && superclass_type.class_literal(db) == pivot_class.class_literal(db)
+            {
+                pivot_found = true;
+            }
+            true
         }))
     }
 
