@@ -27,7 +27,7 @@ cannot override an inherited pure class variable:
 
 ```py
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Protocol
 
 class Base:
     instance_attr: int
@@ -57,6 +57,14 @@ class RegularClassAttributeBase:
 
 class ExplicitClassVarOverride(RegularClassAttributeBase):
     attr: ClassVar[int] = 1
+
+class ClassDefaultBase:
+    class_default: int = 1
+    declared_instance: bool
+
+class ClassDefaultSubclass(ClassDefaultBase):
+    class_default = 2
+    declared_instance = True
 
 class GrandparentClassVar:
     attr: ClassVar[int]
@@ -90,9 +98,19 @@ class DC7(DC6):
 
     # error: [invalid-method-override] "instance variable cannot override class variable `DC6.y`"
     y: int
+
+class ProtocolBase(Protocol):
+    class_attr: ClassVar[int]
+    instance_attr: int
+    instance_attr_with_default: int = 1
+
+class ProtocolImpl(ProtocolBase):
+    class_attr = 1
+    instance_attr = 1
+    instance_attr_with_default = 1
 ```
 
-Imported unannotated class attributes are treated as class variables too:
+Imported unannotated class attributes are not pure class variables either:
 
 `module.py`:
 
@@ -107,7 +125,6 @@ class Base:
 from module import Base
 
 class Subclass(Base):
-    # error: [invalid-method-override] "instance variable cannot override class variable `Base.attr`"
     attr: int
 ```
 

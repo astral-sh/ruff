@@ -723,7 +723,7 @@ fn variable_kind<'db>(
             .ignore_possibly_undefined()
             .is_none()
     {
-        return Some(VariableKind::Class);
+        return None;
     }
 
     if class_member.qualifiers.contains(TypeQualifiers::FINAL)
