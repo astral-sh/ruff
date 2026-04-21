@@ -27,7 +27,7 @@ def test_tuple(param1, param2):
 
 
 @pytest.mark.parametrize(("param1",), [1, 2, 3])
-def test_tuple_one_elem(param1, param2):
+def test_tuple_one_elem_invalid_fix(param1, param2):
     ...
 
 
@@ -37,7 +37,7 @@ def test_list(param1, param2):
 
 
 @pytest.mark.parametrize(["param1"], [1, 2, 3])
-def test_list_one_elem(param1, param2):
+def test_list_one_elem_invalid_fix(param1, param2):
     ...
 
 
@@ -87,9 +87,9 @@ def test_keyword_arguments(param1, param2):
 def test_single_element_tuple(param):
     ...
 
-
-@pytest.mark.parametrize(("param",), [[1], [2]])
-def test_single_element_list(param):
+variable = (2,)
+@pytest.mark.parametrize(("param",), [(1,), variable])
+def test_single_element_tuple_and_variable_mix(param):
     ...
 
 
@@ -134,27 +134,6 @@ def test_comment_in_argvalues(param):
     ],
 )
 def test_comment_between_argvalues_items(param):
-    ...
-
-
-# A fix should be suggested for `argnames`, but not for `argvalues`.
-@pytest.mark.parametrize(
-    ("param",),
-    [
-        (1,),
-        (2, 3),
-    ],
-)
-def test_invalid_argvalues(param):
-    """
-    pytest throws the following error for this test:
-    ------------------------------------------------
-    a.py::test_comment_between_argvalues_items: in "parametrize" the number of names (1):
-        ('param',)
-    must be equal to the number of values (2):
-        (2, 3)
-    ------------------------------------------------
-    """
     ...
 
 

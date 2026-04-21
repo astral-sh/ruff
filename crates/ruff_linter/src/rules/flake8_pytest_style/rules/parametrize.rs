@@ -704,27 +704,40 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     // def test_foo(x):
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
-    let argvalues_edits = unpack_single_element_items(checker, argvalues);
-    let argnames_edit =
-        Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
-    let fix = if checker.comment_ranges().intersects(argnames_edit.range())
-        || argvalues_edits
-            .iter()
-            .any(|edit| checker.comment_ranges().intersects(edit.range()))
-    {
-        Fix::unsafe_edits(argnames_edit, argvalues_edits)
-    } else {
-        Fix::safe_edits(argnames_edit, argvalues_edits)
-    };
-    diagnostic.set_fix(fix);
+    //
+    // In some cases, it's not possible to unpack all `argvalues`:
+    //
+    // ```python
+    // @pytest.mark.parametrize(("x",), [(1,), variable])
+    // def test_foo(x):
+    //     assert isinstance(x, int)
+    //
+    // In this case, it is left unchanged.
+    // ```
+    if let Some(argvalues_edits) = unpack_single_element_items(checker, argvalues) {
+        let argnames_edit =
+            Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
+        let fix = if checker.comment_ranges().intersects(argnames_edit.range())
+            || argvalues_edits
+                .iter()
+                .any(|edit| checker.comment_ranges().intersects(edit.range()))
+        {
+            Fix::unsafe_edits(argnames_edit, argvalues_edits)
+        } else {
+            Fix::safe_edits(argnames_edit, argvalues_edits)
+        };
+        diagnostic.set_fix(fix);
+    }
 }
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
 /// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
+/// In the case where a transformation will break code, `None` is returned.
+/// For instance, `[(1,), two]` is not transformed.
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edit>> {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
-        return vec![];
+        return None;
     };
 
     let mut edits = Vec::with_capacity(elts.len());
@@ -732,15 +745,15 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
             value
         else {
-            return vec![];
+            return None;
         };
 
         let [elt] = elts.as_slice() else {
-            return vec![];
+            return None;
         };
 
         if matches!(elt, Expr::Starred(_)) {
-            return vec![];
+            return None;
         }
 
         edits.push(Edit::range_replacement(
@@ -748,7 +761,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
             value.range(),
         ));
     }
-    edits
+    Some(edits)
 }
 
 fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
