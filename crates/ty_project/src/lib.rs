@@ -26,6 +26,7 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -213,6 +214,21 @@ impl Project {
     #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
+    }
+
+    pub fn set_dependency_metadata(
+        self,
+        db: &mut dyn Db,
+        dependency_metadata: Option<Arc<DependencyMetadata>>,
+    ) {
+        let settings = self
+            .settings(db)
+            .clone()
+            .with_dependency_metadata(dependency_metadata);
+
+        if self.settings(db) != &settings {
+            self.set_settings(db).to(Box::new(settings));
+        }
     }
 
     /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).

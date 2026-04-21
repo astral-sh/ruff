@@ -1411,6 +1411,7 @@ impl AnalysisOptions {
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
+            dependency_metadata: dependency_metadata_default,
         } = AnalysisSettings::default();
 
         let allowed_unresolved_imports =
@@ -1440,6 +1441,7 @@ impl AnalysisOptions {
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
             replace_imports_with_any,
+            dependency_metadata: dependency_metadata_default,
         }
     }
 }

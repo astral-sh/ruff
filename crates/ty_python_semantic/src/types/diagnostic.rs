@@ -3468,12 +3468,12 @@ impl TypeCheckDiagnostics {
         self.diagnostics.push(diagnostic);
     }
 
-    pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
+    pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions.extend(&other.used_suppressions);
     }
 
-    pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+    pub(crate) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
         self.diagnostics.extend(diagnostics);
     }
 
