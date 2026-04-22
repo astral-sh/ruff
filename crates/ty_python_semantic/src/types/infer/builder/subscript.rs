@@ -1,7 +1,7 @@
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
+use ruff_python_ast::{self as ast, ExprContext};
 use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
@@ -1462,10 +1462,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             _ => {
-                let ast_arguments = [
-                    ArgOrKeyword::Arg(&target.slice),
-                    ArgOrKeyword::Arg(rhs_value_node),
-                ];
+                let ast_arguments = [Some(&*target.slice), Some(rhs_value_node)];
 
                 let mut call_arguments =
                     CallArguments::positional([Type::unknown(), Type::unknown()]);
@@ -1480,8 +1477,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                 let Err(call_dunder_err) = self.infer_and_try_call_dunder(
-                    db,
                     object_ty,
+                    None,
                     "__setitem__",
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,

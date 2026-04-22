@@ -4312,7 +4312,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Fall back to non-augmented binary operator inference.
         let binary_return_ty = |builder: &mut Self, value_ty| {
             builder
-                .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
+                .infer_binary_expression_type(
+                    assignment.into(),
+                    false,
+                    None,
+                    target_type,
+                    None,
+                    value_ty,
+                    op,
+                    TypeContext::default(),
+                )
                 .unwrap_or_else(|| {
                     report_unsupported_augmented_assignment(
                         &builder.context,
@@ -4354,12 +4363,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return typed_dict_update_ty;
                 }
 
-                let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
+                let ast_arguments = [Some(value_expr)];
                 let mut call_arguments = CallArguments::positional([Type::unknown()]);
 
                 let call = self.infer_and_try_call_dunder(
-                    db,
                     target_type,
+                    None,
                     op.in_place_dunder(),
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
@@ -4920,16 +4929,111 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     #[expect(clippy::too_many_arguments)]
     fn infer_and_try_call_dunder(
         &mut self,
-        db: &'db dyn Db,
-        object: Type<'db>,
+        object_ty: Type<'db>,
+        object_expr: Option<&ast::Expr>,
         name: &str,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        match object
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+        self.infer_and_try_call_dunder_with_policy(
+            object_ty,
+            object_expr,
+            name,
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            call_expression_tcx,
+            MemberLookupPolicy::default(),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn infer_and_try_call_dunder_with_policy(
+        &mut self,
+        mut object_ty: Type<'db>,
+        object_expr: Option<&ast::Expr>,
+        name: &str,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let db = self.db();
+
+        if let Some(object_expr) = object_expr
+            && let Some(class_type) = object_ty.nominal_class(db)
+            && let Some(generic_alias) = class_type.into_generic_alias()
+            && let Some(generic_context) = generic_alias.origin(db).generic_context(db)
+            && let Some(call_expression_tcx) = call_expression_tcx.annotation
+            && let Place::Defined(DefinedPlace {
+                ty: dunder_callable,
+                ..
+            }) = Type::instance(db, generic_alias.origin(db).identity_specialization(db))
+                .member_lookup_with_policy(
+                    db,
+                    name.into(),
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+        {
+            let bindings = dunder_callable
+                .bindings(db)
+                .match_parameters(db, argument_types);
+
+            let constraints = ConstraintSetBuilder::new();
+            let mut builder = SpecializationBuilder::new(
+                db,
+                &constraints,
+                generic_context.inferable_typevars(db),
+            );
+
+            // Collect the constraints on the callable type's generic context
+            // enforced by the type context of the call expression. Note that
+            // the callable expression of a bound method is initially inferred
+            // without type context, and so the bindings we collect may not be
+            // specialized with the correct types.
+            if let Some(callable) = bindings.single_element() {
+                for (_, binding) in callable.matching_overloads() {
+                    let _ = builder.infer(binding.signature.return_ty, call_expression_tcx);
+                }
+            }
+
+            // Re-infer the callable type with the new type context.
+            let generic_alias =
+                generic_alias
+                    .origin(db)
+                    .apply_specialization(db, |generic_context| {
+                        builder.build_with(generic_context, |_, bounds| {
+                            // Default specialize any type variables to a marker type, which will be
+                            // ignored during argument inference, allowing the concrete subset of the
+                            // parameter type to still affect argument inference.
+                            if bounds.is_none() {
+                                Some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                            } else {
+                                None
+                            }
+                        })
+                    });
+
+            let object_tcx = TypeContext::new(Some(Type::instance(db, generic_alias)));
+
+            // TODO: This is the correct inferred type for `right_expr`, as the
+            // original inference did not provide type context. In principle, the
+            // original inference should have been speculated, and this inference
+            // should be persisted, but we acquire the type context much after the
+            // original inference, which makes this difficult.
+            object_ty = self.speculate().infer_expression(object_expr, object_tcx);
+        }
+
+        match object_ty
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
             .place
         {
             Place::Defined(DefinedPlace {
@@ -5160,11 +5264,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // determine their length.
                 //
                 // TODO: Re-infer splatted arguments with their type context.
-                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
-                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
+                Some(
+                    ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                    | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }),
+                ) => continue,
 
-                ast::ArgOrKeyword::Arg(arg) => arg,
-                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
+                Some(ast::ArgOrKeyword::Arg(arg)) => arg,
+                Some(ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. })) => value,
+
+                None => {
+                    assert!(
+                        argument_types.get_default().is_some(),
+                        "synthesized argument must provide type"
+                    );
+                    continue;
+                }
             };
 
             // Type-form arguments are inferred without type context, so we can infer the argument type directly.
@@ -9510,6 +9624,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
+    ///
+    /// Note that this overrides the inferred types of any expressions or bindings.
     fn extend(&mut self, other: Self) {
         let Self {
             context,
@@ -9640,7 +9756,7 @@ type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
 #[derive(Clone)]
 enum ArgumentsIter<'a> {
     FromAst(ArgumentsSourceOrder<'a>),
-    Synthesized(std::slice::Iter<'a, ArgOrKeyword<'a>>),
+    Synthesized(std::slice::Iter<'a, Option<&'a ast::Expr>>),
 }
 
 impl<'a> ArgumentsIter<'a> {
@@ -9648,18 +9764,18 @@ impl<'a> ArgumentsIter<'a> {
         Self::FromAst(arguments.iter_source_order())
     }
 
-    fn synthesized(arguments: &'a [ArgOrKeyword<'a>]) -> Self {
+    fn synthesized(arguments: &'a [Option<&'a ast::Expr>]) -> Self {
         Self::Synthesized(arguments.iter())
     }
 }
 
 impl<'a> Iterator for ArgumentsIter<'a> {
-    type Item = ArgOrKeyword<'a>;
+    type Item = Option<ArgOrKeyword<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ArgumentsIter::FromAst(args) => args.next(),
-            ArgumentsIter::Synthesized(args) => args.next().copied(),
+            ArgumentsIter::FromAst(args) => Some(args.next()),
+            ArgumentsIter::Synthesized(args) => Some(args.next()?.map(ArgOrKeyword::Arg)),
         }
     }
 }
