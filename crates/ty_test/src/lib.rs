@@ -39,20 +39,21 @@ const MDTEST_EXTERNAL: &str = "MDTEST_EXTERNAL";
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
-pub fn run(
+pub fn run_<C>(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     source: &str,
-    snapshot_path: &Utf8Path,
-    short_title: &str,
     test_name: &str,
+    crate_name: &str,
+    suite: &parser::MarkdownTestSuite<'_, C>,
+    mut run_test: impl FnMut(
+        &parser::MarkdownTest<'_, '_, C>,
+        &mut String,
+        OutputFormat,
+    ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures>,
 ) -> anyhow::Result<()> {
     let output_format = output_format();
 
-    let suite =
-        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
-
-    let mut db = db::Db::setup();
     let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
@@ -66,15 +67,7 @@ pub fn run(
             continue;
         }
 
-        let result = run_test(
-            &mut db,
-            absolute_fixture_path,
-            relative_fixture_path,
-            snapshot_path,
-            &test,
-            &mut assertion,
-            output_format,
-        );
+        let result = run_test(&test, &mut assertion, output_format);
 
         let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
@@ -136,7 +129,7 @@ pub fn run(
             );
             let _ = writeln!(
                 assertion,
-                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p {crate_name} \
                 --test mdtest -- {test_name}",
             );
 
@@ -151,6 +144,43 @@ pub fn run(
     assert!(!any_failures, "{}", &assertion);
 
     Ok(())
+}
+
+/// Run `path` as a markdown test suite with given `title`.
+///
+/// Panic on test failure, and print failure details.
+pub fn run(
+    absolute_fixture_path: &Utf8Path,
+    relative_fixture_path: &Utf8Path,
+    source: &str,
+    snapshot_path: &Utf8Path,
+    short_title: &str,
+    test_name: &str,
+) -> anyhow::Result<()> {
+    let mut db = db::Db::setup();
+
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+
+    run_(
+        absolute_fixture_path,
+        relative_fixture_path,
+        source,
+        test_name,
+        "ty_python_semantic",
+        &suite,
+        |test, assertion, output_format| {
+            run_test(
+                &mut db,
+                absolute_fixture_path,
+                relative_fixture_path,
+                snapshot_path,
+                test,
+                assertion,
+                output_format,
+            )
+        },
+    )
 }
 
 fn run_test(
