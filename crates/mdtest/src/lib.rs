@@ -178,7 +178,7 @@ impl OutputFormat {
     /// Actions can detect them as workflow commands. Workflow commands must
     /// appear at the beginning of a line in stdout to be parsed by GitHub.
     #[expect(clippy::print_stdout)]
-    fn write_error(
+    pub fn write_error(
         self,
         assertion_buf: &mut String,
         file: &str,
