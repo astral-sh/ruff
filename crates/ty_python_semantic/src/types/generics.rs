@@ -1950,9 +1950,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // common cases specially:
             (Type::Union(formal_union), Type::Union(actual_union)) => {
                 // First, if both formal and actual are unions, and precisely one formal union
-                // element _is_ a typevar (not _contains_ a typevar), then we remove any actual
-                // union elements that are a subtype of the formal (as a whole), and map the formal
-                // typevar to any remaining actual union elements.
+                // element _is_ an inferable typevar (not _contains_ a typevar), then we remove any
+                // actual union elements that are a subtype of the formal (as a whole), and map the
+                // formal typevar to any remaining actual union elements.
                 //
                 // In particular, this handles cases like
                 //
@@ -1969,10 +1969,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // We do not handle cases where the `formal` types contain other types that contain type variables
                 // to prevent incorrect specialization: e.g. `T = int | list[int]` for `formal: T | list[T], actual: int | list[int]`
                 // (the correct specialization is `T = int`).
-                let types_have_typevars = formal_union
-                    .elements(self.db)
-                    .iter()
-                    .filter(|ty| ty.has_typevar(self.db));
+                let types_have_typevars = formal_union.elements(self.db).iter().filter(|ty| {
+                    ty.as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(self.db, self.inferable))
+                });
                 let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
                 else {
                     return Ok(());
@@ -2030,10 +2030,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let mut bound_typevars = union_formal
                     .elements(self.db)
                     .iter()
-                    .filter_map(|ty| ty.as_typevar());
+                    .filter_map(|ty| ty.as_typevar())
+                    .filter(|typevar| typevar.is_inferable(self.db, self.inferable));
 
                 // TODO:
-                // Handling more than one bare typevar is something that we can't handle yet.
+                // Handling more than one bare inferable typevar is something that we can't handle yet.
                 if bound_typevars.nth(1).is_some() {
                     return Ok(());
                 }
