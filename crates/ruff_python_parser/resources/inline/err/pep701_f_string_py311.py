@@ -6,6 +6,9 @@ f'''A complex trick: {
 }'''
 f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
 f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+f"{
+    1
+}"
 f"test {a \
     } more"                        # line continuation
 f"""{f"""{x}"""}"""                # mark the whole triple quote

@@ -13,25 +13,17 @@ use crate::{
     Db,
     lint::LintId,
     place::{DefinedPlace, Place},
-    semantic_index::{
-        definition::{Definition, DefinitionKind},
-        place::ScopedPlaceId,
-        place_table,
-        scope::ScopeId,
-        symbol::ScopedSymbolId,
-        use_def_map,
-    },
     types::{
-        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
-            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE,
+            OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
             report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
@@ -39,6 +31,14 @@ use crate::{
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
         tuple::Tuple,
     },
+};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    place_table,
+    scope::ScopeId,
+    symbol::ScopedSymbolId,
+    use_def_map,
 };
 
 /// Prohibited `NamedTuple` attributes that cannot be overwritten.
@@ -82,6 +82,46 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             &member,
         );
     }
+}
+
+/// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
+fn conflicting_named_tuple_field_in_mro<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    field_name: &Name,
+) -> Option<(ClassType<'db>, Option<Definition<'db>>)> {
+    for class_base in class.iter_mro(db, None).skip(1) {
+        let Some(superclass) = class_base.into_class() else {
+            continue;
+        };
+
+        let (superclass_literal, superclass_specialization) =
+            superclass.class_literal_and_specialization(db);
+
+        if CodeGeneratorKind::NamedTuple.matches(db, superclass_literal, superclass_specialization)
+        {
+            match superclass_literal {
+                ClassLiteral::Static(superclass_literal) => {
+                    if let Some(field) = superclass_literal
+                        .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
+                        .get(field_name)
+                    {
+                        return Some((superclass, field.first_declaration));
+                    }
+                }
+                ClassLiteral::DynamicNamedTuple(namedtuple) => {
+                    if namedtuple.field(db, field_name).is_some() {
+                        return Some((superclass, namedtuple.definition(db)));
+                    }
+                }
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_) => {}
+            }
+        }
+    }
+
+    None
 }
 
 fn check_class_declaration<'db>(
@@ -156,7 +196,7 @@ fn check_class_declaration<'db>(
     // annotations) or define methods with these names will raise an `AttributeError` at runtime.
     match class_kind {
         Some(CodeGeneratorKind::NamedTuple) => {
-            if configuration.check_prohibited_named_tuple_attrs()
+            if configuration.check_invalid_named_tuple_definitions()
                 && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
                 && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
                 && let Some(bad_definition) = use_def_map(db, class_scope)
@@ -184,6 +224,36 @@ fn check_class_declaration<'db>(
             policy,
         ),
         Some(CodeGeneratorKind::TypedDict) | None => {}
+    }
+
+    if configuration.check_invalid_named_tuple_field_overrides()
+        && let Some((superclass, overridden_field_declaration)) =
+            conflicting_named_tuple_field_in_mro(db, literal, &member.name)
+        && let Some(builder) = context.report_lint(
+            &INVALID_NAMED_TUPLE_OVERRIDE,
+            first_reachable_definition.focus_range(db, context.module()),
+        )
+    {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot override NamedTuple field `{}` inherited from `{}`",
+            member.name,
+            superclass.name(db)
+        ));
+        diagnostic
+            .info("Subclass members are not allowed to reuse inherited NamedTuple field names");
+        if let Some(first_declaration) = overridden_field_declaration
+            && first_declaration.file(db) == context.file()
+        {
+            diagnostic.annotate(
+                Annotation::secondary(
+                    context.span(first_declaration.kind(db).full_range(context.module())),
+                )
+                .message(format_args!(
+                    "Inherited NamedTuple field `{}` declared here",
+                    member.name
+                )),
+            );
+        }
     }
 
     // Check for invalid Enum member values.
@@ -265,6 +335,10 @@ fn check_class_declaration<'db>(
             let superclass = match class_base {
                 ClassBase::Protocol | ClassBase::Generic => continue,
                 ClassBase::Dynamic(_) => {
+                    has_dynamic_superclass = true;
+                    continue;
+                }
+                ClassBase::Divergent(_) => {
                     has_dynamic_superclass = true;
                     continue;
                 }
@@ -451,6 +525,10 @@ fn check_class_declaration<'db>(
                 superclass,
                 superclass_type,
                 method_kind,
+                || {
+                    type_on_subclass_instance
+                        .assignability_error_context(db, superclass_type_as_type)
+                },
             );
 
             liskov_diagnostic_emitted = true;
@@ -526,10 +604,11 @@ bitflags! {
         const LISKOV_METHODS = 1 << 0;
         const EXPLICIT_OVERRIDE = 1 << 1;
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
-        const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
-        const INVALID_DATACLASS = 1 << 4;
-        const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
-        const INVALID_ENUM_VALUE = 1 << 6;
+        const INVALID_NAMED_TUPLE = 1 << 3;
+        const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 4;
+        const INVALID_DATACLASS = 1 << 5;
+        const FINAL_VARIABLE_OVERRIDDEN = 1 << 6;
+        const INVALID_ENUM_VALUE = 1 << 7;
     }
 }
 
@@ -550,7 +629,10 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE)) {
-            config |= OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR;
+            config |= OverrideRulesConfig::INVALID_NAMED_TUPLE;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE_OVERRIDE)) {
+            config |= OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
             config |= OverrideRulesConfig::INVALID_DATACLASS;
@@ -579,8 +661,12 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
     }
 
-    const fn check_prohibited_named_tuple_attrs(self) -> bool {
-        self.contains(OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR)
+    const fn check_invalid_named_tuple_definitions(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_NAMED_TUPLE)
+    }
+
+    const fn check_invalid_named_tuple_field_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE)
     }
 
     const fn check_invalid_dataclasses(self) -> bool {

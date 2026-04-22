@@ -24,12 +24,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.py:2:12
   |
-1 | # error: [invalid-return-type]
 2 | def f() -> int:
   |            ^^^
-3 |     print("hello")
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: rule `invalid-return-type` is enabled by default
 
 ```

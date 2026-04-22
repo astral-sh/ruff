@@ -32,13 +32,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 error[not-iterable]: Object of type `Iterable` is not iterable
   --> src/mdtest_snippet.py:10:10
    |
- 9 | # error: [not-iterable]
 10 | for x in Iterable():
    |          ^^^^^^^^^^
-11 |     reveal_type(x)  # revealed: int
    |
 info: Its `__iter__` method has an invalid signature
 info: Expected signature `def __iter__(self): ...`
-info: rule `not-iterable` is enabled by default
 
 ```

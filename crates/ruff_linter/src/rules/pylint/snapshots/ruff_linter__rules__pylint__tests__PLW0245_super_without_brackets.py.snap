@@ -17,5 +17,5 @@ help: Add parentheses to `super` call
    -         original_speak = super.speak()  # PLW0245
 10 +         original_speak = super().speak()  # PLW0245
 11 |         return f"{original_speak} But as a dog, it barks!"
-12 | 
+12 |
 13 |

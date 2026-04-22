@@ -4,7 +4,6 @@ use smallvec::{SmallVec, smallvec_inline};
 use crate::{
     Db, FxOrderSet,
     place::Place,
-    semantic_index::definition::Definition,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
@@ -16,6 +15,7 @@ use crate::{
         visitor, walk_signature,
     },
 };
+use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
     /// Create a callable type with a single non-overloaded signature.
@@ -48,10 +48,18 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
+        if let Some(fallback) = self.materialized_divergent_fallback() {
+            return fallback.try_upcast_to_callable_with_policy(db, policy);
+        }
+
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
             Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
+                db,
+                Signature::dynamic(self),
+            ))),
+            Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
             ))),

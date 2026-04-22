@@ -1,10 +1,9 @@
 use crate::{
     Db, Program,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
-    semantic_index::{SemanticIndex, scope::NodeWithScopeKind},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
-        SubclassOfType, Truthiness, Type, binding_type,
+        SubclassOfType, Type, binding_type,
         bound_super::{BoundSuperError, BoundSuperType},
         class::CodeGeneratorKind,
         constraints::{ConstraintSet, ConstraintSetBuilder},
@@ -23,6 +22,7 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
@@ -68,6 +68,9 @@ pub enum KnownClass {
     Member,
     Nonmember,
     StrEnum,
+    IntEnum,
+    Flag,
+    IntFlag,
     // abc
     ABCMeta,
     // Types
@@ -125,7 +128,6 @@ pub enum KnownClass {
     // dataclasses
     Field,
     KwOnly,
-    InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
     NamedTupleLike,
@@ -225,6 +227,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
@@ -243,7 +248,6 @@ impl KnownClass {
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -294,6 +298,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -334,7 +341,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
@@ -385,6 +391,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -425,7 +434,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
@@ -476,6 +484,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -515,7 +526,6 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
-            | KnownClass::InitVar
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
@@ -608,6 +618,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -617,7 +630,6 @@ impl KnownClass {
             | Self::UnionType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
             | Self::GenericContext
@@ -669,6 +681,9 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -720,8 +735,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
-            | KnownClass::Specialization
-            | KnownClass::InitVar => false,
+            | KnownClass::Specialization => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
@@ -796,6 +810,9 @@ impl KnownClass {
             Self::Member => "member",
             Self::Nonmember => "nonmember",
             Self::StrEnum => "StrEnum",
+            Self::IntEnum => "IntEnum",
+            Self::Flag => "Flag",
+            Self::IntFlag => "IntFlag",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -831,7 +848,6 @@ impl KnownClass {
             }
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
-            Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
@@ -1076,6 +1092,16 @@ impl KnownClass {
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
+    pub(crate) fn to_specialized_subclass_of<'db>(
+        self,
+        db: &'db dyn Db,
+        specialization: &[Type<'db>],
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .map(|class_type| SubclassOfType::from(db, class_type))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+    }
+
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
@@ -1126,7 +1152,10 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
-            | Self::StrEnum => KnownModule::Enum,
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -1202,7 +1231,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
-            Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
+            Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1282,12 +1311,14 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::NewType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::AsyncIterator
@@ -1377,13 +1408,15 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
             | Self::NewType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::AsyncIterator
@@ -1478,6 +1511,9 @@ impl KnownClass {
             "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 &[Self::StrEnum]
             }
+            "IntEnum" => &[Self::IntEnum],
+            "Flag" => &[Self::Flag],
+            "IntFlag" => &[Self::IntFlag],
             "auto" => &[Self::Auto],
             "member" => &[Self::Member],
             "nonmember" => &[Self::Nonmember],
@@ -1498,7 +1534,6 @@ impl KnownClass {
             }
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
-            "InitVar" => &[Self::InitVar],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
@@ -1564,6 +1599,9 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -1575,7 +1613,6 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::Field
             | Self::KwOnly
-            | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
             | Self::TypeVar

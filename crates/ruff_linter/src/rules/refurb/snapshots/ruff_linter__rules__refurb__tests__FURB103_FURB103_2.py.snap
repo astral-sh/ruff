@@ -20,7 +20,7 @@ help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
 4 + pathlib.Path("file.txt").write_text("\n", encoding="utf-8")
 5 | f = object()
 6 | print(f)
-7 | 
+7 |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:16:10
@@ -40,15 +40,15 @@ help: Replace with `Path("file.txt").write_text("\n")`
 5  |     f.write("\n")
 6  | f = object()
 --------------------------------------------------------------------------------
-14 | 
+14 |
 15 | def _():
 16 |     # should trigger
    -     with open("file.txt", "w") as f:
    -         f.write("\n")
 17 +     pathlib.Path("file.txt").write_text("\n")
 18 |     return (f.name for _ in [0])
-19 | 
-20 | 
+19 |
+20 |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:23:10
@@ -68,7 +68,7 @@ help: Replace with `Path("file.txt").write_text("\n")`
 5  |     f.write("\n")
 6  | f = object()
 --------------------------------------------------------------------------------
-21 | 
+21 |
 22 | def _set():
 23 |     # should trigger
    -     with open("file.txt", "w") as f:

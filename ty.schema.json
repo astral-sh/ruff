@@ -144,10 +144,10 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/definitions/SupportedPythonVersion"
             },
             {
               "type": "null"
@@ -310,50 +310,6 @@
         }
       ]
     },
-    "PythonVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "description": "Python 3.7",
-          "const": "3.7"
-        },
-        {
-          "description": "Python 3.8",
-          "const": "3.8"
-        },
-        {
-          "description": "Python 3.9",
-          "const": "3.9"
-        },
-        {
-          "description": "Python 3.10",
-          "const": "3.10"
-        },
-        {
-          "description": "Python 3.11",
-          "const": "3.11"
-        },
-        {
-          "description": "Python 3.12",
-          "const": "3.12"
-        },
-        {
-          "description": "Python 3.13",
-          "const": "3.13"
-        },
-        {
-          "description": "Python 3.14",
-          "const": "3.14"
-        },
-        {
-          "description": "Python 3.15",
-          "const": "3.15"
-        }
-      ]
-    },
     "RelativePathBuf": {
       "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.",
       "allOf": [
@@ -397,16 +353,6 @@
         "assert-type-unspellable-subtype": {
           "title": "detects failed type assertions",
           "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        assert_type(x, int)  # error: [assert-type-unspellable-subtype]\n                             # the actual type is `int & ~AlwaysFalsy`,\n                             # which excludes types like `Literal[0]`\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "byte-string-type-annotation": {
-          "title": "detects byte strings in type annotation positions",
-          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -584,19 +530,9 @@
             }
           ]
         },
-        "fstring-type-annotation": {
-          "title": "detects F-strings in type annotation positions",
-          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "ignore-comment-unknown-rule": {
           "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "description": "## What it does\nChecks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` or a `type:ignore[ty:code] directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -884,6 +820,16 @@
             }
           ]
         },
+        "invalid-named-tuple-override": {
+          "title": "detects subclass members that override inherited `NamedTuple` fields",
+          "description": "## What it does\nChecks for subclass members that override inherited `NamedTuple` fields.\n\n## Why is this bad?\nReusing an inherited `NamedTuple` field name in a subclass creates a\nclass where tuple indexing and `repr()` still reflect the original\nfield, while attribute access follows the subclass member.\n\n## Default level\nThis rule is a warning by default because these overrides do not make\nthe class invalid at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass User(NamedTuple):\n    name: str\n\nclass Admin(User):\n    name = \"shadowed\"  # error: [invalid-named-tuple-override]\n\nadmin = Admin(\"Alice\")\nadmin.name  # \"shadowed\"\nadmin[0]  # \"Alice\"\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-newtype": {
           "title": "detects invalid NewType definitions",
           "description": "## What it does\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n```python\nfrom typing import NewType\n\ndef get_name() -> str: ...\n\nFoo = NewType(\"Foo\", int)        # okay\nBar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal\nBaz = NewType(\"Baz\", int | str)  # error: invalid base for `typing.NewType`\n```",
@@ -1074,6 +1020,16 @@
             }
           ]
         },
+        "invalid-typed-dict-field": {
+          "title": "detects invalid `TypedDict` field declarations",
+          "description": "## What it does\nDetects invalid `TypedDict` field declarations.\n\n## Why is this bad?\n`TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the\nsubtype guarantees that `TypedDict` inheritance is meant to preserve.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Base(TypedDict):\n    x: int\n\nclass Child(Base):\n    x: str  # error: [invalid-typed-dict-field]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
@@ -1124,6 +1080,16 @@
             }
           ]
         },
+        "mismatched-type-name": {
+          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
@@ -1147,6 +1113,16 @@
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-callable-init-subclass": {
+          "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
+          "description": "## What it does\nChecks for class definitions that will fail due to non-callable `__init_subclass__`\nmethods.\n\n## Why is this bad?\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt\nto subclass that class will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass Super:\n    __init_subclass__ = None\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
           "default": "error",
           "oneOf": [
             {
@@ -1575,6 +1551,56 @@
         }
       },
       "additionalProperties": false
+    },
+    "SupportedPythonVersion": {
+      "description": "A Python version explicitly supported by ty configuration and CLI parsing.",
+      "oneOf": [
+        {
+          "description": "Python 3.7",
+          "type": "string",
+          "const": "3.7"
+        },
+        {
+          "description": "Python 3.8",
+          "type": "string",
+          "const": "3.8"
+        },
+        {
+          "description": "Python 3.9",
+          "type": "string",
+          "const": "3.9"
+        },
+        {
+          "description": "Python 3.10",
+          "type": "string",
+          "const": "3.10"
+        },
+        {
+          "description": "Python 3.11",
+          "type": "string",
+          "const": "3.11"
+        },
+        {
+          "description": "Python 3.12",
+          "type": "string",
+          "const": "3.12"
+        },
+        {
+          "description": "Python 3.13",
+          "type": "string",
+          "const": "3.13"
+        },
+        {
+          "description": "Python 3.14",
+          "type": "string",
+          "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "type": "string",
+          "const": "3.15"
+        }
+      ]
     },
     "SystemPathBuf": {
       "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",

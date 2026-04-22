@@ -35,19 +35,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str` of type variable `T@Bounded`
  --> src/main.py:3:12
   |
-1 | from library import Bounded, Constrained
-2 |
 3 | x: Bounded[int]  # error: [invalid-type-arguments]
   |            ^^^
-4 | y: Constrained[str]  # error: [invalid-type-arguments]
   |
  ::: src/library.py:1:15
   |
 1 | class Bounded[T: str]:
   |               - Type variable defined here
-2 |     x: T
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```
 
@@ -55,18 +50,13 @@ info: rule `invalid-type-arguments` is enabled by default
 error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `bytes` of type variable `U@Constrained`
  --> src/main.py:4:16
   |
-3 | x: Bounded[int]  # error: [invalid-type-arguments]
 4 | y: Constrained[str]  # error: [invalid-type-arguments]
   |                ^^^
   |
  ::: src/library.py:4:19
   |
-2 |     x: T
-3 |
 4 | class Constrained[U: (int, bytes)]:
   |                   - Type variable defined here
-5 |     x: U
   |
-info: rule `invalid-type-arguments` is enabled by default
 
 ```

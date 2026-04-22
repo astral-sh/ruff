@@ -80,8 +80,8 @@ help: Remove unnecessary `else`
    -         return z
 53 +     b = 2
 54 +     return z
-55 | 
-56 | 
+55 |
+56 |
 57 | def foo3(x, y, z):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -125,8 +125,8 @@ help: Remove unnecessary `else`
    -         c = 3
 79 +     c = 3
 80 |     return
-81 | 
-82 | 
+81 |
+82 |
 
 RET505 [*] Unnecessary `else` after `return` statement
   --> RET505.py:89:9
@@ -172,8 +172,8 @@ help: Remove unnecessary `else`
 100 +         return False
 101 +     except ValueError:
 102 +         return None
-103 | 
-104 | 
+103 |
+104 |
 105 | def fibo(n):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -195,8 +195,8 @@ help: Remove unnecessary `else`
     -         last2 = 0;
 109 +     last = 1;
 110 +     last2 = 0;
-111 | 
-112 | 
+111 |
+112 |
 113 | ###
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -218,8 +218,8 @@ help: Remove unnecessary `else`
     -         pass
 145 +     # comment
 146 +     pass
-147 | 
-148 | 
+147 |
+148 |
 149 | def bar5():
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -239,8 +239,8 @@ help: Remove unnecessary `else`
     -         pass
 153 +     # comment
 154 +     pass
-155 | 
-156 | 
+155 |
+156 |
 157 | def bar6():
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -263,8 +263,8 @@ help: Remove unnecessary `else`
     -         pass
 160 +     # comment
 161 +     pass
-162 | 
-163 | 
+162 |
+163 |
 164 | def bar7():
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -286,8 +286,8 @@ help: Remove unnecessary `else`
     -         pass
 169 +     # comment
 170 +     pass
-171 | 
-172 | 
+171 |
+172 |
 173 | def bar8():
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -304,8 +304,8 @@ help: Remove unnecessary `else`
 176 |         return
     -     else: pass
 177 +     pass
-178 | 
-179 | 
+178 |
+179 |
 180 | def bar9():
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -324,8 +324,8 @@ help: Remove unnecessary `else`
     -     else:\
     -         pass
 183 +     pass
-184 | 
-185 | 
+184 |
+185 |
 186 | x = 0
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -342,8 +342,8 @@ help: Remove unnecessary `else`
 199 |     if self._sb is not None: return self._sb
     -     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
 200 +     self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
-201 | 
-202 | 
+201 |
+202 |
 203 | def indent(x, y, w, z):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -361,13 +361,13 @@ help: Remove unnecessary `else`
 205 |         a = 1
 206 |         return y
     -     else:
-207 | 
+207 |
     -         c = 3
     -         return z
 208 +     c = 3
 209 +     return z
-210 | 
-211 | 
+210 |
+211 |
 212 | def indent(x, y, w, z):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -391,8 +391,8 @@ help: Remove unnecessary `else`
 217 +     # comment
 218 +     c = 3
 219 +     return z
-220 | 
-221 | 
+220 |
+221 |
 222 | def indent(x, y, w, z):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -416,8 +416,8 @@ help: Remove unnecessary `else`
 227 +       # comment
 228 +     c = 3
 229 +     return z
-230 | 
-231 | 
+230 |
+231 |
 232 | def indent(x, y, w, z):
 
 RET505 [*] Unnecessary `else` after `return` statement
@@ -440,7 +440,7 @@ help: Remove unnecessary `else`
     -         return z
 238 +     c = 3
 239 +     return z
-240 | 
+240 |
 241 | def f():
 242 | 	if True:
 
@@ -460,8 +460,8 @@ help: Remove unnecessary `else`
     - 	else:
     - 	 return False
 245 + 	return False
-246 | 
-247 | 
+246 |
+247 |
 248 | def has_untracted_files():
 
 RET505 Unnecessary `else` after `return` statement

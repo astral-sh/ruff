@@ -15,12 +15,12 @@ help: Rename type parameter to remove leading underscores
   -     buf: list[_T]
 2 + class Generic[T]:
 3 +     buf: list[T]
-4 | 
+4 |
   -     def append(self, t: _T):
 5 +     def append(self, t: T):
 6 |         self.buf.append(t)
-7 | 
-8 | 
+7 |
+8 |
 
 UP049 [*] Generic function uses private type parameters
   --> UP049_0.py:10:12
@@ -32,16 +32,16 @@ UP049 [*] Generic function uses private type parameters
 12 |     return y
    |
 help: Rename type parameter to remove leading underscores
-7  | 
-8  | 
+7  |
+8  |
 9  | # simple case, replace _T in signature and body
    - def second[_T](var: tuple[_T]) -> _T:
    -     y: _T = var[1]
 10 + def second[T](var: tuple[T]) -> T:
 11 +     y: T = var[1]
 12 |     return y
-13 | 
-14 | 
+13 |
+14 |
 
 UP049 [*] Generic function uses private type parameters
   --> UP049_0.py:17:5
@@ -54,7 +54,7 @@ UP049 [*] Generic function uses private type parameters
 19 | ](args):
    |
 help: Rename type parameter to remove leading underscores
-14 | 
+14 |
 15 | # one diagnostic for each variable, comments are preserved
 16 | def many_generics[
    -     _T,  # first generic
@@ -81,7 +81,7 @@ help: Rename type parameter to remove leading underscores
 18 +     U,  # second generic
 19 | ](args):
 20 |     return args
-21 | 
+21 |
 
 UP049 [*] Generic function uses private type parameters
   --> UP049_0.py:27:7
@@ -93,8 +93,8 @@ UP049 [*] Generic function uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
 24 | from typing import Literal, cast
-25 | 
-26 | 
+25 |
+26 |
    - def f[_T](v):
    -     cast("_T", v)
 27 + def f[T](v):

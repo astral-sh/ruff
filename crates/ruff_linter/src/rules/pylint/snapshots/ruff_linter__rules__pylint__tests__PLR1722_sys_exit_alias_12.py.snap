@@ -12,7 +12,7 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 help: Replace `exit` with `sys.exit()`
   - import os \
 1 + import os; import sys \
-2 | 
+2 |
   - exit(0)
 3 + sys.exit(0)
 note: This is an unsafe fix and may change runtime behavior

@@ -1,6 +1,8 @@
 use itertools::Either;
 
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
+};
 use crate::types::class::KnownClass;
 use crate::types::{Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
@@ -234,7 +236,7 @@ impl<'db> UnionType<'db> {
                 } else {
                     Definedness::AlwaysDefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -290,7 +292,7 @@ impl<'db> UnionType<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,
@@ -312,7 +314,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
-                if ty == div {
+                if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
@@ -320,7 +322,7 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if ty == &div {
+                if (*ty).same_divergent_marker(div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
@@ -779,7 +781,7 @@ impl<'db> IntersectionType<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                widening: Widening::None,
+                public_type_policy: PublicTypePolicy::Raw,
             })
         }
     }
@@ -832,7 +834,7 @@ impl<'db> IntersectionType<'db> {
                     } else {
                         Definedness::PossiblyUndefined
                     },
-                    widening: Widening::None,
+                    public_type_policy: PublicTypePolicy::Raw,
                 })
             },
             qualifiers,

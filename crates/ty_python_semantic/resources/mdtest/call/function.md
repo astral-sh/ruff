@@ -9,6 +9,20 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Gradual variadic parameters
+
+```py
+from typing import Any
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+
+accepts_anything(1, "one", object(), keyword=object())
+accepts_anything("not an int")  # error: [invalid-argument-type]
+accepts_only_gradual(1, "one", keyword=object())
+accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+```
+
 ## Async
 
 ```py
@@ -823,14 +837,34 @@ def f18(x: int = 0, y: int = 0) -> None: ...
 def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
     f18(*args)
 
-# TODO: Union variadic unpacking should also work when the non-defaulted parameters
-# are covered by all union elements, even if not all remaining parameters are defaulted.
-# Currently we only apply per-element iteration when all remaining positional parameters
-# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
-# greedily matches `c: str` with `int`.
+# Union variadic unpacking also works when the non-defaulted parameters are covered by
+# the shortest union element, even if not all remaining parameters are defaulted.
 def f16(a: int, b: int = 0, c: str = "") -> None: ...
 def f17(x: tuple[int] | tuple[int, int]) -> None:
-    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+    f16(*x)
+
+# Longer union elements must still be rejected when they would contribute
+# extra positional arguments.
+def f20(a: int, b: int) -> None: ...
+def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f20(*x)  # error: [too-many-positional-arguments]
+
+# Shorter union elements must also be rejected when they cannot provide a required
+# positional argument.
+def f22(a: int, b: int, c: int) -> None: ...
+def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f22(*x)  # error: [missing-argument]
+
+# Later positional arguments must not be allowed to "slide left" when a longer
+# union member would still bind an incompatible tuple element. We currently
+# handle this conservatively, so this still reports the broader iterator-based
+# family of errors.
+def f24(a: int, b: int, c: int = 0) -> None: ...
+def f25(x: tuple[int] | tuple[int, str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    f24(*x, 1)  # error: [invalid-argument-type]
 ```
 
 ### Mixed argument and parameter containing variadic
@@ -1572,6 +1606,10 @@ from ty_extensions import Unknown
 def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
 def _(args: "Unknown | tuple[int, int, int]"):
     f(*args, fmt="{key}")  # fine
+
+def g(a: int, b: int = 0, c: int = 0) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]):
+    g(*args, c=1)  # error: [parameter-already-assigned]
 ```
 
 ## Variadic unpacking should stop at max known arity

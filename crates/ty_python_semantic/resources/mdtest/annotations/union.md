@@ -65,7 +65,7 @@ def f():
 ```py
 from typing import Union
 
-# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a parameter annotation"
 def f(x: Union) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -86,32 +86,70 @@ def f(y: X):
 
 ## Diagnostics for PEP-604 unions used on Python less than 3.10
 
-<!-- snapshot-diagnostics -->
-
-PEP-604 unions generally don't work on Python \<=3.9:
+PEP-604 unions generally don't work on Python 3.9 and earlier:
 
 ```toml
 [environment]
 python-version = "3.9"
 ```
 
-`a.py`:
+`foo.py`:
 
 ```py
-x: int | str  # error: [unsupported-operator]
+x: int | str  # snapshot: unsupported-operator
 
 class Foo:
     def __init__(self):
-        self.x: int | str = 42  # error: [unsupported-operator]
+        self.x: int | str = 42  # snapshot: unsupported-operator
 
 d = {}
-d[0]: int | str = 42  # error: [unsupported-operator]
+d[0]: int | str = 42  # snapshot: unsupported-operator
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/foo.py:1:4
+  |
+1 | x: int | str  # snapshot: unsupported-operator
+  |    ---^^^---
+  |    |     |
+  |    |     Has type `<class 'str'>`
+  |    Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+
+
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/foo.py:5:17
+  |
+5 |         self.x: int | str = 42  # snapshot: unsupported-operator
+  |                 ---^^^---
+  |                 |     |
+  |                 |     Has type `<class 'str'>`
+  |                 Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+
+
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/foo.py:8:7
+  |
+8 | d[0]: int | str = 42  # snapshot: unsupported-operator
+  |       ---^^^---
+  |       |     |
+  |       |     Has type `<class 'str'>`
+  |       Has type `<class 'int'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 ```
 
 But these runtime errors can be avoided if you add `from __future__ import annotations` to the top
 of your file:
 
-`b.py`:
+`bar.py`:
 
 ```py
 from __future__ import annotations
@@ -124,10 +162,41 @@ class Foo:
 
 d = {}
 d[0]: int | str = 42
+```
 
-# these are still errors: `from __future__ import annotations`
-# only stringifies *type annotations*, not arbitrary runtime expressions
+The following ones are still errors because `from __future__ import annotations` only stringifies
+*type annotations*, not arbitrary runtime expressions:
 
-X = str | int  # error: [unsupported-operator]
-Y = tuple[str | int, ...]  # error: [unsupported-operator]
+`baz.py`:
+
+```py
+X = str | int  # snapshot: unsupported-operator
+Y = tuple[str | int, ...]  # snapshot: unsupported-operator
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/baz.py:1:5
+  |
+1 | X = str | int  # snapshot: unsupported-operator
+  |     ---^^^---
+  |     |     |
+  |     |     Has type `<class 'int'>`
+  |     Has type `<class 'str'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
+
+
+error[unsupported-operator]: Unsupported `|` operation
+ --> src/baz.py:2:11
+  |
+2 | Y = tuple[str | int, ...]  # snapshot: unsupported-operator
+  |           ---^^^---
+  |           |     |
+  |           |     Has type `<class 'int'>`
+  |           Has type `<class 'str'>`
+  |
+info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
+info: Python 3.9 was assumed when resolving types because it was specified on the command line
 ```

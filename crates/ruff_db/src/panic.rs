@@ -32,6 +32,10 @@ impl Payload {
 }
 
 impl PanicError {
+    pub fn resume_unwind(self) -> ! {
+        std::panic::resume_unwind(self.payload.0)
+    }
+
     pub fn to_diagnostic_message(&self, path: Option<impl std::fmt::Display>) -> String {
         use std::fmt::Write;
 

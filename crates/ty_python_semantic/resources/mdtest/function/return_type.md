@@ -389,7 +389,6 @@ def f(cond: bool) -> str:
 ```py
 def f() -> None:
     if False:
-        # error: [invalid-return-type]
         return 1
 
 # error: [invalid-return-type]
@@ -533,6 +532,38 @@ def i2() -> typing.Generator:
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+def invalid_return_type() -> typing.Generator[None, None, None]:
+    yield
+    return ""  # error: [invalid-return-type]
+```
+
+The return value of the function must be assignable to the return type of the `Generator`. This is
+specified in the third type parameter.
+
+```py
+def wrong_return() -> typing.Generator[int, int, int]:
+    yield 1
+    return ""  # error: [invalid-return-type]
+```
+
+If the function has no return and it's implicitly returning it is still type checked.
+
+```py
+def bare_return_ok() -> typing.Generator[int, int, None]:
+    yield 1
+
+def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+    yield 1
+```
+
+Iterators must not return anything.
+
+```py
+def iterator_must_not_return() -> typing.Iterator[int]:
+    yield 2
+    # error: [invalid-return-type]
+    return "foo"
 ```
 
 ### Asynchronous
@@ -560,6 +591,10 @@ async def i() -> typing.AsyncIterable:
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+async def k() -> typing.AsyncGenerator:
+    yield 42
+    return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
 ## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes

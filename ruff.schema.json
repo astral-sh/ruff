@@ -1613,6 +1613,17 @@
             }
           ]
         },
+        "nested-string-quote-style": {
+          "description": "Controls the quote style for nested strings inside interpolated string expressions.\n\n- `alternating` (default): Use alternating quotes.\n- `preferred`: Use the configured [`quote-style`](#format_quote-style).\n\n```python\nf\"{data['key']}\"  # alternating (default)\nf\"{data[\"key\"]}\"  # preferred\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NestedStringQuoteStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "preview": {
           "description": "Whether to enable the unstable preview style formatting.",
           "type": [
@@ -2659,6 +2670,13 @@
     "NameImports": {
       "type": "string"
     },
+    "NestedStringQuoteStyle": {
+      "type": "string",
+      "enum": [
+        "alternating",
+        "preferred"
+      ]
+    },
     "OutputFormat": {
       "type": "string",
       "enum": [
@@ -3104,6 +3122,9 @@
         "AIR001",
         "AIR002",
         "AIR003",
+        "AIR2",
+        "AIR20",
+        "AIR201",
         "AIR3",
         "AIR30",
         "AIR301",
@@ -4196,6 +4217,7 @@
         "RUF048",
         "RUF049",
         "RUF05",
+        "RUF050",
         "RUF051",
         "RUF052",
         "RUF053",
@@ -4218,6 +4240,8 @@
         "RUF07",
         "RUF070",
         "RUF071",
+        "RUF072",
+        "RUF073",
         "RUF1",
         "RUF10",
         "RUF100",

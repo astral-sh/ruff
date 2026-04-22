@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, EvaluationMode, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -13,6 +13,56 @@ use crate::{
 };
 use ruff_python_ast as ast;
 use std::borrow::Cow;
+use ty_python_core::EvaluationMode;
+
+/// Extract the element types from an expression with a statically known fixed-length iteration.
+///
+/// List and tuple literals are expanded directly so we preserve precise element types, including
+/// recursively unpacking starred elements whose iterables are also fixed-length.
+pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
+    db: &'db dyn Db,
+    iterable: &ast::Expr,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    fn extend_fixed_length_iterable<'db>(
+        db: &'db dyn Db,
+        iterable: &ast::Expr,
+        expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
+        element_types: &mut Vec<Type<'db>>,
+    ) -> Option<()> {
+        let elements = match iterable {
+            ast::Expr::List(list) => Some(&list.elts),
+            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+            _ => None,
+        };
+
+        if let Some(elements) = elements {
+            for element in elements {
+                if let ast::Expr::Starred(starred) = element {
+                    extend_fixed_length_iterable(
+                        db,
+                        starred.value.as_ref(),
+                        expression_type,
+                        element_types,
+                    )?;
+                } else {
+                    element_types.push(expression_type(element));
+                }
+            }
+            return Some(());
+        }
+
+        let iterable_type = expression_type(iterable);
+        let spec = iterable_type.try_iterate(db).ok()?;
+        let tuple = spec.as_fixed_length()?;
+        element_types.extend(tuple.all_elements().iter().copied());
+        Some(())
+    }
+
+    let mut element_types = Vec::new();
+    extend_fixed_length_iterable(db, iterable, &mut expression_type, &mut element_types)?;
+    Some(element_types.into_boxed_slice())
+}
 
 impl<'db> Type<'db> {
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
@@ -166,6 +216,7 @@ impl<'db> Type<'db> {
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
                 | Type::GenericAlias(_)
@@ -232,7 +283,10 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-                Err(CallDunderError::PossiblyUnbound(dunder_aiter_bindings)) => {
+                Err(CallDunderError::PossiblyUnbound {
+                    bindings: dunder_aiter_bindings,
+                    ..
+                }) => {
                     let iterator = dunder_aiter_bindings.return_type(db);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(_) => Err(IterationError::IterCallError {
@@ -310,7 +364,10 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is possibly unbound...
-            Err(CallDunderError::PossiblyUnbound(dunder_iter_outcome)) => {
+            Err(CallDunderError::PossiblyUnbound {
+                bindings: dunder_iter_outcome,
+                ..
+            }) => {
                 let iterator = dunder_iter_outcome.return_type(db);
 
                 match try_call_dunder_next_on_iterator(iterator) {
@@ -463,13 +520,14 @@ impl<'db> IterationError<'db> {
                 dunder_getitem_error,
             } => match dunder_getitem_error {
                 CallDunderError::MethodNotAvailable => Some(*dunder_next_return),
-                CallDunderError::PossiblyUnbound(dunder_getitem_outcome) => {
-                    Some(UnionType::from_two_elements(
-                        db,
-                        *dunder_next_return,
-                        dunder_getitem_outcome.return_type(db),
-                    ))
-                }
+                CallDunderError::PossiblyUnbound {
+                    bindings: dunder_getitem_outcome,
+                    ..
+                } => Some(UnionType::from_two_elements(
+                    db,
+                    *dunder_next_return,
+                    dunder_getitem_outcome.return_type(db),
+                )),
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
                     Some(*dunder_next_return)
                 }
@@ -634,7 +692,7 @@ impl<'db> IterationError<'db> {
                         iterator_type = iterator.display(db),
                     ));
                     }
-                    CallDunderError::PossiblyUnbound(_) => {
+                    CallDunderError::PossiblyUnbound { .. } => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which may not have a `{dunder_next_name}` method",
@@ -688,7 +746,7 @@ impl<'db> IterationError<'db> {
                          and it doesn't have a `__getitem__` method",
                     );
                 }
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     reporter
                         .may_not("It may not have an `__iter__` method or a `__getitem__` method");
                 }
@@ -754,7 +812,7 @@ impl<'db> IterationError<'db> {
                     reporter
                         .is_not("It doesn't have an `__iter__` method or a `__getitem__` method");
                 }
-                CallDunderError::PossiblyUnbound(_) => {
+                CallDunderError::PossiblyUnbound { .. } => {
                     reporter.is_not(
                         "It has no `__iter__` method and it may not have a `__getitem__` method",
                     );

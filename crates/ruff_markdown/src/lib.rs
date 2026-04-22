@@ -237,6 +237,7 @@ More text.
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
             @r#"
+
         This is poorly formatted code:
 
         ```py
@@ -320,6 +321,7 @@ print( 'hello' )
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
             @r#"
+
         ~~~py
         print("hello")
         ~~~
@@ -339,6 +341,7 @@ print( 'hello' )
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
             @r#"
+
         ````py
         print("hello")
         ````
@@ -384,6 +387,7 @@ print( 'hello' )
             None,
             &FormatterSettings::default()
         ), @r#"
+
         ```py
         print("hello")
         ```
@@ -422,6 +426,7 @@ print( 'hello' )
             None,
             &FormatterSettings::default()
         ), @r#"
+
         ```py
         print("hello")
         ```
@@ -495,6 +500,7 @@ def bar(): ...
 ~~~
         "#;
         assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+
         ```{py}
         print("hello")
         ```

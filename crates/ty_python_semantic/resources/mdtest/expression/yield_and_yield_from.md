@@ -95,7 +95,7 @@ def outer_generator():
 A dict literal that is structurally compatible with a `TypedDict` should be accepted.
 
 ```py
-from typing import Iterator, TypedDict
+from typing import Iterator, Generator, TypedDict
 
 class Person(TypedDict):
     name: str
@@ -119,6 +119,19 @@ def persons() -> Iterator[Person]:
     # error: [invalid-yield]
     # error: [invalid-argument-type]
     yield from [{"name": 42}]
+```
+
+This also works for return values:
+
+```py
+def persons(f: bool) -> Generator[None, None, Person]:
+    yield
+    if f:
+        return {"name": "Bob"}
+    else:
+        # error: [invalid-return-type]
+        # error: [invalid-argument-type]
+        return {"name": 42}
 ```
 
 ## `yield` expression send type inference
@@ -170,6 +183,7 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
 
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
+    return 1
 ```
 
 ## Error cases
@@ -185,14 +199,24 @@ def generator() -> Generator:
 
 ### Invalid `yield` type
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import Generator
 
 def invalid_generator() -> Generator[int, None, None]:
-    # error: [invalid-yield] "Yield type `Literal[""]` does not match annotated yield type `int`"
+    # snapshot: invalid-yield
     yield ""
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+ --> src/mdtest_snippet.py:3:28
+  |
+3 | def invalid_generator() -> Generator[int, None, None]:
+  |                            -------------------------- Function annotated with yield type `int` here
+4 |     # snapshot: invalid-yield
+5 |     yield ""
+  |           ^^ expression of type `Literal[""]`, expected `int`
+  |
 ```
 
 ### Invalid annotation
@@ -214,14 +238,14 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [inval
 ```py
 from typing import Generator
 
-# TODO: should emit an error (does not return `str`)
+# error: [invalid-return-type]
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
 
-# TODO: should emit an error (does not return `int`)
 def invalid_generator2() -> Generator[int, None, None]:
     yield 1
 
+    # error: [invalid-return-type]
     return "done"
 ```
 
@@ -240,8 +264,6 @@ def outer() -> Generator[int, None, None]:
 
 ### `yield from` with incompatible send type
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import Generator
 
@@ -249,6 +271,44 @@ def inner() -> Generator[int, int, None]:
     x = yield 1
 
 def outer() -> Generator[int, str, None]:
-    # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
+    # snapshot: invalid-yield
     yield from inner()
+```
+
+```snapshot
+error[invalid-yield]: Send type does not match annotation
+ --> src/mdtest_snippet.py:6:16
+  |
+6 | def outer() -> Generator[int, str, None]:
+  |                ------------------------- Function annotated with send type `str` here
+7 |     # snapshot: invalid-yield
+8 |     yield from inner()
+  |                ^^^^^^^ generator with send type `int`, expected `str`
+  |
+```
+
+### Non generator function with `Generator` annotation
+
+```py
+from typing import Generator
+
+def non_gen() -> Generator[int, int, None]:
+    # snapshot: invalid-return-type
+    return 1
+
+reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:3:18
+  |
+3 | def non_gen() -> Generator[int, int, None]:
+  |                  ------------------------- Expected `Generator[int, int, None]` because of return type
+4 |     # snapshot: invalid-return-type
+5 |     return 1
+  |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
+  |
+info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
+info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```

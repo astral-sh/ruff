@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
 use lsp_types::notification::PublishDiagnostics;
@@ -7,8 +8,12 @@ use lsp_types::{
     NumberOrString, PublishDiagnosticsParams, Url,
 };
 use ruff_diagnostics::Applicability;
-use ruff_text_size::Ranged;
+use ruff_python_ast::name::Name;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
+use ty_python_semantic::types::ide_support::{
+    UnreachableKind, unreachable_ranges, unused_bindings,
+};
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -24,9 +29,37 @@ use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub(super) struct UnnecessaryHint {
+    range: TextRange,
+    kind: UnnecessaryHintKind,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+enum UnnecessaryHintKind {
+    UnusedBinding(Name),
+    UnreachableCode(UnreachableKind),
+}
+
+impl UnnecessaryHintKind {
+    fn message(&self) -> String {
+        match self {
+            Self::UnusedBinding(name) => format!("`{name}` is unused"),
+            Self::UnreachableCode(UnreachableKind::Unconditional) => {
+                "Code is always unreachable".to_owned()
+            }
+            Self::UnreachableCode(UnreachableKind::CurrentAnalysis) => {
+                "Code is unreachable\nThis may depend on your current environment and settings"
+                    .to_owned()
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
+    unnecessary_hints: Vec<UnnecessaryHint>,
     encoding: PositionEncoding,
     file_or_notebook: File,
 }
@@ -37,16 +70,17 @@ impl Diagnostics {
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
+        unnecessary_hints: &[UnnecessaryHint],
     ) -> Option<String> {
-        if diagnostics.is_empty() {
+        if diagnostics.is_empty() && unnecessary_hints.is_empty() {
             return None;
         }
 
-        // Generate result ID based on raw diagnostic content only
+        // Generate result ID based on raw diagnostic content only.
         let mut hasher = DefaultHasher::new();
 
-        // Hash the length first to ensure different numbers of diagnostics produce different hashes
         diagnostics.hash(&mut hasher);
+        unnecessary_hints.hash(&mut hasher);
 
         Some(format!("{:016x}", hasher.finish()))
     }
@@ -55,7 +89,7 @@ impl Diagnostics {
     ///
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id(&self) -> Option<String> {
-        Self::result_id_from_hash(&self.items)
+        Self::result_id_from_hash(&self.items, &self.unnecessary_hints)
     }
 
     pub(super) fn to_lsp_diagnostics(
@@ -73,7 +107,7 @@ impl Diagnostics {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
-            for diagnostic in &self.items {
+            for diagnostic in &*self.items {
                 let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
                     db,
                     diagnostic,
@@ -95,25 +129,52 @@ impl Diagnostics {
                     .push(lsp_diagnostic);
             }
 
+            for hint in &self.unnecessary_hints {
+                let Some((url, lsp_diagnostic)) = unnecessary_hint_to_lsp_diagnostic(
+                    db,
+                    self.file_or_notebook,
+                    self.encoding,
+                    hint,
+                ) else {
+                    continue;
+                };
+
+                let Some(url) = url else {
+                    tracing::warn!("Unable to find notebook cell");
+                    continue;
+                };
+
+                cell_diagnostics
+                    .entry(url)
+                    .or_default()
+                    .push(lsp_diagnostic);
+            }
+
             LspDiagnostics::NotebookDocument(cell_diagnostics)
         } else {
-            LspDiagnostics::TextDocument(
-                self.items
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.encoding,
-                                client_capabilities,
-                                global_settings,
-                            )?
-                            .1,
-                        )
-                    })
-                    .collect(),
-            )
+            let mut diagnostics = self
+                .items
+                .iter()
+                .filter_map(|diagnostic| {
+                    Some(
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.encoding,
+                            client_capabilities,
+                            global_settings,
+                        )?
+                        .1,
+                    )
+                })
+                .collect::<Vec<_>>();
+            diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
+                db,
+                self.file_or_notebook,
+                self.encoding,
+                &self.unnecessary_hints,
+            ));
+            LspDiagnostics::TextDocument(diagnostics)
         }
     }
 }
@@ -140,18 +201,6 @@ impl LspDiagnostics {
             }
         }
     }
-}
-
-pub(super) fn clear_diagnostics_if_needed(
-    document: &DocumentHandle,
-    session: &Session,
-    client: &Client,
-) {
-    if session.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
-    {
-        return;
-    }
-    session.clear_diagnostics(client, document.url());
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
@@ -326,12 +375,89 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
+    let unnecessary_hints = collect_hints(db, file);
 
     Some(Diagnostics {
         items: diagnostics,
+        unnecessary_hints,
         encoding,
         file_or_notebook: file,
     })
+}
+
+pub(super) fn collect_hints(db: &ProjectDatabase, file: File) -> Vec<UnnecessaryHint> {
+    if !db.project().should_check_file(db, file) {
+        return Vec::new();
+    }
+
+    let unreachable = unreachable_ranges(db, file);
+
+    let mut hints = unused_bindings(db, file)
+        .iter()
+        // Avoid a narrower unused-binding hint inside code that is already reported as unreachable.
+        .filter(|binding| {
+            unreachable.is_empty()
+                || !unreachable
+                    .iter()
+                    .any(|range| range.range.contains_range(binding.range))
+        })
+        .map(|binding| UnnecessaryHint {
+            range: binding.range,
+            kind: UnnecessaryHintKind::UnusedBinding(binding.name.clone()),
+        })
+        .collect::<Vec<_>>();
+
+    hints.extend(unreachable.iter().map(|range| UnnecessaryHint {
+        range: range.range,
+        kind: UnnecessaryHintKind::UnreachableCode(range.kind),
+    }));
+
+    hints.sort_unstable_by(|left, right| {
+        (left.range.start(), left.range.end(), &left.kind).cmp(&(
+            right.range.start(),
+            right.range.end(),
+            &right.kind,
+        ))
+    });
+    hints
+}
+
+pub(super) fn unnecessary_hints_to_lsp_diagnostics(
+    db: &ProjectDatabase,
+    file: File,
+    encoding: PositionEncoding,
+    hints: &[UnnecessaryHint],
+) -> Vec<Diagnostic> {
+    hints
+        .iter()
+        .filter_map(|hint| unnecessary_hint_to_lsp_diagnostic(db, file, encoding, hint))
+        .map(|(_, diagnostic)| diagnostic)
+        .collect()
+}
+
+fn unnecessary_hint_to_lsp_diagnostic(
+    db: &ProjectDatabase,
+    file: File,
+    encoding: PositionEncoding,
+    hint: &UnnecessaryHint,
+) -> Option<(Option<Url>, Diagnostic)> {
+    let range = hint.range.to_lsp_range(db, file, encoding)?;
+    let url = range.to_location().map(|location| location.uri);
+
+    Some((
+        url,
+        Diagnostic {
+            range: range.local_range(),
+            severity: Some(DiagnosticSeverity::HINT),
+            code: None,
+            code_description: None,
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: hint.kind.message(),
+            related_information: None,
+            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+            data: None,
+        },
+    ))
 }
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
@@ -419,6 +545,40 @@ pub(super) fn to_lsp_diagnostic(
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
+    let mut message = if supports_related_information {
+        // Show both the primary and annotation messages if available,
+        // because we don't create a related information for the primary message.
+        if let Some(annotation_message) = diagnostic
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message())
+        {
+            format!("{}: {annotation_message}", diagnostic.primary_message())
+        } else {
+            diagnostic.primary_message().to_string()
+        }
+    } else {
+        diagnostic.concise_message().to_string()
+    };
+
+    // Append info sub-diagnostics that have no location (and thus
+    // can't be shown as "related information") to the message.
+    let mut first = true;
+    for sub_diagnostic in diagnostic.sub_diagnostics() {
+        if sub_diagnostic.primary_annotation().is_none() {
+            if first {
+                message.push('\n');
+                first = false;
+            }
+            write!(
+                message,
+                "\n{severity}: {hint}",
+                hint = sub_diagnostic.concise_message(),
+                severity = sub_diagnostic.severity()
+            )
+            .ok();
+        }
+    }
+
     Some((
         url,
         Diagnostic {
@@ -428,20 +588,7 @@ pub(super) fn to_lsp_diagnostic(
             code: Some(NumberOrString::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: if supports_related_information {
-                // Show both the primary and annotation messages if available,
-                // because we don't create a related information for the primary message.
-                if let Some(annotation_message) = diagnostic
-                    .primary_annotation()
-                    .and_then(|annotation| annotation.get_message())
-                {
-                    format!("{}: {annotation_message}", diagnostic.primary_message())
-                } else {
-                    diagnostic.primary_message().to_string()
-                }
-            } else {
-                diagnostic.concise_message().to_string()
-            },
+            message,
             related_information,
             data: serde_json::to_value(data).ok(),
         },

@@ -29,7 +29,7 @@ It is invalid to parameterize `Annotated` with less than two arguments.
 ```py
 from typing_extensions import Annotated
 
-# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
 def _(x: Annotated):
     reveal_type(x)  # revealed: Unknown
 
@@ -39,17 +39,19 @@ def _(flag: bool):
     else:
         X = bool
 
-    # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+    # error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
     def f(y: X):
         reveal_type(y)  # revealed: Unknown | bool
 
-# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a type expression"
+# error: [invalid-type-form] "`typing.Annotated` requires at least two arguments when used in a parameter annotation"
 def _(x: Annotated | bool):
     reveal_type(x)  # revealed: Unknown | bool
 
 # error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
-def _(x: Annotated[()]):
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+def _(x: Annotated[()], y: list[Annotated[()]]):
     reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: list[Unknown]
 
 # error: [invalid-type-form]
 def _(x: Annotated[int]):

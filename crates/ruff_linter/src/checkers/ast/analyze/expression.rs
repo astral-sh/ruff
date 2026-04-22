@@ -1304,6 +1304,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::AirflowVariableGetOutsideTask) {
                 airflow::rules::variable_get_outside_task(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::AirflowXcomPullInTemplateString) {
+                airflow::rules::xcom_pull_in_template_string(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
             }
@@ -1531,6 +1534,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
                 }
+            }
+            if checker.is_rule_enabled(Rule::FStringPercentFormat) {
+                ruff::rules::fstring_percent_format(checker, bin_op);
             }
         }
         Expr::BinOp(ast::ExprBinOp {

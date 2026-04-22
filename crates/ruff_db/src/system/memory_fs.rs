@@ -8,13 +8,13 @@ use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
 use crate::system::{
-    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, SystemPath,
-    SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, file_time_now, walk_directory,
+    DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemVirtualPathBuf, file_time_now, walk_directory,
 };
 
 use super::walk_directory::{
-    DirectoryWalker, ErrorKind, WalkDirectoryBuilder, WalkDirectoryConfiguration,
-    WalkDirectoryVisitor, WalkDirectoryVisitorBuilder, WalkState,
+    DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration, WalkDirectoryVisitor,
+    WalkDirectoryVisitorBuilder, WalkState,
 };
 
 /// File system that stores all content in memory.
@@ -131,7 +131,7 @@ impl MemoryFileSystem {
                 Entry::File(file) => {
                     String::from_utf8(file.content.to_vec()).map_err(|_| invalid_utf8())
                 }
-                Entry::Directory(_) => Err(is_a_directory()),
+                Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
             }
         }
 
@@ -270,46 +270,6 @@ impl MemoryFileSystem {
         WalkDirectoryBuilder::new(path, MemoryWalker { fs: self.clone() })
     }
 
-    pub fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_,
-        glob::PatternError,
-    > {
-        // Very naive implementation that iterates over all files and collects all that match the given pattern.
-
-        let normalized = self.normalize_path(pattern);
-        let pattern = glob::Pattern::new(normalized.as_str())?;
-        let matches = std::sync::Mutex::new(Vec::new());
-
-        self.walk_directory("/").standard_filters(false).run(|| {
-            Box::new(|entry| {
-                match entry {
-                    Ok(entry) => {
-                        if pattern.matches_path(entry.path().as_std_path()) {
-                            matches.lock().unwrap().push(Ok(entry.into_path()));
-                        }
-                    }
-                    Err(error) => match error.kind {
-                        ErrorKind::Loop { .. } => {
-                            unreachable!("Loops aren't possible in the memory file system because it doesn't support symlinks.")
-                        }
-                        ErrorKind::Io { err, path } => {
-                            matches.lock().unwrap().push(Err(GlobError { path: path.expect("walk_directory to always set a path").into_std_path_buf(), error: GlobErrorKind::IOError(err)}));
-                        }
-                        ErrorKind::NonUtf8Path { path } => {
-                            matches.lock().unwrap().push(Err(GlobError { path, error: GlobErrorKind::NonUtf8Path}));
-                        }
-                    },
-                }
-                WalkState::Continue
-            })
-        });
-
-        Ok(matches.into_inner().unwrap().into_iter())
-    }
-
     pub fn remove_file(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         fn remove_file(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
             let mut by_path = fs.inner.by_path.write().unwrap();
@@ -321,7 +281,7 @@ impl MemoryFileSystem {
                         entry.remove();
                         Ok(())
                     }
-                    Entry::Directory(_) => Err(is_a_directory()),
+                    Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
                 },
                 btree_map::Entry::Vacant(_) => Err(not_found()),
             }
@@ -376,7 +336,7 @@ impl MemoryFileSystem {
             // Skip the directory path itself
             for (maybe_child, _) in by_path.range(normalized.clone()..).skip(1) {
                 if maybe_child.starts_with(&normalized) {
-                    return Err(directory_not_empty());
+                    return Err(io::Error::from(io::ErrorKind::DirectoryNotEmpty));
                 } else if !maybe_child.as_str().starts_with(normalized.as_str()) {
                     break;
                 }
@@ -388,7 +348,7 @@ impl MemoryFileSystem {
                         entry.remove();
                         Ok(())
                     }
-                    Entry::File(_) => Err(not_a_directory()),
+                    Entry::File(_) => Err(io::Error::from(io::ErrorKind::NotADirectory)),
                 },
                 btree_map::Entry::Vacant(_) => Err(not_found()),
             }
@@ -407,7 +367,7 @@ impl MemoryFileSystem {
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
         if entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         };
 
         // Collect the entries into a vector to avoid deadlocks when the
@@ -498,22 +458,6 @@ fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
 }
 
-fn is_a_directory() -> std::io::Error {
-    // Note: Rust returns `ErrorKind::IsADirectory` for this error but this is a nightly only variant :(.
-    //   So we have to use other for now.
-    std::io::Error::other("Is a directory")
-}
-
-fn not_a_directory() -> std::io::Error {
-    // Note: Rust returns `ErrorKind::NotADirectory` for this error but this is a nightly only variant :(.
-    //   So we have to use `Other` for now.
-    std::io::Error::other("Not a directory")
-}
-
-fn directory_not_empty() -> std::io::Error {
-    std::io::Error::other("directory not empty")
-}
-
 fn invalid_utf8() -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::InvalidData,
@@ -536,7 +480,7 @@ fn create_dir_all(
         });
 
         if entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
     }
 
@@ -551,7 +495,7 @@ fn get_or_create_file<'a>(
         let parent_entry = paths.get(parent).ok_or_else(not_found)?;
 
         if parent_entry.is_file() {
-            return Err(not_a_directory());
+            return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
     }
 
@@ -564,7 +508,7 @@ fn get_or_create_file<'a>(
 
     match entry {
         Entry::File(file) => Ok(file),
-        Entry::Directory(_) => Err(is_a_directory()),
+        Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
     }
 }
 
@@ -860,7 +804,7 @@ mod tests {
         let error = fs
             .create_directory_all(SystemPath::new("a/b.py/c"))
             .unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -882,7 +826,7 @@ mod tests {
             .write_file_all(SystemPath::new("a/b.py/c"), "content")
             .unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -917,7 +861,7 @@ mod tests {
 
         let error = fs.read_to_string(SystemPath::new("a")).unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -941,7 +885,7 @@ mod tests {
 
         let error = fs.write_file(SystemPath::new("a"), "content").unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -999,7 +943,7 @@ mod tests {
         fs.create_directory_all("a")?;
 
         let error = fs.remove_file("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::IsADirectory);
 
         Ok(())
     }
@@ -1024,7 +968,7 @@ mod tests {
         let fs = with_files(["a/a.py"]);
 
         let error = fs.remove_directory("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::DirectoryNotEmpty);
     }
 
     #[test]
@@ -1054,7 +998,7 @@ mod tests {
         let fs = with_files(["a"]);
 
         let error = fs.remove_directory("a").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(error.kind(), ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -1088,8 +1032,7 @@ mod tests {
         let Err(error) = fs.read_directory("a.py") else {
             panic!("Expected this to fail");
         };
-        assert_eq!(error.kind(), std::io::ErrorKind::Other);
-        assert!(error.to_string().contains("Not a directory"));
+        assert_eq!(error.kind(), std::io::ErrorKind::NotADirectory);
     }
 
     #[test]
@@ -1223,28 +1166,6 @@ mod tests {
     ),
 }"#
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn glob() -> std::io::Result<()> {
-        let root = SystemPath::new("/src");
-        let fs = MemoryFileSystem::with_current_directory(root);
-
-        fs.write_files_all([
-            (root.join("foo.py"), "print('foo')"),
-            (root.join("a/bar.py"), "print('bar')"),
-            (root.join("a/.baz.py"), "print('baz')"),
-        ])?;
-
-        let mut matches = fs.glob("/src/a/**").unwrap().flatten().collect::<Vec<_>>();
-        matches.sort_unstable();
-
-        assert_eq!(matches, vec![root.join("a/.baz.py"), root.join("a/bar.py")]);
-
-        let matches = fs.glob("**/bar.py").unwrap().flatten().collect::<Vec<_>>();
-        assert_eq!(matches, vec![root.join("a/bar.py")]);
 
         Ok(())
     }

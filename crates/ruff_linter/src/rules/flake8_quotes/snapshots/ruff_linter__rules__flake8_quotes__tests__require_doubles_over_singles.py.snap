@@ -31,7 +31,7 @@ help: Replace single quotes with double quotes
 2 + this_should_be_linted = u"double quote string"
 3 | this_should_be_linted = f'double quote string'
 4 | this_should_be_linted = f'double {"quote"} string'
-5 | 
+5 |
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles.py:3:25
@@ -48,5 +48,5 @@ help: Replace single quotes with double quotes
   - this_should_be_linted = f'double quote string'
 3 + this_should_be_linted = f"double quote string"
 4 | this_should_be_linted = f'double {"quote"} string'
-5 | 
+5 |
 6 | # https://github.com/astral-sh/ruff/issues/10546

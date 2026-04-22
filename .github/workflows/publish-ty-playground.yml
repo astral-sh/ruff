@@ -27,6 +27,7 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: release-playground
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:

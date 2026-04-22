@@ -440,12 +440,11 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             AnyNodeRef::ExprList(list) => {
                 self.add_range(list.range());
             }
-            AnyNodeRef::ExprTuple(tuple) => {
+            AnyNodeRef::ExprTuple(tuple)
                 // Only fold parenthesized tuples.
-                if tuple.parenthesized {
+                if tuple.parenthesized => {
                     self.add_range(tuple.range());
                 }
-            }
             AnyNodeRef::ExprDict(dict) => {
                 self.add_range(dict.range());
             }
@@ -526,7 +525,7 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -637,7 +636,7 @@ def main():
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range (imports)
          --> main.py:2:1
           |
@@ -679,7 +678,7 @@ import requests
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range (imports)
          --> main.py:2:1
           |
@@ -727,7 +726,7 @@ from fastapi import FastAPI
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range (imports)
          --> main.py:2:1
           |
@@ -811,7 +810,7 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -897,7 +896,7 @@ else:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -979,7 +978,7 @@ if condition:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
           --> main.py:2:1
            |
@@ -1049,7 +1048,7 @@ else:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -1119,7 +1118,7 @@ finally:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -1334,7 +1333,7 @@ match value:
             )
             .build();
 
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:2:1
           |
@@ -1704,7 +1703,7 @@ def foo():
 
         assert_snapshot!(
             test.folding_ranges(),
-            @r"
+            @"
         info[folding-range]: Folding Range
          --> main.py:6:1
           |
@@ -1886,7 +1885,7 @@ with open("file.txt") as f:
         let test = CursorTest::builder()
             .source("main.py", "class MyClass:\n    pass\n<CURSOR>")
             .build();
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:1:1
           |
@@ -1900,7 +1899,7 @@ with open("file.txt") as f:
         let test = CursorTest::builder()
             .source("main.py", "class MyClass:\r\n    pass\r\n<CURSOR>")
             .build();
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:1:1
           |
@@ -1914,7 +1913,7 @@ with open("file.txt") as f:
         let test = CursorTest::builder()
             .source("main.py", "class MyClass:\r    pass\r<CURSOR>")
             .build();
-        assert_snapshot!(test.folding_ranges(), @r"
+        assert_snapshot!(test.folding_ranges(), @"
         info[folding-range]: Folding Range
          --> main.py:1:1
           |

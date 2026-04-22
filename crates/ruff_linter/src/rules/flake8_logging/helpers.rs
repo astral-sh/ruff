@@ -4,10 +4,6 @@ use ruff_text_size::{Ranged, TextSize};
 
 pub(super) fn outside_handlers(offset: TextSize, semantic: &SemanticModel) -> bool {
     for stmt in semantic.current_statements() {
-        if matches!(stmt, Stmt::FunctionDef(_)) {
-            break;
-        }
-
         let Stmt::Try(StmtTry { handlers, .. }) = stmt else {
             continue;
         };

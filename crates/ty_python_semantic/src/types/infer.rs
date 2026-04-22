@@ -1,5 +1,6 @@
 //! We have Salsa queries for inferring types at three different granularities: scope-level,
-//! definition-level, and expression-level.
+//! definition-level, and expression-level, plus lightweight queries for focused subregions like
+//! function decorators.
 //!
 //! Scope-level inference is for when we are actually checking a file, and need to check types for
 //! everything in that file's scopes, or give a linter access to types of arbitrary expressions
@@ -43,25 +44,24 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::expression::Expression;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::FunctionType;
+use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, declaration_type,
+    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    declaration_type,
 };
-use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
+use ty_python_core::definition::Definition;
+use ty_python_core::expression::Expression;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::unpack::Unpack;
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, semantic_index};
 
 mod builder;
 mod comparisons;
-mod deferred;
 #[cfg(test)]
 mod tests;
 
@@ -100,6 +100,82 @@ fn definition_cycle_initial<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+}
+
+/// Infer decorator expression types for a function definition.
+///
+/// This is a lightweight query that avoids the cycle risk of calling
+/// `infer_definition_types` when we need to check decorators while
+/// already inside definition inference (e.g. checking `Self` in a
+/// `@staticmethod`).
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn function_known_decorators<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecoratorInference<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::FunctionDecorators(definition),
+        index,
+        &module,
+    )
+    .finish_function_decorator_inference()
+}
+
+pub(crate) fn function_known_decorator_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecorators {
+    function_known_decorators(db, definition).known_decorators()
+}
+
+/// A compact inference result for function decorators.
+///
+/// Unlike [`DefinitionInference`], this stores only decorator expression types and
+/// diagnostics, plus the expression-side state that needs to be merged back into
+/// function-definition inference.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct FunctionDecoratorInference<'db> {
+    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    called_functions: Box<[FunctionType<'db>]>,
+    known_decorators: FunctionDecorators,
+    diagnostics: TypeCheckDiagnostics,
+}
+
+impl<'db> FunctionDecoratorInference<'db> {
+    pub(crate) fn expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.expression_types.get(&expression.into()).copied()
+    }
+
+    pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
+        &self.expression_types
+    }
+
+    pub(crate) fn bindings(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
+        self.bindings.iter().copied()
+    }
+
+    pub(crate) fn called_functions(&self) -> &[FunctionType<'db>] {
+        &self.called_functions
+    }
+
+    pub(crate) fn known_decorators(&self) -> FunctionDecorators {
+        self.known_decorators
+    }
+
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+        &self.diagnostics
+    }
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -513,6 +589,8 @@ pub(crate) enum InferenceRegion<'db> {
     Expression(Expression<'db>, TypeContext<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
+    /// infer types for the decorators on a function [`Definition`]
+    FunctionDecorators(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -523,9 +601,9 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                definition.scope(db)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::FunctionDecorators(definition)
+            | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
     }
@@ -658,6 +736,10 @@ struct DefinitionInferenceExtra<'db> {
 
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
+
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -729,6 +811,14 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    /// Get qualifiers for an annotation expression
+    pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.qualifiers.get(&expression.into()).copied())
+            .unwrap_or_default()
     }
 
     #[track_caller]
@@ -817,9 +907,6 @@ struct ExpressionInferenceExtra<'db> {
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
-
-    /// `true` if all places in this expression are definitely bound
-    all_definitely_bound: bool,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -828,7 +915,6 @@ impl<'db> ExpressionInference<'db> {
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
-                all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -887,8 +973,8 @@ impl<'db> ExpressionInference<'db> {
 }
 
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub(crate) struct InferenceFlags: u8 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub(crate) struct InferenceFlags: u16 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
@@ -901,13 +987,52 @@ bitflags::bitflags! {
         /// are an error. It is unset in other contexts (e.g., `TypeVar` defaults, explicit class
         /// specialization) where unbound type variables are expected.
         const CHECK_UNBOUND_TYPEVARS = 1 << 1;
+
+        /// Whether the visitor is currently visiting a vararg annotation
+        /// (e.g., `*args: int` or `**kwargs: int` in a function definition).
+        const IN_VARARG_ANNOTATION = 1 << 2;
+
+        /// Whether the visitor is currently visiting a return-type annotation
+        const IN_RETURN_TYPE = 1 << 3;
+
+        /// Whether the visitor is currently visiting a type alias value expression
+        const IN_TYPE_ALIAS = 1 << 4;
+
+        /// Whether the visitor is currently visiting a parameter annotation
+        const IN_PARAMETER_ANNOTATION = 1 << 5;
+
+        /// Whether we are currently in a context where `Concatenate` can be legal
+        const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
+
+        /// Whether we're in the first pass of inferring a PEP-613 type alias.
+        ///
+        /// During this pass, `invalid-type-form` diagnostics are suppressed;
+        /// these are emitted during the second, post-inference, pass.
+        const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
+
+        const IN_NO_TYPE_CHECK = 1 << 8;
     }
 }
 
+impl get_size2::GetSize for InferenceFlags {}
+
 impl InferenceFlags {
+    #[must_use = "Inference flags should always be restored to the original value after being temporarily modified"]
     fn replace(&mut self, other: Self, set_to: bool) -> bool {
         let previously_contained_flag = self.contains(other);
         self.set(other, set_to);
         previously_contained_flag
+    }
+
+    pub(super) const fn type_expression_context(self) -> &'static str {
+        if self.contains(InferenceFlags::IN_RETURN_TYPE) {
+            "return type annotation"
+        } else if self.contains(InferenceFlags::IN_PARAMETER_ANNOTATION) {
+            "parameter annotation"
+        } else if self.contains(InferenceFlags::IN_TYPE_ALIAS) {
+            "type alias value"
+        } else {
+            "type expression"
+        }
     }
 }

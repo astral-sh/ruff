@@ -69,7 +69,7 @@ impl Violation for Numpy2Deprecation {
         } = self;
         match migration_guide {
             Some(migration_guide) => {
-                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
+                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
             }
             None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0"),
         }

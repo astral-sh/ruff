@@ -1,0 +1,46 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: for.md - For loops - Union type as iterable where one union element has a non-callable `__iter__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class TestIter:
+ 2 |     def __next__(self) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class Test:
+ 6 |     def __iter__(self) -> TestIter:
+ 7 |         return TestIter()
+ 8 | 
+ 9 | class NotIter:
+10 |     # `__iter__` is present but not callable
+11 |     __iter__: int = 32
+12 | 
+13 | def _(flag: bool):
+14 |     iterable = Test() if flag else NotIter()
+15 |     # error: [not-iterable]
+16 |     for x in iterable:
+17 |         reveal_type(x)  # revealed: int | Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Test | NotIter` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+16 |     for x in iterable:
+   |              ^^^^^^^^
+   |
+info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable
+
+```

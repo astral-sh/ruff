@@ -14,7 +14,7 @@ TC008 [*] Remove quotes from type alias
 help: Remove quotes
 10 |     OptStr: TypeAlias = str | None
 11 |     Bar: TypeAlias = Foo[int]
-12 | 
+12 |
    -     a: TypeAlias = 'int'  # TC008
 13 +     a: TypeAlias = int  # TC008
 14 |     b: TypeAlias = 'Dict'  # TC008
@@ -32,7 +32,7 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
 11 |     Bar: TypeAlias = Foo[int]
-12 | 
+12 |
 13 |     a: TypeAlias = 'int'  # TC008
    -     b: TypeAlias = 'Dict'  # TC008
 14 +     b: TypeAlias = Dict  # TC008
@@ -51,7 +51,7 @@ TC008 [*] Remove quotes from type alias
 17 |     e: TypeAlias = 'Foo.bar'  # TC008
    |
 help: Remove quotes
-12 | 
+12 |
 13 |     a: TypeAlias = 'int'  # TC008
 14 |     b: TypeAlias = 'Dict'  # TC008
    -     c: TypeAlias = 'Foo'   # TC008
@@ -237,7 +237,7 @@ help: Remove quotes
    -     n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
    -         ' | None')
 27 +     n: TypeAlias = (int | None)
-28 | 
-29 | 
+28 |
+29 |
 30 |     class Baz: ...
 note: This is an unsafe fix and may change runtime behavior

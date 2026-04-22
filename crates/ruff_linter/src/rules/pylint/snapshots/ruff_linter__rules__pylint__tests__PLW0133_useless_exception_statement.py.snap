@@ -12,7 +12,7 @@ PLW0133 [*] Missing `raise` statement on exception
 28 |     MySubError("This is a custom error")  # PLW0133
    |
 help: Add `raise` keyword
-23 | 
+23 |
 24 | # Test case 1: Useless exception statement
 25 | def func():
    -     AssertionError("This is an assertion error")  # PLW0133
@@ -180,7 +180,7 @@ PLW0133 [*] Missing `raise` statement on exception
 106 |     (MySubError("This is an exception"))  # PLW0133
     |
 help: Add `raise` keyword
-101 | 
+101 |
 102 | # Test case 9: Useless exception statement in parentheses
 103 | def func():
     -     (RuntimeError("This is an exception"))  # PLW0133
@@ -201,7 +201,7 @@ PLW0133 [*] Missing `raise` statement on exception
 114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
     |
 help: Add `raise` keyword
-109 | 
+109 |
 110 | # Test case 10: Useless exception statement in continuation
 111 | def func():
     -     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
@@ -221,14 +221,14 @@ PLW0133 [*] Missing `raise` statement on exception
 121 |     MyUserWarning("This is a custom user warning")  # PLW0133
     |
 help: Add `raise` keyword
-117 | 
+117 |
 118 | # Test case 11: Useless warning statement
 119 | def func():
     -     UserWarning("This is a user warning")  # PLW0133
 120 +     raise UserWarning("This is a user warning")  # PLW0133
 121 |     MyUserWarning("This is a custom user warning")  # PLW0133
-122 | 
-123 | 
+122 |
+123 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -244,12 +244,12 @@ PLW0133 [*] Missing `raise` statement on exception
 help: Add `raise` keyword
 124 | # Test case 12: Useless exception statement at module level
 125 | import builtins
-126 | 
+126 |
     - builtins.TypeError("still an exception even though it's an Attribute")  # PLW0133
 127 + raise builtins.TypeError("still an exception even though it's an Attribute")  # PLW0133
-128 | 
+128 |
 129 | PythonFinalizationError("Added in Python 3.13")  # PLW0133
-130 | 
+130 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -263,14 +263,14 @@ PLW0133 [*] Missing `raise` statement on exception
 131 | MyError("This is an exception")  # PLW0133
     |
 help: Add `raise` keyword
-126 | 
+126 |
 127 | builtins.TypeError("still an exception even though it's an Attribute")  # PLW0133
-128 | 
+128 |
     - PythonFinalizationError("Added in Python 3.13")  # PLW0133
 129 + raise PythonFinalizationError("Added in Python 3.13")  # PLW0133
-130 | 
+130 |
 131 | MyError("This is an exception")  # PLW0133
-132 | 
+132 |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -284,12 +284,12 @@ PLW0133 [*] Missing `raise` statement on exception
 139 | MyUserWarning("This is a custom user warning")  # PLW0133
     |
 help: Add `raise` keyword
-134 | 
+134 |
 135 | MyValueError("This is an exception")  # PLW0133
-136 | 
+136 |
     - UserWarning("This is a user warning")  # PLW0133
 137 + raise UserWarning("This is a user warning")  # PLW0133
-138 | 
+138 |
 139 | MyUserWarning("This is a custom user warning")  # PLW0133
-140 | 
+140 |
 note: This is an unsafe fix and may change runtime behavior

@@ -19,5 +19,5 @@ help: Organize imports
 4 | from numpy import pi as π
   - import numpy as ℂℇℊℋℌℍℎℐℑℒℓℕℤΩℨKÅℬℭℯℰℱℹℴ
   - import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
-5 | 
+5 |
 6 | h = 2 * π * ℏ

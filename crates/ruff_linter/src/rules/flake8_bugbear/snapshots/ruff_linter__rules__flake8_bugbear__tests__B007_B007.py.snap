@@ -22,14 +22,14 @@ B007 [*] Loop control variable `k` not used within loop body
 19 |             print(i + j)
    |
 help: Rename unused `k` to `_k`
-15 | 
+15 |
 16 | for i in range(10):
 17 |     for j in range(10):
    -         for k in range(10):  # k not used, i and j used transitively
 18 +         for _k in range(10):  # k not used, i and j used transitively
 19 |             print(i + j)
-20 | 
-21 | 
+20 |
+21 |
 note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `i` not used within loop body
@@ -50,12 +50,12 @@ B007 [*] Loop control variable `k` not used within loop body
    |
 help: Rename unused `k` to `_k`
 27 |                     yield i, (j, (k, l))
-28 | 
-29 | 
+28 |
+29 |
    - for i, (j, (k, l)) in strange_generator():  # i, k not used
 30 + for i, (j, (_k, l)) in strange_generator():  # i, k not used
 31 |     print(j, l)
-32 | 
+32 |
 33 | FMT = "{foo} {bar}"
 note: This is an unsafe fix and may change runtime behavior
 
@@ -116,14 +116,14 @@ B007 [*] Loop control variable `bar` not used within loop body
 54 |             break
    |
 help: Rename unused `bar` to `_bar`
-49 | 
+49 |
 50 | def f():
 51 |     # Fixable.
    -     for foo, bar, baz in (["1", "2", "3"],):
 52 +     for foo, _bar, baz in (["1", "2", "3"],):
 53 |         if foo or baz:
 54 |             break
-55 | 
+55 |
 note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `bar` not used within loop body
@@ -149,14 +149,14 @@ B007 [*] Loop control variable `bar` not used within loop body
 70 |             break
    |
 help: Rename unused `bar` to `_bar`
-65 | 
+65 |
 66 | def f():
 67 |     # Fixable.
    -     for foo, bar, baz in (["1", "2", "3"],):
 68 +     for foo, _bar, baz in (["1", "2", "3"],):
 69 |         if foo or baz:
 70 |             break
-71 | 
+71 |
 note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `bar` not used within loop body

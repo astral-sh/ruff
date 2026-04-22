@@ -58,6 +58,22 @@ reveal_type(even)  # revealed: (int, /) -> bool
 reveal_type(even(14))  # revealed: bool
 ```
 
+Decorator expressions can also introduce bindings that remain visible after the decorated
+definition:
+
+```py
+def decorator_factory(flag: bool):
+    def decorator(func):
+        return func
+    return decorator
+
+@decorator_factory(seen := True)
+def f():
+    pass
+
+reveal_type(seen)  # revealed: Literal[True]
+```
+
 ## Multiple decorators
 
 Multiple decorators can be applied to a single function. They are applied in "bottom-up" order,
@@ -257,7 +273,7 @@ emit an error:
 ```py
 class NoInit: ...
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 1, got 2"
 @NoInit
 def foo(): ...
 
@@ -326,7 +342,7 @@ Using `type[SomeClass]` as a decorator validates against the class's constructor
 class Base: ...
 
 def apply_decorator(cls: type[Base]) -> None:
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 1, got 2"
     @cls
     def inner() -> None: ...
 ```

@@ -237,8 +237,7 @@ from typing_extensions import Callable, Concatenate, TypeAliasType
 MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
-    # TODO: should be (int, / ...) -> str
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
 
 T = TypeVar("T")
 
@@ -270,8 +269,7 @@ def _(x: ListOrDict[int]):
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
 
 def _(c: MyAlias7[int]):
-    # TODO: should be (int, / ...) -> None
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (int, /, *args: Any, **kwargs: Any) -> None
 ```
 
 ## Imported
@@ -347,6 +345,20 @@ my_isinstance(1, (int, (str | float)))
 my_isinstance(1, 1)
 # TODO should be an invalid-argument-type error
 my_isinstance(1, (int, (str, 1)))
+```
+
+## Materialization of self-referential generic PEP 613 type aliases
+
+```py
+from typing import TypeAlias, TypeVar, Union
+from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+
+static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
 ```
 
 ## Conditionally imported on Python < 3.10
@@ -428,8 +440,7 @@ Empty: TypeAlias
 
 ## Simple syntactic validation
 
-We don't yet do full validation for the right-hand side of a `TypeAlias` assignment, but we do
-simple syntactic validation:
+We do full validation of the right-hand side of a type alias.
 
 ```toml
 [environment]
@@ -442,6 +453,9 @@ from typing_extensions import Annotated, Literal, TypeAlias
 GoodTypeAlias: TypeAlias = Annotated[int, (1, 3.14, lambda x: x)]
 GoodTypeAlias: TypeAlias = tuple[int, *tuple[str, ...]]
 
+var1 = 3
+
+# typing conformance cases:
 BadTypeAlias1: TypeAlias = eval("".join(map(chr, [105, 110, 116])))  # error: [invalid-type-form]
 BadTypeAlias2: TypeAlias = [int, str]  # error: [invalid-type-form]
 BadTypeAlias3: TypeAlias = ((int, str),)  # error: [invalid-type-form]
@@ -450,15 +464,20 @@ BadTypeAlias5: TypeAlias = {"a": "b"}  # error: [invalid-type-form]
 BadTypeAlias6: TypeAlias = (lambda: int)()  # error: [invalid-type-form]
 BadTypeAlias7: TypeAlias = [int][0]  # error: [invalid-type-form]
 BadTypeAlias8: TypeAlias = int if 1 < 3 else str  # error: [invalid-type-form]
+BadTypeAlias9: TypeAlias = var1  # error: [invalid-type-form]
 BadTypeAlias10: TypeAlias = True  # error: [invalid-type-form]
 BadTypeAlias11: TypeAlias = 1  # error: [invalid-type-form]
 BadTypeAlias12: TypeAlias = list or set  # error: [invalid-type-form]
 BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
-BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
 
-# error: [invalid-type-form]
-# error: [invalid-type-form]
+# bonus ones from Alex:
+#
+# error:[invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
+# error: [invalid-type-form]
+BadTypeAlias15: TypeAlias = Literal[-3.14]
+# error: [unsupported-operator]
+BadTypeAlias16: TypeAlias = list["int" | "str"]
 ```
 
 ## No type qualifiers

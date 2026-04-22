@@ -1299,11 +1299,11 @@ def _(
 ```py
 from ty_extensions import Intersection, Not
 
-# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a parameter annotation"
 def f(x: Intersection) -> None:
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a parameter annotation"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -1322,6 +1322,59 @@ class C:
 
 def f(c: C):
     reveal_type(c.x)  # revealed: ~AlwaysFalsy
+```
+
+## Methods on intersections
+
+### The same method from a common base
+
+```py
+from ty_extensions import Intersection
+
+class Base:
+    def f(self) -> int:
+        return 0
+
+class X(Base):
+    pass
+
+class Y(Base):
+    pass
+
+def test(x: Intersection[X, Y]) -> None:
+    reveal_type(x.f)  # revealed: (bound method X.f() -> int) & (bound method Y.f() -> int)
+    reveal_type(x.f())  # revealed: int
+
+# Example subclass that inhabits that intersection:
+class Z(X, Y):
+    pass
+
+test(Z())
+```
+
+### A method that could be compatible with a protocol (without violating Liskov)
+
+```py
+from typing import Protocol
+from ty_extensions import Intersection
+
+class Proto(Protocol):
+    def method(self) -> int: ...
+
+class X:
+    # This `method` isn't compatible with `Proto`, but a subclass could refine it...
+    def method(self) -> int | str:
+        return "hello"
+
+def test(x: Intersection[X, Proto]) -> None:
+    reveal_type(x.method())  # revealed: int
+
+# ...like this. This subclass inhabits the intersection above.
+class Y(X):
+    def method(self) -> int:
+        return 42
+
+test(Y())
 ```
 
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)

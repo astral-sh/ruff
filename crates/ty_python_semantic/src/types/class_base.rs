@@ -3,9 +3,9 @@ use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext, TypeMapping,
-    todo_type,
+    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
+    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
+    TypeMapping, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -20,6 +20,7 @@ use crate::{Db, DisplaySettings};
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
     Dynamic(DynamicType<'db>),
+    Divergent(DivergentType),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -44,6 +45,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
+            Self::Divergent(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -55,16 +57,19 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
-            ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
+            ClassBase::Dynamic(
+                DynamicType::Unknown
+                | DynamicType::UnknownGeneric(_)
+                | DynamicType::InvalidConcatenateUnknown,
+            ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
-                | DynamicType::TodoFunctionalTypedDict
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
                 | DynamicType::TodoTypeVarTuple,
             ) => "@Todo",
-            ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
+            ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict => "TypedDict",
@@ -90,6 +95,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+            Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
@@ -276,7 +282,11 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => None,
+            Self::Dynamic(_)
+            | Self::Divergent(_)
+            | Self::Generic
+            | Self::Protocol
+            | Self::TypedDict => None,
         }
     }
 
@@ -285,6 +295,7 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Class(class) => class.metaclass(db),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            Self::Divergent(divergent) => Type::Divergent(divergent),
             // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
             Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
         }
@@ -301,7 +312,11 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => {
                 Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
+            Self::Dynamic(_)
+            | Self::Divergent(_)
+            | Self::Generic
+            | Self::Protocol
+            | Self::TypedDict => self,
         }
     }
 
@@ -352,6 +367,7 @@ impl<'db> ClassBase<'db> {
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Dynamic(_)
+            | ClassBase::Divergent(_)
             | ClassBase::Generic
             | ClassBase::Protocol
             | ClassBase::TypedDict => false,
@@ -363,12 +379,13 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
-            ClassBase::Dynamic(_) | ClassBase::Generic | ClassBase::TypedDict => {
-                ClassBaseMroIterator::length_2(db, self)
-            }
+            ClassBase::Dynamic(_)
+            | ClassBase::Divergent(_)
+            | ClassBase::Generic
+            | ClassBase::TypedDict => ClassBaseMroIterator::length_2(db, self),
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
@@ -394,6 +411,7 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
+                    ClassBase::Divergent(_) => f.write_str("Divergent"),
                     ClassBase::Class(class) => Type::from(class)
                         .display_with(self.db, self.settings.clone())
                         .fmt(f),
@@ -422,6 +440,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            ClassBase::Divergent(divergent) => Type::Divergent(divergent),
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
@@ -437,6 +456,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 }
 
 /// An iterator over the MRO of a class base.
+#[derive(Clone)]
 enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),

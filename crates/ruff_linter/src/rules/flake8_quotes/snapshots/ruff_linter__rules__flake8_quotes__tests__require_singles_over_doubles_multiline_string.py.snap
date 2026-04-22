@@ -18,6 +18,6 @@ help: Replace double multiline quotes with single quotes
 2 | be
   - "linted" """
 3 + "linted" '''
-4 | 
+4 |
 5 | s = ''' This "should"
 6 | "not" be

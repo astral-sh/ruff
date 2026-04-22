@@ -11,5 +11,5 @@ UP009 [*] UTF-8 encoding declaration is unnecessary
 help: Remove unnecessary coding comment
   -  # coding=utf8
 1 | print("Hello world")
-2 | 
+2 |
 3 | """
