@@ -35,7 +35,7 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, project_options_overrides))]
     pub fn apply_changes(
         &mut self,
-        changes: Vec<ChangeEvent>,
+        changes: &[ChangeEvent],
         project_options_overrides: Option<&ProjectOptionsOverrides>,
     ) -> ChangeResult {
         let project = self.project();
@@ -91,7 +91,7 @@ impl ProjectDatabase {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
                     if synced_files.insert(path.to_path_buf()) {
                         let absolute =
-                            SystemPath::absolute(&path, self.system().current_directory());
+                            SystemPath::absolute(path, self.system().current_directory());
                         File::sync_path_only(self, &absolute);
                         if let Some(root) = self.files().root(self, &absolute) {
                             match root.kind_at_time_of_creation(self) {
@@ -129,7 +129,7 @@ impl ProjectDatabase {
                     match kind {
                         CreatedKind::File => {
                             if synced_files.insert(path.to_path_buf()) {
-                                File::sync_path(self, &path);
+                                File::sync_path(self, path);
                             }
                         }
                         CreatedKind::Directory | CreatedKind::Any => {
@@ -147,15 +147,15 @@ impl ProjectDatabase {
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
 
-                    if self.system().is_file(&path) {
-                        if project.is_file_included(self, &path) {
+                    if self.system().is_file(path) {
+                        if project.is_file_included(self, path) {
                             // Add the parent directory because `walkdir`
                             // always visits explicitly passed files even if
                             // they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
                         }
-                    } else if project.is_directory_included(self, &path) {
-                        added_paths.insert(path);
+                    } else if project.is_directory_included(self, path) {
+                        added_paths.insert(path.clone());
                     }
                 }
 
@@ -168,16 +168,16 @@ impl ProjectDatabase {
                         }
                         DeletedKind::Any => self
                             .files
-                            .try_system(self, &path)
+                            .try_system(self, path)
                             .is_some_and(|file| file.exists(self)),
                     };
 
                     if is_file {
                         if synced_files.insert(path.to_path_buf()) {
-                            File::sync_path(self, &path);
+                            File::sync_path(self, path);
                         }
 
-                        if let Some(file) = self.files().try_system(self, &path) {
+                        if let Some(file) = self.files().try_system(self, path) {
                             project.remove_file(self, file);
                         }
                     } else {
@@ -185,14 +185,14 @@ impl ProjectDatabase {
 
                         if custom_stdlib_versions_path
                             .as_ref()
-                            .is_some_and(|versions_path| versions_path.starts_with(&path))
+                            .is_some_and(|versions_path| versions_path.starts_with(path))
                         {
                             result.custom_stdlib_changed = true;
                         }
 
-                        let directory_included = project.is_directory_included(self, &path);
+                        let directory_included = project.is_directory_included(self, path);
 
-                        if directory_included || path == project_root {
+                        if directory_included || path == &project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(
@@ -213,11 +213,11 @@ impl ProjectDatabase {
                 }
 
                 ChangeEvent::CreatedVirtual(path) | ChangeEvent::ChangedVirtual(path) => {
-                    File::sync_virtual_path(self, &path);
+                    File::sync_virtual_path(self, path);
                 }
 
                 ChangeEvent::DeletedVirtual(path) => {
-                    if let Some(virtual_file) = self.files().try_virtual_file(&path) {
+                    if let Some(virtual_file) = self.files().try_virtual_file(path) {
                         virtual_file.close(self);
                     }
                 }

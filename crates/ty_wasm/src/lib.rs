@@ -184,7 +184,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![ChangeEvent::Created {
+            &[ChangeEvent::Created {
                 path: path.clone(),
                 kind: CreatedKind::File,
             }],
@@ -217,7 +217,7 @@ impl Workspace {
             .map_err(into_error)?;
 
         self.db.apply_changes(
-            vec![
+            &[
                 ChangeEvent::Changed {
                     path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
@@ -251,7 +251,7 @@ impl Workspace {
                 .map_err(into_error)?;
 
             self.db.apply_changes(
-                vec![ChangeEvent::Deleted {
+                &[ChangeEvent::Deleted {
                     path: system_path.to_path_buf(),
                     kind: DeletedKind::File,
                 }],
