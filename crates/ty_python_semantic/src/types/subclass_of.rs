@@ -163,8 +163,7 @@ impl<'db> SubclassOfType<'db> {
                 if mapped.is_never() {
                     Type::Never
                 } else {
-                    SubclassOfType::try_from_instance(db, mapped)
-                        .unwrap_or(SubclassOfType::subclass_of_unknown())
+                    mapped.to_meta_type(db)
                 }
             }
         }
@@ -460,16 +459,12 @@ impl<'db> SubclassOfInner<'db> {
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    TypeVarBoundOrConstraints::UpperBound(
-                        SubclassOfType::try_from_instance(db, bound)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown()),
-                    )
+                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        SubclassOfType::try_from_instance(db, *constraint)
-                            .unwrap_or(SubclassOfType::subclass_of_unknown())
-                    }))
+                    TypeVarBoundOrConstraints::Constraints(
+                        constraints.map(db, |constraint| constraint.to_meta_type(db)),
+                    )
                 }
             })
         });
