@@ -3483,20 +3483,13 @@ impl<'db> CallableBinding<'db> {
                         let module = parsed_module(context.db(), file).load(context.db());
                         let node =
                             overload.node(context.db(), function.file(context.db()), &module);
-                        let range = if node.body.len() == 1 {
-                            node.range()
+                        let span = if node.body.len() == 1 {
+                            Span::from(file).with_range(node.range())
                         } else {
-                            TextRange::new(
-                                node.start(),
-                                node.returns
-                                    .as_deref()
-                                    .map(Ranged::end)
-                                    .unwrap_or_else(|| node.parameters.end()),
-                            )
+                            overload.spans(context.db()).decorators_and_header
                         };
                         sub.annotate(
-                            Annotation::primary(Span::from(file).with_range(range))
-                                .message("First overload defined here"),
+                            Annotation::primary(span).message("First overload defined here"),
                         );
                         diag.sub(sub);
                     }
