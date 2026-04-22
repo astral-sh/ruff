@@ -386,6 +386,23 @@ reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
 reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+```py
+def _[T](t: T):
+    def union_with_non_inferable_t[U](x: T | U) -> U:
+        raise NotImplementedError
+
+    reveal_type(union_with_non_inferable_t("a"))  # revealed: Literal["a"]
+    reveal_type(union_with_non_inferable_t(1))  # revealed: Literal[1]
+    reveal_type(union_with_non_inferable_t(t))  # revealed: Unknown
+
+    def _(x: int | T):
+        # TODO: This should reveal `int`.
+        reveal_type(union_with_non_inferable_t(x))  # revealed: Unknown
+
+    def _(x: int | None):
+        reveal_type(union_with_non_inferable_t(x))  # revealed: int | None
+```
+
 This also works if the typevar has a bound:
 
 ```py
