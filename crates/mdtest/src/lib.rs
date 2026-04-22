@@ -165,7 +165,7 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    pub const fn is_cli(self) -> bool {
+    const fn is_cli(self) -> bool {
         matches!(self, OutputFormat::Cli)
     }
 
@@ -178,7 +178,7 @@ impl OutputFormat {
     /// Actions can detect them as workflow commands. Workflow commands must
     /// appear at the beginning of a line in stdout to be parsed by GitHub.
     #[expect(clippy::print_stdout)]
-    pub fn write_error(
+    fn write_error(
         self,
         assertion_buf: &mut String,
         file: &str,
