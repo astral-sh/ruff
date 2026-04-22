@@ -29,7 +29,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type, declaration_type,
     infer_definition_types,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -1698,7 +1698,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
-    types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
 }
 
 /// An assignment from a bound type variable to a given type, along with the variance of the outermost
@@ -1737,12 +1737,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<(Type<'db>, Type<'db>)>,
         ) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
+        let db = self.db;
         let types = generic_context
-            .variables_inner(self.db)
+            .variables_inner(db)
             .iter()
             .map(|(identity, variable)| {
-                match self.types.get(identity).copied() {
+                match self.types.get_mut(identity) {
                     Some(mapped_ty) => {
+                        let mapped_ty = mapped_ty.get_or_build();
                         // The typevar was inferred — present both bounds as the inferred type.
                         let chosen = choose(*variable, Some((mapped_ty, mapped_ty)));
                         Some(chosen.unwrap_or(mapped_ty))
@@ -1751,7 +1753,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             });
 
-        generic_context.specialize_recursive(self.db, types)
+        generic_context.specialize_recursive(db, types)
     }
 
     /// Insert a type mapping for a bound typevar.
@@ -1776,10 +1778,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return;
                 }
 
-                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
+                entry.get_mut().add(self.db, ty);
             }
             Entry::Vacant(entry) => {
-                entry.insert(ty);
+                entry.insert(UnionAccumulator::new(ty));
             }
         }
     }

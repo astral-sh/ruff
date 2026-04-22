@@ -350,6 +350,48 @@ pub(crate) struct UnionBuilder<'db> {
     recursively_defined: RecursivelyDefined,
 }
 
+/// Accumulates types into a union, deferring `UnionBuilder` allocation until a second type is added.
+pub(crate) enum UnionAccumulator<'db> {
+    Single(Type<'db>),
+    Union(UnionBuilder<'db>),
+}
+
+impl<'db> UnionAccumulator<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        UnionAccumulator::Single(ty)
+    }
+
+    pub(crate) fn add(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match self {
+            UnionAccumulator::Single(existing) => {
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(*existing);
+                builder.add_in_place(ty);
+                *self = UnionAccumulator::Union(builder);
+            }
+            UnionAccumulator::Union(builder) => builder.add_in_place(ty),
+        }
+    }
+
+    pub(crate) fn get_or_build(&mut self) -> Type<'db> {
+        match self {
+            UnionAccumulator::Single(ty) => *ty,
+            UnionAccumulator::Union(_) => {
+                let ty = std::mem::replace(self, UnionAccumulator::Single(Type::Never)).into_type();
+                *self = UnionAccumulator::Single(ty);
+                ty
+            }
+        }
+    }
+
+    pub(crate) fn into_type(self) -> Type<'db> {
+        match self {
+            UnionAccumulator::Single(ty) => ty,
+            UnionAccumulator::Union(builder) => builder.build(),
+        }
+    }
+}
+
 impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {

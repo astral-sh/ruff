@@ -55,7 +55,8 @@ use crate::types::{
     DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -4347,7 +4348,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     return None;
                 };
 
-                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
                     FxHashMap::default();
 
                 for solution in &solutions {
@@ -4391,13 +4392,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                         preferred
                             .entry(identity)
-                            .and_modify(|existing| {
-                                *existing =
-                                    UnionType::from_two_elements(self.db, *existing, inferred_ty);
-                            })
-                            .or_insert(inferred_ty);
+                            .and_modify(|existing| existing.add(self.db, inferred_ty))
+                            .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                     }
                 }
+
+                let preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> = preferred
+                    .into_iter()
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type()))
+                    .collect();
 
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
