@@ -151,6 +151,26 @@ def test_match_refutable(x: dict | int) -> None:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
 ```
 
+## Sequence patterns
+
+```py
+from collections.abc import Sequence
+
+def test_match_star(x: Sequence[int] | int) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
+        case _:
+            reveal_type(x)  # revealed: (int & ~Sequence[object]) | (Sequence[int] & str) | bytes | bytearray
+
+def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: list[int]
+        case _:
+            reveal_type(x)  # revealed: str | bytes | bytearray
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on

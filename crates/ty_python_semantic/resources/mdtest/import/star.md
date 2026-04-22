@@ -243,7 +243,7 @@ print((
     L,
     M,  # error: [possibly-unresolved-reference]
     N,  # error: [possibly-unresolved-reference]
-    O,  # error: [possibly-unresolved-reference]
+    O,  # error: [unresolved-reference]
     P,  # error: [possibly-unresolved-reference]
     Q,  # error: [possibly-unresolved-reference]
     R,  # error: [possibly-unresolved-reference]

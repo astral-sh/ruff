@@ -33,6 +33,49 @@ def _(target: int):
     reveal_type(y)
 ```
 
+## With sequence wildcard
+
+```py
+from collections.abc import Sequence
+
+def sequence_star_pattern_is_exhaustive(paths: list[int]) -> None:
+    match paths:
+        case []:
+            value = 0
+        case [_first]:
+            value = 1
+        case [_first, _second]:
+            value = 2
+        case [*_paths]:
+            raise ValueError
+
+    print(value)
+
+def sequence_star_pattern_is_not_exhaustive_for_text(paths: Sequence[str]) -> None:
+    match paths:
+        case []:
+            value = 0
+        case [_first]:
+            value = 1
+        case [_first, _second]:
+            value = 2
+        case [*_paths]:
+            raise ValueError
+
+    print(value)  # error: [possibly-unresolved-reference]
+
+def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
+    match paths:
+        case []:
+            value = 0
+        case [_first]:
+            value = 1
+        case [_first, _second, *_paths]:
+            raise ValueError
+
+    print(value)  # error: [possibly-unresolved-reference]
+```
+
 ## Basic match
 
 ```py
