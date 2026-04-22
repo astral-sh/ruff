@@ -42,7 +42,6 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
-use crate::types::context::InNoTypeCheck;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
@@ -871,7 +870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 // Match `infer_function_definition`: suppress diagnostics that follow
                 // `@no_type_check`, including later decorators.
-                self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                self.context.inference_flags |= InferenceFlags::IN_NO_TYPE_CHECK;
             }
         }
     }

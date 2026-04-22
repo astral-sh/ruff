@@ -974,7 +974,7 @@ impl<'db> ExpressionInference<'db> {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct InferenceFlags: u8 {
+    pub(crate) struct InferenceFlags: u16 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
@@ -1009,6 +1009,8 @@ bitflags::bitflags! {
         /// During this pass, `invalid-type-form` diagnostics are suppressed;
         /// these are emitted during the second, post-inference, pass.
         const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
+
+        const IN_NO_TYPE_CHECK = 1 << 8;
     }
 }
 
