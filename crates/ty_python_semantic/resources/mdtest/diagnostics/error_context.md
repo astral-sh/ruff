@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
@@ -409,7 +409,7 @@ info: This violates the Liskov Substitution Principle
 Incompatible field types:
 
 ```py
-from typing import Any, TypedDict
+from typing import Any, TypedDict, NotRequired, ReadOnly
 
 class Person(TypedDict):
     name: str
@@ -430,6 +430,7 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `Other`
    |             |
    |             Declared type
    |
+info: field "name" on TypedDict `Person` has type `str` which is not assignable to type `bytes` expected by TypedDict `Other`
 ```
 
 Missing required fields:
@@ -452,23 +453,86 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `PersonW
    |             |
    |             Declared type
    |
+info: required field "age" is not present in source TypedDict `Person`
+```
+
+Non-required fields that are required in the target:
+
+```py
+class PersonWithOptionalAge(TypedDict):
+    name: str
+    age: NotRequired[int]
+
+def _(source: PersonWithOptionalAge):
+    target: PersonWithAge = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithOptionalAge` is not assignable to `PersonWithAge`
+  --> src/mdtest_snippet.py:22:13
+   |
+22 |     target: PersonWithAge = source  # snapshot
+   |             -------------   ^^^^^^ Incompatible value of type `PersonWithOptionalAge`
+   |             |
+   |             Declared type
+   |
+info: field "age" is required in TypedDict `PersonWithAge` but not required in TypedDict `PersonWithOptionalAge`
+```
+
+Read-only fields that are mutable in the target:
+
+```py
+class PersonWithReadOnlyName(TypedDict):
+    name: ReadOnly[str]
+
+def _(source: PersonWithReadOnlyName):
+    target: Person = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithReadOnlyName` is not assignable to `Person`
+  --> src/mdtest_snippet.py:27:13
+   |
+27 |     target: Person = source  # snapshot
+   |             ------   ^^^^^^ Incompatible value of type `PersonWithReadOnlyName`
+   |             |
+   |             Declared type
+   |
+info: field "name" is read-only in TypedDict `PersonWithReadOnlyName` but mutable in TypedDict `Person`
+```
+
+Required fields that are not required and mutable in the target:
+
+```py
+def _(source: PersonWithAge):
+    target: PersonWithOptionalAge = source  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `PersonWithAge` is not assignable to `PersonWithOptionalAge`
+  --> src/mdtest_snippet.py:29:13
+   |
+29 |     target: PersonWithOptionalAge = source  # snapshot
+   |             ---------------------   ^^^^^^ Incompatible value of type `PersonWithAge`
+   |             |
+   |             Declared type
+   |
+info: field "age" is required in TypedDict `PersonWithAge` but not required and mutable in TypedDict `PersonWithOptionalAge`
+help: The required field could be removed through a destructive operation like `del` on the target.
 ```
 
 Assigning a `TypedDict` to a `dict`
 
 ```py
-class Person(TypedDict):
-    name: str
-
 def _(source: Person):
     target: dict[str, Any] = source  # snapshot
 ```
 
 ```snapshot
 error[invalid-assignment]: Object of type `Person` is not assignable to `dict[str, Any]`
-  --> src/mdtest_snippet.py:21:13
+  --> src/mdtest_snippet.py:31:13
    |
-21 |     target: dict[str, Any] = source  # snapshot
+31 |     target: dict[str, Any] = source  # snapshot
    |             --------------   ^^^^^^ Incompatible value of type `Person`
    |             |
    |             Declared type
