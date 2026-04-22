@@ -44,9 +44,6 @@ class Series(ElementOpsMixin[T], Generic[T]):
         raise NotImplementedError
 
 def _(left: Series[bool]):
-    # TODO: no error
-    # TODO: revealed: Series[bool]
-    # error: [no-matching-overload]
-    # revealed: Unknown
+    # revealed: Series[bool]
     reveal_type(left.mul(True))
 ```
