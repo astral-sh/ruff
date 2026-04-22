@@ -52,7 +52,7 @@ pub struct MarkdownTestSuite<'s, C> {
 }
 
 impl<'s, C> MarkdownTestSuite<'s, C> {
-    pub fn tests(&self) -> MarkdownTestIterator<'_, 's, C> {
+    pub(crate) fn tests(&self) -> MarkdownTestIterator<'_, 's, C> {
         MarkdownTestIterator {
             suite: self,
             current_file_index: 0,
@@ -141,11 +141,11 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         contracted_name
     }
 
-    pub fn uncontracted_name(&self) -> String {
+    pub(crate) fn uncontracted_name(&self) -> String {
         self.joined_name(false)
     }
 
-    pub fn name(&self) -> String {
+    pub(crate) fn name(&self) -> String {
         self.joined_name(true)
     }
 
@@ -157,7 +157,7 @@ impl<'m, 's, C> MarkdownTest<'m, 's, C> {
         &self.section.config
     }
 
-    pub fn should_snapshot_diagnostics(&self) -> bool {
+    fn should_snapshot_diagnostics(&self) -> bool {
         self.section
             .directives
             .has_directive_set(MdtestDirective::SnapshotDiagnostics)
@@ -291,7 +291,7 @@ struct SectionId;
 /// [`MarkdownTest`]), or it may contain nested sections (headers with more `#` characters), but
 /// not both.
 #[derive(Debug)]
-pub struct Section<'s, C> {
+struct Section<'s, C> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
