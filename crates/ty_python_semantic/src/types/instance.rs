@@ -504,21 +504,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
-        } else {
+        let structurally_satisfied =
             protocol
                 .inner
                 .interface(db)
                 .members(db)
                 .when_all(db, self.constraints, |member| {
                     self.type_satisfies_protocol_member(db, ty, &member)
-                })
-        };
+                });
+
         if structurally_satisfied.is_never_satisfied(db) {
             self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
