@@ -392,8 +392,10 @@ impl<'db> EnumLiteralType<'db> {
         let ClassLiteral::Static(class) = self.enum_class(db) else {
             return None;
         };
+
         let scope = class.body_scope(db);
         let symbol_id = place_table(db, scope).symbol_id(self.name(db))?;
+
         use_def_map(db, scope)
             .end_of_scope_symbol_bindings(symbol_id)
             .find_map(|binding| binding.binding.definition())
