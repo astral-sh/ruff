@@ -331,8 +331,7 @@ def f2[T](x: T) -> type[T]:
 reveal_type(f2(int(1)))  # revealed: type[int]
 reveal_type(f2(object()))  # revealed: type
 
-# TODO: This should reveal `type[Literal[1]]`.
-reveal_type(f2(1))  # revealed: type[Unknown]
+reveal_type(f2(1))  # revealed: <class 'int'>
 
 def f3[T](x: type[T]) -> T:
     return x()
