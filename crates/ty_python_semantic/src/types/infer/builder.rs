@@ -93,8 +93,9 @@ use crate::types::{
     KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy,
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, infer_complete_scope_types, infer_scope_types, todo_type,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
+    UnionBuilder, UnionType, binding_type, infer_complete_scope_types, infer_scope_types,
+    todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -5131,7 +5132,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Use a forward assignability check to infer typevar specializations from the
                     // declared type context. For example, if the return type is `list[T]` and the
                     // declared type context is `list[int]`, the check produces `T = int`.
-                    let mut tcx_mappings = FxHashMap::default();
+                    let mut tcx_mappings: FxHashMap<
+                        BoundTypeVarIdentity<'db>,
+                        UnionAccumulator<'db>,
+                    > = FxHashMap::default();
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let return_ty = overload
                             .normalized_constructor_return(db)
@@ -5146,18 +5150,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 for binding in solution {
                                     tcx_mappings
                                         .entry(binding.bound_typevar.identity(db))
-                                        .and_modify(|existing| {
-                                            *existing = UnionType::from_two_elements(
-                                                db,
-                                                *existing,
-                                                binding.solution,
-                                            );
-                                        })
-                                        .or_insert(binding.solution);
+                                        .and_modify(|existing| existing.add(db, binding.solution))
+                                        .or_insert_with(|| UnionAccumulator::new(binding.solution));
                                 }
                             }
                         }
                     }
+
+                    let tcx_mappings: FxHashMap<_, Type<'db>> = tcx_mappings
+                        .into_iter()
+                        .map(|(identity, accumulator)| (identity, accumulator.into_type()))
+                        .collect();
 
                     // Default specialize any type variables to a marker type, which will be ignored
                     // during argument inference, allowing the concrete subset of the parameter
@@ -5966,8 +5969,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type context is a covariant superclass of the collection (e.g., `Sequence[Any]` as type
         // context for `list[T]`).
         let (elt_tcx_constraints, elt_tcx_variance) = {
-            let mut elt_tcx_constraints: FxHashMap<BoundTypeVarIdentity<'_>, Type<'db>> =
-                FxHashMap::default();
+            let mut elt_tcx_constraints: FxHashMap<
+                BoundTypeVarIdentity<'db>,
+                UnionAccumulator<'db>,
+            > = FxHashMap::default();
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
@@ -6036,14 +6041,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let identity = binding.bound_typevar.identity(db);
                                 elt_tcx_constraints
                                     .entry(identity)
-                                    .and_modify(|existing| {
-                                        *existing = UnionType::from_two_elements(
-                                            db,
-                                            *existing,
-                                            inferred_ty,
-                                        );
-                                    })
-                                    .or_insert(inferred_ty);
+                                    .and_modify(|existing| existing.add(db, inferred_ty))
+                                    .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                             }
                         }
 
@@ -6055,6 +6054,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            let elt_tcx_constraints: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+                elt_tcx_constraints
+                    .into_iter()
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type()))
+                    .collect();
 
             (elt_tcx_constraints, elt_tcx_variance)
         };
