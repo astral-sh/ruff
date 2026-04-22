@@ -6223,9 +6223,14 @@ impl<'db> Type<'db> {
                 .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
                 .or_else(|| property.deleter(db).and_then(|deleter| deleter.definition(db))),
 
-            Self::LiteralValue(_)
-            // TODO: For enum literals, it would be even better to jump to the definition of the specific member
-            | Self::KnownBoundMethod(_)
+            Self::LiteralValue(literal) => literal
+                .as_enum()
+                .and_then(|enum_lit| enum_lit.definition(db))
+                .map(TypeDefinition::EnumMember)
+                .or_else(|| self.to_meta_type(db).definition(db)),
+
+            Self::KnownBoundMethod(_)
+            // These types fall back to their meta-type for "Go to type definition".
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)

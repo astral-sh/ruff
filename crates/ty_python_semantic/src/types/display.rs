@@ -1227,7 +1227,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .enum_class(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
-                    write!(f, ".{}", enum_literal.name(self.db))
+                    f.write_char('.')?;
+                    write!(
+                        f.with_type(Type::enum_literal(enum_literal)),
+                        "{}",
+                        enum_literal.name(self.db)
+                    )
                 }
             },
             Type::TypeVar(bound_typevar) => {

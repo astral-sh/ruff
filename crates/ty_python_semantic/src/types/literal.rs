@@ -5,6 +5,8 @@ use ruff_python_ast::name::Name;
 use crate::Db;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{ClassLiteral, KnownClass, Type};
+use ty_python_core::definition::Definition;
+use ty_python_core::{place_table, use_def_map};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -384,5 +386,16 @@ impl get_size2::GetSize for EnumLiteralType<'_> {}
 impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let ClassLiteral::Static(class) = self.enum_class(db) else {
+            return None;
+        };
+        let scope = class.body_scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(self.name(db))?;
+        use_def_map(db, scope)
+            .end_of_scope_symbol_bindings(symbol_id)
+            .find_map(|binding| binding.binding.definition())
     }
 }
