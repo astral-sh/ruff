@@ -6230,7 +6230,6 @@ impl<'db> Type<'db> {
                 .or_else(|| self.to_meta_type(db).definition(db)),
 
             Self::KnownBoundMethod(_)
-            // These types fall back to their meta-type for "Go to type definition".
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
