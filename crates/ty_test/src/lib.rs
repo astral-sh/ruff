@@ -1,5 +1,4 @@
 use crate::config::{Log, MarkdownTestConfig, SystemKind};
-use crate::db::Db;
 use anyhow::{anyhow, bail};
 use camino::Utf8Path;
 use colored::Colorize;
@@ -8,7 +7,7 @@ use mdtest::parser::{self, EmbeddedFileSourceMap};
 use mdtest::{
     Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, output_format,
 };
-use ruff_db::Db as _;
+use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -54,7 +53,7 @@ pub fn run(
     let suite =
         parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
-    let mut db = Db::setup();
+    let mut db = db::Db::setup();
     let mut markdown_edits = vec![];
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
@@ -403,7 +402,10 @@ fn run_test(
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let mdtest_result = attempt_test(db, ty_python_semantic::Db::check_file, test_file);
+            let mdtest_result = attempt_test(
+                |file| ty_python_semantic::Db::check_file(db, file),
+                test_file,
+            );
             let diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
@@ -436,7 +438,7 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(db, pull_types, test_file);
+            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -687,29 +689,27 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
 ///
 /// If no panic occurs, the result of the function is returned as an `Ok()` variant.
 ///
-/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant.
-/// This will be formatted into a diagnostic message by `ty_test`.
-fn attempt_test<'db, 'a, T, F>(
-    db: &'db Db,
+/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant to
+/// be formatted into a diagnostic message by callers.
+pub fn attempt_test<'a, T, F>(
     test_fn: F,
     test_file: &'a TestFile<'a>,
 ) -> Result<T, AttemptTestError<'a>>
 where
-    F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
+    F: FnOnce(File) -> T + std::panic::UnwindSafe,
 {
-    catch_unwind(|| test_fn(db, test_file.file))
-        .map_err(|info| AttemptTestError { info, test_file })
+    catch_unwind(|| test_fn(test_file.file)).map_err(|info| AttemptTestError { info, test_file })
 }
 
-struct AttemptTestError<'a> {
-    info: PanicError,
+pub struct AttemptTestError<'a> {
+    pub info: PanicError,
     test_file: &'a TestFile<'a>,
 }
 
 impl AttemptTestError<'_> {
-    fn into_file_failures(
+    pub fn into_file_failures(
         self,
-        db: &Db,
+        db: &dyn Db,
         action: &str,
         clarification: Option<&str>,
     ) -> FileFailures {
