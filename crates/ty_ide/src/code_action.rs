@@ -102,36 +102,19 @@ fn unwrap_block(db: &dyn Db, file: File, range: TextRange) -> Option<CodeAction>
                     | NodeKind::StmtWhile
             )
         })?;
+    let newline = parsed
+        .tokens()
+        .before(colon.start())
+        .iter()
+        .rfind(|it| it.kind().is_any_newline())?;
+    let keyword = parsed
+        .tokens()
+        .after(newline.end())
+        .iter()
+        .find(|it| it.kind().is_keyword() && target.range().contains_range(it.range()))?;
 
-    let trigger_ranges = target.as_stmt_if().into_iter().flat_map(|stmt_if| {
-        stmt_if
-            .elif_else_clauses
-            .iter()
-            .map(|elif| {
-                let delete_range = elif.range.cover_offset(stmt_if.end());
-                (&elif.body, delete_range, elif.range)
-            })
-            .chain([(&stmt_if.body, stmt_if.range, stmt_if.range)])
-    });
-    let trigger_ranges =
-        trigger_ranges.chain(target.as_stmt_match().into_iter().flat_map(|stmt_match| {
-            stmt_match
-                .cases
-                .iter()
-                .map(|case| (&case.body, stmt_match.range(), case.range))
-        }));
-    let mut trigger_ranges = trigger_ranges.chain(
-        target
-            .as_stmt_try()
-            .map(|it| &it.body)
-            .or_else(|| target.as_stmt_with().map(|it| &it.body))
-            .or_else(|| target.as_stmt_for().map(|it| &it.body))
-            .or_else(|| target.as_stmt_while().map(|it| &it.body))
-            .map(|body| (body, target.range(), target.range())),
-    );
-
-    let (stmts, delete_range, _) =
-        trigger_ranges.find(|(_, _, trigger_range)| range.intersect(*trigger_range).is_some())?;
+    let (stmts, delete_range, _) = unwrap_block_trigger_ranges(&target, keyword)
+        .find(|(_, _, trigger_range)| range.intersect(*trigger_range).is_some())?;
     let current_indent = IndentSpan::of(parsed.tokens(), target);
     let stmts_indent = IndentSpan::of(parsed.tokens(), stmts.first()?);
     let dedent = stmts_indent.len().checked_sub(current_indent.len())?;
@@ -150,6 +133,64 @@ fn unwrap_block(db: &dyn Db, file: File, range: TextRange) -> Option<CodeAction>
         edits,
         preferred: false,
     })
+}
+
+fn unwrap_block_trigger_ranges<'a>(
+    target: &ruff_python_ast::AnyNodeRef<'a>,
+    keyword: &Token,
+) -> impl Iterator<Item = (&'a [ruff_python_ast::Stmt], TextRange, TextRange)> {
+    let keyword = keyword.range();
+
+    let branches = target.as_stmt_if().into_iter().flat_map(|stmt_if| {
+        [&stmt_if.body]
+            .into_iter()
+            .chain(stmt_if.elif_else_clauses.iter().map(|it| &it.body))
+    });
+    let branches = branches.chain(target.as_stmt_try().into_iter().flat_map(|stmt_try| {
+        [&stmt_try.body]
+            .into_iter()
+            .chain(
+                stmt_try
+                    .handlers
+                    .iter()
+                    .filter_map(|it| Some(&it.as_except_handler()?.body)),
+            )
+            .chain([&stmt_try.orelse, &stmt_try.finalbody])
+    }));
+    let branches = branches.chain(
+        target
+            .as_stmt_while()
+            .into_iter()
+            .flat_map(|it| [&it.body, &it.orelse])
+            .chain(
+                target
+                    .as_stmt_for()
+                    .into_iter()
+                    .flat_map(|it| [&it.body, &it.orelse]),
+            ),
+    );
+    let branches = branches.chain(target.as_stmt_with().into_iter().map(|it| &it.body));
+
+    let trigger_ranges = branches.filter_map(move |body| {
+        let first = body.first()?.range();
+        (keyword.start() < first.start()).then(|| {
+            (
+                &body[..],
+                keyword.cover_offset(target.end()),
+                keyword.cover(first),
+            )
+        })
+    });
+
+    let trigger_ranges =
+        trigger_ranges.chain(target.as_stmt_match().into_iter().flat_map(|stmt_match| {
+            stmt_match
+                .cases
+                .iter()
+                .map(|case| (&case.body[..], stmt_match.range(), case.range))
+        }));
+
+    trigger_ranges
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -1046,6 +1087,189 @@ mod tests {
         3 +     foo
         4 +     bar()
         5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_except_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                except<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:11
+          |
+        3 |     try:
+        4 |         ...
+        5 |     except:
+          |           ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     try:
+        4 |         ...
+          -     except:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_else_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                else<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:9
+          |
+        3 |     try:
+        4 |         ...
+        5 |     else:
+          |         ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     try:
+        4 |         ...
+          -     else:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_try_finally_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                try:
+                    ...
+                except:
+                    ...
+                finally<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:7:12
+          |
+        5 |     except:
+        6 |         ...
+        7 |     finally:
+          |            ^
+        8 |         foo
+        9 |         bar()
+          |
+        4 |         ...
+        5 |     except:
+        6 |         ...
+          -     finally:
+          -         foo
+          -         bar()
+        7 +     foo
+        8 +     bar()
+        9 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_while_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                while True<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:3:15
+          |
+        2 | if 1:
+        3 |     while True:
+          |               ^
+        4 |         foo
+        5 |         bar()
+          |
+        1 |
+        2 | if 1:
+          -     while True:
+          -         foo
+          -         bar()
+        3 +     foo
+        4 +     bar()
+        5 |     ...
+        ");
+    }
+
+    #[test]
+    fn unwrap_block_while_else_refactor() {
+        let test = CodeActionTest::with_source(
+            r#"
+            if 1:
+                while True:
+                    ...
+                else<START><END>:
+                    foo
+                    bar()
+                ...
+        "#,
+        );
+
+        assert_snapshot!(test.refactor_code_actions(), @"
+        info[code-action(refactor)]: Unwrap this statements block
+         --> main.py:5:9
+          |
+        3 |     while True:
+        4 |         ...
+        5 |     else:
+          |         ^
+        6 |         foo
+        7 |         bar()
+          |
+        2 | if 1:
+        3 |     while True:
+        4 |         ...
+          -     else:
+          -         foo
+          -         bar()
+        5 +     foo
+        6 +     bar()
+        7 |     ...
         ");
     }
 
