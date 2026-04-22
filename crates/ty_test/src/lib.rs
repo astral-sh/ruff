@@ -5,8 +5,8 @@ use colored::Colorize;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self, EmbeddedFileSourceMap};
 use mdtest::{
-    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, attempt_test,
-    output_format,
+    Failures, FileFailures, MDTEST_TEST_FILTER, MarkdownEdit, OutputFormat, TestFile, TestOutcome,
+    attempt_test, output_format,
 };
 use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
@@ -151,12 +151,6 @@ pub fn run(
     assert!(!any_failures, "{}", &assertion);
 
     Ok(())
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestOutcome {
-    Success,
-    Skipped,
 }
 
 fn run_test(

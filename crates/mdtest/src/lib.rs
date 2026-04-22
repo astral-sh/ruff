@@ -547,6 +547,12 @@ impl AttemptTestError<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestOutcome {
+    Success,
+    Skipped,
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use ruff_db::Db;
