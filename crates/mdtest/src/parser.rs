@@ -291,7 +291,7 @@ struct SectionId;
 /// [`MarkdownTest`]), or it may contain nested sections (headers with more `#` characters), but
 /// not both.
 #[derive(Debug)]
-struct Section<'s, C> {
+pub struct Section<'s, C> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
