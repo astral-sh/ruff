@@ -74,7 +74,11 @@ use super::{
 ///
 ///
 /// class GenericClass1(Generic[ReusableT]): ...
+///
+///
 /// class GenericClass2(Generic[ReusableT]): ...
+///
+///
 /// class GenericClass3(Generic[ReusableT]): ...
 /// ```
 ///
@@ -86,7 +90,11 @@ use super::{
 ///
 ///
 /// class GenericClass1[ReusableT: ReusableTBound]: ...
+///
+///
 /// class GenericClass2[ReusableT: ReusableTBound]: ...
+///
+///
 /// class GenericClass3[ReusableT: ReusableTBound]: ...
 /// ```
 ///
