@@ -673,6 +673,27 @@ def decorated(t: T) -> None:
     reveal_type(cast(T, t))  # revealed: T@decorated
 ```
 
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Callable, Generic, TypeVar
+
+F = TypeVar("F", bound=Callable)
+
+def my_decorator(f: F) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box(Generic[F]):
+    cls: type[F]
+
+def specialized(box: Box[Callable]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
