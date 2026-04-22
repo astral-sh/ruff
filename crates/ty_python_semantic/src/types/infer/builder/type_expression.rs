@@ -207,6 +207,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 left_type_value,
                                 ast::Operator::BitOr,
                                 right_type_value,
+                                TypeContext::default(),
                             )
                             .is_err();
 

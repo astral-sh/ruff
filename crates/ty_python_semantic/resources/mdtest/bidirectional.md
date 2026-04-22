@@ -48,51 +48,6 @@ reveal_type(x)  # revealed: list[int]
 
 x: list[list[int]] = [[1], [2], *([3], [4])]
 reveal_type(x)  # revealed: list[list[int]]
-
-x: list[list[int | str]] = [[1], [2]] * 3
-reveal_type(x)  # revealed: list[list[int | str]]
-
-x: list[list[int | str]] = 3 * ([[1]] + [[2]])
-reveal_type(x)  # revealed: list[list[int | str]]
-
-x: list[int | str] = 3 * ["x" for _ in range(3)]
-reveal_type(x)  # revealed: list[int | str]
-
-# Tuple elements are inferred individually, but type context can prevent e.g. `int` widening.
-x: tuple[list[Literal[1]]] = (list1(1),)
-reveal_type(x)  # revealed: tuple[list[Literal[1]]]
-
-x: tuple[list[Literal[1]], ...] = (list1(1),) * 3
-reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
-
-x: tuple[list[Literal[1]], ...] = 3 * ((list1(1),) + (list1(1),))
-reveal_type(x)  # revealed: tuple[list[Literal[1]], ...]
-
-x: set[int | str] = {1, 2} | {3, 4}
-reveal_type(x)  # revealed: set[int | str]
-
-x: set[int | str] = {42 for _ in range(3)}
-reveal_type(x)  # revealed: set[int | str]
-
-x: dict[int | str, int | str] = {1: 2} | {3: 4}
-reveal_type(x)  # revealed: dict[int | str, int | str]
-
-x: dict[int | str, int | str] = {str(i): i for i in range(3)}
-reveal_type(x)  # revealed: dict[int | str, int | str]
-
-# TODO: We currently eagerly pass type context to collection literals on either side of a binary
-# operator. That makes the cases above work, but it's not generally sound. For example, it gives the
-# wrong result in this case.
-class X:
-    def __add__(self, _: list[int]) -> list[int | str]:
-        return []
-
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `X` and `list[int | str]`"
-x: list[int | str] = X() + [1]
-
-# TODO: We also don't yet support generic function calls like this.
-# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[int | str]`"
-x: list[int | str] = list1(42) * 3
 ```
 
 `typed_dict.py`:
@@ -133,6 +88,8 @@ reveal_type(d4_invalid_dict)  # revealed: TD
 d5_literal: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 d5_dict: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 
+# TODO: We could support this.
+# error: [invalid-assignment]
 d6_dict: TD = {"x": 1} | {"x": 2}
 
 def return_literal() -> TD:
@@ -616,6 +573,79 @@ def _(x: Intersection[X, Y]):
     # TODO: Reveal `Bar` and `Baz` here.
     x |= reveal_type({"bar": [1, "2"]})  # revealed: dict[str, list[int | str]]
     x |= reveal_type({"bar": [1, None]})  # revealed: dict[str, list[int | None]]
+```
+
+## Binary Operators
+
+The signature of binary operator dunder calls is used as type context for both sides
+of the binary operation:
+
+```py
+from typing import Literal
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+# TODO: This should also reveal `list[list[int | str]]`.
+x1: list[list[int | str]] = reveal_type([[1], [2]]) * 3  # revealed: list[list[int]]
+reveal_type(x1)  # revealed: list[list[int | str]]
+
+x2: list[list[int | str]] = 3 * reveal_type([[1]] + [[2]])  # revealed: list[list[int]]
+reveal_type(x2)  # revealed: list[list[int | str]]
+
+x3: list[int | str] = 3 * ["x" for _ in range(3)]
+reveal_type(x3)  # revealed: list[int | str]
+
+x4: tuple[list[Literal[1]]] = (lst(1),)
+reveal_type(x4)  # revealed: tuple[list[Literal[1]]]
+
+x5: tuple[list[Literal[1]], ...] = (lst(1),) * 3
+reveal_type(x5)  # revealed: tuple[list[Literal[1]], ...]
+
+x6: tuple[list[Literal[1]], ...] = 3 * ((lst(1),) + (lst(1),))
+reveal_type(x6)  # revealed: tuple[list[Literal[1]], ...]
+
+x7: set[int | str] = {1, 2} | {3, 4}
+reveal_type(x7)  # revealed: set[int | str]
+
+x8: set[int | str] = {42 for _ in range(3)}
+reveal_type(x8)  # revealed: set[int | str]
+
+x9: dict[int | str, int | str] = {1: 2} | {3: 4}
+reveal_type(x9)  # revealed: dict[int | str, int | str]
+
+x10: dict[int | str, int | str] = {str(i): i for i in range(3)}
+reveal_type(x10)  # revealed: dict[int | str, int | str]
+
+class X:
+    def __add__(self, _: list[int]) -> list[int | str]:
+        return []
+
+x11: list[int | str] = X() + [1]
+reveal_type(x11)  # revealed: list[int | str]
+
+class Y:
+    def __add__(self, _: list[int | str]) -> list[int]:
+        return []
+
+x12: list[int] = Y() + [1]
+reveal_type(x12)  # revealed: list[int]
+
+x13: list[int | str] = lst(42) * 3
+reveal_type(x13)  # revealed: list[int | str]
+
+x14: list[list[int | str]] = lst(lst(42)) * 3
+reveal_type(x14)  # revealed: list[list[int | str]]
+
+class Y[T]:
+    x: T
+
+    def __init__(self, x: T): ...
+    def __add__[U](self, _: Y[U]) -> Y[T | U]:
+        raise NotImplementedError
+
+x15: Y[int | str] = Y(1) + Y(2)
+reveal_type(x15)  # revealed: Y[int | str]
 ```
 
 ## `await` expressions

@@ -18,6 +18,7 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
+        tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         #[salsa::tracked]
         fn try_call_bin_op_return_type_impl<'db>(
@@ -25,13 +26,14 @@ impl<'db> Type<'db> {
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
+            tcx: TypeContext<'db>,
         ) -> Option<Type<'db>> {
-            Type::try_call_bin_op(db, left_ty, op, right_ty)
+            Type::try_call_bin_op(db, left_ty, op, right_ty, tcx)
                 .ok()
                 .map(|bindings| bindings.return_type(db))
         }
 
-        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty, tcx)
     }
 
     pub(crate) fn try_call_bin_op(
@@ -39,8 +41,16 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
+        tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallBinOpError> {
-        Self::try_call_bin_op_with_policy(db, left_ty, op, right_ty, MemberLookupPolicy::default())
+        Self::try_call_bin_op_with_policy(
+            db,
+            left_ty,
+            op,
+            right_ty,
+            tcx,
+            MemberLookupPolicy::default(),
+        )
     }
 
     pub(crate) fn try_call_bin_op_with_policy(
@@ -48,6 +58,7 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
+        tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallBinOpError> {
         // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
@@ -80,7 +91,7 @@ impl<'db> Type<'db> {
                         db,
                         reflected_dunder,
                         &mut CallArguments::positional([left_ty]),
-                        TypeContext::default(),
+                        tcx,
                         policy,
                     )
                     .or_else(|_| {
@@ -88,7 +99,7 @@ impl<'db> Type<'db> {
                             db,
                             op.dunder(),
                             &mut CallArguments::positional([right_ty]),
-                            TypeContext::default(),
+                            tcx,
                             policy,
                         )
                     })?);
@@ -99,7 +110,7 @@ impl<'db> Type<'db> {
             db,
             op.dunder(),
             &mut CallArguments::positional([right_ty]),
-            TypeContext::default(),
+            tcx,
             policy,
         );
 
@@ -111,7 +122,7 @@ impl<'db> Type<'db> {
                     db,
                     op.reflected_dunder(),
                     &mut CallArguments::positional([left_ty]),
-                    TypeContext::default(),
+                    tcx,
                     policy,
                 )?)
             }

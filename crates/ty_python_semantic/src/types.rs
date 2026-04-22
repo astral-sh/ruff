@@ -4771,15 +4771,27 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
-        tcx: TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         if let Type::Intersection(intersection) = self {
-            return intersection.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+            return intersection.try_call_dunder_with_policy(
+                db,
+                name,
+                argument_types,
+                call_expression_tcx,
+                policy,
+            );
         }
 
         if let Type::Union(union) = self {
-            return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
+            return union.try_call_dunder_with_policy(
+                db,
+                name,
+                argument_types,
+                call_expression_tcx,
+                policy,
+            );
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -4801,7 +4813,7 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, &constraints, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, call_expression_tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound {

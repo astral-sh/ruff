@@ -1021,7 +1021,13 @@ pub fn definitions_for_bin_op<'db>(
     let left_ty = binary_op.left.inferred_type(model)?;
     let right_ty = binary_op.right.inferred_type(model)?;
 
-    let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
+    let Ok(bindings) = Type::try_call_bin_op(
+        model.db(),
+        left_ty,
+        binary_op.op,
+        right_ty,
+        TypeContext::default(),
+    ) else {
         return None;
     };
 

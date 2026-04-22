@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use itertools::Itertools;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
@@ -62,13 +63,35 @@ impl<'db> Type<'db> {
             ClassLiteral::Static(class_literal) => {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {
-                    Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
-                        db,
-                        specialization
-                            .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                            .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-                            .as_ref(),
-                    )),
+                    Some(KnownClass::Tuple) => {
+                        let Some(specialization) = specialization else {
+                            return Type::homogeneous_tuple(db, Type::unknown());
+                        };
+
+                        let Some(tuple_spec) = specialization.tuple(db) else {
+                            let tuple_typevar = class_literal
+                                .generic_context(db)
+                                .and_then(|generic_context| {
+                                    generic_context.variables(db).exactly_one().ok()
+                                })
+                                .expect("`tuple` should have exactly one type variable");
+
+                            // We sometimes internally specialize `_T_co@tuple` directly.
+                            if let Ok((typevar, ty)) = specialization
+                                .generic_context(db)
+                                .variables(db)
+                                .zip(specialization.types(db))
+                                .exactly_one()
+                                && typevar == tuple_typevar
+                            {
+                                return Type::homogeneous_tuple(db, *ty);
+                            }
+
+                            return Type::homogeneous_tuple(db, Type::unknown());
+                        };
+
+                        Type::tuple(TupleType::new(db, tuple_spec))
+                    }
                     Some(KnownClass::Object) => Type::object(),
                     _ => class_literal
                         .is_typed_dict(db)
