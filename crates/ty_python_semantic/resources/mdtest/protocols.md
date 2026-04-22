@@ -1329,8 +1329,7 @@ class HasY(Protocol):
 
 class HasXAndYProto(HasX, HasY, Protocol): ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(HasXAndYProto, Intersection[HasX, HasY]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(HasXAndYProto, Intersection[HasX, HasY]))
 ```
 
 But this is only true if the subclass has `Protocol` in its explicit bases (otherwise, it is a

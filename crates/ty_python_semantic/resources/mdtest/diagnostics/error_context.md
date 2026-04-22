@@ -725,6 +725,8 @@ error[invalid-assignment]: Object of type `DoesNotSupportFoo1 & DoesNotSupportFo
    |             |
    |             Declared type
    |
+info: type `DoesNotSupportFoo1 & DoesNotSupportFoo2` is not assignable to protocol `SupportsFoo`
+info: └── protocol member `foo` is not defined on type `DoesNotSupportFoo1 & DoesNotSupportFoo2`
 ```
 
 ## Assigning an overload set
