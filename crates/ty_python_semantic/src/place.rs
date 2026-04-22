@@ -17,8 +17,10 @@ use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
-use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::ReachabilityConstraints;
+use ty_python_core::predicate::{Predicate, Predicates, ScopedPredicateId};
+use ty_python_core::reachability_constraints::{
+    ReachabilityConstraints, ScopedReachabilityConstraintId,
+};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -596,6 +598,21 @@ pub(super) fn place_from_bindings<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+}
+
+fn place_from_bindings_impl<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_with_evaluator(
+        db,
+        bindings_with_constraints,
+        requires_explicit_reexport,
+        &|db, predicates, reachability_constraints, reachability_constraint| {
+            reachability_constraints.evaluate(db, predicates, reachability_constraint)
+        },
+    )
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -1342,10 +1359,16 @@ pub(crate) struct ReachableLoopBinding<'db> {
 /// ## Implementation Note
 /// This function gets called cross-module. It, therefore, shouldn't
 /// access any AST nodes from the file containing the declarations.
-fn place_from_bindings_impl<'db>(
+pub(super) fn place_from_bindings_with_evaluator<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
+    evaluate_reachability: &impl Fn(
+        &'db dyn Db,
+        &Predicates<'db>,
+        &ReachabilityConstraints,
+        ScopedReachabilityConstraintId,
+    ) -> Truthiness,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1371,7 +1394,12 @@ fn place_from_bindings_impl<'db>(
     // expressions, which is extra work and can lead to cycles.
     let unbound_visibility = || {
         unbound_reachability_constraint.map(|reachability_constraint| {
-            reachability_constraints.evaluate(db, predicates, reachability_constraint)
+            evaluate_reachability(
+                db,
+                predicates,
+                reachability_constraints,
+                reachability_constraint,
+            )
         })
     };
 
@@ -1391,7 +1419,12 @@ fn place_from_bindings_impl<'db>(
                 }
                 DefinitionState::Deleted => {
                     deleted_reachability = deleted_reachability.or_else(|| {
-                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
+                        evaluate_reachability(
+                            db,
+                            predicates,
+                            reachability_constraints,
+                            reachability_constraint,
+                        )
                     });
                     return None;
                 }
@@ -1401,8 +1434,12 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_reachability =
-                reachability_constraints.evaluate(db, predicates, reachability_constraint);
+            let static_reachability = evaluate_reachability(
+                db,
+                predicates,
+                reachability_constraints,
+                reachability_constraint,
+            );
 
             if static_reachability.is_always_false() {
                 // If the static reachability evaluates to false, the binding is either not reachable
