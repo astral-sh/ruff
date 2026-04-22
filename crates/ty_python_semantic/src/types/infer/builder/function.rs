@@ -576,9 +576,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
-            self.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
+            self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
             self.infer_parameter(kwarg);
-            self.inference_flags
+            self.context
+                .inference_flags
                 .remove(InferenceFlags::IN_KWARG_ANNOTATION);
         }
         self.context

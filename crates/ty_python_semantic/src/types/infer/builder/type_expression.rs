@@ -2153,7 +2153,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let inner_ty = self.infer_type_expression(arguments_slice);
 
                 if self
-                    .inference_flags
+                    .inference_flags()
                     .contains(InferenceFlags::IN_KWARG_ANNOTATION)
                 {
                     if resolve_unpacked_typed_dict_kwargs_annotation_target(self.db(), inner_ty)

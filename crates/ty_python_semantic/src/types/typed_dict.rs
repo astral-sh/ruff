@@ -20,8 +20,7 @@ use super::diagnostic::{
 use super::infer::infer_deferred_types;
 use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, SpecialFormType, Type, TypeMapping,
-    TypeQualifiers,
-    UnionBuilder, definition_expression_type, visitor,
+    TypeQualifiers, UnionBuilder, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -1584,7 +1583,7 @@ fn validate_from_dict_literal<'db, 'ast>(
             } else if dict_item.key.is_none() {
                 let unpacked_ty = expression_type_fn(&dict_item.value, TypeContext::default());
                 if let Some(unpacked_keys) =
-                    extract_unpacked_typed_dict_keys(context.db(), unpacked_ty)
+                    extract_unpacked_typed_dict_keys_from_value_type(context.db(), unpacked_ty)
                 {
                     let (unpacked_provided_keys, _) = validate_extracted_typed_dict_keys(
                         context,
@@ -1753,7 +1752,8 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
             .validate();
         } else if item.key.is_none() {
             let unpacked_ty = expression_type_fn(&item.value);
-            if let Some(unpacked_keys) = extract_unpacked_typed_dict_keys(context.db(), unpacked_ty)
+            if let Some(unpacked_keys) =
+                extract_unpacked_typed_dict_keys_from_value_type(context.db(), unpacked_ty)
             {
                 let (unpacked_provided_keys, unpacked_valid) = validate_extracted_typed_dict_keys(
                     context,

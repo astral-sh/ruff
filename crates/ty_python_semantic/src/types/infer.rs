@@ -1211,9 +1211,6 @@ bitflags::bitflags! {
         /// (e.g., `*args: int` or `**kwargs: int` in a function definition).
         const IN_VARARG_ANNOTATION = 1 << 2;
 
-        /// Whether the visitor is currently visiting a `**kwargs` annotation.
-        const IN_KWARG_ANNOTATION = 1 << 7;
-
         /// Whether the visitor is currently visiting a return-type annotation
         const IN_RETURN_TYPE = 1 << 3;
 
@@ -1233,6 +1230,9 @@ bitflags::bitflags! {
         const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
 
         const IN_NO_TYPE_CHECK = 1 << 8;
+
+        /// Whether the visitor is currently visiting a `**kwargs` annotation.
+        const IN_KWARG_ANNOTATION = 1 << 9;
     }
 }
 
