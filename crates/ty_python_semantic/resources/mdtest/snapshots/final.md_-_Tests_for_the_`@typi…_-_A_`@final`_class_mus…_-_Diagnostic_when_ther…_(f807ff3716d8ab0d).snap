@@ -45,13 +45,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented abstract methods
- --> src/mdtest_snippet.py:6:7
+ --> src/mdtest_snippet.py:4:1
   |
-6 | class Abstract(ABC):
-  |       ^^^^^^^^ 10 abstract methods are unimplemented, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`
-7 |     @abstractmethod
-8 |     def aaaaaaaaaa(self) -> int: ...
-  |         ---------- `aaaaaaaaaa` declared as abstract
+4 |   @final
+  |   ------
+5 |   # error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbb…
+6 |   class Abstract(ABC):
+  |         ^^^^^^^^ 10 abstract methods are unimplemented, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`
+7 | /     @abstractmethod
+8 | |     def aaaaaaaaaa(self) -> int: ...
+  | |____________________________________- `aaaaaaaaaa` declared as abstract
   |
 info: Use `--verbose` to see all 10 unimplemented abstract methods
 

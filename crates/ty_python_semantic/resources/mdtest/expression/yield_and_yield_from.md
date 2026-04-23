@@ -309,4 +309,6 @@ error[invalid-return-type]: Return type does not match returned value
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
   |
+info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
+info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```

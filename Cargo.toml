@@ -94,7 +94,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.7.3", features = [
+get-size2 = { version = "0.8.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -105,7 +105,7 @@ getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
-hashbrown = { version = "0.16.0", default-features = false, features = [
+hashbrown = { version = "0.17.0", default-features = false, features = [
     "raw-entry",
     "equivalent",
     "inline-more",
@@ -157,7 +157,7 @@ regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "2f687a17ceea8ec7aaa605561ccbde938ccef086", default-features = false, features = [
+salsa = { version="0.26.1", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

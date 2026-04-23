@@ -86,10 +86,10 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    | ^^^^^^^^^
    |
 info: First overload defined here
-  --> src/mdtest_snippet.py:4:5
+  --> src/mdtest_snippet.py:3:1
    |
- 4 |   def f(
-   |  _____^
+ 3 | / @overload
+ 4 | | def f(
  5 | |     lion: int,
  6 | |     turtle: int,
  7 | |     tortoise: int,
@@ -107,7 +107,7 @@ info: First overload defined here
 19 | |     leopard: int,
 20 | |     hyena: int,
 21 | | ) -> int: ...
-   | |________^
+   | |_____________^ First overload defined here
    |
 info: Possible overloads for function `f`:
 info:   (lion: int, turtle: int, tortoise: int, goat: int, capybara: int, chicken: int, ostrich: int, gorilla: int, giraffe: int, condor: int, kangaroo: int, anaconda: int, tarantula: int, millipede: int, leopard: int, hyena: int) -> int

@@ -473,7 +473,9 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             |
    |             Declared type
    |
-info: `TypedDict` types are not assignable to `dict` (consider using `Mapping` instead)
+info: TypedDict `Person` is not assignable to `dict`
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
+help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
 ## Protocols
@@ -1079,4 +1081,66 @@ def _(source: frozenset[bool]):
 
 def _(source: tuple[bool, bool]):
     target: tuple[int, int] = source
+```
+
+## Error context in other scenarios
+
+### In `invalid-return-type` diagnostics
+
+```py
+def f() -> tuple[int, str]:
+    return 1, b""  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:1:12
+  |
+1 | def f() -> tuple[int, str]:
+  |            --------------- Expected `tuple[int, str]` because of return type
+2 |     return 1, b""  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
+
+### In `invalid-assignment` for attribute assignments
+
+```py
+class C:
+    x: tuple[int, str]
+
+c = C()
+c.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is not assignable to attribute `x` of type `tuple[int, str]`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | c.x = (1, b"")  # snapshot
+  | ^^^
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+```
+
+### In `invalid-yield` diagnostics
+
+```py
+from typing import Generator
+
+def f() -> Generator[tuple[int, str], None, None]:
+    yield (1, b"")  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+ --> src/mdtest_snippet.py:3:12
+  |
+3 | def f() -> Generator[tuple[int, str], None, None]:
+  |            -------------------------------------- Function annotated with yield type `tuple[int, str]` here
+4 |     yield (1, b"")  # snapshot: invalid-yield
+  |           ^^^^^^^^ expression of type `tuple[Literal[1], Literal[b""]]`, expected `tuple[int, str]`
+  |
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```

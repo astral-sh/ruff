@@ -4,7 +4,6 @@ use crate::{
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, UnionType,
-        context::InNoTypeCheck,
         diagnostic::{
             FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
             USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
@@ -261,7 +260,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(KnownFunction::NoTypeCheck) => {
                         // If the function is decorated with the `no_type_check` decorator,
                         // we need to suppress any errors that come after the decorators.
-                        self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                        self.context.inference_flags |= InferenceFlags::IN_NO_TYPE_CHECK;
                         continue;
                     }
                     Some(KnownFunction::Final) => {
@@ -415,7 +414,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
     ) {
         let db = self.db();
-        let mut prev_in_no_type_check = self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+        let mut prev_in_no_type_check = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_NO_TYPE_CHECK, true);
         for decorator in &function.decorator_list {
             let decorator_type = self.infer_decorator(decorator);
             if let Type::FunctionLiteral(function) = decorator_type
@@ -423,11 +425,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 // If the function is decorated with the `no_type_check` decorator,
                 // we need to suppress any errors that come after the decorators.
-                prev_in_no_type_check = InNoTypeCheck::Yes;
+                prev_in_no_type_check = true;
                 break;
             }
         }
-        self.context.set_in_no_type_check(prev_in_no_type_check);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_NO_TYPE_CHECK, prev_in_no_type_check);
 
         let has_type_params = function.type_params.is_some();
         let has_defaults = function
@@ -497,12 +501,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {
         if let Some(returns) = returns {
-            self.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
+            self.context.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
             self.infer_type_expression_with_state(
                 returns,
                 DeferredExpressionState::from(self.defer_annotations()),
             );
-            self.inference_flags.remove(InferenceFlags::IN_RETURN_TYPE);
+            self.context
+                .inference_flags
+                .remove(InferenceFlags::IN_RETURN_TYPE);
         }
     }
 
@@ -532,20 +538,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kwarg,
         } = parameters;
 
-        self.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
+        self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
         for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
-            self.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
+            self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
-            self.inference_flags
+            self.context
+                .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
         }
-        self.inference_flags
+        self.context
+            .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
     }
 

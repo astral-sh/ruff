@@ -261,6 +261,11 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
+        // Prevent lookup on BoundSuper proxy object
+        if matches!(ty, Type::BoundSuper(_)) {
+            continue;
+        }
+
         let meta_type = ty.to_meta_type(db);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
@@ -1072,14 +1077,15 @@ pub fn definitions_for_unary_op<'db>(
                 Ok(bindings) => bindings,
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
-                    CallDunderError::PossiblyUnbound(bindings)
+                    CallDunderError::PossiblyUnbound { bindings, .. }
                     | CallDunderError::CallError(_, bindings),
                 ) => *bindings,
             }
         }
         Err(CallDunderError::MethodNotAvailable) => return None,
         Err(
-            CallDunderError::PossiblyUnbound(bindings) | CallDunderError::CallError(_, bindings),
+            CallDunderError::PossiblyUnbound { bindings, .. }
+            | CallDunderError::CallError(_, bindings),
         ) => *bindings,
     };
 

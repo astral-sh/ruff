@@ -9,7 +9,7 @@ use crate::session::client::Client;
 use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
-use rustc_hash::FxHashMap;
+use ruff_db::system::SystemPathBuf;
 use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 
@@ -25,7 +25,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         client: &Client,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
-        let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
+        let mut changes = Vec::new();
 
         for change in params.changes {
             let path = DocumentKey::from_url(&change.uri).into_file_path();
@@ -36,13 +36,6 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                     tracing::debug!("Ignoring virtual path from change event: `{path}`");
                     continue;
                 }
-            };
-
-            let Some(db) = session.project_db_for_path(&system_path) else {
-                tracing::trace!(
-                    "Ignoring change event for `{system_path}` because it's not in any workspace"
-                );
-                continue;
             };
 
             let change_event = match change.typ {
@@ -67,20 +60,22 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 }
             };
 
-            events_by_db
-                .entry(db.project().root(db).to_path_buf())
-                .or_default()
-                .push(change_event);
+            changes.push(change_event);
         }
 
-        if events_by_db.is_empty() {
+        if changes.is_empty() {
             return Ok(());
         }
 
-        for (root, changes) in events_by_db {
+        let roots: Vec<SystemPathBuf> = session
+            .project_dbs()
+            .map(|db| db.project().root(db).to_owned())
+            .collect();
+
+        for root in roots {
             tracing::debug!("Applying changes to `{root}`");
 
-            session.apply_changes(&AnySystemPath::System(root.clone()), changes);
+            session.apply_changes(&AnySystemPath::System(root.clone()), &changes);
             publish_settings_diagnostics(session, client, root);
         }
 

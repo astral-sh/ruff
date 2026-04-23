@@ -325,15 +325,6 @@ impl Session {
         &mut self.project_state_mut(path).db
     }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
-    /// any.
-    pub(crate) fn project_db_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectDatabase> {
-        self.project_state_for_path(path).map(|state| &state.db)
-    }
-
     /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
     ///
     /// If the path is a system path, it will return the project database that is closest to the
@@ -406,7 +397,7 @@ impl Session {
     pub(crate) fn apply_changes(
         &mut self,
         path: &AnySystemPath,
-        changes: Vec<ChangeEvent>,
+        changes: &[ChangeEvent],
     ) -> ChangeResult {
         let overrides = path.as_system().and_then(|root| {
             self.workspaces()
@@ -1341,7 +1332,7 @@ impl Session {
                 } else {
                     ChangeEvent::Opened(system_path.clone())
                 };
-                self.apply_changes(path, vec![event]);
+                self.apply_changes(path, &[event]);
 
                 if is_not_python {
                     return;
@@ -1970,14 +1961,14 @@ impl DocumentHandle {
         let path = self.notebook_or_file_path();
         let changes = match path {
             AnySystemPath::System(system_path) => {
-                vec![ChangeEvent::file_content_changed(system_path.clone())]
+                [ChangeEvent::file_content_changed(system_path.clone())]
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+                [ChangeEvent::ChangedVirtual(virtual_path.clone())]
             }
         };
 
-        session.apply_changes(path, changes);
+        session.apply_changes(path, &changes);
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
