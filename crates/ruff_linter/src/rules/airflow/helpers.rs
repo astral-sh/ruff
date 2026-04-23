@@ -326,3 +326,23 @@ pub(crate) fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &Semanti
         false
     })
 }
+
+/// Returns `true` if the given function is decorated with a specific `@task.<variant>`
+/// form (e.g., `@task.branch` or `@task.short_circuit`).
+pub(crate) fn is_airflow_task_variant(
+    function_def: &StmtFunctionDef,
+    semantic: &SemanticModel,
+    variant: &str,
+) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        let expr = map_callable(&decorator.expression);
+        if let Expr::Attribute(ExprAttribute { value, attr, .. }) = expr {
+            attr.as_str() == variant
+                && semantic.resolve_qualified_name(value).is_some_and(|qn| {
+                    matches!(qn.segments(), ["airflow", "decorators" | "sdk", "task"])
+                })
+        } else {
+            false
+        }
+    })
+}
