@@ -230,6 +230,17 @@ fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
 }
 
+pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
+    IntersectionBuilder::new(db)
+        .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
+        // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
+        // patterns explicitly do not match them or their subclasses.
+        .add_negative(KnownClass::Str.to_instance(db))
+        .add_negative(KnownClass::Bytes.to_instance(db))
+        .add_negative(KnownClass::Bytearray.to_instance(db))
+        .build()
+}
+
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
 /// match that pattern.
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
@@ -259,6 +270,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::Mapping(kind) => {
             if kind.is_irrefutable() {
                 mapping_pattern_type(db)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            if kind.is_irrefutable() {
+                sequence_pattern_type(db)
             } else {
                 Type::Never
             }
@@ -660,6 +678,20 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     Truthiness::Ambiguous
                 }
             } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+                Truthiness::AlwaysFalse
+            } else {
+                Truthiness::Ambiguous
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            let sequence_ty = sequence_pattern_type(db);
+            if subject_ty.is_subtype_of(db, sequence_ty) {
+                if kind.is_irrefutable() {
+                    Truthiness::AlwaysTrue
+                } else {
+                    Truthiness::Ambiguous
+                }
+            } else if subject_ty.is_disjoint_from(db, sequence_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous

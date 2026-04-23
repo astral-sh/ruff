@@ -1352,6 +1352,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ClassPatternKind::Refutable
                 })
             }
+            ast::Pattern::MatchSequence(pattern) => {
+                // `case [*rest]` matches every sequence, while all other sequence patterns
+                // are refutable because they impose a minimum and/or exact length.
+                PatternPredicateKind::Sequence(
+                    if matches!(pattern.patterns.as_slice(), [ast::Pattern::MatchStar(_)]) {
+                        ClassPatternKind::Irrefutable
+                    } else {
+                        ClassPatternKind::Refutable
+                    },
+                )
+            }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
                     .patterns
@@ -1367,7 +1378,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .map(|p| Box::new(self.predicate_kind(p))),
                 pattern.name.as_ref().map(|name| name.id.clone()),
             ),
-            _ => PatternPredicateKind::Unsupported,
+            ast::Pattern::MatchStar(_) => PatternPredicateKind::Unsupported,
         }
     }
 
