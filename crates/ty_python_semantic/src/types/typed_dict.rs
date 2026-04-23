@@ -18,8 +18,8 @@ use super::diagnostic::{
 };
 use super::infer::infer_deferred_types;
 use super::{
-    ApplyTypeMappingVisitor, IntersectionType, Type, TypeMapping, TypeQualifiers, UnionBuilder,
-    definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
+    UnionBuilder, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -275,10 +275,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // required target fields
                 let Some(source_item_field) = source_items.get(target_item_name) else {
                     // Self is missing a required field.
+                    self.provide_context(|| ErrorContext::TypedDictFieldMissing {
+                        field_name: target_item_name.clone(),
+                        source,
+                    });
                     return self.never();
                 };
                 if !source_item_field.is_required() {
                     // A required field is not required in self.
+                    self.provide_context(|| ErrorContext::TypedDictFieldNotRequiredInSource {
+                        field_name: target_item_name.clone(),
+                        source,
+                        target,
+                    });
                     return self.never();
                 }
                 if target_item_field.is_read_only() {
@@ -294,6 +303,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 } else {
                     if source_item_field.is_read_only() {
                         // A read-only field can't be assigned to a mutable target.
+                        self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
+                            field_name: target_item_name.clone(),
+                            source,
+                            target,
+                        });
                         return self.never();
                     }
                     // For mutable fields in the target, the relation needs to apply both
@@ -350,11 +364,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         if source_item_field.is_read_only() {
                             // A read-only field can't be assigned to a mutable target.
+                            self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
+                                field_name: target_item_name.clone(),
+                                source,
+                                target,
+                            });
                             return self.never();
                         }
                         if source_item_field.is_required() {
                             // A required field can't be assigned to a not-required, mutable field
                             // in the target, because `del` is allowed on the target field.
+                            self.provide_context(|| {
+                                ErrorContext::TypedDictFieldNotRequiredAndMutableInTarget {
+                                    field_name: target_item_name.clone(),
+                                    source,
+                                    target,
+                                }
+                            });
                             return self.never();
                         }
 
@@ -386,6 +412,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             result.intersect(db, self.constraints, field_constraints);
             if result.is_never_satisfied(db) {
+                if let Some(source_item_field) = source_items.get(target_item_name) {
+                    self.provide_context(|| ErrorContext::TypedDictFieldIncompatible {
+                        field_name: target_item_name.clone(),
+                        source,
+                        target,
+                        source_field: source_item_field.declared_ty,
+                        target_field: target_item_field.declared_ty,
+                    });
+                }
                 return result;
             }
         }
