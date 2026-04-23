@@ -4,17 +4,22 @@ use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
+use ty_python_semantic::types::ide_support::{
+    resolved_call_signature, type_alias_hover, typed_dict_key_hover,
+};
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarKind, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
+
+    // covering_node(root, range);
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -27,6 +32,11 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         | GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
             typed_dict_key_hover(&model, subscript)
         }
+        _ => None,
+    };
+
+    let is_alias_type = match &goto_target {
+        GotoTarget::Expression(ast::ExprRef::Name(name)) => type_alias_hover(&model, name),
         _ => None,
     };
 
@@ -70,23 +80,37 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         if let Some(docstring) = typed_dict_key.docstring {
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
+    } else if let Some(type_alias_resolved) = is_alias_type {
+        let qualifiers = goto_target.type_qualifiers(&model);
+
+        contents.push(HoverContent::Type(
+            type_alias_resolved.resolved_type,
+            None,
+            qualifiers,
+            Some(type_alias_resolved.alias_name),
+        ));
+
+        if let Some(docstring) = type_alias_resolved.docstring {
+            contents.push(HoverContent::Docstring(Docstring::new(docstring)));
+        };
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
         contents.push(match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
                 .bind_pep695(db)
-                .map_or(HoverContent::Type(ty, None, qualifiers), |typevar| {
+                .map_or(HoverContent::Type(ty, None, qualifiers, None), |typevar| {
                     HoverContent::Type(
                         Type::TypeVar(typevar),
                         Some(typevar.variance(db)),
                         qualifiers,
+                        None,
                     )
                 }),
             Type::TypeVar(typevar) => {
-                HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers)
+                HoverContent::Type(ty, Some(typevar.variance(db)), qualifiers, None)
             }
-            _ => HoverContent::Type(ty, None, qualifiers),
+            _ => HoverContent::Type(ty, None, qualifiers, None),
         });
     }
     contents.extend(docs);
@@ -163,7 +187,12 @@ impl fmt::Display for DisplayHover<'_, '_> {
 #[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
     Signature(String),
-    Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
+    Type(
+        Type<'db>,
+        Option<TypeVarVariance>,
+        TypeQualifiers,
+        Option<String>,
+    ),
     TypedDictKey {
         owner: String,
         key: String,
@@ -210,7 +239,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
             }
-            HoverContent::Type(ty, variance, qualifiers) => {
+            HoverContent::Type(ty, variance, qualifiers, alias) => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
                     Some(TypeVarVariance::Contravariant) => " (contravariant)",
@@ -230,9 +259,17 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     format!(" ({})", names.join(", "))
                 };
 
+                let alias_prefix = match alias {
+                    Some(alias_name) => format!("{} = ", alias_name),
+                    _ => String::from(""),
+                };
+
                 let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
-                    .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
+                    .fenced_code_block(
+                        format!("{alias_prefix}{ty_string}{variance}{qualifier_suffix}"),
+                        syntax,
+                    )
                     .fmt(f)
             }
             HoverContent::TypedDictKey { owner, key, ty } => {
@@ -6157,6 +6194,89 @@ except <CURSOR># Trigger completion/hover here
         );
 
         assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_implicit_type_alias() {
+        let test = hover_test(
+            r#"
+
+class MyType:
+    """Awesome docs"""
+
+
+
+U = MyType
+
+class CoolType(str):
+    u: U<CURSOR>
+
+
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        U = MyType
+        ---------------------------------------------
+        Awesome docs
+
+        ---------------------------------------------
+        ```python
+        U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:8
+           |
+        10 | class CoolType(str):
+        11 |     u: U
+           |        ^- Cursor offset
+           |        |
+           |        source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_type_alias_pep_695() {
+        let test = hover_test(
+            r#"
+
+class MyType:
+    """Awesome docs"""
+
+type U = MyType
+
+class CoolType(str):
+    u: U<CURSOR>
+
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        U = MyType
+        ---------------------------------------------
+        Awesome docs
+
+        ---------------------------------------------
+        ```python
+        U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:8
+          |
+        8 | class CoolType(str):
+        9 |     u: U
+          |        ^- Cursor offset
+          |        |
+          |        source
+          |
+        ");
     }
 
     impl CursorTest {

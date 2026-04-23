@@ -468,6 +468,47 @@ pub fn typed_dict_key_hover<'db>(
     })
 }
 
+#[derive(Debug)]
+pub struct TypeAliasHover<'db> {
+    pub alias_name: String,
+    pub resolved_type: Type<'db>,
+    pub docstring: Option<String>,
+}
+
+pub fn type_alias_hover<'db>(
+    model: &SemanticModel<'db>,
+    name: &ast::ExprName,
+) -> Option<TypeAliasHover<'db>> {
+    let db = model.db();
+
+    let inferred_type = name.inferred_type(model);
+
+    let docstring = inferred_type.and_then(|x| x.definition(db)?.definition()?.docstring(db));
+
+    match inferred_type? {
+        Type::NominalInstance(instance) => {
+            // Detects whether the type is a direct type or an implicit type alias
+            if name.id() == instance.class_name(db) {
+                return None;
+            }
+
+            return Some(TypeAliasHover {
+                alias_name: name.id().to_string(),
+                resolved_type: inferred_type?,
+                docstring: docstring,
+            });
+        }
+        Type::TypeAlias(alias) => {
+            return Some(TypeAliasHover {
+                alias_name: alias.definition(db).name(db)?,
+                resolved_type: alias.value_type(db),
+                docstring: docstring,
+            });
+        }
+        _ => return None,
+    }
+}
+
 /// Returns definitions for a keyword argument in a call expression.
 /// This resolves the keyword argument to the corresponding parameter(s) in the callable's signature(s).
 pub fn definitions_for_keyword_argument<'db>(
