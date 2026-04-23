@@ -883,7 +883,14 @@ impl From<&FormatCommandError> for Diagnostic {
     fn from(error: &FormatCommandError) -> Self {
         let annotation = error.path().map(|path| {
             let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
-            let span = Span::from(file);
+            // For parse errors, use the location from ParseError
+            let span = if let FormatCommandError::Parse(parse_error) = error {
+                // ParseError has a `location` field of type TextRange
+                let loc = parse_error.location;
+                Span::new(loc.start(), loc.end())
+            } else {
+                Span::from(file)
+            };
             let mut annotation = Annotation::primary(span);
             annotation.hide_snippet(true);
             annotation
