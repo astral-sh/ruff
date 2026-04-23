@@ -40,6 +40,8 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         _ => None,
     };
 
+    dbg!(&is_alias_type);
+
     let docs = if typed_dict_key.is_some() {
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
@@ -6257,6 +6259,118 @@ class CoolType(str):
 
         assert_snapshot!(test.hover(), @"
         U = MyType
+        ---------------------------------------------
+        Awesome docs
+
+        ---------------------------------------------
+        ```python
+        U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:8
+          |
+        8 | class CoolType(str):
+        9 |     u: U
+          |        ^- Cursor offset
+          |        |
+          |        source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_type_alias_pep_695_field_name() {
+        let test = hover_test(
+            r#"
+
+class MyType:
+    """Awesome docs"""
+
+type U = MyType
+
+class CoolType(str):
+    u<CURSOR>: U
+
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        u = MyType
+        ---------------------------------------------
+        Awesome docs
+
+        ---------------------------------------------
+        ```python
+        U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:8
+          |
+        8 | class CoolType(str):
+        9 |     u: U
+          |        ^- Cursor offset
+          |        |
+          |        source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_type_alias_pep_695_definition() {
+        let test = hover_test(
+            r#"
+
+class MyType:
+    """Awesome docs"""
+
+type U<CURSOR> = MyType
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        u = MyType
+        ---------------------------------------------
+        Awesome docs
+
+        ---------------------------------------------
+        ```python
+        U = MyType
+        ```
+        ---
+        Awesome docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:8
+          |
+        8 | class CoolType(str):
+        9 |     u: U
+          |        ^- Cursor offset
+          |        |
+          |        source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_type_alias_definition() {
+        let test = hover_test(
+            r#"
+
+class MyType:
+    """Awesome docs"""
+
+U<CURSOR> = MyType
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        u = MyType
         ---------------------------------------------
         Awesome docs
 

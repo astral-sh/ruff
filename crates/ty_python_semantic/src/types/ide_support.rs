@@ -485,6 +485,8 @@ pub fn type_alias_hover<'db>(
 
     let docstring = inferred_type.and_then(|x| x.definition(db)?.definition()?.docstring(db));
 
+    dbg!(inferred_type, name);
+
     match inferred_type? {
         Type::NominalInstance(instance) => {
             // Detects whether the type is a direct type or an implicit type alias
