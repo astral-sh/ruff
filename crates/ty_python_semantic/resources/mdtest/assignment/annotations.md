@@ -255,25 +255,40 @@ b: set[int] = {1, 2, "3"}
 
 When an annotated assignment has a value whose inferred type is assignable to the declared type, the
 binding uses the declared type if the declared type is also assignable back to the inferred type.
+This indicates that we are dealing with difference in precision (graduality) rather than a narrowed
+static type; in that case we want to prefer the user's annotation.
+
 The actual inferred type of the right-hand side is still used to validate the assignment.
 
 ```py
 from typing import Any
 
+def returns_list_any() -> list[Any]:
+    return [1]
+
 def returns_list_int() -> list[int]:
     return [1]
 
-reveal_type(returns_list_int())  # revealed: list[int]
+def returns_any() -> Any:
+    return 1
 
-uses_declared_type: list[Any] = returns_list_int()
-reveal_type(uses_declared_type)  # revealed: list[Any]
+v1: Any = 1
+reveal_type(v1)  # revealed: Any
 
-uses_inferred_type: object = returns_list_int()
-reveal_type(uses_inferred_type)  # revealed: list[int]
+v2: int = returns_any()
+reveal_type(v2)  # revealed: int
 
-invalid: list[str] = (  # error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
-    returns_list_int()
-)
+v3: list[Any] = returns_list_int()
+reveal_type(v3)  # revealed: list[Any]
+
+v4: list[int] = returns_list_any()
+reveal_type(v4)  # revealed: list[int]
+
+v4: object = returns_list_int()
+reveal_type(v4)  # revealed: list[int]
+
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+invalid: list[str] = returns_list_int()
 ```
 
 ## Generic constructor annotations are understood
@@ -711,15 +726,25 @@ reveal_type(x2)  # revealed: Covariant[Literal[1]]
 reveal_type(x3)  # revealed: Contravariant[int]
 reveal_type(x4)  # revealed: Invariant[int]
 
-x5: Bivariant[Any] = bivariant(1)
-x6: Covariant[Any] = covariant(1)
-x7: Contravariant[Any] = contravariant(1)
-x8: Invariant[Any] = invariant(1)
+x5: Bivariant[int | None] = bivariant(1)
+x6: Covariant[int | None] = covariant(1)
+x7: Contravariant[int | None] = contravariant(1)
+x8: Invariant[int | None] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[Any]
-reveal_type(x6)  # revealed: Covariant[Any]
-reveal_type(x7)  # revealed: Contravariant[Any]
-reveal_type(x8)  # revealed: Invariant[Any]
+reveal_type(x5)  # revealed: Bivariant[int | None]
+reveal_type(x6)  # revealed: Covariant[Literal[1]]
+reveal_type(x7)  # revealed: Contravariant[int | None]
+reveal_type(x8)  # revealed: Invariant[int | None]
+
+x9: Bivariant[Any] = bivariant(1)
+x10: Covariant[Any] = covariant(1)
+x11: Contravariant[Any] = contravariant(1)
+x12: Invariant[Any] = invariant(1)
+
+reveal_type(x9)  # revealed: Bivariant[Any]
+reveal_type(x10)  # revealed: Covariant[Any]
+reveal_type(x11)  # revealed: Contravariant[Any]
+reveal_type(x12)  # revealed: Invariant[Any]
 ```
 
 ```py
