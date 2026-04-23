@@ -270,7 +270,7 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
-reveal_type(eve1a)  # revealed: Person
+reveal_type(eve1a)  # revealed: dict[str, bytes | None] & Person
 reveal_type(eve1b)  # revealed: Person
 
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
@@ -279,7 +279,7 @@ eve2a: Person = {"age": 22}
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
-reveal_type(eve2a)  # revealed: Person
+reveal_type(eve2a)  # revealed: dict[str, int] & Person
 reveal_type(eve2b)  # revealed: Person
 
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
@@ -288,7 +288,7 @@ eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 # error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
 eve3b = Person(name="Eve", age=25, extra=True)
 
-reveal_type(eve3a)  # revealed: Person
+reveal_type(eve3a)  # revealed: dict[str, str | int] & Person
 reveal_type(eve3b)  # revealed: Person
 ```
 
@@ -758,7 +758,7 @@ reveal_type(x1)  # revealed: Foo
 # error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `Foo` constructor"
 # error: [invalid-key] "Unknown key "bar" for TypedDict `Foo`"
 x1_bad: Foo | None = {"bar": 1}
-reveal_type(x1_bad)  # revealed: Foo | None
+reveal_type(x1_bad)  # revealed: dict[str, int] & Foo
 
 class Bar(TypedDict):
     bar: int
@@ -774,7 +774,7 @@ reveal_type(x4)  # revealed: Bar
 
 # error: [invalid-assignment]
 x5: Foo | Bar = {"baz": 1}
-reveal_type(x5)  # revealed: Foo | Bar
+reveal_type(x5)  # revealed: (dict[str, int] & Foo) | (dict[str, int] & Bar)
 
 class FooBar1(TypedDict):
     foo: int
@@ -1039,7 +1039,7 @@ ok2 = MyTypedDict2({**bad1, "aaa": 1, "ccc": 3})
 
 # error: [invalid-argument-type] "Invalid argument to key "aaa" with declared type `int` on TypedDict `MyTypedDict2`: value of type `str`"
 still_union: Optional[MyTypedDict2] = {**bad1, "ccc": 3}
-reveal_type(still_union)  # revealed: MyTypedDict2 | None
+reveal_type(still_union)  # revealed: dict[str, Unknown | int] & MyTypedDict2
 ```
 
 Unpacking `Never` or a dynamic type (`Any`, `Unknown`) passes unconditionally, since these types can

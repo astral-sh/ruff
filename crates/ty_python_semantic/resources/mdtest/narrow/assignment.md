@@ -336,7 +336,9 @@ def f(c: C, s: str):
     c.x = s  # error: [invalid-assignment]
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
+    reveal_type(s)  # revealed: Never
 
+def g(c: C, s: str):
     # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int

@@ -238,6 +238,6 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
             # show the type `Literal["a"]` instead of `@Todo(…)`. We only
             # assert on the first part of the message because the `@Todo`
             # message is not available in release mode builds.
-            # error: [type-assertion-failure] "Type `@Todo"
+            # error: [type-assertion-failure] "Type `(@Todo"
             assert_never(obj)
 ```

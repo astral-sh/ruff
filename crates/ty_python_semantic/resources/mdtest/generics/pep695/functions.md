@@ -881,8 +881,10 @@ from ty_extensions import Not
 
 def f[T](x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
-    y = x  # error: [invalid-assignment]
     return x
+
+def g[T](x: T, y: Not[T]) -> None:
+    y = x  # error: [invalid-assignment]
 ```
 
 ## `Callable` parameters

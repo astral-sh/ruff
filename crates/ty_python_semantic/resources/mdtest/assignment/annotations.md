@@ -45,6 +45,32 @@ x: int
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
 
+## Assignment bindings intersect declared and inferred types
+
+When a declared name is bound, later uses should see the intersection of the declared type and the
+inferred type of the right-hand side. This is true whether the declaration is part of the assignment
+or appears on a separate line:
+
+```py
+from typing import Any
+
+def make_any() -> Any: ...
+
+combined: int = make_any()
+reveal_type(combined)  # revealed: Any & int
+
+split: int
+split = make_any()
+reveal_type(split)  # revealed: Any & int
+
+invalid_combined: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+reveal_type(invalid_combined)  # revealed: Never
+
+invalid_split: int
+invalid_split = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+reveal_type(invalid_split)  # revealed: Never
+```
+
 ## Tuple annotations are understood
 
 ```toml
@@ -531,28 +557,28 @@ class TD2(TypedDict):
 
 def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
-    reveal_type(x1)  # revealed: Any
+    reveal_type(x1)  # revealed: Any & TD
 
     x2: TD = dt.get(key, {"x": 0})
-    reveal_type(x2)  # revealed: Any
+    reveal_type(x2)  # revealed: Any & TD
 
     x3: TD | None = dt.get(key, {})
-    reveal_type(x3)  # revealed: Any
+    reveal_type(x3)  # revealed: (Any & TD) | (Any & None)
 
     x4: TD | None = dt.get(key, {"x": 0})
-    reveal_type(x4)  # revealed: Any
+    reveal_type(x4)  # revealed: (Any & TD) | (Any & None)
 
     x5: TD2 = dt.get(key, {})
-    reveal_type(x5)  # revealed: Any
+    reveal_type(x5)  # revealed: Any & TD2
 
     x6: TD2 = dt.get(key, {"x": 0})
-    reveal_type(x6)  # revealed: Any
+    reveal_type(x6)  # revealed: Any & TD2
 
     x7: TD2 | None = dt.get(key, {})
-    reveal_type(x7)  # revealed: Any
+    reveal_type(x7)  # revealed: (Any & TD2) | (Any & None)
 
     x8: TD2 | None = dt.get(key, {"x": 0})
-    reveal_type(x8)  # revealed: Any
+    reveal_type(x8)  # revealed: (Any & TD2) | (Any & None)
 ```
 
 Partially specialized type context is not ignored:
@@ -643,7 +669,7 @@ reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[int] | dict[int, int]
+reveal_type(g)  # revealed: (list[int] & list[Any]) | (dict[int, int] & dict[Any, Any])
 ```
 
 We only prefer the declared type if it is in non-covariant position.
@@ -691,7 +717,7 @@ x7: Contravariant[Any] = contravariant(1)
 x8: Invariant[Any] = invariant(1)
 
 reveal_type(x5)  # revealed: Bivariant[Literal[1]]
-reveal_type(x6)  # revealed: Covariant[Literal[1]]
+reveal_type(x6)  # revealed: Covariant[Literal[1]] & Covariant[Any]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
 ```
@@ -753,16 +779,16 @@ from collections import defaultdict
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
-reveal_type(x1)  # revealed: list[int]
+reveal_type(x1)  # revealed: list[int] & Sequence[Any]
 
 x2: MutableSequence[Any] = [1, 2, 3]
 reveal_type(x2)  # revealed: list[Any]
 
 x3: Iterable[Any] = [1, 2, 3]
-reveal_type(x3)  # revealed: list[int]
+reveal_type(x3)  # revealed: list[int] & Iterable[Any]
 
 x4: Iterable[Iterable[Any]] = [[1, 2, 3]]
-reveal_type(x4)  # revealed: list[list[int]]
+reveal_type(x4)  # revealed: list[list[int]] & Iterable[Iterable[Any]]
 
 x5: list[Iterable[Any]] = [[1, 2, 3]]
 reveal_type(x5)  # revealed: list[Iterable[Any]]
@@ -771,16 +797,16 @@ x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
 x7: Sequence[Any] = [i for i in [1, 2, 3]]
-reveal_type(x7)  # revealed: list[int]
+reveal_type(x7)  # revealed: list[int] & Sequence[Any]
 
 x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
 reveal_type(x8)  # revealed: list[Any]
 
 x9: Iterable[Any] = [i for i in [1, 2, 3]]
-reveal_type(x9)  # revealed: list[int]
+reveal_type(x9)  # revealed: list[int] & Iterable[Any]
 
 x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
-reveal_type(x10)  # revealed: list[list[int]]
+reveal_type(x10)  # revealed: list[list[int]] & Iterable[Iterable[Any]]
 
 x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x11)  # revealed: list[Iterable[Any]]
@@ -814,7 +840,7 @@ def f[T](x: T) -> list[list[T]]:
     return [[x]]
 
 x17: Sequence[Sequence[Any]] = f(1)
-reveal_type(x17)  # revealed: list[list[int]]
+reveal_type(x17)  # revealed: list[list[int]] & Sequence[Sequence[Any]]
 
 x18: Sequence[list[Any]] = f(1)
 reveal_type(x18)  # revealed: list[list[Any]]

@@ -135,10 +135,11 @@ Public.a = None
 
 ### Possibly undeclared and possibly unbound
 
-If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
+If a symbol is possibly undeclared and possibly unbound, the public type reflects the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
 same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
-error for both `a` and `b`:
+error for both `a` and `b`. The explicit `Any` annotation for `a` absorbs the literal type of its
+binding:
 
 ```py
 from typing import Any
@@ -154,7 +155,7 @@ class Public:
         b: str
 
 # error: [possibly-missing-attribute]
-reveal_type(Public.a)  # revealed: Literal[1] | Any
+reveal_type(Public.a)  # revealed: Any
 # error: [possibly-missing-attribute]
 reveal_type(Public.b)  # revealed: Literal[2] | str
 

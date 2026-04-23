@@ -294,10 +294,10 @@ d = Foo()
 
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[1]
-reveal_type(c)  # revealed: Literal[1]
+reveal_type(c)  # revealed: Literal[1] & Unknown
 reveal_type(d)  # revealed: Foo
-reveal_type(e)  # revealed: Foo
-reveal_type(f)  # revealed: Literal[1]
+reveal_type(e)  # revealed: Never
+reveal_type(f)  # revealed: Never
 ```
 
 ## Parameter

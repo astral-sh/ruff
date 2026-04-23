@@ -143,7 +143,8 @@ struct TypeAndRange<'db> {
 enum DeclaredAndInferredType<'db> {
     /// We know that both the declared and inferred types are the same.
     AreTheSame(TypeAndQualifiers<'db>),
-    /// Declared and inferred types might be different, we need to check assignability.
+    /// Declared and inferred types might be different, we need to check assignability and record
+    /// their intersection as the binding type.
     MightBeDifferent {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
@@ -1180,7 +1181,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
 
-        let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
+        let (declared_ty, binding_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
                 (type_and_qualifiers, type_and_qualifiers.inner_type())
             }
@@ -1216,9 +1217,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
-                    (declared_ty, inferred_ty)
-                } else {
+                if !inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
                     report_invalid_assignment(
                         &self.context,
                         node,
@@ -1226,15 +1225,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         declared_ty.inner_type(),
                         inferred_ty,
                     );
+                }
 
-                    // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_ty.inner_type())
+                if should_skip_declared_intersection(
+                    declared_ty.qualifiers,
+                    declared_ty.inner_type(),
+                    inferred_ty,
+                ) {
+                    (declared_ty, inferred_ty)
+                } else {
+                    (
+                        declared_ty,
+                        IntersectionType::from_two_elements(
+                            self.db(),
+                            inferred_ty,
+                            declared_ty.inner_type(),
+                        ),
+                    )
                 }
             }
         };
 
         self.declarations.insert(definition, declared_ty);
-        self.bindings.insert(definition, inferred_ty);
+        self.bindings.insert(definition, binding_ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -9541,6 +9554,23 @@ impl<V> IntoIterator for VecSet<V> {
     }
 }
 
+fn should_skip_declared_intersection<'db>(
+    qualifiers: TypeQualifiers,
+    declared_ty: Type<'db>,
+    inferred_ty: Type<'db>,
+) -> bool {
+    // Bare `Final` has no inner declared type, but the binding should keep the inferred value.
+    let is_bare_final = qualifiers.contains(TypeQualifiers::FINAL)
+        && matches!(declared_ty, Type::Dynamic(DynamicType::Unknown));
+    // Dataclass field specifiers are field-definition markers, not the assigned field value.
+    let is_dataclass_field_specifier = matches!(
+        inferred_ty,
+        Type::KnownInstance(KnownInstanceType::Field(_))
+    );
+
+    is_bare_final || is_dataclass_field_specifier
+}
+
 #[must_use]
 struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
@@ -9560,12 +9590,11 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder: &mut TypeInferenceBuilder<'db, 'ast>,
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
-        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
-
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);
         let use_def = builder.index.use_def_map(file_scope_id);
         let place_table = builder.index.place_table(file_scope_id);
+        let is_symbol_binding = place_table.place(self.binding.place(db)).is_symbol();
 
         let mut bound_ty = inferred_ty;
 
@@ -9620,19 +9649,30 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, declared_ty) {
-            report_invalid_assignment(
-                &builder.context,
-                self.node,
-                self.binding,
-                declared_ty,
-                bound_ty,
-            );
+        if let Some(declared_ty) = self.declared_ty {
+            let is_assignable = bound_ty.is_assignable_to(db, declared_ty);
+            if !is_assignable {
+                report_invalid_assignment(
+                    &builder.context,
+                    self.node,
+                    self.binding,
+                    declared_ty,
+                    bound_ty,
+                );
+            }
 
-            // Allow declarations to override inference in case of invalid assignment.
-            bound_ty = declared_ty;
+            if is_symbol_binding
+                && !should_skip_declared_intersection(self.qualifiers, declared_ty, bound_ty)
+            {
+                bound_ty = IntersectionType::from_two_elements(db, bound_ty, declared_ty);
+            } else if !is_symbol_binding && !is_assignable {
+                // Non-symbol assignment targets may not actually store the assigned RHS value.
+                bound_ty = declared_ty;
+            }
         }
+
         // In the following cases, the bound type may not be the same as the RHS value type.
+        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())

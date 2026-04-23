@@ -36,7 +36,7 @@ def _(l: list[int] | None = None):
 
     l2: list[int] = l or list()
     # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
-    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | (list[Unknown] & list[int])
 
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -124,7 +124,7 @@ reveal_type(d3_dict)  # revealed: dict[str, int]
 d4_invalid_literal: TD = {"x": "1"}  # error: [invalid-argument-type]
 d4_invalid_dict: TD = dict(x="1")  # error: [invalid-argument-type]
 
-reveal_type(d4_invalid_literal)  # revealed: TD
+reveal_type(d4_invalid_literal)  # revealed: dict[str, str] & TD
 reveal_type(d4_invalid_dict)  # revealed: TD
 
 # Note: the second variant (`d5_dict`) is not technically allowed by the `dict.__init__` overloads
@@ -483,28 +483,28 @@ reveal_type(f2)  # revealed: (x: int) -> Bar
 # error: [missing-typed-dict-key] "Missing required key 'bar' in TypedDict `Bar` constructor"
 # error: [invalid-assignment] "Object of type `(x: int) -> dict[Unknown, Unknown]` is not assignable to `(int, /) -> Bar`"
 f3: Callable[[int], Bar] = lambda x: {}
-reveal_type(f3)  # revealed: (int, /) -> Bar
+reveal_type(f3)  # revealed: ((x: int) -> dict[Unknown, Unknown]) & ((int, /) -> Bar)
 
 # TODO: This should reveal `str`.
 f4: Callable[[str], str] = lambda x: reveal_type(x)  # revealed: Unknown
-reveal_type(f4)  # revealed: (x: str) -> Unknown
+reveal_type(f4)  # revealed: ((x: str) -> Unknown) & ((str, /) -> str)
 
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
 f5: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
-reveal_type(f5)  # revealed: (tuple[int, ...], /) -> None
+reveal_type(f5)  # revealed: ((x: tuple[int, ...], y, z) -> None) & ((tuple[int, ...], /) -> None)
 
 f6: Callable[[int, str], None] = lambda *args: None
-reveal_type(f6)  # revealed: (*args) -> None
+reveal_type(f6)  # revealed: ((*args) -> None) & ((int, str, /) -> None)
 
 # N.B. `Callable` annotations only support positional parameters.
 # error: [invalid-assignment]
 f7: Callable[[int], None] = lambda *, x=1: None
-reveal_type(f7)  # revealed: (int, /) -> None
+reveal_type(f7)  # revealed: ((*, x=1) -> None) & ((int, /) -> None)
 
 # TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
 f8: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f8)  # revealed: (*args, *, x=1) -> None
+reveal_type(f8)  # revealed: ((*args, *, x=1) -> None) & ((tuple[int, ...], int, /) -> None)
 
 def _(x: bool):
     signatures = {

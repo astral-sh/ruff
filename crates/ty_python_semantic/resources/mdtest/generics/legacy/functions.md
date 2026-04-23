@@ -793,8 +793,10 @@ T = TypeVar("T")
 
 def f(x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
-    y = x  # error: [invalid-assignment]
     return x
+
+def g(x: T, y: Not[T]) -> None:
+    y = x  # error: [invalid-assignment]
 ```
 
 ## Prefer exact matches for constrained typevars

@@ -294,8 +294,8 @@ def _():
 ```
 
 This pattern appears frequently with conditional imports. The `import` statement is both a
-declaration and a binding, but we still add `None` to the public type union in a situation like
-this:
+declaration and a binding. When the import's type is unknown, it absorbs the fallback `None`
+binding:
 
 ```py
 try:
@@ -303,10 +303,10 @@ try:
 except ImportError:
     optional_dependency = None
 
-reveal_type(optional_dependency)  # revealed: Unknown | None
+reveal_type(optional_dependency)  # revealed: Unknown
 
 def _():
-    reveal_type(optional_dependency)  # revealed: Unknown | None
+    reveal_type(optional_dependency)  # revealed: Unknown
 ```
 
 ## Limitations

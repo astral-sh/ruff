@@ -353,10 +353,10 @@ x10 = sub2(1, 2)
 reveal_type(x10)  # revealed: Sub2[int, int]
 
 x11: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x11)  # revealed: Sub2[Literal[1], int]
+reveal_type(x11)  # revealed: Sub2[Literal[1], int] & Sup2A[Literal[1], Literal[2]]
 
 x12: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x12)  # revealed: Sub2[int, Literal[2]]
+reveal_type(x12)  # revealed: Sub2[int, Literal[2]] & Sup2B[Literal[1], Literal[2]]
 ```
 
 ## Constrained TypeVars with Literal constraints
