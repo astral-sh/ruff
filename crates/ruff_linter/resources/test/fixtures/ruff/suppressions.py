@@ -163,11 +163,11 @@ def f(
 
 
 class Foo:
-    # ruff: ignore[ARG002]  should be unused due to ignore-all below
+    # ruff: ignore[ARG002]  should be unused due to file-ignore below
     def bar(self, arg1, arg2):
         print("hello")
 
-# ruff: ignore-all[ARG002]  should cover the class method above!
+# ruff: file-ignore[ARG002]  should cover the class method above!
 
 
 # Ensure LAST suppression in file is reported.

@@ -29,8 +29,8 @@ use crate::{Locator, Violation, warn_user_once};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 enum SuppressionAction {
-    /// # ruff:ignore-all[...] file level suppression
-    IgnoreAll,
+    /// # ruff:file-ignore[...] file level suppression
+    FileIgnore,
     /// # ruff:disable[...] start of a block suppression
     Disable,
     /// # ruff:enable[...] end of a block suppression
@@ -560,7 +560,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 }
                 suppressions.next();
                 continue;
-            } else if suppression.action == SuppressionAction::IgnoreAll {
+            } else if suppression.action == SuppressionAction::FileIgnore {
                 if is_ruff_ignore_enabled(self.settings) {
                     match indentation_at_offset(suppression.range.start(), self.source) {
                         // Module scope
@@ -592,7 +592,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     }
                 } else {
                     warn_user_once!(
-                        "#ruff:ignore-all comment found but not active, enable preview mode"
+                        "#ruff:file-ignore comment found but not active, enable preview mode"
                     );
                 }
                 suppressions.next();
@@ -1009,9 +1009,9 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
-        } else if self.cursor.as_str().starts_with("ignore-all") {
-            self.cursor.skip_bytes("ignore-all".len());
-            Ok(SuppressionAction::IgnoreAll)
+        } else if self.cursor.as_str().starts_with("file-ignore") {
+            self.cursor.skip_bytes("file-ignore".len());
+            Ok(SuppressionAction::FileIgnore)
         } else if self.cursor.as_str().starts_with("ignore") {
             self.cursor.skip_bytes("ignore".len());
             Ok(SuppressionAction::Ignore)
@@ -2196,10 +2196,10 @@ bar = [
     }
 
     #[test]
-    fn ignore_all_suppression_single() {
+    fn file_disable_suppression_single() {
         let source = r#"
 print("start")
-# ruff:ignore-all[code]
+# ruff:file-ignore[code]
 print("end")
         "#;
         assert_debug_snapshot!(
@@ -2208,11 +2208,11 @@ print("end")
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[code]\nprint(\"end\")\n        ",
+                    covered_source: "\nprint(\"start\")\n# ruff:file-ignore[code]\nprint(\"end\")\n        ",
                     code: "code",
                     disable_comment: SuppressionComment {
-                        text: "# ruff:ignore-all[code]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[code]",
+                        action: FileIgnore,
                         codes: [
                             "code",
                         ],
@@ -2229,11 +2229,11 @@ print("end")
     }
 
     #[test]
-    fn ignore_all_suppression_multiple() {
+    fn file_disable_suppression_multiple() {
         let source = r#"
 print("start")
-# ruff:ignore-all[alpha, beta]
-# ruff:ignore-all[gamma]
+# ruff:file-ignore[alpha, beta]
+# ruff:file-ignore[gamma]
 print("end")
         "#;
         assert_debug_snapshot!(
@@ -2242,11 +2242,11 @@ print("end")
         Suppressions {
             valid: [
                 Suppression {
-                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    covered_source: "\nprint(\"start\")\n# ruff:file-ignore[alpha, beta]\n# ruff:file-ignore[gamma]\nprint(\"end\")\n        ",
                     code: "alpha",
                     disable_comment: SuppressionComment {
-                        text: "# ruff:ignore-all[alpha, beta]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[alpha, beta]",
+                        action: FileIgnore,
                         codes: [
                             "alpha",
                             "beta",
@@ -2256,11 +2256,11 @@ print("end")
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    covered_source: "\nprint(\"start\")\n# ruff:file-ignore[alpha, beta]\n# ruff:file-ignore[gamma]\nprint(\"end\")\n        ",
                     code: "beta",
                     disable_comment: SuppressionComment {
-                        text: "# ruff:ignore-all[alpha, beta]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[alpha, beta]",
+                        action: FileIgnore,
                         codes: [
                             "alpha",
                             "beta",
@@ -2270,11 +2270,11 @@ print("end")
                     enable_comment: None,
                 },
                 Suppression {
-                    covered_source: "\nprint(\"start\")\n# ruff:ignore-all[alpha, beta]\n# ruff:ignore-all[gamma]\nprint(\"end\")\n        ",
+                    covered_source: "\nprint(\"start\")\n# ruff:file-ignore[alpha, beta]\n# ruff:file-ignore[gamma]\nprint(\"end\")\n        ",
                     code: "gamma",
                     disable_comment: SuppressionComment {
-                        text: "# ruff:ignore-all[gamma]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[gamma]",
+                        action: FileIgnore,
                         codes: [
                             "gamma",
                         ],
@@ -2291,9 +2291,9 @@ print("end")
     }
 
     #[test]
-    fn ignore_all_suppression_trailing() {
+    fn file_disable_suppression_trailing() {
         let source = r#"
-print("hello")  # ruff:ignore-all[code]
+print("hello")  # ruff:file-ignore[code]
         "#;
         assert_debug_snapshot!(
             Suppressions::debug(source),
@@ -2304,8 +2304,8 @@ print("hello")  # ruff:ignore-all[code]
                 InvalidSuppression {
                     kind: Trailing,
                     comment: SuppressionComment {
-                        text: "# ruff:ignore-all[code]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[code]",
+                        action: FileIgnore,
                         codes: [
                             "code",
                         ],
@@ -2320,10 +2320,10 @@ print("hello")  # ruff:ignore-all[code]
     }
 
     #[test]
-    fn ignore_all_suppression_indented() {
+    fn file_disable_suppression_indented() {
         let source = r#"
 def foo():
-    # ruff:ignore-all[code]
+    # ruff:file-ignore[code]
     pass
         "#;
         assert_debug_snapshot!(
@@ -2335,8 +2335,8 @@ def foo():
                 InvalidSuppression {
                     kind: NotModuleScope,
                     comment: SuppressionComment {
-                        text: "# ruff:ignore-all[code]",
-                        action: IgnoreAll,
+                        text: "# ruff:file-ignore[code]",
+                        action: FileIgnore,
                         codes: [
                             "code",
                         ],
@@ -2537,14 +2537,14 @@ def foo():
     }
 
     #[test]
-    fn ignore_all_single_code() {
+    fn file_disable_single_code() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore-all[code]"),
+            parse_suppression_comment("# ruff: file-ignore[code]"),
             @r##"
         Ok(
             SuppressionComment {
-                text: "# ruff: ignore-all[code]",
-                action: IgnoreAll,
+                text: "# ruff: file-ignore[code]",
+                action: FileIgnore,
                 codes: [
                     "code",
                 ],
