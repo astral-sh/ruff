@@ -188,9 +188,9 @@ def get_object() -> object:
 match get_object():
     case {"something": M}:
         pass
-    case [*N]:
-        pass
     case [O]:
+        pass
+    case [*N]:
         pass
     case I(foo=R):
         pass
@@ -243,7 +243,7 @@ print((
     L,
     M,  # error: [possibly-unresolved-reference]
     N,  # error: [possibly-unresolved-reference]
-    O,  # error: [unresolved-reference]
+    O,  # error: [possibly-unresolved-reference]
     P,  # error: [possibly-unresolved-reference]
     Q,  # error: [possibly-unresolved-reference]
     R,  # error: [possibly-unresolved-reference]
