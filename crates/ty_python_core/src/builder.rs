@@ -3334,9 +3334,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Lambda(lambda) => {
-                if let Some(current_statement) = self.current_statement_mut() {
-                    current_statement.lambda_exprs.push(lambda);
-                }
+                self.current_statement_mut()
+                    .expect("every lambda expression is part of a statement")
+                    .lambda_exprs
+                    .push(lambda);
 
                 if let Some(parameters) = &lambda.parameters {
                     // The default value of the parameters needs to be evaluated in the

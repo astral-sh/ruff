@@ -48,7 +48,6 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
-use ty_python_core::statement::StatementInner;
 
 use crate::Db;
 use crate::types::diagnostic::TypeCheckDiagnostics;
@@ -64,6 +63,7 @@ pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::Definition;
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
 
